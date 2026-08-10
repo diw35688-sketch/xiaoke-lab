@@ -21,12 +21,31 @@ def run_daily_experiment_check():
         connection.execute("INSERT OR REPLACE INTO app_settings (key,value) VALUES ('last_daily_experiment_check', ?)", (datetime.now().isoformat(timespec='seconds'),))
 
 
-def create_experiment(name, goal="", start_at=None, end_at=None, equipment="", notes=""):
+def create_experiment(name, goal="", start_at=None, end_at=None, equipment="", notes="", plan_id=None, step_order=None, depends_on=""):
     initialize_database()
     with get_connection() as connection:
-        cursor = connection.execute("INSERT INTO experiments (name,goal,status,start_at,end_at,equipment,notes) VALUES (?,?,'pending',?,?,?,?)", (name, goal, start_at, end_at, equipment, notes))
+        cursor = connection.execute("""INSERT INTO experiments
+            (name,goal,status,start_at,end_at,equipment,notes,plan_id,step_order,depends_on)
+            VALUES (?,?,'pending',?,?,?,?,?,?,?)""", (name, goal, start_at, end_at, equipment, notes, plan_id, step_order, depends_on))
         row = connection.execute("SELECT * FROM experiments WHERE id=?", (cursor.lastrowid,)).fetchone()
     return dict(row)
+
+
+def create_experiment_plan(template_id, name, start_at, steps):
+    initialize_database()
+    with get_connection() as connection:
+        cursor = connection.execute("INSERT INTO experiment_plans (template_id,name,start_at) VALUES (?,?,?)", (template_id, name, start_at))
+        plan_id = cursor.lastrowid
+        created = []
+        for step in steps:
+            step_cursor = connection.execute("""INSERT INTO experiments
+                (name,goal,status,start_at,end_at,equipment,notes,plan_id,step_order,depends_on)
+                VALUES (?,?,'pending',?,?,?,?,?,?,?)""", (
+                step["name"], step["goal"], step["start_at"], step["end_at"], step["equipment"], step["notes"],
+                plan_id, step["order"], ",".join(str(item) for item in step["depends_on"]),
+            ))
+            created.append(dict(connection.execute("SELECT * FROM experiments WHERE id=?", (step_cursor.lastrowid,)).fetchone()))
+    return {"id": plan_id, "name": name, "template_id": template_id, "start_at": start_at, "steps": created}
 
 
 def list_experiments(include_completed=False):
@@ -47,7 +66,7 @@ def list_history():
 
 def set_experiment_status(experiment_id, status):
     if status not in {"pending", "completed"}:
-        raise ValueError("状态只允许为 pending 或 completed。")
+        raise ValueError("状态只允许 pending 或 completed。")
     initialize_database()
     with get_connection() as connection:
         cursor = connection.execute("UPDATE experiments SET status=? WHERE id=?", (status, experiment_id))
@@ -67,8 +86,7 @@ def delete_history_item(experiment_id):
 def clear_history():
     initialize_database()
     with get_connection() as connection:
-        cursor = connection.execute("DELETE FROM experiments WHERE status='completed'")
-    return cursor.rowcount
+        return connection.execute("DELETE FROM experiments WHERE status='completed'").rowcount
 
 
 def list_memories(limit=50):
@@ -79,8 +97,7 @@ def list_memories(limit=50):
 
 
 def save_memory(content, category="general"):
-    initialize_database()
-    content = content.strip()
+    initialize_database(); content = content.strip()
     if not content:
         raise ValueError("记忆内容不能为空。")
     with get_connection() as connection:
@@ -90,8 +107,7 @@ def save_memory(content, category="general"):
 
 
 def ensure_conversation(conversation_id=None):
-    initialize_database()
-    conversation_id = conversation_id or str(uuid.uuid4())
+    initialize_database(); conversation_id = conversation_id or str(uuid.uuid4())
     with get_connection() as connection:
         connection.execute("INSERT OR IGNORE INTO conversations (id) VALUES (?)", (conversation_id,))
     return conversation_id

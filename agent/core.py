@@ -54,11 +54,19 @@ def _memory_context():
     return "已确认的长期记忆：\n" + "\n".join(f"- [{item['category']}] {item['content']}" for item in memories)
 
 
-def run_agent(history, conversation_id):
+def _client():
     if not OPENAI_API_KEY:
         raise ValueError("尚未配置 OPENAI_API_KEY。请检查 .env 文件。")
-    client = OpenAI(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL, timeout=httpx.Timeout(30, connect=10), max_retries=1)
-    messages = [{"role":"system","content":INSTRUCTIONS + "\n\n" + _memory_context()}, *history]
+    return OpenAI(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL, timeout=httpx.Timeout(60, connect=10), max_retries=1)
+
+
+def _messages(history):
+    return [{"role":"system","content":INSTRUCTIONS + "\n\n" + _memory_context()}, *history]
+
+
+def run_agent(history, conversation_id):
+    client = _client()
+    messages = _messages(history)
     try:
         for _ in range(6):
             response = client.chat.completions.create(model=MODEL_NAME, messages=messages, tools=TOOLS)
@@ -80,3 +88,48 @@ def run_agent(history, conversation_id):
     except APIStatusError as error:
         raise ModelServiceError(f"学校大模型服务返回异常（状态码 {error.status_code}）。", 502) from error
     return "工具调用次数过多，已停止本次请求。"
+
+
+def stream_agent(history, conversation_id):
+    """逐段产出模型文字；遇到工具调用时先执行工具，再继续流式回答。"""
+    client = _client()
+    messages = _messages(history)
+    try:
+        for _ in range(6):
+            text_parts = []
+            calls_by_index = {}
+            stream = client.chat.completions.create(model=MODEL_NAME, messages=messages, tools=TOOLS, stream=True)
+            for chunk in stream:
+                if not chunk.choices:
+                    continue
+                delta = chunk.choices[0].delta
+                if delta.content:
+                    text_parts.append(delta.content)
+                    yield delta.content
+                for partial in delta.tool_calls or []:
+                    call = calls_by_index.setdefault(partial.index, {"id":"", "type":"function", "function":{"name":"", "arguments":""}})
+                    if partial.id:
+                        call["id"] = partial.id
+                    if partial.function:
+                        if partial.function.name:
+                            call["function"]["name"] = partial.function.name
+                        if partial.function.arguments:
+                            call["function"]["arguments"] += partial.function.arguments
+
+            calls = [calls_by_index[index] for index in sorted(calls_by_index)]
+            if not calls:
+                return
+            messages.append({"role":"assistant", "content":"".join(text_parts) or None, "tool_calls":calls})
+            for call in calls:
+                try:
+                    result = run_tool(call["function"]["name"], json.loads(call["function"]["arguments"]), conversation_id)
+                except Exception as error:
+                    result = {"error":str(error)}
+                messages.append({"role":"tool", "tool_call_id":call["id"], "content":json.dumps(result, ensure_ascii=False)})
+    except APITimeoutError as error:
+        raise ModelServiceError("学校大模型连接超时。请检查校园网或 VPN 后重试。", 504) from error
+    except APIConnectionError as error:
+        raise ModelServiceError("无法连接学校大模型服务。请检查网络后重试。", 502) from error
+    except APIStatusError as error:
+        raise ModelServiceError(f"学校大模型服务返回异常（状态码 {error.status_code}）。", 502) from error
+    raise ModelServiceError("工具调用次数过多，已停止本次请求。", 500)
