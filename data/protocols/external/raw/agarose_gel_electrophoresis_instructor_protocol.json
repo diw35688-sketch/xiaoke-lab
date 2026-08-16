@@ -1,0 +1,99 @@
+{
+  "source": "protocols.io",
+  "source_url": "https://www.protocols.io/view/agarose-gel-electrophoresis-instructor-protocol-ce6nthde.pdf",
+  "fetched_at": "2026-08-12T12:46:32+08:00",
+  "license": {
+    "name": "Creative Commons Attribution License (CC BY; version not stated in PDF export)",
+    "url": "https://creativecommons.org/licenses/by/4.0/"
+  },
+  "authors": [
+    "Brian Teague"
+  ],
+  "title": "Agarose Gel Electrophoresis (Instructor Protocol)",
+  "version": "未获取到",
+  "doi": "未获取到",
+  "steps_raw": [
+    {
+      "number": 1,
+      "text": "Aug 12, 2022\nAgarose Gel Electrophoresis (Instructor Protocol)\nThis  protocol  is a draft, published without a DOI.\nBrian Teague\nUniversity of Wisconsin - Stout\nYeast ORFans CURE\nBrian Teague\nTrinity University\nCreate & collaborate more with a free account\nEdit and publish protocols, collaborate in communities, share insights through comments, and\ntrack progress with run records.\nCreate free account\n1\n1\nProtocol Citation: Brian Teague 2022. Agarose Gel Electrophoresis (Instructor Protocol). protocols.io https://dx.doi.org/\nLicense: This is an open access  protocol  distributed under the terms of the  Creative Commons Attribution License,  which\npermits unrestricted use, distribution, and reproduction in any medium, provided the original author and source are credited\nProtocol status: Working\nWe use this protocol and it's working\nCreated: August 12, 2022\n1/4"
+    },
+    {
+      "number": 2,
+      "text": "Last Modified: August 12, 2022\nProtocol  Integer ID: 68526\nKeywords: agarose gel electrophoresi, instructor protocol, gel, protocol, instructor, included several common student error,\nseveral common student error, student\nAbstract\nThis is the instructor protocol for\nThe protocol is pretty straightforward, but I have included several common student errors to watch out for!\nNAME\nAgarose gel electrophoresis\nCREATED BY\nBrian Teague\nPreview\nProtocol\nImage Attribution\nDr d12, CC BY-SA 3.0 , via Wikimedia Commons\nMaterials\nLAB buffer (recipe linked in the steps)\nSafety warnings\nLithium acetate: May cause eye and skin irritation. May cause respiratory and digestive tract irritation.\nThe toxicological properties of this material have not been fully investigated.\nBoric acid: May damage fertility. May damage the unborn child.\nWear appropriate personal protective equipment (PPE), including a lab coat, nitrile gloves and safety\nglasses.\n2/4"
+    },
+    {
+      "number": 3,
+      "text": "Make the LAB buffer\n1\nMake LAB buffer following this recipe:\nFor a class of 24, I usually prepare 6x \n1 L  bottles of 1X LAB. We go through a lot --\nthere are three gels that get run over the course of the semester, plus repeats.\nNAME\nLAB Agarose Gel Electrophoresis Buffer Recipe\nCREATED BY\nBrian Teague\nPreview\nProtocol\nInstructor Tips & Common Student Errors\n2\nInstructor Tips\nThe benefit of using LAB is the ability to run gels at higher voltage -- our \"mini\" gel\ntanks go at 120 V for 20 minutes and get pretty decent gels. It is totally possible to\ncast, load and run an LAB gel in 2 hours.\nI usually demonstrate the proper assembly of the gel tank\nGels with Sybr Safe are fine in the refrigerator for 48 hours, but much longer than that\nand the stain degrades too much. That is -- a gel cast on Tuesday will be fine for a lab\non Thursday, but not the other way around. To store a gel, put it in a zipper sandwich\nbaggie and add a splash (not more) of LAB buffer. Label and store at \n4 °C in the\nrefrigerator.\nA common student error is to forget the DNA stain. But all is not lost -- you can post-\nstain these gels. Put the gel in a small container (a tip box lid is often fine), cover with\nLAB, add \n5 µL  of Sybr Safe, and put on a slow rocker or orbital shaker.\n3\nCommon Student Errors\nForgot to add the DNA stain\nDidn't 100% dissolve the agarose (it should be CLEAR AS WATER, no flecks floating\naround in it)\nRan the gel backward (remember, \"run to red\")\nOnly ran \n1 µL  of the restriction digest (instead of the whole digest)\n3/4"
+    },
+    {
+      "number": 4,
+      "text": "Alternately, ran the entire PCR (instead of just \n1 µL ) -- leaving not enough to\npurify.\n4/4"
+    }
+  ],
+  "materials_raw": [
+    "LAB buffer (recipe linked in the steps)"
+  ],
+  "notes": "原始内容由 protocols.io 公开 PDF 导出；未翻译、未改写。PDF 明确写明 Creative Commons Attribution License，但未在导出页注明具体 CC 版本，因此许可证名称保留该原文表述，链接指向 CC BY 4.0 说明页。steps_raw 按 PDF 文本层中可识别的编号步骤分段；若原 PDF 无可识别编号，则将全文放入第 1 步。 steps_raw 以 PDF 每页原文块保存，保留页内换行；未翻译未改写。",
+  "translation_zh": {
+    "title": "琼脂糖凝胶电泳（教师用方案）",
+    "abstract_zh": "这是配套的教师用方案。操作本身相当直接，但我列出了几个需要留意的学生常见错误。",
+    "steps": [
+      {
+        "number": 1,
+        "title_zh": "配制 LAB 缓冲液",
+        "text_zh": "按配方配制 LAB 缓冲液（配方见原方案中链接的独立协议 “LAB Agarose Gel Electrophoresis Buffer Recipe”）。\n\n对于 24 人的班级，我通常配制 6 瓶 1 L 的 1X LAB 缓冲液。用量很大——整个学期要跑三次胶，还不算重做的。",
+        "source_text": "Make LAB buffer following this recipe: For a class of 24, I usually prepare 6x 1 L bottles of 1X LAB. We go through a lot -- there are three gels that get run over the course of the semester, plus repeats."
+      },
+      {
+        "number": 2,
+        "title_zh": "教师提示",
+        "text_zh": "使用 LAB 缓冲液的好处是可以在更高电压下跑胶——我们的“mini”电泳槽在 120 V 下跑 20 minutes 就能得到相当不错的胶。在 2 hours 内完成灌胶、上样和电泳是完全可行的。\n\n我通常会示范电泳槽的正确组装方法。\n\n加了 Sybr Safe 的胶在冰箱里放 48 hours 没问题，但再久染料就降解得太厉害了。也就是说：周二灌的胶周四上课能用，反过来不行。保存时把胶装进自封袋，加一点点（不要多）LAB 缓冲液，贴好标签后于 4 °C 冰箱保存。\n\n一个常见的学生错误是忘记加 DNA 染料。但还有救——这些胶可以后染。把胶放进小容器（枪头盒盖通常就行），用 LAB 缓冲液没过，加入 5 µL Sybr Safe，然后放在慢速摇床或轨道摇床上。",
+        "source_text": "Instructor Tips: The benefit of using LAB is the ability to run gels at higher voltage -- our \"mini\" gel tanks go at 120 V for 20 minutes and get pretty decent gels. It is totally possible to cast, load and run an LAB gel in 2 hours. I usually demonstrate the proper assembly of the gel tank. Gels with Sybr Safe are fine in the refrigerator for 48 hours, but much longer than that and the stain degrades too much... To store a gel, put it in a zipper sandwich baggie and add a splash (not more) of LAB buffer. Label and store at 4 °C in the refrigerator. A common student error is to forget the DNA stain. But all is not lost -- you can post-stain these gels. Put the gel in a small container (a tip box lid is often fine), cover with LAB, add 5 µL of Sybr Safe, and put on a slow rocker or orbital shaker."
+      },
+      {
+        "number": 3,
+        "title_zh": "学生常见错误",
+        "text_zh": "· 忘记加 DNA 染料\n· 琼脂糖没有 100% 溶解（应该像水一样清澈，不能有悬浮的絮状物）\n· 电泳方向接反了（记住口诀 “run to red”，即 DNA 向红色正极迁移）\n· 只上样了 1 µL 酶切产物（而不是整个酶切体系）\n· 反过来，把整个 PCR 产物全部上样（而不是只取 1 µL），导致剩余量不够做纯化",
+        "source_text": "Common Student Errors: Forgot to add the DNA stain; Didn't 100% dissolve the agarose (it should be CLEAR AS WATER, no flecks floating around in it); Ran the gel backward (remember, \"run to red\"); Only ran 1 µL of the restriction digest (instead of the whole digest); Alternately, ran the entire PCR (instead of just 1 µL) -- leaving not enough to purify."
+      }
+    ],
+    "materials": [
+      {
+        "zh": "LAB 缓冲液（配方见方案中链接）",
+        "source": "LAB buffer (recipe linked in the steps)"
+      }
+    ],
+    "safety_warnings_zh": [
+      "乙酸锂（Lithium acetate）：可能引起眼睛和皮肤刺激。可能引起呼吸道和消化道刺激。该物质的毒理学性质尚未得到充分研究。",
+      "硼酸（Boric acid）：可能损害生育力。可能对胎儿造成伤害。",
+      "请佩戴适当的个人防护装备（PPE），包括实验服、丁腈手套和护目镜。"
+    ],
+    "translator": "claude (人工校对流程未完成)",
+    "translated_at": "2026-08-12T13:56:46.571785+08:00",
+    "reviewed_by": null,
+    "review_status": "UNREVIEWED",
+    "uncertain_terms": [
+      "LAB buffer —— 推测为 Lithium Acetate Borate（乙酸锂-硼酸）缓冲液，但原文未展开缩写，保留英文 [待确认]",
+      "Sybr Safe —— DNA 染料商品名，保留原名不译",
+      "run to red —— 电泳方向口诀，已加解释性翻译，建议教学时保留英文原句 [待确认]",
+      "Yeast ORFans CURE —— 原作者所属课程名（CURE 为基于课程的本科科研训练），保留英文 [待确认]"
+    ],
+    "attribution": {
+      "original_title": "Agarose Gel Electrophoresis (Instructor Protocol)",
+      "original_authors": [
+        "Brian Teague"
+      ],
+      "original_affiliation": "University of Wisconsin - Stout / Trinity University",
+      "original_url": "https://www.protocols.io/view/agarose-gel-electrophoresis-instructor-protocol-ce6nthde.pdf",
+      "doi": "未获取到（原文声明 published without a DOI）",
+      "license_name": "Creative Commons Attribution License (CC BY; version not stated in PDF export)",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "statement": "本中文版为对原方案的翻译改编版本，内容已经过修改（翻译为中文）。原作者未参与本翻译，亦不对本译本负责。原文著作权与署名归原作者所有。"
+    }
+  },
+  "teaching_suitability": {
+    "level": "undergraduate_basic",
+    "reason": "作者为高校教师，专为本科教学编写，原文含教师提示与学生常见错误清单；操作为基础分子生物学实验，设备与试剂常见。",
+    "demo_recommended": true
+  }
+}

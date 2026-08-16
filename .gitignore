@@ -39,3 +39,27 @@ Thumbs.db
 
 # Generated artifacts (regenerable from tracked sources)
 *.docx
+
+# 网页端运行时模型设置（含密钥，不提交）
+web/settings.json
+web/.env
+web/lab_agent.db
+
+# 构建/打包产物（不提交）
+dist/
+build/
+*.spec
+setup_log.txt
+
+# 网页端运行时模型设置/敏感数据（不提交）
+web/certs/
+web/uploads/
+web/voice/outputs/
+
+# 本机/编辑器局部配置
+.codebuddy/
+web/.codebuddy/
+
+# 环境变量文件（保留 .env.example）
+*.env
+!.env.example
