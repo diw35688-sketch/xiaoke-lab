@@ -1,0 +1,138 @@
+/* 设计 token：对齐 deepseek-harness 的 design-platform 语义别名。
+   要点：背景以白与极浅蓝灰为主，边框用低透明度黑而非实色，
+   强调色只在必要处出现，避免整页彩色标签造成的"AI 生成感"。 */
+:root {
+  --n-00: rgb(255,255,255);
+  --n-50: rgb(249,250,251);
+  --n-60: rgb(245,246,247);
+  --n-75: rgb(241,243,245);
+  --n-100: rgb(235,238,242);
+  --n-200: rgb(225,229,238);
+  --n-400: rgb(173,178,184);
+  --n-500: rgb(151,157,166);
+  --n-600: rgb(129,133,140);
+  --n-700: rgb(97,102,107);
+  --n-800: rgb(53,54,56);
+  --n-900: rgb(27,27,28);
+  --n-950: rgb(21,21,23);
+
+  --brand: rgb(86,134,254);
+  --brand-strong: rgb(65,118,230);
+  --brand-50: rgb(237,243,254);
+  --brand-100: rgb(228,237,253);
+
+  --amber-100: rgb(254,245,231);
+  --amber-600: rgb(221,134,41);
+  --red-50: rgb(254,242,242);
+  --red-500: rgb(239,68,68);
+  --red-600: rgb(236,19,19);
+  --green-100: rgb(230,250,237);
+  --green-500: rgb(34,197,94);
+  --green-900: rgb(35,60,44);
+
+  --bd-1: rgba(0,0,0,.04);
+  --bd-2: rgba(0,0,0,.10);
+  --bd-3: rgba(0,0,0,.12);
+
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 10px;
+
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-md: 13px;
+  --fs-lg: 15px;
+}
+
+
+/* composer 接管后，队友原有的输入行、语音行与悬浮设置按钮一律不渲染。
+   用样式表而不是 JS 设 style：JS 里的定时刷新会重设按钮样式，把 inline 的
+   display:none 覆盖掉，这正是界面出现两个对话框的原因。 */
+.chat-form,
+.voice-row,
+#asr-bar,
+#settings-open,
+.chat-head {
+  display: none !important;
+}
+
+/* 聊天区撑满右列，消除截图里那一大片空白 */
+#sh-chat-host { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+#chat-card { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+#chat { flex: 1; min-height: 0; overflow-y: auto; }
+
+/* 气泡：参考 deepseek-harness —— assistant 不套气泡，user 是右侧唯一的 22px 圆角气泡 */
+#chat .message { margin: 0; display: flex; }
+#chat .message.user { justify-content: flex-end; }
+#chat .bubble {
+  max-width: 85%;
+  padding: 10px 15px;
+  border-radius: 22px;
+  font-size: 15px;
+  line-height: 24px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+#chat .message.assistant .bubble {
+  max-width: 100%;
+  padding: 0 16px;
+  border-radius: 0;
+  background: transparent;
+  color: var(--n-900);
+}
+#chat .message.user .bubble { background: var(--brand); color: #fff; }
+
+
+/* 对话流内的思考链 / 工具链：紧凑行，不抢占 assistant 正文的视觉权重。 */
+#chat .message.think,
+#chat .message.tool { padding: 0 16px; }
+#chat .chat-think,
+#chat .chat-tool {
+  border: 1px solid var(--bd-1);
+  border-radius: 12px;
+  background: var(--n-50);
+  padding: 8px 10px;
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+  color: var(--n-700);
+  min-width: 0; flex: 1;
+}
+#chat .chat-think-head,
+#chat .chat-tool-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--n-600);
+}
+#chat .chat-think-head .ic,
+#chat .chat-tool-head .ic { font-size: 11px; color: var(--n-500); flex: 0 0 auto; }
+#chat .chat-think-head .tt,
+#chat .chat-tool-head .tt { flex: 0 0 auto; }
+#chat .chat-think-head .st,
+#chat .chat-tool-head .st { margin-left: auto; font-weight: 400; font-size: var(--fs-xs); color: var(--n-500); }
+#chat .chat-think-body,
+#chat .chat-tool-body {
+  margin-top: 4px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 110px;
+  overflow-y: auto;
+  color: var(--n-600);
+  font-size: var(--fs-xs);
+}
+#chat .chat-think.running .chat-think { border-color: var(--bd-2); background: var(--n-60); }
+#chat .chat-tool .st.done { color: var(--green-500); }
+#chat .chat-tool .st.error,
+#chat .message.tool.tool-error .chat-tool { border-color: rgba(239,68,68,.25); color: var(--red-600); }
+
+/* 手机/投屏端卡片视觉优化 */
+@media (max-width: 820px) {
+  #rc { padding: 0 10px; }
+  .rc-card { border-radius: 18px; box-shadow: 0 8px 24px rgba(15,23,42,.08); }
+  .rc-t { font-size: 16px; line-height: 1.5; }
+  .rc-step { padding: 3px 9px 3px 4px; font-size: 11px; }
+  .rc-badge { min-width: 22px; height: 22px; font-size: 11px; }
+  .rc-progress { height: 8px; }
+  .rc-safe, .rc-card-h, .rc-body { border-radius: 0; }
+}

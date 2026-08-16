@@ -1,0 +1,7 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+lab_agent.db
+# 本地大模型
+models/

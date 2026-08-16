@@ -543,6 +543,8 @@ A负责提供稳定消息协议和Mock数据，不应让前端直接读取 `main
 | `LLM-08` | `P1` | 缺少关键参数时产生追问 | `REAL_OK` | “将溶液加热”产生温度/时间追问 |
 | `LLM-09` | `P1` | 阶段总结接口 | `AUTO_OK` | processor/validation 单测通过，未接主流程 |
 | `LLM-10` | `P1` | 会话结束总结接入 | `TODO` | 依赖确认收尾流程 |
+| `PROTOCOL-01` | `P0` | 实验方案数据合同、严格方案库、选择结果与确定性缺失字段 | `AUTO_OK` | frozen dataclass严格校验；实体字段白名单动态来自`dataclasses.fields(ExperimentEntities)`；3份种子方案可加载；79项专项、全量501项通过 |
+| `PROTOCOL-INTEGRATION-01` | `P0` | 方案选择与当前步骤接入会话主链路 | `TODO` | 下一轮任务；先定义会话级已选方案/当前步骤状态，再让程序计算缺失字段；保留无方案自由记录，避免直接修改现有统一理解合同 |
 
 ### C. 后台队列与会话上下文
 
@@ -955,3 +957,82 @@ Word/PDF 属于表现层增强，可以在系统 TTS 之后完成。
 6. 如果文件结构变化，同步更新任务备注和交接文档。
 7. 开发、测试或真实验收中发现的新问题，必须在本清单登记任务 ID 或写入维护日志，不能只保留在对话中。
 8. 新问题需要注明发现来源、影响、依赖关系和建议处理时机；未确定方案时标记为 `TODO` 或 `DESIGN`，不得假装已经解决。
+
+---
+
+## 合并补充：protocol / TTS / 危化品三层（2026-08-14）
+
+以下内容来自与主线并行开发的分支，合并时以主线记录为基底，本节仅补充主线未覆盖的部分。
+
+最后更新：2026-08-12
+- 全量自动测试：`517 tests OK`（项目 `.venv`，2026-08-12）
+- 最近真实连续口述会话：`20260811_143031`
+- 最近真实会话已验证：CREATE✅、ANSWER✅（extractor提取实体→已执行）；新老并行重复问题（已知）；LLM不稳定偶尔abstention（已知）；启动慢（MODEL-LOAD-02）
+> `PROTOCOL-INTEGRATION-01`：把已选方案和当前步骤接入会话级状态；本轮已先完成新语义纯数据合同，接线前仍不修改 `main.py`。
+| 17 | `P0` | `PROTOCOL-01` 实验方案合同、方案库与确定性缺失字段 | `AUTO_OK` | 将“方案目标值”和“现场必须记录值”拆开，并为实体值保留来源、偏差和显式步骤游标 | 新增协议来源值、偏差检测、步骤游标3个纯数据模块；种子方案改用`protocol_values`/`must_record`；新增16项专项测试；全量517项通过；保留旧字段读取兼容但新逻辑只看新字段；未改main、未接LLM/ASR/OCR/上传 |
+| `TTS-01` | `P3` | 定义 TTSClient 接口 | `AUTO_OK` | 本轮以TTSBackend Protocol、CancelScope、InterruptibleTTSPlayer和NullTTSBackend完成纯契约；新增17项测试，未接真实引擎、声卡或主流程 |
+| 2026-08-12 | 修正PROTOCOL-01字段语义：方案目标值与现场实测值分离；新增值来源、字符串偏差检测和显式步骤游标 | 新增16项专项；项目`.venv`全量518项通过；`git diff --check`通过 | 纯数据、纯函数和本地JSON读取，无外部服务或真实设备验收；3份重写后的本科中文方案均由ProtocolStore成功加载；未修改main、未接LLM/ASR/OCR/上传、未提交或推送 | `PROTOCOL-INTEGRATION-01`接入会话级方案/步骤状态；继续保留自由记录模式 |
+# 补充内容
+知识库+RAG 帮 LLM 更精准地结构化口述（补全缺省参数、纠正专业词、发现 SOP 偏差），用户画像 减少重复追问（记住个人默认值和偏好），两者都是增强现有链路质量而非新增功能模块。
+当前预留接口建议（3 处，不动业务逻辑）
+1. SessionContext 扩展一个可选字段
+当前 CTX-01 传"最近 N 条事件"给 LLM。在构建上下文时增加一个可选参数，现在什么都不传：
+# 构建 LLM prompt 时
+context = {
+    "recent_events": [...],   # 已有
+    "user_profile": {},       # 新增，当前为空字典
+    "knowledge_hints": [],    # 新增，当前为空列表
+}
+user_profile 以后填：默认离心转速、常用体积、交互详细程度等。
+knowledge_hints 以后填：SOP 匹配片段、术语纠错候选、安全提示等。
+两个字段今天为空，LLM prompt 构造逻辑不需要改，只是数据结构上占位。
+2. PendingClarification 追问增加来源标记
+当前 CLARIFY-01/09 的追问结构里，追问只有 source_segment_id 和 missing_fields。增加一个可选字段标记追问的"知识来源"：
+{
+    "source_segment_id": 3,
+    "missing_fields": ["离心时间"],
+    "knowledge_source": null   # 新增，以后可以是 "sop:protocol_42" 或 "rag:exp_20260801"
+}
+用途：以后知识库触发的追问和 LLM 自己猜的追问可以区别对待——知识库触发的可以降低重复询问频率，LLM 猜的保持现有确认逻辑。
+3. ExperimentEvent 实体字段预留标准化引用
+当前 LLM-07 产出操作/观察/测量/异常四类事件。实体信息（试剂名、设备名、数值）目前混在 normalized_text 里。在数据结构中增加一个可选的对象字段*：
+{
+    "type": "observation",
+    "normalized_text": "溶液变为蓝色",
+    "entities": {               # 新增，当前为 null
+        "reagent": null,
+        "equipment": null,
+        "measured_value": null,
+        "matched_term": null
+    }
+}
+matched_term 以后存知识库匹配到的标准术语（如 ASR 的"一液枪"匹配到标准词"移液枪"），reagent 以后可以关联到化学品属性库。
+┌─────┬─────────────────┬─────────────┬───────────────────────────┐
+│ 序  │      位置       │    成本     │           收益            │
+│ 号  │                 │             │                           │
+├─────┼─────────────────┼─────────────┼───────────────────────────┤
+│ 1   │ SessionContext  │ 改一处构造  │ 画像和 RAG 都有了注入点   │
+│     │ 加两个空字段    │             │                           │
+├─────┼─────────────────┼─────────────┼───────────────────────────┤
+│     │ PendingClarific │ 改一个数据  │ 区分"有依据的追问"和"猜测 │
+│ 2   │ ation 加 knowle │ 结构        │ 追问"                     │
+│     │ dge_source      │             │                           │
+├─────┼─────────────────┼─────────────┼───────────────────────────┤
+│ 3   │ ExperimentEvent │ 改一个数据  │ 实体可追溯、可纠错、可关  │
+│     │  加 entities    │ 结构        │ 联外部库                  │
+└─────┴─────────────────┴─────────────┴───────────────────────────┘
+三处都是纯数据结构预留，不改一行业务判断逻辑。
+注：这个可能已在你的领域记录设计中被覆盖（OUTPUT_PRESENTATION_POLICY.md 2.1 节的 ExperimentEvent 提到"实体"），如果已有字段就直接用，不需要重复加。
+## 2026-08-12 本轮维护记录：PROTOCOL-01旧字段语义清理
+- 任务：迁移 `tests/test_protocol.py`、`tests/test_protocol_missing_fields.py`、`tests/test_protocol_selection.py`、`tests/test_protocol_store.py` 中的旧 `required_fields` / `expected_values` 用法。
+- 源码：删除 `src/storage/protocol_store.py` 的旧字段读取兼容；正式 JSON 只接受 `protocol_values` 与 `must_record`。
+- 语义：`protocol_values` 是方案固定值，不参与缺失追问；`must_record` 只表示本次现场必须产生的实测字段。
+- 测试：用户指定的全量命令最终通过，`Ran 518 tests ... OK`。
+- 验收边界：本轮只处理纯数据合同、存储读取和测试迁移，不修改 `src/main.py`，不接入 LLM 或会话主流程。
+## 2026-08-12 本轮维护记录：可打断TTS纯逻辑地基
+- 任务：定义按块产出的TTS后端合同、基于代数计数器的取消范围、可注入音频sink的播放结果合同和null占位工厂。
+- 新增：`src/audio/cancel_scope.py`、`src/audio/tts_backend.py`、`src/audio/null_tts_backend.py`、`src/audio/tts_player.py`、`src/audio/tts_factory.py`、`tests/test_tts.py`；配置同步加入`TTS_BACKEND`和`TTS_ENABLED`，`.env.example`同步更新。
+- 测试：TTS专项17项通过；全量自动测试从518项增加到535项，`Ran 535 tests ... OK`；`git diff --check`通过；新增和修改文件均通过UTF-8读取与中文字符自检。
+- 设计边界：取消检查放在每个音频块进入sink之前；单写者+多读者前提下不加锁；有意不实现真实播放接入所需的过时输出丢弃队列。
+- 验收边界：本轮不修改`src/main.py`、`InteractionCommandType`、`AssistantState`接线，不引入sounddevice输出流或任何真实TTS依赖，不接模型、不碰声卡；因此状态为`AUTO_OK`，不是`REAL_OK`。
+- 下一步：`PROTOCOL-INTEGRATION-01`仍是项目主线；TTS方向下一步再评估真实后端和播放设备接入，必须先补半双工状态、输出协调和真实设备验收方案。

@@ -1,0 +1,72 @@
+{
+  "source": "protocols.io",
+  "source_url": "https://www.protocols.io/view/passaging-adherent-cancer-cell-lines-bgtbjwin.pdf",
+  "fetched_at": "2026-08-12T12:46:32+08:00",
+  "license": {
+    "name": "Creative Commons Attribution License (CC BY; version not stated in PDF export)",
+    "url": "https://creativecommons.org/licenses/by/4.0/"
+  },
+  "authors": [
+    "Emily Souster",
+    "Verity Goodwin",
+    "Adam Jackson",
+    "Charlotte Beaver",
+    "Fiona Behan",
+    "Rizwan Ansari",
+    "Mathew Garnett"
+  ],
+  "title": "Passaging Adherent Cancer Cell Lines",
+  "version": "未获取到",
+  "doi": "https://doi.org/10.17504/protocols.io.bgtbjwin",
+  "steps_raw": [
+    {
+      "number": 1,
+      "text": "Jul 23, 2020\nPassaging adherent cancer cell lines\nDOI\nhttps://dx.doi.org/10.17504/protocols.io.bgtbjwin\nEmily Souster , Verity Goodwin , Adam Jackson , Charlotte Beaver , Fiona Behan , Rizwan Ansari ,\nMathew Garnett\nWellcome Sanger Institute\nCellular Generation and …\nEmily Souster\nCreate & collaborate more with a free account\nEdit and publish protocols, collaborate in communities, share insights through comments, and\ntrack progress with run records.\nCreate free account\n1\n1\n1\n1\n1\n1\n1\n1\nDOI: https://dx.doi.org/10.17504/protocols.io.bgtbjwin\nProtocol Citation: Emily Souster, Verity Goodwin, Adam Jackson, Charlotte Beaver, Fiona Behan, Rizwan Ansari, Mathew\nGarnett 2020. Passaging adherent cancer cell lines. protocols.io https://dx.doi.org/10.17504/protocols.io.bgtbjwin\nLicense: This is an open access  protocol  distributed under the terms of the  Creative Commons Attribution License,  which\npermits unrestricted use, distribution, and reproduction in any medium, provided the original author and source are credited\nprotocols.io | https://dx.doi.org/10.17504/protocols.io.bgtbjwin\nJuly 23, 2020\n1/7"
+    },
+    {
+      "number": 2,
+      "text": "Protocol status: Working\nWe use this protocol and it's working\nCreated: May 24, 2020\nLast Modified: July 23, 2020\nProtocol  Integer ID: 37443\nKeywords: adherent cancer cell lines this sop, passaging adherent cancer cell line, adherent cancer cell line, expansion of\nadherent cancer cell line, transduced cell line, cell line, use in downstream protocol, expasion of cas9, sop, downstream\nprotocol, cell\nAbstract\nThis SOP is for the routine maintenance and expansion of adherent cancer cell lines. \nIt also details how cells are harvested and counted for use in downstream protocols.\nThis protocol is also used in expasion of Cas9 transduced cell lines, prior to banking.\nProcess diagram:\nprotocols.io | https://dx.doi.org/10.17504/protocols.io.bgtbjwin\nJuly 23, 2020\n2/7"
+    },
+    {
+      "number": 3,
+      "text": "Guidelines\nCancer cells should be passaged at ~80-90% confluent where possible. They should not be allowed to reach\n100% confluence.\nFigure 1. Adherent cancer cell line ready to be passaged (x5).\nprotocols.io | https://dx.doi.org/10.17504/protocols.io.bgtbjwin\nJuly 23, 2020\n3/7"
+    },
+    {
+      "number": 4,
+      "text": "Materials\nMATERIALS\nFalcon™ 15mL Conical Centrifuge Tubes Fisher Scientific Catalog #14-959-53A\nTrypLE&trade; Express Enzyme (1X), no phenol red Thermo Fisher Catalog #12604021\nCell culture treated T75 flasks Corning Catalog #430641\nCell Culture Treated T150 Flasks Corning Catalog #430825\nDPBS Invitrogen - Thermo Fisher Catalog #14190\n10mg/ml Blasticidin InvivoGen Catalog #ant-bl-1\nSelect an appropriate culture media for your cell line. Common culture medias used for cancer cell lines are serum\nsupplemented Advanced DMEM F-12 or RPMI, in the presence of pen-strep.\nEquipment\nMicrobiological Safety Cabinet (MSC)\nLight Microscope\nNucleocounter/Cell counter\nPipette Boy\nStripettes\nCentrifuge\nPipettes and tips\n37 °C  , 5% CO2 incubator\nSafety warnings\nBlasticidin is toxic if swallowed and harmful in contact with skin.\nBefore start\nPre-warm complete culture media to room-temperature. \nCheck the cells under a microscope and record percentage confluency. Cancer cells should be passaged\nwhen ~80-90% confluent. \nprotocols.io | https://dx.doi.org/10.17504/protocols.io.bgtbjwin\nJuly 23, 2020\n4/7"
+    },
+    {
+      "number": 5,
+      "text": "Detaching and collecting cells\n1\nRemove the old culture media using a sterile aspirator pipette.\n2\nGently wash the cells with PBS (see Table 1, column B for recommended volume).\nAspirate the PBS from the flask.\nSize of flask\nVolume of PBS (ml)\nVolume of TrypLE\n(ml)\nVolu\nme\nof\nmed\nia\nand\ncells\n(ml)\nT25\n5\n3\n7\nT75\n7.5\n4\n12\nT150\n10\n5\n24\nT525 (3 layer)\n30\n15\n60\nT875 (5 layer)\n50\n25\n100\nNote\nAlways aim to add reagents at the side/back of the flask initially to avoid dislodging\nany cells.\nTable 1.  Recommended volumes for different flask types.\n3\nAdd sufficient TrypLE Express Enzyme to cover the bottom of the flask (see Table 1,\ncolumn C for recommended volume). Rock the flask to allow the TrypLE to cover the\nsurface of the cells.\n4\nIncubate the flask at \n37 °C   for 3-5 minutes. Use the microscope to check if the\ncells have detached. If necessary, tap the side of the flask, or return to incubator until all\ncells have detached.\n5\nAdd fresh media to the flask at an equal volume to the TrypLE added in Step 3. Use the\nliquid in the flask to rinse the cells off the bottom of the flask. Transfer the entire volume\nprotocols.io | https://dx.doi.org/10.17504/protocols.io.bgtbjwin\nJuly 23, 2020\n5/7"
+    },
+    {
+      "number": 6,
+      "text": "to an appropriately sized sterile tube. \n6\nSpin the tube at \n300 x g  for 3 minutes. \nSafety information\nTubes should be spun inside centrifuge buckets with sealed safety caps. After\nspinning, the sealed bucket should be transferred to a microbiology safety cabinet\nbefore removing the tubes.\n7\nAspirate the supernatant, taking care to avoid disturbing the cell pellet. Resuspend the\npellet in an appropriate volume of fresh media (around \n5 mL  -\n20 mL  ) and mix\nwell to ensure a single cell suspension.\n8\nIf a cell count is not required, proceed to Step 9. \nTo take a cell count, aliquot \n100 µL  of cell suspension and count using your\npreferred method.\nRe-seeding cells\n9\nAdd fresh media and an appropriate volume of cell suspension to a new flask, to achieve\nthe desired split ratio or cell number (where possible, aim for the total volume of media\nand cells in the flask to follow the recommeded volumes in Table 1, column D). \nFor example, if splitting a T75 flask 1:2, either add the entire cell suspension to fresh\nmedia in a T150 flask (achieving a total volume of \n24 mL  ), OR add half the cell\nsuspension to fresh media in a T75 (achieving a total volume of \n12 mL  ).\nNote\nThe required split ratio will be dependend on the growth rate and behaviour of\nindividual cell lines.\n9.1\nIf maintaining a selected population of Cas9 cells, add blasticidin to achieve the desired\nconcentration, as determined by: 'Blasticidin titration of cancer cell lines' protocol. \nprotocols.io | https://dx.doi.org/10.17504/protocols.io.bgtbjwin\nJuly 23, 2020\n6/7"
+    },
+    {
+      "number": 7,
+      "text": "Add the required volume of 10mg/ml blasticidin depending on the flask size (Table 2), to\nachieve the desired final concentration.\nSize of\nflask\nVolume\nof media\n(ml)\n10µg/ml\nBlasticidin\n(µl)\n25µg/ml\nBlasticidin\n(µl)\n50µg/ml\nBlasticidin\n(µl)\n75µ\ng/ml\nBlas\nticid\nin\n(µl)\nT25\n7\n7\n17.5\n35\n52.5\nT75\n12\n12\n30\n60\n90\nT150\n24\n24\n60\n120\n180\nT525 (3\nlayer)\n60\n60\n150\n300\n450\nT875 (5\nlayer)\n100\n100\n250\n500\n750\nTable 2. Volume of 10mg/ml blasticidin stock required in different media volumes to\nachieve the final concentrations shown.\nSafety information\nBlasticidin is toxic if swallowed and harmful in contact with skin.\n10\nTransfer the flask to a \n37 °C  , 5% CO2 incubator. Agitate the flask gently back and\nforth and side to side to ensure even distribution of cells across the flask.\n11\nInspect the cells daily and record confluency. Cancer cell lines should have a complete\nmedia change twice per week, or as needed if the media looks yellow.\nprotocols.io | https://dx.doi.org/10.17504/protocols.io.bgtbjwin\nJuly 23, 2020\n7/7"
+    }
+  ],
+  "materials_raw": [
+    "MATERIALS",
+    "Falcon™ 15mL Conical Centrifuge Tubes Fisher Scientific Catalog #14-959-53A",
+    "TrypLE&trade; Express Enzyme (1X), no phenol red Thermo Fisher Catalog #12604021",
+    "Cell culture treated T75 flasks Corning Catalog #430641",
+    "Cell Culture Treated T150 Flasks Corning Catalog #430825",
+    "DPBS Invitrogen - Thermo Fisher Catalog #14190",
+    "10mg/ml Blasticidin InvivoGen Catalog #ant-bl-1",
+    "Select an appropriate culture media for your cell line. Common culture medias used for cancer cell lines are serum",
+    "supplemented Advanced DMEM F-12 or RPMI, in the presence of pen-strep.",
+    "Equipment",
+    "Microbiological Safety Cabinet (MSC)",
+    "Light Microscope",
+    "Nucleocounter/Cell counter",
+    "Pipette Boy",
+    "Stripettes",
+    "Centrifuge",
+    "Pipettes and tips",
+    "37 °C  , 5% CO2 incubator"
+  ],
+  "notes": "原始内容由 protocols.io 公开 PDF 导出；未翻译、未改写。PDF 明确写明 Creative Commons Attribution License，但未在导出页注明具体 CC 版本，因此许可证名称保留该原文表述，链接指向 CC BY 4.0 说明页。steps_raw 按 PDF 文本层中可识别的编号步骤分段；若原 PDF 无可识别编号，则将全文放入第 1 步。 steps_raw 以 PDF 每页原文块保存，保留页内换行；未翻译未改写。"
+}

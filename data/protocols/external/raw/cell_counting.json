@@ -1,0 +1,166 @@
+{
+  "source": "protocols.io",
+  "source_url": "https://www.protocols.io/view/cell-counting-8ajhscn.pdf",
+  "fetched_at": "2026-08-12T12:46:32+08:00",
+  "license": {
+    "name": "Creative Commons Attribution License (CC BY; version not stated in PDF export)",
+    "url": "https://creativecommons.org/licenses/by/4.0/"
+  },
+  "authors": [
+    "Laura Sánchez"
+  ],
+  "title": "Cell Counting",
+  "version": "V.1",
+  "doi": "https://doi.org/10.17504/protocols.io.8ajhscn",
+  "steps_raw": [
+    {
+      "number": 1,
+      "text": "Oct 16, 2019\nVersion 1\nCell Counting V.1\nDOI\nhttps://dx.doi.org/10.17504/protocols.io.8ajhscn\nLaura Sánchez\nAEGIS - Madrid iGEM 2019\nAEGIS - Madrid iGEM 2019\nManuela De Las Casas\nUniversidad Complutense de Madrid, AEGIS - Madrid iGEM 2019\nCreate & collaborate more with a free account\nEdit and publish protocols, collaborate in communities, share insights through comments, and\ntrack progress with run records.\nCreate free account\n1\n1\nDOI: https://dx.doi.org/10.17504/protocols.io.8ajhscn\nProtocol Citation: Laura Sánchez 2019. Cell Counting. protocols.io https://dx.doi.org/10.17504/protocols.io.8ajhscn\nLicense: This is an open access  protocol  distributed under the terms of the  Creative Commons Attribution License,  which\npermits unrestricted use, distribution, and reproduction in any medium, provided the original author and source are credited\nProtocol status: Working\nWe use this protocol and it's working\nprotocols.io | https://dx.doi.org/10.17504/protocols.io.8ajhscn\nOctober 16, 2019\n1/4"
+    },
+    {
+      "number": 2,
+      "text": "Created: October 16, 2019\nLast Modified: October 16, 2019\nProtocol  Integer ID: 28715\nKeywords: cell counting bacterial concentration, bacterial concentration, cell counting, spectrophotometer, concentration, light\nscattering, quickest method at the lab bench, cell, turbidity\nAbstract\nBacterial concentration can be measured by several methods. One of them is turbidity. Turbidity, or light\nscattering, is measured in a spectrophotometer such as a Spectronic 20. This method has the advantage of being\nthe quickest method at the lab bench.\nMaterials\nReagents\nTurbid broth culture of E. coli\nTryptic soy broth (TSB)\nLab equipment\n21 clean culture tubes (they do not need to be sterile)\nClean spectrophotometer cuvettes\n10-1000 ml pipets\nPipump\nVortex mixer\nSafety warnings\nPlease note: Be sure to wear gloves during this procedure, to avoid getting culture on your hands while\ntransferring liquid from tubes. Lab coat is also required.\nBefore start\nCheck all working surfaces and materials are clean before start\nprotocols.io | https://dx.doi.org/10.17504/protocols.io.8ajhscn\nOctober 16, 2019\n2/4"
+    },
+    {
+      "number": 3,
+      "text": "Making an absorbance curve for Escherichia coli\n1\nTurn on the spectrophotometer and set the wavelength to 425 nm. Let it warm up for at\nleast 15 min.\n2\nLabel the culture tubes 1 – 21. Using different pipets, add turbid E. coli culture and TSB to\neach tube in the volumes shown in the table.\n3\nMix each tube thoroughly by vortexing for 1 – 2 sec with a vortex mixer.\n4\nWith no tube in the spectrophotometer, set the 0%T setting.\nprotocols.io | https://dx.doi.org/10.17504/protocols.io.8ajhscn\nOctober 16, 2019\n3/4"
+    },
+    {
+      "number": 4,
+      "text": "5\nTransfer 3 – 4 ml of broth from tube 21 (TSB with no E. coli) to the spectrophotometer\ncuvette, carefully wipe the outside of the tube with a kimwipe, place the tube in the\nmachine, and set the 100%T setting (blank the spectrophotometer). Switch the\nspectrophotometer setting to “Absorbance.”\n6\nRemove the cuvette and pour the broth back into tube 21. Carefully drain the last few\ndrops from the lip of the cuvette into a kimwipe. Put the contaminated kimwipe in the\nbiohazard bag.\n7\nStarting with tube #20 and going backwards to tube #1, repeat steps 5-6. \n8\nTransfer the data to a Microsoft Excel spreadsheet. The spreadsheet should contain the\nfollowing columns: volume of E. coli culture, volume of broth, dilution factor, and\nmeasured absorbance.\n9\nIn the spreadsheet, create an X-Y scatter plot of dilution factor vs absorbance. \n* Please note: All charts must be added as separate sheets in the workbook, not pasted\ninto the worksheet with the data columns. \n10\nAdd a second order polynomial trendline to the plot, and set the options on the trendline\nto show the equation and the correlation coefficient.\n11\nFrom the plot, identify the range in which absorbance is proportional to bacterial\nconcentration. Create a second plot, plotting only the linear range of dilution factor vs\nabsorbance.\n12\nAdd a linear trendline to the second plot, and set the options for the trendline to show the\nequation and the correlation coefficient. \nprotocols.io | https://dx.doi.org/10.17504/protocols.io.8ajhscn\nOctober 16, 2019\n4/4"
+    }
+  ],
+  "materials_raw": [
+    "Reagents",
+    "Turbid broth culture of E. coli",
+    "Tryptic soy broth (TSB)",
+    "Lab equipment",
+    "21 clean culture tubes (they do not need to be sterile)",
+    "Clean spectrophotometer cuvettes",
+    "10-1000 ml pipets",
+    "Pipump",
+    "Vortex mixer"
+  ],
+  "notes": "原始内容由 protocols.io 公开 PDF 导出；未翻译、未改写。PDF 明确写明 Creative Commons Attribution License，但未在导出页注明具体 CC 版本，因此许可证名称保留该原文表述，链接指向 CC BY 4.0 说明页。steps_raw 按 PDF 文本层中可识别的编号步骤分段；若原 PDF 无可识别编号，则将全文放入第 1 步。 steps_raw 以 PDF 每页原文块保存，保留页内换行；未翻译未改写。",
+  "translation_zh": {
+    "title": "细胞计数（大肠杆菌吸光度标准曲线的绘制）",
+    "abstract_zh": "通过分光光度法测定一系列稀释度的大肠杆菌培养物吸光度，绘制标准曲线并确定吸光度与菌浓度成正比的线性范围。",
+    "steps": [
+      {
+        "number": 1,
+        "title_zh": "开机预热",
+        "text_zh": "打开分光光度计，将波长设置为 425 nm。预热至少 15 min。",
+        "source_text": "Turn on the spectrophotometer and set the wavelength to 425 nm. Let it warm up for at least 15 min."
+      },
+      {
+        "number": 2,
+        "title_zh": "配制稀释系列",
+        "text_zh": "将培养管编号为 1 – 21。使用不同的移液器，按表中给出的体积向各管加入浑浊的大肠杆菌培养液和 TSB（胰酪大豆胨肉汤）。",
+        "source_text": "Label the culture tubes 1 - 21. Using different pipets, add turbid E. coli culture and TSB to each tube in the volumes shown in the table."
+      },
+      {
+        "number": 3,
+        "title_zh": "混匀",
+        "text_zh": "用涡旋混合器将每管涡旋 1 – 2 sec，充分混匀。",
+        "source_text": "Mix each tube thoroughly by vortexing for 1 - 2 sec with a vortex mixer."
+      },
+      {
+        "number": 4,
+        "title_zh": "调零",
+        "text_zh": "分光光度计中不放任何比色管，设定 0%T。",
+        "source_text": "With no tube in the spectrophotometer, set the 0%T setting."
+      },
+      {
+        "number": 5,
+        "title_zh": "空白校准",
+        "text_zh": "从 21 号管（不含大肠杆菌的 TSB）中取 3 – 4 ml 培养基转入比色皿，用 Kimwipe 无尘纸小心擦拭管外壁，放入仪器，设定 100%T（对分光光度计调空白）。随后将仪器切换到 Absorbance（吸光度）模式。",
+        "source_text": "Transfer 3 - 4 ml of broth from tube 21 (TSB with no E. coli) to the spectrophotometer cuvette, carefully wipe the outside of the tube with a kimwipe, place the tube in the machine, and set the 100%T setting (blank the spectrophotometer). Switch the spectrophotometer setting to Absorbance."
+      },
+      {
+        "number": 6,
+        "title_zh": "回收与废弃处理",
+        "text_zh": "取出比色皿，将培养基倒回 21 号管。小心地把比色皿口沿残留的最后几滴液体沥到 Kimwipe 无尘纸上。将被污染的无尘纸投入生物危害废弃物袋。",
+        "source_text": "Remove the cuvette and pour the broth back into tube 21. Carefully drain the last few drops from the lip of the cuvette into a kimwipe. Put the contaminated kimwipe in the biohazard bag."
+      },
+      {
+        "number": 7,
+        "title_zh": "逐管测定",
+        "text_zh": "从 20 号管开始，倒序测至 1 号管，重复步骤 5-6。",
+        "source_text": "Starting with tube #20 and going backwards to tube #1, repeat steps 5-6."
+      },
+      {
+        "number": 8,
+        "title_zh": "数据录入",
+        "text_zh": "将数据转入 Microsoft Excel 表格。表格应包含以下列：大肠杆菌培养液体积、培养基体积、稀释倍数、实测吸光度。",
+        "source_text": "Transfer the data to a Microsoft Excel spreadsheet. The spreadsheet should contain the following columns: volume of E. coli culture, volume of broth, dilution factor, and measured absorbance."
+      },
+      {
+        "number": 9,
+        "title_zh": "作散点图",
+        "text_zh": "在表格中制作稀释倍数对吸光度的 X-Y 散点图。注意：所有图表必须作为独立工作表添加到工作簿中，不得直接粘贴到含数据列的工作表内。",
+        "source_text": "In the spreadsheet, create an X-Y scatter plot of dilution factor vs absorbance. All charts must be added as separate sheets in the workbook."
+      },
+      {
+        "number": 10,
+        "title_zh": "添加二次多项式趋势线",
+        "text_zh": "为图表添加二阶多项式趋势线，并在趋势线选项中勾选显示方程和相关系数。",
+        "source_text": "Add a second order polynomial trendline to the plot, and set the options on the trendline to show the equation and the correlation coefficient."
+      },
+      {
+        "number": 11,
+        "title_zh": "确定线性范围",
+        "text_zh": "从图中找出吸光度与细菌浓度成正比的范围。仅用该线性范围的数据，绘制第二张稀释倍数对吸光度的图。",
+        "source_text": "From the plot, identify the range in which absorbance is proportional to bacterial concentration. Create a second plot, plotting only the linear range."
+      },
+      {
+        "number": 12,
+        "title_zh": "添加线性趋势线",
+        "text_zh": "为第二张图添加线性趋势线，并在趋势线选项中勾选显示方程和相关系数。",
+        "source_text": "Add a linear trendline to the second plot, and set the options for the trendline to show the equation and the correlation coefficient."
+      }
+    ],
+    "materials": [
+      {
+        "zh": "大肠杆菌（E. coli）培养液",
+        "source": "turbid E. coli culture"
+      },
+      {
+        "zh": "TSB 胰酪大豆胨肉汤 [待确认缩写全称]",
+        "source": "TSB"
+      },
+      {
+        "zh": "Kimwipe 无尘擦拭纸（商品名保留）",
+        "source": "kimwipe"
+      }
+    ],
+    "safety_warnings_zh": [
+      "接触过菌液的擦拭纸等废弃物须投入生物危害废弃物袋，按微生物实验室规范处理。"
+    ],
+    "translator": "claude (人工校对流程未完成)",
+    "translated_at": "2026-08-12T13:58:57.219793+08:00",
+    "reviewed_by": null,
+    "review_status": "UNREVIEWED",
+    "uncertain_terms": [
+      "TSB —— 推测为 Tryptic Soy Broth（胰酪大豆胨肉汤），原文未展开缩写 [待确认]",
+      "0%T / 100%T —— 透光率调零与满度校准，保留原写法",
+      "Kimwipe —— 无尘擦拭纸商品名，保留不译"
+    ],
+    "attribution": {
+      "original_title": "Cell Counting",
+      "original_authors": [
+        "Laura Sánchez"
+      ],
+      "original_affiliation": "AEGIS - Madrid iGEM 2019",
+      "original_url": "https://www.protocols.io/view/cell-counting-8ajhscn.pdf",
+      "doi": "https://doi.org/10.17504/protocols.io.8ajhscn",
+      "license_name": "Creative Commons Attribution License (CC BY; version not stated in PDF export)",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "statement": "本中文版为对原方案的翻译改编版本，内容已经过修改（翻译为中文）。原作者未参与本翻译，亦不对本译本负责。"
+    }
+  },
+  "teaching_suitability": {
+    "level": "undergraduate_basic",
+    "reason": "分光光度法测定与标准曲线绘制是本科微生物学/生化基础实验的经典内容，仪器与试剂常见，且含明确的数据处理训练。",
+    "demo_recommended": true
+  }
+}

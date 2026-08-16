@@ -1,0 +1,230 @@
+{
+  "source": "protocols.io",
+  "source_url": "https://www.protocols.io/view/0-1xbwt-buffer-c68izhue.pdf",
+  "fetched_at": "2026-08-12T12:46:32+08:00",
+  "license": {
+    "name": "Creative Commons Attribution License (CC BY; version not stated in PDF export)",
+    "url": "https://creativecommons.org/licenses/by/4.0/"
+  },
+  "authors": [
+    "Anna Schmidt",
+    "Sarah Nagel",
+    "Matthias Meyer"
+  ],
+  "title": "0.1xBWT buffer",
+  "version": "V.1",
+  "doi": "https://doi.org/10.17504/protocols.io.e6nvwdnn7lmk/v1",
+  "steps_raw": [
+    {
+      "number": 1,
+      "text": "Mar 22, 2024\nVersion 1\n0.1xBWT buffer V.1\nDOI\nhttps://dx.doi.org/10.17504/protocols.io.e6nvwdnn7lmk/v1\nAnna Schmidt , Sarah Nagel , Matthias Meyer\nMax Planck Institute for Evolutionary Anthropology\nMPI EVA Ancient DNA C…\nAnya Patova\nThe Max Planck Institute for Evolutionary Anthropology\nCreate & collaborate more with a free account\nEdit and publish protocols, collaborate in communities, share insights through comments, and\ntrack progress with run records.\nCreate free account\n1\n1\n1\n1\nDOI: https://dx.doi.org/10.17504/protocols.io.e6nvwdnn7lmk/v1\nDocument Citation: Anna Schmidt, Sarah Nagel, Matthias Meyer 2024. 0.1xBWT buffer. protocols.io\nhttps://dx.doi.org/10.17504/protocols.io.e6nvwdnn7lmk/v1\nLicense: This is an open access  document  distributed under the terms of the  Creative Commons Attribution License,  which\npermits unrestricted use, distribution, and reproduction in any medium, provided the original author and source are credited\nCreated: January 09, 2024\nprotocols.io | https://dx.doi.org/10.17504/protocols.io.e6nvwdnn7lmk/v1\nMarch 21, 2024\n1/5"
+    },
+    {
+      "number": 2,
+      "text": "Last Modified: April 10, 2024\nDocument  Integer ID: 93162\nKeywords: stranded dna library preparation, dna library preparation, stranded dna library, dna libraries for the sequencing, dna\nfrom ancient biological remain, wash buffer, degraded dna, dna, protocol for the preparation, buffer, ancient biological remain\nFunders Acknowledgements:\nMax Planck Society\nGrant ID: -\nAbstract\nProtocol for the preparation of 0.1x BWT buffer (Wash buffer II) for automated single-stranded DNA library\npreparation using the ssDNA2.0 method (Gansauge et al. 2020).\nReferences\nGansauge, M.-T., Aximu-Petri, A., Nagel, S., & Meyer, M. (2020). Manual and automated preparation of single-\nstranded DNA libraries for the sequencing of DNA from ancient biological remains and other sources of highly\ndegraded DNA. Nature Protocols, 15, 2279-2300. \nprotocols.io | https://dx.doi.org/10.17504/protocols.io.e6nvwdnn7lmk/v1\nMarch 21, 2024\n2/5"
+    },
+    {
+      "number": 3,
+      "text": "Note\nThis protocol describes the preparation of 500 ml buffer. \nMaterials\nReagent/consumable\nSupplier\nCatalogue number\nReagents\nWater          \nSigma Aldrich/Merck\n1153332500\n5 M NaCl\nSigma Aldrich/Merck\nS5150-1L\n1 M Tris-HCl, pH 8.0\nAppliChem\nA4577,1000\n0.5 M EDTA, ph 8.0\nAppliChem\nA4892,1000\nTween-20\nThermo Fisher Scientific\n11417160\nConsumables\nSquare media bottle 500\nml\nVWR\n391-0630\n50 ml serological pipet\nCorning BV\n357550\n10 ml serological pipet\nCorning BV\n357551\n5 ml serological pipet\nCorning BV\n357543\nEquipment\nSerological pipette controller (e.g. battery-powered pipetting aid ROTILABO, cat. no. TC16.1) \nProtocol\n1. Prepare the buffer in a 500 ml square media bottle by adding the following reagents. Use the glass pipette for\ntransfer of large volumes (> 1 ml). Mix reagents by shaking the bottle.\nReagent\nVolume\nFinal concentration in reaction\nWater\n483.75 ml\n5 M NaCl\n10 ml\n100 mM\nprotocols.io | https://dx.doi.org/10.17504/protocols.io.e6nvwdnn7lmk/v1\nMarch 21, 2024\n3/5"
+    },
+    {
+      "number": 4,
+      "text": "Reagent\nVolume\nFinal concentration in reaction\n1 M Tris-HCl, pH\n8.0\n5 ml\n10 mM\n0.5 M EDTA, ph\n8.0\n1 ml\n1 mM\n100% Tween-20\n0.25 ml\n0.05%\nsum\n500 ml\n2. Review the protocol in which the buffer is used to determine whether the buffer should be decontaminated\nusing UV treatment. Instructions for UV-decontamination are provided in the Appendix.\n3. Store the buffer at room temperature until used. Shelf life is at least one year from preparation.\nAppendix\nNote\n[Note]\nIt is also acceptable to use the scale of the bottle to fill up to 400 ml with water, then adding the remaining\n~84 ml using the glass pipette. \nNote\n[Labeling]\nLabel the bottle with the buffer name, batch ID, date and the initials of the person who prepared the buffer.\nAttention: Every single bottle prepared at the same day gets a new batch ID. Name the batches with Roman\nnumerals (e.g. batch I, batch II, etc.)\nNote\n[Documentation]\nNote the lot numbers, date and initials written on the reagents used for buffer preparation in Labfolder\n(orange fields).\nprotocols.io | https://dx.doi.org/10.17504/protocols.io.e6nvwdnn7lmk/v1\nMarch 21, 2024\n4/5"
+    },
+    {
+      "number": 5,
+      "text": "NAME\nUV decontamination of reagents/buffers\nCREATED BY\nElena Essel\nPreview\nDocument\nprotocols.io | https://dx.doi.org/10.17504/protocols.io.e6nvwdnn7lmk/v1\nMarch 21, 2024\n5/5"
+    }
+  ],
+  "materials_raw": [
+    "Reagent/consumable",
+    "Supplier",
+    "Catalogue number",
+    "Reagents",
+    "Water",
+    "Sigma Aldrich/Merck",
+    "1153332500",
+    "5 M NaCl",
+    "Sigma Aldrich/Merck",
+    "S5150-1L",
+    "1 M Tris-HCl, pH 8.0",
+    "AppliChem",
+    "A4577,1000",
+    "0.5 M EDTA, ph 8.0",
+    "AppliChem",
+    "A4892,1000",
+    "Tween-20",
+    "Thermo Fisher Scientific",
+    "11417160",
+    "Consumables",
+    "Square media bottle 500",
+    "ml",
+    "VWR",
+    "391-0630",
+    "50 ml serological pipet",
+    "Corning BV",
+    "357550",
+    "10 ml serological pipet",
+    "Corning BV",
+    "357551",
+    "5 ml serological pipet",
+    "Corning BV",
+    "357543",
+    "Equipment",
+    "Serological pipette controller (e.g. battery-powered pipetting aid ROTILABO, cat. no. TC16.1)",
+    "Protocol",
+    "1. Prepare the buffer in a 500 ml square media bottle by adding the following reagents. Use the glass pipette for",
+    "transfer of large volumes (> 1 ml). Mix reagents by shaking the bottle.",
+    "Reagent",
+    "Volume",
+    "Final concentration in reaction",
+    "Water",
+    "483.75 ml",
+    "5 M NaCl",
+    "10 ml",
+    "100 mM",
+    "protocols.io | https://dx.doi.org/10.17504/protocols.io.e6nvwdnn7lmk/v1",
+    "March 21, 2024",
+    "3/5",
+    "Reagent",
+    "Volume",
+    "Final concentration in reaction",
+    "1 M Tris-HCl, pH",
+    "8.0",
+    "5 ml",
+    "10 mM",
+    "0.5 M EDTA, ph",
+    "8.0",
+    "1 ml",
+    "1 mM",
+    "100% Tween-20",
+    "0.25 ml",
+    "0.05%",
+    "sum",
+    "500 ml",
+    "2. Review the protocol in which the buffer is used to determine whether the buffer should be decontaminated",
+    "using UV treatment. Instructions for UV-decontamination are provided in the Appendix.",
+    "3. Store the buffer at room temperature until used. Shelf life is at least one year from preparation.",
+    "Appendix",
+    "Note",
+    "[Note]",
+    "It is also acceptable to use the scale of the bottle to fill up to 400 ml with water, then adding the remaining",
+    "~84 ml using the glass pipette.",
+    "Note",
+    "[Labeling]",
+    "Label the bottle with the buffer name, batch ID, date and the initials of the person who prepared the buffer.",
+    "Attention: Every single bottle prepared at the same day gets a new batch ID. Name the batches with Roman",
+    "numerals (e.g. batch I, batch II, etc.)",
+    "Note",
+    "[Documentation]",
+    "Note the lot numbers, date and initials written on the reagents used for buffer preparation in Labfolder",
+    "(orange fields).",
+    "protocols.io | https://dx.doi.org/10.17504/protocols.io.e6nvwdnn7lmk/v1",
+    "March 21, 2024",
+    "4/5",
+    "NAME",
+    "UV decontamination of reagents/buffers",
+    "CREATED BY",
+    "Elena Essel",
+    "Preview",
+    "Document",
+    "protocols.io | https://dx.doi.org/10.17504/protocols.io.e6nvwdnn7lmk/v1",
+    "March 21, 2024",
+    "5/5"
+  ],
+  "notes": "原始内容由 protocols.io 公开 PDF 导出；未翻译、未改写。PDF 明确写明 Creative Commons Attribution License，但未在导出页注明具体 CC 版本，因此许可证名称保留该原文表述，链接指向 CC BY 4.0 说明页。steps_raw 按 PDF 文本层中可识别的编号步骤分段；若原 PDF 无可识别编号，则将全文放入第 1 步。 steps_raw 以 PDF 每页原文块保存，保留页内换行；未翻译未改写。",
+  "translation_zh": {
+    "title": "0.1xBWT 缓冲液配制",
+    "abstract_zh": "本方案描述 500 ml 缓冲液的配制方法。",
+    "steps": [
+      {
+        "number": 1,
+        "title_zh": "配制缓冲液",
+        "text_zh": "在 500 ml 方形试剂瓶中按下表加入各试剂配制缓冲液。转移大体积（> 1 ml）时使用玻璃移液管。通过摇动瓶子混匀试剂。\n\n试剂 / 体积 / 反应中终浓度：\n· Water — 483.75 ml\n· 5 M NaCl — 10 ml — 100 mM\n· 1 M Tris-HCl, pH 8.0 — 5 ml — 10 mM\n· 0.5 M EDTA, pH 8.0 — 1 ml — 1 mM\n· 100% Tween-20 — 0.25 ml — 0.05%\n· 合计 — 500 ml",
+        "source_text": "Prepare the buffer in a 500 ml square media bottle by adding the following reagents. Use the glass pipette for transfer of large volumes (> 1 ml). Mix reagents by shaking the bottle. [Water 483.75 ml; 5 M NaCl 10 ml -> 100 mM; 1 M Tris-HCl pH 8.0 5 ml -> 10 mM; 0.5 M EDTA pH 8.0 1 ml -> 1 mM; 100% Tween-20 0.25 ml -> 0.05%; sum 500 ml]"
+      },
+      {
+        "number": 2,
+        "title_zh": "确认是否需要紫外去污",
+        "text_zh": "查阅使用该缓冲液的具体方案，确定是否需要对缓冲液进行紫外（UV）去污处理。紫外去污的操作说明见附录。",
+        "source_text": "Review the protocol in which the buffer is used to determine whether the buffer should be decontaminated using UV treatment. Instructions for UV-decontamination are provided in the Appendix."
+      },
+      {
+        "number": 3,
+        "title_zh": "保存",
+        "text_zh": "缓冲液在室温下保存至使用。自配制之日起保质期至少一年。",
+        "source_text": "Store the buffer at room temperature until used. Shelf life is at least one year from preparation."
+      }
+    ],
+    "notes_zh": [
+      "[补充] 也可以先利用瓶身刻度加水至 400 ml，再用玻璃移液管补加剩余约 84 ml。",
+      "[标签] 在瓶上标注缓冲液名称、批次编号（batch ID）、日期以及配制人姓名缩写。注意：同一天配制的每一瓶都要有各自新的批次编号。批次用罗马数字命名（如 batch I、batch II 等）。",
+      "[记录] 将配制所用试剂上的批号（lot number）、日期和姓名缩写记录到 Labfolder（橙色字段）中。"
+    ],
+    "materials": [
+      {
+        "zh": "Water（Sigma Aldrich/Merck，货号 1153332500）",
+        "source": "Water, Sigma Aldrich/Merck, 1153332500"
+      },
+      {
+        "zh": "5 M NaCl（Sigma Aldrich/Merck，货号 S5150-1L）",
+        "source": "5 M NaCl, Sigma Aldrich/Merck, S5150-1L"
+      },
+      {
+        "zh": "1 M Tris-HCl, pH 8.0（AppliChem，货号 A4577,1000）",
+        "source": "1 M Tris-HCl, pH 8.0, AppliChem, A4577,1000"
+      },
+      {
+        "zh": "0.5 M EDTA, pH 8.0（AppliChem，货号 A4892,1000）",
+        "source": "0.5 M EDTA, ph 8.0, AppliChem, A4892,1000"
+      },
+      {
+        "zh": "Tween-20（Thermo Fisher Scientific，货号 11417160）",
+        "source": "Tween-20, Thermo Fisher Scientific, 11417160"
+      },
+      {
+        "zh": "500 ml 方形试剂瓶（VWR，货号 391-0630）",
+        "source": "Square media bottle 500 ml, VWR, 391-0630"
+      },
+      {
+        "zh": "50 / 10 / 5 ml 血清移液管（Corning BV）",
+        "source": "50/10/5 ml serological pipet, Corning BV"
+      },
+      {
+        "zh": "血清移液管助吸器（如电池供电的 ROTILABO 助吸器，货号 TC16.1）",
+        "source": "Serological pipette controller (e.g. ROTILABO, cat. no. TC16.1)"
+      }
+    ],
+    "safety_warnings_zh": [
+      "原文未单独列出安全警告。实际操作请遵守本实验室对 EDTA、Tris 及紫外设备的常规防护要求。"
+    ],
+    "translator": "claude (人工校对流程未完成)",
+    "translated_at": "2026-08-12T13:59:28.498573+08:00",
+    "reviewed_by": null,
+    "review_status": "UNREVIEWED",
+    "uncertain_terms": [
+      "BWT —— 缓冲液名称缩写，原文未展开 [待确认]",
+      "Labfolder —— 电子实验记录本软件名，保留不译",
+      "所有试剂名、货号、浓度与体积均按原文保留，未做任何换算"
+    ],
+    "attribution": {
+      "original_title": "0.1xBWT buffer",
+      "original_authors": [
+        "Anna Schmidt",
+        "Sarah Nagel",
+        "Matthias Meyer"
+      ],
+      "original_affiliation": "Max Planck Institute",
+      "original_url": "https://www.protocols.io/view/0-1xbwt-buffer-c68izhue.pdf",
+      "doi": "https://doi.org/10.17504/protocols.io.e6nvwdnn7lmk/v1",
+      "license_name": "Creative Commons Attribution License (CC BY; version not stated in PDF export)",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "statement": "本中文版为对原方案的翻译改编版本，内容已经过修改（翻译为中文）。原作者未参与本翻译，亦不对本译本负责。"
+    }
+  },
+  "teaching_suitability": {
+    "level": "undergraduate_basic",
+    "reason": "缓冲液配制是最典型的本科基础实验操作，步骤短、参数明确（体积与终浓度齐全），非常适合演示按方案核对参数与偏差检测。",
+    "demo_recommended": true
+  }
+}

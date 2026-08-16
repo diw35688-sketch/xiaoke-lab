@@ -1,0 +1,37 @@
+{
+  "source": "protocols.io",
+  "source_url": "https://www.protocols.io/view/confocal-microscopy-of-dfp-treated-cells-dzfp73mn.pdf",
+  "fetched_at": "2026-08-12T12:46:32+08:00",
+  "license": {
+    "name": "Creative Commons Attribution License (CC BY; version not stated in PDF export)",
+    "url": "https://creativecommons.org/licenses/by/4.0/"
+  },
+  "authors": [
+    "Elias Adriaenssens"
+  ],
+  "title": "Confocal Microscopy of DFP-Treated Cells",
+  "version": "V.1",
+  "doi": "https://doi.org/10.17504/protocols.io.n2bvj9e9blk5/v1",
+  "steps_raw": [
+    {
+      "number": 1,
+      "text": "Mar 21, 2025\nConfocal Microscopy of DFP-Treated Cells\nNature Cell Biology\nDOI\nhttps://dx.doi.org/10.17504/protocols.io.n2bvj9e9blk5/v1\nElias Adriaenssens\nSascha Martens lab, University of Vienna, Max Perutz Labs - Vienna\nElias Adriaenssens\nSascha Martens lab, University of Vienna, Max Perutz Labs - ...\nCreate & collaborate more with a free account\nEdit and publish protocols, collaborate in communities, share insights through comments, and\ntrack progress with run records.\nCreate free account\n1\n1\nDOI: https://dx.doi.org/10.17504/protocols.io.n2bvj9e9blk5/v1\nExternal link: https://doi.org/10.1038/s41556-025-01712-y\nProtocol Citation: Elias Adriaenssens 2025. Confocal Microscopy of DFP-Treated Cells. protocols.io\nhttps://dx.doi.org/10.17504/protocols.io.n2bvj9e9blk5/v1\nManuscript citation:\nAdriaenssens, E., Schaar, S., Cook, A.S.I. et al. Reconstitution of BNIP3/NIX-mitophagy initiation reveals hierarchical flexibility of the\nautophagy machinery. Nat Cell Biol 27, 1272–1287 (2025). https://doi.org/10.1038/s41556-025-01712-y\nprotocols.io | https://dx.doi.org/10.17504/protocols.io.n2bvj9e9blk5/v1\nMarch 21, 2025\n1/3"
+    },
+    {
+      "number": 2,
+      "text": "License: This is an open access  protocol  distributed under the terms of the  Creative Commons Attribution License,  which\npermits unrestricted use, distribution, and reproduction in any medium, provided the original author and source are credited\nProtocol status: Working\nWe use this protocol and it's working\nCreated: February 05, 2025\nLast Modified: March 21, 2025\nProtocol  Integer ID: 120015\nKeywords: ASAPCRN, confocal microscopy of dfp, confocal microscopy, cells after fixation, treated cell, treated cells this\nprotocol detail, dfp, microscopy, cell\nFunders Acknowledgements:\nAligning Science Across Parkinson’s (ASAP)\nGrant ID: ASAP-000350\nMarie Skłodowska-Curie MSCA Postdoctoral fellowship\nGrant ID: 101062916\nAbstract\nThis protocol details the confocal microscopy of DFP-Treated cells after fixation and staining.\nMaterials\nBovine Serum Albumin [BSA] Fisher Scientific Catalog #9048-46-8\nDAPI Fluoromount-G® Southern Biotech Catalog #0100-20\nprotocols.io | https://dx.doi.org/10.17504/protocols.io.n2bvj9e9blk5/v1\nMarch 21, 2025\n2/3"
+    },
+    {
+      "number": 3,
+      "text": "Procedure\n1d 2h 20m\n1\nSeed the cells on glass coverslips (12 mm #1.5) at a concentration of 120,000 cells/well,\nand after treatment with DFP for \n24:00:00 , fix in 100% methanol for \n00:20:00\nat \n-20 °C .\n2\nAfter washing with PBS, block the samples with 5% (v/v) BSA (9048-46-8, Sigma-\nAldrich) diluted in PBS for \n01:00:00  at \nRoom temperature .\n3\nDilute the primary and secondary antibodies in 5% BSA and incubate for \n01:00:00\nat \nRoom temperature  with three PBS washing steps in between.\n4\nMount the cells on microscopy slides in DAPI Fluoromount-G mounting medium (0100-\n20, Southern Biotech), which stains the nuclei, add a cover glass, and store at \n4 °C\nuntil use.\n5\nPerform the confocal microscopy with a Zeiss LSM700 laser scanning confocal\nmicroscopy with Plan-Apochromat 40×/1.30 Oil DIC, WD 0.21 mm objective or Zeiss\nLSM900 with Airyscan 2 confocal super-resolution microscopy with Plan-Apochromat\n63×/1.4 Oil DIC, WD 0.19 mm objective.\n1d 0h 20m\n1h\n1h\nprotocols.io | https://dx.doi.org/10.17504/protocols.io.n2bvj9e9blk5/v1\nMarch 21, 2025\n3/3"
+    }
+  ],
+  "materials_raw": [
+    "Bovine Serum Albumin [BSA] Fisher Scientific Catalog #9048-46-8",
+    "DAPI Fluoromount-G® Southern Biotech Catalog #0100-20",
+    "protocols.io | https://dx.doi.org/10.17504/protocols.io.n2bvj9e9blk5/v1",
+    "March 21, 2025",
+    "2/3"
+  ],
+  "notes": "原始内容由 protocols.io 公开 PDF 导出；未翻译、未改写。PDF 明确写明 Creative Commons Attribution License，但未在导出页注明具体 CC 版本，因此许可证名称保留该原文表述，链接指向 CC BY 4.0 说明页。steps_raw 按 PDF 文本层中可识别的编号步骤分段；若原 PDF 无可识别编号，则将全文放入第 1 步。 steps_raw 以 PDF 每页原文块保存，保留页内换行；未翻译未改写。"
+}
