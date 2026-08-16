@@ -321,3 +321,173 @@ git diff --check
 **当前唯一下一项**：`CLARIFICATION-COMPOUND-CONFIRM-ANSWER-01`。先修数据正确性，确保
 同一句中的确认和实体回答都被执行、字段不丢，再处理 NOACTION 和后续呈现体验；未经用户重新
 确认不得跳项。
+
+---
+
+## 合并补充：protocol / TTS / 危化品三层（2026-08-14）
+
+以下内容来自与主线并行开发的分支，合并时以主线记录为基底，本节仅补充主线未覆盖的部分。
+
+最后整理：2026-08-12
+`PROTOCOL-INTEGRATION-01`：把实验方案接入会话级状态，仍不修改主流程业务规则。
+具体是：会话开始时记录已选方案与当前步骤，普通实验记录经实体结构化后调用
+`compute_missing_fields`，把确定性缺失字段送入现有追问采用链；选择结果为自由
+模式（`None`）时，必须完整保留现在的无方案自由记录行为。
+最后才在 `src/main.py` 做最薄的一层依赖连接。
+`PROTOCOL-01` 语义修正已完成并达到 AUTO_OK：95项专项、全量517项通过。旧链重复问题、LLM偶发
+abstention和启动慢仍是已知问题，本轮没有顺手处理。
+## 2. 可复现基线
+- 真实项目：`C:\Users\dahli\Desktop\asr_demo`（已拆平，无 asr_demo/ 嵌套）
+- 正式解释器：`.venv` 中的 Python 3.11.9
+- 全量自动测试：`535 tests OK`（项目 `.venv`，2026-08-12；本轮新增17项TTS纯逻辑测试）
+- 当前 Git 分支：`codex/asr-demo-unified-understanding`
+- 当前远程：`total = https://github.com/diw35688-sketch/ai107.git`
+- 工作区有未提交改动；本轮明确不提交、不推送。`src/core/unified_understanding.py`、`src/llm/unified_processor.py`和`scripts/demo_offline_session.py`为本轮开始前已有改动，未回滚或覆盖。
+### 采用合同
+- 实验候选经过来源、原文、目标、权限和降级形状检查后，才生成不可变规范快照。
+- 待确认动作被建模为 create/review/defer/answer/confirm/reject_suggestion/no_action。
+- PREPARE_CREATE/PREPARE_UPDATE 只表示准备动作，没有 commit 方法。
+- LLM 中风险状态候选不能直接修改问题；降级 NOTE 不能制造正式问题。
+### 实验方案与确定性缺失字段
+- `ProtocolStep`和`ExperimentProtocol`使用frozen dataclass，并由`ProtocolError`统一承接非法输入。
+- 正式字段是`protocol_values`（方案目标值，永不追问）和`must_record`（现场实测值，缺失才追问）；旧`required_fields`/`expected_values`仅作为读取兼容别名。
+- `SourcedFieldValue`与`FieldValueSource`保存`SPOKEN`、`PROTOCOL_DEFAULT`、`DEVIATION`来源；默认值不覆盖学生原始值。
+- `ProtocolStore`严格读取新JSON字段，拒绝未知/缺失字段、版本不符、重复ID、文件缺失和损坏JSON；上一轮临时旧数据保留读取兼容。
+- `compute_missing_fields`只比较`must_record`，按字段原顺序稳定输出，不调用LLM、不做IO。
+- `detect_protocol_deviations`只做字符串级比较，不做单位归一化或数值换算；例如`60℃`与`60摄氏度`暂判为不一致。
+- `ProtocolStepCursor`是不可变显式游标，仅支持`next`/`prev`/`jump_to`，越界明确报错，不做LLM步骤对齐。
+- `data/protocols/undergraduate_basic_protocols.json`中的3份本科方案已按“方案已定/现场必测”重写。
+- 本轮未修改`main.py`、`InteractionCommandType`，未接LLM/ASR/OCR/上传，也未改现有统一理解合同。
+### main影子模式
+- `UNIFIED_SHADOW_ENABLED` 默认 false；本机 `.env` 当前为真实测试临时开启状态，提交时 `.env` 不进入 Git。
+- 影子链读取同一最终 ASR 证据和只读待确认快照。
+- 影子摘要只显示目标、权限、采用类型、缺失字段、追问标志和动作类型。
+- 影子不写业务文件、不改 SessionContext/ReplyCoordinator、不发 TTS；异常只产生失败摘要，旧流程继续。
+## 4. 最近真实验收
+### 影子会话：Prompt缺失字段 + 执行器验证
+- 会话：`20260811_103134`（1段实验口述"将溶液加热。"+ 结束命令）
+- 影子输出：`目标=experiment_pipeline, 缺失字段=('temperature','duration'), 需要追问=True, 待确认动作=create；未执行`
+- 旧流程：正常创建追问问题1，终端显示"请问加热的目标温度是多少？需要加热多长时间？"
+- 结论：新旧链对"将溶液加热"的判断完全一致，新链的施工单正确产出但未执行（影子隔离生效）。
+### Prompt缺失字段能力修复 + 项目拆平
+- 统一Prompt实验规则新增一行，与旧ANALYSIS_SYSTEM_PROMPT第4条规则一致。
+- 真实DeepSeek以独立脚本复验"将溶液加热。"：missing_fields=['temperature','duration']、1次成功2.32秒。
+- 项目拆平：消除asr_demo/嵌套，消除路径断裂问题（.env、models、测试命令全部简化）。
+- 推送到total/codex/asr-demo-unified-understanding。
+### main影子接入
+- 会话：`20260810_120209`
+- 前3段真实进入 experiment_pipeline/structured_experiment，影子明确“未执行”。
+- 结束候选进入旁路未开放目标后安全失败，旧流程继续，证明失败隔离。
+### 结束命令单一来源
+- 真实问题：“接受实验记录。😔”被旧 main 当作 NOTE。
+- 已删除 main 独立结束字典/正则，统一委托 `InteractionCommandParser`。
+- 修改后短真实会话中，ASR业务记录保持186条、事件保持133条，结束口述没有进入分段、LLM或存储。
+- 状态：`REAL_OK`。
+### 新旧追问差异
+- 会话：`20260810_180242`
+- 真实 ASR：”将溶液加热。”
+- 旧链：`missing_fields=[temperature, duration]`，生成追问。
+- 新统一链及保存证据重放：`missing_fields=()`、`follow_up_required=False`、`no_action`。
+- 根因不是合同矛盾：统一 Prompt 缺少”何时登记缺失字段”的业务能力规则。
+### 统一Prompt缺失字段能力修复
+- 修改：`unified_prompts.py` 实验规则新增一行，与旧 `ANALYSIS_SYSTEM_PROMPT` 第4条规则文字一致。
+- 真实 DeepSeek 复验”将溶液加热。”：`missing_fields=['temperature','duration']`、`should_ask_follow_up=True`、`follow_up_question=”加热到什么温度？需要加热多长时间？”`、降级=False、1次成功2.32秒。
+- 状态：`REAL_OK`。
+## 5. 当前工作区构成
+累计修改大致分为：
+src/asr/              后端抽象与证据schema
+src/core/             统一理解、分派、执行、采用、影子合同
+src/llm/              统一Processor与Router
+src/evaluation/       控制语料基线与术语后处理对照
+scripts/              Fake/真实旁路及评测入口
+tests/                每个新增边界的专项和集成测试
+docs/                 任务清单、交接和学习记录
+本机数据边界：
+- `.env`：忽略，包含本机配置/密钥，不提交。
+- `audio/recordings/`：忽略，真实录音不提交。
+- `results/`：忽略，真实会话数据不提交。
+- `.venv*`、模型下载缓存：忽略，不提交。
+- `audio/wav/`：仓库已有固定非敏感测试样本，保持跟踪。
+- `evaluation/asr_commands/` 中的计划、人工基线和清单可跟踪；采集尝试与生成报告已忽略。
+## 6. 仍未开放的能力
+- ClarificationExecutor尚未接入main.py影子位（CREATE/DEFER/CONFIRM只产出施工单，未真实修改协调器）。
+- ANSWER施工单不填充实体字段（需LLM从answer_text中提取结构化entities）。
+- 自然表达（"我先跳过/可先跳过"）会误入实验管线，需COMMAND-03修复后DEFER才能正常走新链路。
+- 实验方案尚未接入会话状态、当前步骤、主流程或追问执行；当前只有稳定合同、读取、选择和纯函数。
+- 新统一链尚未接管旧 SegmentProcessor 或真实存储。
+- ClarificationAction 尚未提交到 ReplyCoordinator。
+- 结束会话副作用尚未通过统一执行器开放；main仍在正式本地Parser命中后直接结束。
+- 热词候选模型尚未验证或切换。
+- 专业词后处理尚未接入主链。
+- Presentation/TTS 尚未接入。
+- 未提交、未推送、未创建 PR。
+## 7. 提交前整理门
+当前分支是 `main`，且累计改动较多。提交到新总仓前必须：
+1. 确认目标远程地址，不把改动误推到当前 `origin`。
+2. 新建 `codex/` 前缀工作分支，不在 `main` 提交。
+3. 复核 `git status --short`，只暂存源码、测试、脚本和文档。
+4. 确认 `.env`、录音、结果、模型、虚拟环境没有进入暂存区。
+5. 运行 `392+` 全量测试与 `git diff --check`。
+6. 按能力边界拆分提交；不要把全部累计修改压成无法审查的一次提交。
+7. 推送前检查远程和分支名；未经用户明确要求不提交、不推送。
+建议提交分组：
+1. ASR后端抽象＋ASR证据schema v2
+2. 控制语料基线＋术语后处理评测
+3. 统一理解Prompt/Processor/Router
+4. 安全分派＋执行请求合同
+5. 实验/待确认采用合同＋集成旁路
+6. main影子模式＋结束命令单一来源
+7. 任务清单、交接与学习日志
+## 8. 教学与真实验收约定
+每轮按“目的、技术路线、设计原因、实现功能、本轮知识、验收方法、下一步建议”讲解。
+修改触及麦克风、真实 ASR、真实 LLM、持久化或主流程时，自动测试通过后必须主动安排真实环境验收；验收前说明输入、数据外发范围、观察指标和成功/失败标准，验收后用终端、文件计数、会话编号等证据更新状态。历史单次外发授权不能自动扩大。
+## 2026-08-12 本轮验收补充
+- 全量：`Ran 517 tests ... OK`。相对上一轮501项，新增16项协议语义专项测试。
+- 新增模块：`src/core/protocol_cursor.py`、`src/core/protocol_deviations.py`；来源值结构位于`src/core/protocol.py`。
+- 禁止误读：本轮只有纯数据结构和纯函数，不代表方案已接入会话状态或主流程；下一轮仍需显式接线。
+## 2026-08-12 旧语义兼容层清除
+- 上一轮为保住旧测试保留了 `required_fields`/`expected_values` 到新字段的迁移兼容层，
+  实测发现它把已判定为错误的行为原样保留（旧写法构造仍会追问方案里写死的值），本轮彻底删除。
+  `ProtocolStep` 现在只接受 `protocol_values` 和 `must_record`，`ProtocolStore` 同步删除旧字段读取兼容。
+- 约 28 处使用旧字段的测试**逐个按新语义改写**，不是删除；每条原有校验意图都有新测试接住，
+  并新增 `test_protocol_values_are_not_missing_even_when_unprovided` 锁住修正后的语义。
+- 验收：项目 `.venv` 跑 `python -B -m unittest discover`，518 项全部通过。
+- 全库确认 `src/` 与 `tests/` 中不再出现 `required_fields` / `expected_values`。
+- 本轮未改 `src/main.py`、未改 `InteractionCommandType`、未接主流程、未调用 LLM，也未提交或推送。
+- **教训**：语义变更时，"保持所有旧测试全绿"是有害约束。旧测试若编码了已被判定为错误的语义，
+  正确做法是改写测试，而不是加兼容层保护错误行为。
+## 2026-08-12：可打断TTS纯逻辑地基
+### 已完成
+- 新增`CancelScope`：32位代数计数器，提供`generation`、`cancel()`、`is_stale()`、`new_response()`和`reset()`。
+- 新增`TTSBackend`：`runtime_checkable Protocol`，要求后端按块生成`int16`单声道NumPy音频。
+- 新增`InterruptibleTTSPlayer`和`TTSPlaybackResult`：每块播放前检查取消，完成/取消/失败均返回不可变结果；后端和sink异常不冒泡。
+- 新增`NullTTSBackend`与`create_tts_backend()`：当前只支持`null`，使用集中配置的`TTS_BACKEND`和`SAMPLE_RATE`。
+- 配置新增`TTS_BACKEND=null`、`TTS_ENABLED=false`；`.env.example`已同步。
+### 验收证据
+- TTS专项：17项通过。
+- 全量：`Ran 535 tests ... OK`。
+- 语法编译：新增TTS模块、配置和测试均通过`py_compile`。
+- `git diff --check`通过。
+- UTF-8自检：`.env.example`、`src/config.py`、5个TTS源码文件和`tests/test_tts.py`均可用无BOM UTF-8读回，中文字符未损坏。
+### 下一轮注意
+本轮没有真实TTS、没有`OutputStream`、没有模型下载、没有声卡操作、没有`main.py`或`InteractionCommandType`改动；不能把本轮`AUTO_OK`解释成真实播放已验收。接入真实设备前，需要先确定半双工策略、`AssistantState.SPEAKING`生命周期、用户打断入口以及真实sink的线程/资源释放规则。
+## 2026-08-13：PROTOCOL-INTEGRATION-01 会话级方案状态
+### 本轮已完成
+- 新增 `src/core/protocol_session.py` 的 `ProtocolSessionState`：不可变会话级方案状态，自由模式下 `cursor=None`；
+  `next/prev/jump_to/current_step` 在自由模式下均有明确定义的行为，不抛异常。
+- 新增 `src/core/protocol_segment_evaluation.py` 的 `evaluate_segment(state, entities)`：纯函数适配器，
+  把缺失字段、偏差、带来源的字段值汇聚成 `SegmentEvaluation`，供追问链直接消费。
+- `ProtocolStep` 新增 `field_prompts`（字段缺失时的追问话术）；`ProtocolStore` 支持读取该字段。
+  强校验：key 必须属于实体白名单，且**必须同时出现在 `must_record` 里**——给 `protocol_values`
+  配追问话术是语义矛盾，构造阶段直接拒绝。
+- 新增 `scripts/demo_protocol_session.py` 离线演示，运行方式：
+  `$env:PYTHONPATH='.'; .\.venv\Scripts\python.exe -B scripts\demo_protocol_session.py`
+- 测试基线从 535 项增至 553 项，`.\.venv\Scripts\python.exe -B -m unittest discover` 全部通过。
+### 下一轮接线要点
+下一轮做最薄的追问链连接：从 `ProtocolSessionState` 取当前步骤，调 `evaluate_segment`，
+当 `follow_up_required=True` 时调用现有 `ReplyCoordinator.register_clarification`
+（参数为 `segment_id / raw_text / question / missing_fields / requires_confirmation / clarification_id_prefix`）。
+偏差走独立确认路径，不复用缺失字段追问。仍然最后才在 `main.py` 做入口层薄连接。
+### 本轮故意未做
+未改 `src/main.py`，未接 TTS / ASR / LLM，未改 `InteractionCommandType`，未做真实设备验收，未提交未推送。
+

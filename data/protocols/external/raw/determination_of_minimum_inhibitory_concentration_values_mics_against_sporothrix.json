@@ -1,0 +1,35 @@
+{
+  "source": "protocols.io",
+  "source_url": "https://www.protocols.io/view/determination-of-minimum-inhibitory-concentration-bjfbkjin.pdf",
+  "fetched_at": "2026-08-12T12:46:32+08:00",
+  "license": {
+    "name": "Creative Commons Attribution License (CC BY; version not stated in PDF export)",
+    "url": "https://creativecommons.org/licenses/by/4.0/"
+  },
+  "authors": [
+    "luanaborba"
+  ],
+  "title": "Determination of minimum inhibitory concentration values (MICs) against Sporothrix",
+  "version": "未获取到",
+  "doi": "https://doi.org/10.17504/protocols.io.bjfbkjin",
+  "steps_raw": [
+    {
+      "number": 1,
+      "text": "Aug 07, 2020\nVersion 1\nDetermination of minimum inhibitory concentration values (MICs) against\nSporothrix brasiliensis and Sporothrix schenckii V.1\nDOI\nhttps://dx.doi.org/10.17504/protocols.io.bjfbkjin\nluanaborba\nUniversidade Federal do Rio de Janeiro\nL. P. Borba-Santos\nluanaborba\nCreate & collaborate more with a free account\nEdit and publish protocols, collaborate in communities, share insights through comments, and\ntrack progress with run records.\nCreate free account\n1\n1\nDOI: https://dx.doi.org/10.17504/protocols.io.bjfbkjin\nDocument Citation: luanaborba 2020. Determination of minimum inhibitory concentration values (MICs) against Sporothrix\nbrasiliensis and Sporothrix schenckii. protocols.io https://dx.doi.org/10.17504/protocols.io.bjfbkjin\nLicense: This is an open access  document  distributed under the terms of the  Creative Commons Attribution License,  which\npermits unrestricted use, distribution, and reproduction in any medium, provided the original author and source are credited\nprotocols.io | https://dx.doi.org/10.17504/protocols.io.bjfbkjin\nAugust 6, 2020\n1/4"
+    },
+    {
+      "number": 2,
+      "text": "Created: August 07, 2020\nLast Modified: August 07, 2020\nDocument  Integer ID: 40131\nKeywords: sporothrix brasiliensi, minimum inhibitory concentration value, sporothrix\nprotocols.io | https://dx.doi.org/10.17504/protocols.io.bjfbkjin\nAugust 6, 2020\n2/4"
+    },
+    {
+      "number": 3,
+      "text": "Determination of minimum inhibitory concentration values (MICs) against Sporothrix brasiliensis and \nSporothrix schenckii\nThe minimum inhibitory concentration (MIC) of compounds was determined using the broth microdilution\ntechnique described by the CLSI1 with modifications.\n1. Stock solutions of compounds in dimethyl sulfoxide (DMSO) at 1 mM were diluted in RPMI 1640 medium2 \nsupplemented with 2% glucose and buffered to pH 7.2, with 0.165 M MOPS (from here on referred to as\n“supplemented RPMI”) to obtain solutions 4-fold concentrated using sterile microtubes;\n2. Itraconazole2 (reference antifungal) was also included in the experiment;\n3. Aliquots of 100 µl of compounds were added in two wells of the first column of a flat-bottom 96-well microplate\n(KASVI, Brazil);\n4. Aliquots of 100 µl of supplemented RPMI were added in all microplate wells (including wells containing\ncompounds) using a multichannel pipette and a serial 2-fold dilution was performed to the tenth column;\n5. The eleventh column corresponded to the positive controls (containing 100 µl supplemented RPMI without\ncompounds) and the twelfth to the negative controls (containing 200 µl supplemented RPMI);\n6. A standardized suspension of Sporothrix yeasts was adjusted using a Neubauer chamber, prepared in\nsupplemented RPMI, and 100 µl containing 2 x 105 CFU/ml was added in microplates containing compounds\n(except in the twelfth column);\n7. The final concentration of compounds ranged from 0.002 to 1 µM, while yeasts were 1 x 105 CFU/ml;\n8. Samples were incubated at 35 °C for 48 h, in a 5 % CO2 atmosphere;\n9. Fungal growth was analyzed by visual inspection in an inverted light microscope (Axiovert 100, ZEISS Company,\nGermany);\n10. After visual inspection, samples were homogenized and the optical density was quantified by\nspectrophotometric readings at 492 nm, in a microtiter plate reader (EMax Plus, Molecular Devices, USA);\n11. The absorbance value for each well was subtracted from the mean value for the negative controls;\n12.  Inhibition of fungal growth (I) relative to positive controls was calculated according to the following equation: I\n= 100 – (A x 100/C), where A is the absorbance of treated wells, and C is the absorbance of positive controls;\n13. Concentrations that inhibit 50% and 80% of fungal growth (IC50 and IC80, respectively) were estimated. \nprotocols.io | https://dx.doi.org/10.17504/protocols.io.bjfbkjin\nAugust 6, 2020\n3/4"
+    },
+    {
+      "number": 4,
+      "text": "1CLSI. Reference Method for Broth Dilution Antifungal Susceptibility Testing of Yeasts. 4th ed. CLSI standard\nM27.Wayne, PA: Clinical and Laboratory Standards Institute; 2017.\n2Sigma Chemical Co., USA.\nprotocols.io | https://dx.doi.org/10.17504/protocols.io.bjfbkjin\nAugust 6, 2020\n4/4"
+    }
+  ],
+  "materials_raw": [],
+  "notes": "原始内容由 protocols.io 公开 PDF 导出；未翻译、未改写。PDF 明确写明 Creative Commons Attribution License，但未在导出页注明具体 CC 版本，因此许可证名称保留该原文表述，链接指向 CC BY 4.0 说明页。steps_raw 按 PDF 文本层中可识别的编号步骤分段；若原 PDF 无可识别编号，则将全文放入第 1 步。 steps_raw 以 PDF 每页原文块保存，保留页内换行；未翻译未改写。"
+}
