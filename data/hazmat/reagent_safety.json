@@ -1,0 +1,4385 @@
+{
+  "schema_version": 1,
+  "built_at": "2026-08-14T21:07:23.028187+08:00",
+  "scope": "本科生物与化学基础实验常用试剂，不是通用危化品数据库",
+  "data_status_meaning": {
+    "CLASSIFIED": "PubChem 有 GHS 危害分类",
+    "NO_GHS_CLASSIFICATION": "物质可查到但无 GHS 危害分类（通常为低危物质，仍不等于绝对安全）",
+    "NOT_FOUND": "PubChem 化合物库查不到（多为聚合物或混合物），本库无该物质数据，不可据此认为无害"
+  },
+  "authority_note": "事实数据（CAS、分子式、分子量、GHS分类）来自 PubChem，可逐条溯源；H码中文依据 GB 30000 系列。PubChem 聚合多来源 SDS，采用并集，存在偏保守的分类；本库 review_status 全部为 UNREVIEWED，不得作为正式安全依据，不替代 MSDS 与实验室 SOP。",
+  "reagents": [
+    {
+      "name_zh": "氢氧化钠",
+      "name_en": "sodium hydroxide",
+      "cas": "1310-73-2",
+      "molecular_formula": "HNaO",
+      "molecular_weight": "39.997",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [
+          "Corrosive",
+          "Health Hazard",
+          "Irritant"
+        ],
+        "hazard_codes": [
+          "H290",
+          "H314",
+          "H315",
+          "H318",
+          "H319",
+          "H335",
+          "H370"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H290",
+            "text": "可能腐蚀金属"
+          },
+          {
+            "code": "H314",
+            "text": "造成严重皮肤灼伤和眼损伤"
+          },
+          {
+            "code": "H315",
+            "text": "造成皮肤刺激"
+          },
+          {
+            "code": "H318",
+            "text": "造成严重眼损伤"
+          },
+          {
+            "code": "H319",
+            "text": "造成严重眼刺激"
+          },
+          {
+            "code": "H335",
+            "text": "可能引起呼吸道刺激"
+          },
+          {
+            "code": "H370",
+            "text": "对器官造成损害"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": [
+          "P234",
+          "P260",
+          "P261",
+          "P264",
+          "P264+P265",
+          "P270",
+          "P271",
+          "P280",
+          "P301+P330+P331",
+          "P302+P352",
+          "P302+P361+P354",
+          "P304+P340",
+          "P305+P351+P338",
+          "P305+P354+P338",
+          "P308+P316",
+          "P316",
+          "P317",
+          "P319",
+          "P321",
+          "P332+P317"
+        ]
+      },
+      "critical_codes": [
+        "H314",
+        "H318",
+        "H370"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/14798",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "盐酸",
+      "name_en": "hydrochloric acid",
+      "cas": "7647-01-0",
+      "molecular_formula": "ClH",
+      "molecular_weight": "36.46",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [
+          "Acute Toxic",
+          "Compressed Gas",
+          "Corrosive",
+          "Environmental Hazard",
+          "Health Hazard",
+          "Irritant"
+        ],
+        "hazard_codes": [
+          "H280",
+          "H290",
+          "H301",
+          "H314",
+          "H318",
+          "H330",
+          "H331",
+          "H334",
+          "H335",
+          "H370",
+          "H372",
+          "H400"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H280",
+            "text": "内装加压气体，遇热可能爆炸"
+          },
+          {
+            "code": "H290",
+            "text": "可能腐蚀金属"
+          },
+          {
+            "code": "H301",
+            "text": "吞咽会中毒"
+          },
+          {
+            "code": "H314",
+            "text": "造成严重皮肤灼伤和眼损伤"
+          },
+          {
+            "code": "H318",
+            "text": "造成严重眼损伤"
+          },
+          {
+            "code": "H330",
+            "text": "吸入致命"
+          },
+          {
+            "code": "H331",
+            "text": "吸入会中毒"
+          },
+          {
+            "code": "H334",
+            "text": "吸入可能导致过敏或哮喘症状或呼吸困难"
+          },
+          {
+            "code": "H335",
+            "text": "可能引起呼吸道刺激"
+          },
+          {
+            "code": "H370",
+            "text": "对器官造成损害"
+          },
+          {
+            "code": "H372",
+            "text": "长期或反复接触会对器官造成损害"
+          },
+          {
+            "code": "H400",
+            "text": "对水生生物毒性极大"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": [
+          "P233",
+          "P234",
+          "P260",
+          "P261",
+          "P264",
+          "P264+P265",
+          "P270",
+          "P271",
+          "P273",
+          "P280",
+          "P284",
+          "P301+P316",
+          "P301+P330+P331",
+          "P302+P361+P354",
+          "P304+P340",
+          "P305+P354+P338",
+          "P308+P316",
+          "P316",
+          "P317",
+          "P319"
+        ]
+      },
+      "critical_codes": [
+        "H301",
+        "H314",
+        "H318",
+        "H330",
+        "H331",
+        "H370",
+        "H372"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/313",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "硫酸铜",
+      "name_en": "copper sulfate",
+      "cas": "7758-98-7",
+      "molecular_formula": "CuO4S",
+      "molecular_weight": "159.61",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [
+          "Acute Toxic",
+          "Corrosive",
+          "Environmental Hazard",
+          "Health Hazard",
+          "Irritant"
+        ],
+        "hazard_codes": [
+          "H301",
+          "H302",
+          "H314",
+          "H315",
+          "H317",
+          "H318",
+          "H319",
+          "H335",
+          "H341",
+          "H361",
+          "H370",
+          "H372",
+          "H373",
+          "H400",
+          "H410"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H301",
+            "text": "吞咽会中毒"
+          },
+          {
+            "code": "H302",
+            "text": "吞咽有害"
+          },
+          {
+            "code": "H314",
+            "text": "造成严重皮肤灼伤和眼损伤"
+          },
+          {
+            "code": "H315",
+            "text": "造成皮肤刺激"
+          },
+          {
+            "code": "H317",
+            "text": "可能造成皮肤过敏反应"
+          },
+          {
+            "code": "H318",
+            "text": "造成严重眼损伤"
+          },
+          {
+            "code": "H319",
+            "text": "造成严重眼刺激"
+          },
+          {
+            "code": "H335",
+            "text": "可能引起呼吸道刺激"
+          },
+          {
+            "code": "H341",
+            "text": "怀疑造成遗传性缺陷"
+          },
+          {
+            "code": "H361",
+            "text": "怀疑对生育力或未出生的胎儿造成伤害"
+          },
+          {
+            "code": "H370",
+            "text": "对器官造成损害"
+          },
+          {
+            "code": "H372",
+            "text": "长期或反复接触会对器官造成损害"
+          },
+          {
+            "code": "H373",
+            "text": "长期或反复接触可能对器官造成损害"
+          },
+          {
+            "code": "H400",
+            "text": "对水生生物毒性极大"
+          },
+          {
+            "code": "H410",
+            "text": "对水生生物毒性极大并具有长期持续影响"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": [
+          "P203",
+          "P260",
+          "P261",
+          "P264",
+          "P264+P265",
+          "P270",
+          "P271",
+          "P272",
+          "P273",
+          "P280",
+          "P301+P316",
+          "P301+P317",
+          "P301+P330+P331",
+          "P302+P352",
+          "P302+P361+P354",
+          "P304+P340",
+          "P305+P351+P338",
+          "P305+P354+P338",
+          "P308+P316",
+          "P316"
+        ]
+      },
+      "critical_codes": [
+        "H301",
+        "H314",
+        "H318",
+        "H370",
+        "H372"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/24462",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "五水硫酸铜",
+      "name_en": "copper sulfate pentahydrate",
+      "cas": "7758-99-8",
+      "molecular_formula": "CuH10O9S",
+      "molecular_weight": "249.69",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [
+          "Corrosive",
+          "Environmental Hazard",
+          "Health Hazard",
+          "Irritant"
+        ],
+        "hazard_codes": [
+          "H290",
+          "H302",
+          "H314",
+          "H315",
+          "H317",
+          "H318",
+          "H319",
+          "H341",
+          "H361",
+          "H370",
+          "H372",
+          "H373",
+          "H400",
+          "H410",
+          "H411"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H290",
+            "text": "可能腐蚀金属"
+          },
+          {
+            "code": "H302",
+            "text": "吞咽有害"
+          },
+          {
+            "code": "H314",
+            "text": "造成严重皮肤灼伤和眼损伤"
+          },
+          {
+            "code": "H315",
+            "text": "造成皮肤刺激"
+          },
+          {
+            "code": "H317",
+            "text": "可能造成皮肤过敏反应"
+          },
+          {
+            "code": "H318",
+            "text": "造成严重眼损伤"
+          },
+          {
+            "code": "H319",
+            "text": "造成严重眼刺激"
+          },
+          {
+            "code": "H341",
+            "text": "怀疑造成遗传性缺陷"
+          },
+          {
+            "code": "H361",
+            "text": "怀疑对生育力或未出生的胎儿造成伤害"
+          },
+          {
+            "code": "H370",
+            "text": "对器官造成损害"
+          },
+          {
+            "code": "H372",
+            "text": "长期或反复接触会对器官造成损害"
+          },
+          {
+            "code": "H373",
+            "text": "长期或反复接触可能对器官造成损害"
+          },
+          {
+            "code": "H400",
+            "text": "对水生生物毒性极大"
+          },
+          {
+            "code": "H410",
+            "text": "对水生生物毒性极大并具有长期持续影响"
+          },
+          {
+            "code": "H411",
+            "text": "对水生生物有毒并具有长期持续影响"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": [
+          "P203",
+          "P234",
+          "P260",
+          "P261",
+          "P264",
+          "P264+P265",
+          "P270",
+          "P272",
+          "P273",
+          "P280",
+          "P301+P317",
+          "P301+P330+P331",
+          "P302+P352",
+          "P302+P361+P354",
+          "P304+P340",
+          "P305+P351+P338",
+          "P305+P354+P338",
+          "P308+P316",
+          "P316",
+          "P317"
+        ]
+      },
+      "critical_codes": [
+        "H314",
+        "H318",
+        "H370",
+        "H372"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/24463",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "磷酸二氢钠",
+      "name_en": "sodium dihydrogen phosphate",
+      "cas": "7558-80-7",
+      "molecular_formula": "H2NaO4P",
+      "molecular_weight": "119.977",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Warning",
+        "pictograms": [
+          "Irritant"
+        ],
+        "hazard_codes": [
+          "H319"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H319",
+            "text": "造成严重眼刺激"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": [
+          "P264+P265",
+          "P280",
+          "P305+P351+P338",
+          "P337+P317"
+        ]
+      },
+      "critical_codes": [],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/23672064",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "磷酸氢二钠",
+      "name_en": "disodium hydrogen phosphate",
+      "cas": "7558-79-4",
+      "molecular_formula": "HNa2O4P",
+      "molecular_weight": "141.959",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Warning",
+        "pictograms": [
+          "Irritant"
+        ],
+        "hazard_codes": [
+          "H319"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H319",
+            "text": "造成严重眼刺激"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": [
+          "P264+P265",
+          "P280",
+          "P305+P351+P338",
+          "P337+P317"
+        ]
+      },
+      "critical_codes": [],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/24203",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "酚酞",
+      "name_en": "phenolphthalein",
+      "cas": "77-09-8",
+      "molecular_formula": "C20H14O4",
+      "molecular_weight": "318.3",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [
+          "Health Hazard",
+          "Irritant"
+        ],
+        "hazard_codes": [
+          "H317",
+          "H319",
+          "H341",
+          "H350",
+          "H351",
+          "H360",
+          "H361",
+          "H372",
+          "H401",
+          "H412"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H317",
+            "text": "可能造成皮肤过敏反应"
+          },
+          {
+            "code": "H319",
+            "text": "造成严重眼刺激"
+          },
+          {
+            "code": "H341",
+            "text": "怀疑造成遗传性缺陷"
+          },
+          {
+            "code": "H350",
+            "text": "可能致癌"
+          },
+          {
+            "code": "H351",
+            "text": "怀疑致癌"
+          },
+          {
+            "code": "H360",
+            "text": "可能对生育力或未出生的胎儿造成伤害"
+          },
+          {
+            "code": "H361",
+            "text": "怀疑对生育力或未出生的胎儿造成伤害"
+          },
+          {
+            "code": "H372",
+            "text": "长期或反复接触会对器官造成损害"
+          },
+          {
+            "code": "H401",
+            "text": "对水生生物有毒"
+          },
+          {
+            "code": "H412",
+            "text": "对水生生物有害并具有长期持续影响"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": [
+          "P203",
+          "P260",
+          "P261",
+          "P264",
+          "P264+P265",
+          "P270",
+          "P272",
+          "P273",
+          "P280",
+          "P302+P352",
+          "P305+P351+P338",
+          "P318",
+          "P319",
+          "P321",
+          "P333+P317",
+          "P337+P317",
+          "P362+P364",
+          "P405",
+          "P501"
+        ]
+      },
+      "critical_codes": [
+        "H350",
+        "H360",
+        "H372"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/4764",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "乙醇",
+      "name_en": "ethanol",
+      "cas": "64-17-5",
+      "molecular_formula": "C2H6O",
+      "molecular_weight": "46.07",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [
+          "Flammable",
+          "Health Hazard",
+          "Irritant"
+        ],
+        "hazard_codes": [
+          "H225",
+          "H315",
+          "H319",
+          "H320",
+          "H335",
+          "H336",
+          "H340",
+          "H350",
+          "H360",
+          "H372",
+          "H373",
+          "H412"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H225",
+            "text": "高度易燃液体和蒸气"
+          },
+          {
+            "code": "H315",
+            "text": "造成皮肤刺激"
+          },
+          {
+            "code": "H319",
+            "text": "造成严重眼刺激"
+          },
+          {
+            "code": "H320",
+            "text": "造成眼刺激"
+          },
+          {
+            "code": "H335",
+            "text": "可能引起呼吸道刺激"
+          },
+          {
+            "code": "H336",
+            "text": "可能引起昏昏欲睡或眩晕"
+          },
+          {
+            "code": "H340",
+            "text": "可能造成遗传性缺陷"
+          },
+          {
+            "code": "H350",
+            "text": "可能致癌"
+          },
+          {
+            "code": "H360",
+            "text": "可能对生育力或未出生的胎儿造成伤害"
+          },
+          {
+            "code": "H372",
+            "text": "长期或反复接触会对器官造成损害"
+          },
+          {
+            "code": "H373",
+            "text": "长期或反复接触可能对器官造成损害"
+          },
+          {
+            "code": "H412",
+            "text": "对水生生物有害并具有长期持续影响"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": [
+          "P203",
+          "P210",
+          "P233",
+          "P240",
+          "P241",
+          "P242",
+          "P243",
+          "P260",
+          "P261",
+          "P264",
+          "P264+P265",
+          "P270",
+          "P271",
+          "P273",
+          "P280",
+          "P302+P352",
+          "P303+P361+P353",
+          "P304+P340",
+          "P305+P351+P338",
+          "P318"
+        ]
+      },
+      "critical_codes": [
+        "H225",
+        "H340",
+        "H350",
+        "H360",
+        "H372"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/702",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "硼酸",
+      "name_en": "boric acid",
+      "cas": "10043-35-3",
+      "molecular_formula": "BH3O3",
+      "molecular_weight": "61.84",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [
+          "Health Hazard",
+          "Irritant"
+        ],
+        "hazard_codes": [
+          "H303",
+          "H315",
+          "H319",
+          "H335",
+          "H360",
+          "H370",
+          "H372",
+          "H402"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H303",
+            "text": "吞咽可能有害"
+          },
+          {
+            "code": "H315",
+            "text": "造成皮肤刺激"
+          },
+          {
+            "code": "H319",
+            "text": "造成严重眼刺激"
+          },
+          {
+            "code": "H335",
+            "text": "可能引起呼吸道刺激"
+          },
+          {
+            "code": "H360",
+            "text": "可能对生育力或未出生的胎儿造成伤害"
+          },
+          {
+            "code": "H370",
+            "text": "对器官造成损害"
+          },
+          {
+            "code": "H372",
+            "text": "长期或反复接触会对器官造成损害"
+          },
+          {
+            "code": "H402",
+            "text": "对水生生物有害"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": [
+          "P203",
+          "P260",
+          "P261",
+          "P264",
+          "P264+P265",
+          "P270",
+          "P271",
+          "P273",
+          "P280",
+          "P301+P317",
+          "P302+P352",
+          "P304+P340",
+          "P305+P351+P338",
+          "P308+P316",
+          "P318",
+          "P319",
+          "P321",
+          "P332+P317",
+          "P337+P317",
+          "P362+P364"
+        ]
+      },
+      "critical_codes": [
+        "H360",
+        "H370",
+        "H372"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/7628",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "乙酸锂",
+      "name_en": "lithium acetate",
+      "cas": "546-89-4",
+      "molecular_formula": "C2H3LiO2",
+      "molecular_weight": "66.0",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Warning",
+        "pictograms": [
+          "Irritant"
+        ],
+        "hazard_codes": [
+          "H302",
+          "H319"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H302",
+            "text": "吞咽有害"
+          },
+          {
+            "code": "H319",
+            "text": "造成严重眼刺激"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": [
+          "P264",
+          "P264+P265",
+          "P270",
+          "P280",
+          "P301+P317",
+          "P305+P351+P338",
+          "P330",
+          "P337+P317",
+          "P501"
+        ]
+      },
+      "critical_codes": [],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/3474584",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "Tris碱",
+      "name_en": "tromethamine",
+      "cas": "77-86-1",
+      "molecular_formula": "C4H11NO3",
+      "molecular_weight": "121.14",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Warning",
+        "pictograms": [
+          "Irritant"
+        ],
+        "hazard_codes": [
+          "H315",
+          "H319",
+          "H335"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H315",
+            "text": "造成皮肤刺激"
+          },
+          {
+            "code": "H319",
+            "text": "造成严重眼刺激"
+          },
+          {
+            "code": "H335",
+            "text": "可能引起呼吸道刺激"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": [
+          "P261",
+          "P264",
+          "P264+P265",
+          "P271",
+          "P280",
+          "P302+P352",
+          "P304+P340",
+          "P305+P351+P338",
+          "P319",
+          "P321",
+          "P332+P317",
+          "P337+P317",
+          "P362+P364",
+          "P403+P233",
+          "P405",
+          "P501"
+        ]
+      },
+      "critical_codes": [],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/6503",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "氯化钠",
+      "name_en": "sodium chloride",
+      "cas": "7647-14-5",
+      "molecular_formula": "ClNa",
+      "molecular_weight": "58.44",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [
+          "Corrosive",
+          "Irritant"
+        ],
+        "hazard_codes": [
+          "H318",
+          "H319",
+          "H412"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H318",
+            "text": "造成严重眼损伤"
+          },
+          {
+            "code": "H319",
+            "text": "造成严重眼刺激"
+          },
+          {
+            "code": "H412",
+            "text": "对水生生物有害并具有长期持续影响"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": [
+          "P264+P265",
+          "P273",
+          "P280",
+          "P305+P351+P338",
+          "P305+P354+P338",
+          "P317",
+          "P337+P317",
+          "P501"
+        ]
+      },
+      "critical_codes": [
+        "H318"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/5234",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "硫酸",
+      "name_en": "sulfuric acid",
+      "cas": "7664-93-9",
+      "molecular_formula": "H2O4S",
+      "molecular_weight": "98.08",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [
+          "Acute Toxic",
+          "Corrosive",
+          "Environmental Hazard",
+          "Health Hazard"
+        ],
+        "hazard_codes": [
+          "H290",
+          "H303",
+          "H314",
+          "H318",
+          "H330",
+          "H370",
+          "H372",
+          "H402",
+          "H410"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H290",
+            "text": "可能腐蚀金属"
+          },
+          {
+            "code": "H303",
+            "text": "吞咽可能有害"
+          },
+          {
+            "code": "H314",
+            "text": "造成严重皮肤灼伤和眼损伤"
+          },
+          {
+            "code": "H318",
+            "text": "造成严重眼损伤"
+          },
+          {
+            "code": "H330",
+            "text": "吸入致命"
+          },
+          {
+            "code": "H370",
+            "text": "对器官造成损害"
+          },
+          {
+            "code": "H372",
+            "text": "长期或反复接触会对器官造成损害"
+          },
+          {
+            "code": "H402",
+            "text": "对水生生物有害"
+          },
+          {
+            "code": "H410",
+            "text": "对水生生物毒性极大并具有长期持续影响"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": [
+          "P234",
+          "P260",
+          "P264",
+          "P264+P265",
+          "P270",
+          "P271",
+          "P273",
+          "P280",
+          "P284",
+          "P301+P317",
+          "P301+P330+P331",
+          "P302+P361+P354",
+          "P304+P340",
+          "P305+P354+P338",
+          "P308+P316",
+          "P316",
+          "P317",
+          "P319",
+          "P320",
+          "P321"
+        ]
+      },
+      "critical_codes": [
+        "H314",
+        "H318",
+        "H330",
+        "H370",
+        "H372"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/1118",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "硝酸",
+      "name_en": "nitric acid",
+      "cas": "7697-37-2",
+      "molecular_formula": "HNO3",
+      "molecular_weight": "63.013",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [
+          "Acute Toxic",
+          "Corrosive",
+          "Environmental Hazard",
+          "Health Hazard",
+          "Oxidizer"
+        ],
+        "hazard_codes": [
+          "H272",
+          "H290",
+          "H302",
+          "H304",
+          "H314",
+          "H318",
+          "H330",
+          "H331",
+          "H370",
+          "H372",
+          "H402"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H272",
+            "text": "可能加剧燃烧；氧化剂"
+          },
+          {
+            "code": "H290",
+            "text": "可能腐蚀金属"
+          },
+          {
+            "code": "H302",
+            "text": "吞咽有害"
+          },
+          {
+            "code": "H304",
+            "text": "吞咽及进入呼吸道可能致命"
+          },
+          {
+            "code": "H314",
+            "text": "造成严重皮肤灼伤和眼损伤"
+          },
+          {
+            "code": "H318",
+            "text": "造成严重眼损伤"
+          },
+          {
+            "code": "H330",
+            "text": "吸入致命"
+          },
+          {
+            "code": "H331",
+            "text": "吸入会中毒"
+          },
+          {
+            "code": "H370",
+            "text": "对器官造成损害"
+          },
+          {
+            "code": "H372",
+            "text": "长期或反复接触会对器官造成损害"
+          },
+          {
+            "code": "H402",
+            "text": "对水生生物有害"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": [
+          "P210",
+          "P220",
+          "P234",
+          "P260",
+          "P261",
+          "P264",
+          "P264+P265",
+          "P270",
+          "P271",
+          "P273",
+          "P280",
+          "P284",
+          "P301+P316",
+          "P301+P317",
+          "P301+P330+P331",
+          "P302+P361+P354",
+          "P304+P340",
+          "P305+P354+P338",
+          "P308+P316",
+          "P316"
+        ]
+      },
+      "critical_codes": [
+        "H304",
+        "H314",
+        "H318",
+        "H330",
+        "H331",
+        "H370",
+        "H372"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/944",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "磷酸",
+      "name_en": "phosphoric acid",
+      "cas": "7664-38-2",
+      "molecular_formula": "H3O4P",
+      "molecular_weight": "97.995",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [
+          "Acute Toxic",
+          "Corrosive",
+          "Health Hazard",
+          "Irritant"
+        ],
+        "hazard_codes": [
+          "H290",
+          "H302",
+          "H313",
+          "H314",
+          "H318",
+          "H331",
+          "H332",
+          "H335",
+          "H370",
+          "H402"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H290",
+            "text": "可能腐蚀金属"
+          },
+          {
+            "code": "H302",
+            "text": "吞咽有害"
+          },
+          {
+            "code": "H313",
+            "text": "皮肤接触可能有害"
+          },
+          {
+            "code": "H314",
+            "text": "造成严重皮肤灼伤和眼损伤"
+          },
+          {
+            "code": "H318",
+            "text": "造成严重眼损伤"
+          },
+          {
+            "code": "H331",
+            "text": "吸入会中毒"
+          },
+          {
+            "code": "H332",
+            "text": "吸入有害"
+          },
+          {
+            "code": "H335",
+            "text": "可能引起呼吸道刺激"
+          },
+          {
+            "code": "H370",
+            "text": "对器官造成损害"
+          },
+          {
+            "code": "H402",
+            "text": "对水生生物有害"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": [
+          "P234",
+          "P260",
+          "P261",
+          "P264",
+          "P264+P265",
+          "P270",
+          "P271",
+          "P273",
+          "P280",
+          "P301+P317",
+          "P301+P330+P331",
+          "P302+P317",
+          "P302+P361+P354",
+          "P304+P340",
+          "P305+P354+P338",
+          "P308+P316",
+          "P316",
+          "P317",
+          "P319",
+          "P321"
+        ]
+      },
+      "critical_codes": [
+        "H314",
+        "H318",
+        "H331",
+        "H370"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/1004",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "氢氧化钾",
+      "name_en": "potassium hydroxide",
+      "cas": "1310-58-3",
+      "molecular_formula": "HKO",
+      "molecular_weight": "56.106",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [
+          "Acute Toxic",
+          "Corrosive",
+          "Health Hazard",
+          "Irritant"
+        ],
+        "hazard_codes": [
+          "H290",
+          "H301",
+          "H302",
+          "H304",
+          "H314",
+          "H318",
+          "H370",
+          "H372",
+          "H402"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H290",
+            "text": "可能腐蚀金属"
+          },
+          {
+            "code": "H301",
+            "text": "吞咽会中毒"
+          },
+          {
+            "code": "H302",
+            "text": "吞咽有害"
+          },
+          {
+            "code": "H304",
+            "text": "吞咽及进入呼吸道可能致命"
+          },
+          {
+            "code": "H314",
+            "text": "造成严重皮肤灼伤和眼损伤"
+          },
+          {
+            "code": "H318",
+            "text": "造成严重眼损伤"
+          },
+          {
+            "code": "H370",
+            "text": "对器官造成损害"
+          },
+          {
+            "code": "H372",
+            "text": "长期或反复接触会对器官造成损害"
+          },
+          {
+            "code": "H402",
+            "text": "对水生生物有害"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": [
+          "P234",
+          "P260",
+          "P264",
+          "P264+P265",
+          "P270",
+          "P273",
+          "P280",
+          "P301+P316",
+          "P301+P317",
+          "P301+P330+P331",
+          "P302+P361+P354",
+          "P304+P340",
+          "P305+P354+P338",
+          "P308+P316",
+          "P316",
+          "P317",
+          "P319",
+          "P321",
+          "P330",
+          "P331"
+        ]
+      },
+      "critical_codes": [
+        "H301",
+        "H304",
+        "H314",
+        "H318",
+        "H370",
+        "H372"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/14797",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "氨水",
+      "name_en": "ammonium hydroxide",
+      "cas": "1336-21-6",
+      "molecular_formula": "H5NO",
+      "molecular_weight": "35.046",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [
+          "Acute Toxic",
+          "Corrosive",
+          "Environmental Hazard",
+          "Health Hazard",
+          "Irritant"
+        ],
+        "hazard_codes": [
+          "H290",
+          "H302",
+          "H314",
+          "H318",
+          "H331",
+          "H335",
+          "H370",
+          "H371",
+          "H373",
+          "H400",
+          "H401",
+          "H402"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H290",
+            "text": "可能腐蚀金属"
+          },
+          {
+            "code": "H302",
+            "text": "吞咽有害"
+          },
+          {
+            "code": "H314",
+            "text": "造成严重皮肤灼伤和眼损伤"
+          },
+          {
+            "code": "H318",
+            "text": "造成严重眼损伤"
+          },
+          {
+            "code": "H331",
+            "text": "吸入会中毒"
+          },
+          {
+            "code": "H335",
+            "text": "可能引起呼吸道刺激"
+          },
+          {
+            "code": "H370",
+            "text": "对器官造成损害"
+          },
+          {
+            "code": "H371",
+            "text": "可能对器官造成损害"
+          },
+          {
+            "code": "H373",
+            "text": "长期或反复接触可能对器官造成损害"
+          },
+          {
+            "code": "H400",
+            "text": "对水生生物毒性极大"
+          },
+          {
+            "code": "H401",
+            "text": "对水生生物有毒"
+          },
+          {
+            "code": "H402",
+            "text": "对水生生物有害"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": [
+          "P234",
+          "P260",
+          "P261",
+          "P264",
+          "P264+P265",
+          "P270",
+          "P271",
+          "P273",
+          "P280",
+          "P301+P317",
+          "P301+P330+P331",
+          "P302+P361+P354",
+          "P304+P340",
+          "P305+P354+P338",
+          "P308+P316",
+          "P316",
+          "P317",
+          "P319",
+          "P321",
+          "P330"
+        ]
+      },
+      "critical_codes": [
+        "H314",
+        "H318",
+        "H331",
+        "H370"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/14923",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "碳酸钠",
+      "name_en": "sodium carbonate",
+      "cas": "497-19-8",
+      "molecular_formula": "CNa2O3",
+      "molecular_weight": "105.988",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [
+          "Corrosive",
+          "Health Hazard",
+          "Irritant"
+        ],
+        "hazard_codes": [
+          "H304",
+          "H318",
+          "H319",
+          "H332",
+          "H335",
+          "H336",
+          "H370"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H304",
+            "text": "吞咽及进入呼吸道可能致命"
+          },
+          {
+            "code": "H318",
+            "text": "造成严重眼损伤"
+          },
+          {
+            "code": "H319",
+            "text": "造成严重眼刺激"
+          },
+          {
+            "code": "H332",
+            "text": "吸入有害"
+          },
+          {
+            "code": "H335",
+            "text": "可能引起呼吸道刺激"
+          },
+          {
+            "code": "H336",
+            "text": "可能引起昏昏欲睡或眩晕"
+          },
+          {
+            "code": "H370",
+            "text": "对器官造成损害"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": [
+          "P260",
+          "P261",
+          "P264",
+          "P264+P265",
+          "P270",
+          "P271",
+          "P280",
+          "P301+P316",
+          "P304+P340",
+          "P305+P351+P338",
+          "P305+P354+P338",
+          "P308+P316",
+          "P317",
+          "P319",
+          "P321",
+          "P331",
+          "P337+P317",
+          "P403+P233",
+          "P405",
+          "P501"
+        ]
+      },
+      "critical_codes": [
+        "H304",
+        "H318",
+        "H370"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/10340",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "碳酸氢钠",
+      "name_en": "sodium bicarbonate",
+      "cas": "144-55-8",
+      "molecular_formula": "CHNaO3",
+      "molecular_weight": "84.007",
+      "data_status": "NO_GHS_CLASSIFICATION",
+      "ghs": {
+        "signal_word": null,
+        "pictograms": [],
+        "hazard_codes": [],
+        "hazard_statements_zh": [],
+        "unmapped_codes": [],
+        "precautionary_codes": []
+      },
+      "critical_codes": [],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/516892",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": [
+        "PubChem无GHS分类数据"
+      ]
+    },
+    {
+      "name_zh": "甲醇",
+      "name_en": "methanol",
+      "cas": "67-56-1",
+      "molecular_formula": "CH4O",
+      "molecular_weight": "32.042",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [
+          "Acute Toxic",
+          "Flammable",
+          "Health Hazard",
+          "Irritant"
+        ],
+        "hazard_codes": [
+          "H225",
+          "H301",
+          "H302",
+          "H303",
+          "H311",
+          "H319",
+          "H331",
+          "H335",
+          "H336",
+          "H360",
+          "H370",
+          "H372"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H225",
+            "text": "高度易燃液体和蒸气"
+          },
+          {
+            "code": "H301",
+            "text": "吞咽会中毒"
+          },
+          {
+            "code": "H302",
+            "text": "吞咽有害"
+          },
+          {
+            "code": "H303",
+            "text": "吞咽可能有害"
+          },
+          {
+            "code": "H311",
+            "text": "皮肤接触会中毒"
+          },
+          {
+            "code": "H319",
+            "text": "造成严重眼刺激"
+          },
+          {
+            "code": "H331",
+            "text": "吸入会中毒"
+          },
+          {
+            "code": "H335",
+            "text": "可能引起呼吸道刺激"
+          },
+          {
+            "code": "H336",
+            "text": "可能引起昏昏欲睡或眩晕"
+          },
+          {
+            "code": "H360",
+            "text": "可能对生育力或未出生的胎儿造成伤害"
+          },
+          {
+            "code": "H370",
+            "text": "对器官造成损害"
+          },
+          {
+            "code": "H372",
+            "text": "长期或反复接触会对器官造成损害"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": [
+          "P203",
+          "P210",
+          "P233",
+          "P240",
+          "P241",
+          "P242",
+          "P243",
+          "P260",
+          "P261",
+          "P262",
+          "P264",
+          "P264+P265",
+          "P270",
+          "P271",
+          "P280",
+          "P301+P316",
+          "P301+P317",
+          "P302+P352",
+          "P303+P361+P353",
+          "P304+P340"
+        ]
+      },
+      "critical_codes": [
+        "H225",
+        "H301",
+        "H311",
+        "H331",
+        "H360",
+        "H370",
+        "H372"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/887",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "异丙醇",
+      "name_en": "isopropyl alcohol",
+      "cas": "67-63-0",
+      "molecular_formula": "C3H8O",
+      "molecular_weight": "60.10",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [
+          "Corrosive",
+          "Environmental Hazard",
+          "Flammable",
+          "Health Hazard",
+          "Irritant"
+        ],
+        "hazard_codes": [
+          "H225",
+          "H303",
+          "H305",
+          "H313",
+          "H318",
+          "H319",
+          "H335",
+          "H336",
+          "H361",
+          "H370",
+          "H372",
+          "H373",
+          "H400",
+          "H410"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H225",
+            "text": "高度易燃液体和蒸气"
+          },
+          {
+            "code": "H303",
+            "text": "吞咽可能有害"
+          },
+          {
+            "code": "H313",
+            "text": "皮肤接触可能有害"
+          },
+          {
+            "code": "H318",
+            "text": "造成严重眼损伤"
+          },
+          {
+            "code": "H319",
+            "text": "造成严重眼刺激"
+          },
+          {
+            "code": "H335",
+            "text": "可能引起呼吸道刺激"
+          },
+          {
+            "code": "H336",
+            "text": "可能引起昏昏欲睡或眩晕"
+          },
+          {
+            "code": "H361",
+            "text": "怀疑对生育力或未出生的胎儿造成伤害"
+          },
+          {
+            "code": "H370",
+            "text": "对器官造成损害"
+          },
+          {
+            "code": "H372",
+            "text": "长期或反复接触会对器官造成损害"
+          },
+          {
+            "code": "H373",
+            "text": "长期或反复接触可能对器官造成损害"
+          },
+          {
+            "code": "H400",
+            "text": "对水生生物毒性极大"
+          },
+          {
+            "code": "H410",
+            "text": "对水生生物毒性极大并具有长期持续影响"
+          }
+        ],
+        "unmapped_codes": [
+          "H305"
+        ],
+        "precautionary_codes": [
+          "P203",
+          "P210",
+          "P233",
+          "P240",
+          "P241",
+          "P242",
+          "P243",
+          "P260",
+          "P261",
+          "P264",
+          "P264+P265",
+          "P270",
+          "P271",
+          "P273",
+          "P280",
+          "P301+P316",
+          "P301+P317",
+          "P302+P317",
+          "P303+P361+P353",
+          "P304+P340"
+        ]
+      },
+      "critical_codes": [
+        "H225",
+        "H318",
+        "H370",
+        "H372"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/3776",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "丙酮",
+      "name_en": "acetone",
+      "cas": "67-64-1",
+      "molecular_formula": "C3H6O",
+      "molecular_weight": "58.08",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [
+          "Flammable",
+          "Health Hazard",
+          "Irritant"
+        ],
+        "hazard_codes": [
+          "H225",
+          "H305",
+          "H319",
+          "H320",
+          "H335",
+          "H336",
+          "H361",
+          "H372",
+          "H373"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H225",
+            "text": "高度易燃液体和蒸气"
+          },
+          {
+            "code": "H319",
+            "text": "造成严重眼刺激"
+          },
+          {
+            "code": "H320",
+            "text": "造成眼刺激"
+          },
+          {
+            "code": "H335",
+            "text": "可能引起呼吸道刺激"
+          },
+          {
+            "code": "H336",
+            "text": "可能引起昏昏欲睡或眩晕"
+          },
+          {
+            "code": "H361",
+            "text": "怀疑对生育力或未出生的胎儿造成伤害"
+          },
+          {
+            "code": "H372",
+            "text": "长期或反复接触会对器官造成损害"
+          },
+          {
+            "code": "H373",
+            "text": "长期或反复接触可能对器官造成损害"
+          }
+        ],
+        "unmapped_codes": [
+          "H305"
+        ],
+        "precautionary_codes": [
+          "P203",
+          "P210",
+          "P233",
+          "P240",
+          "P241",
+          "P242",
+          "P243",
+          "P260",
+          "P261",
+          "P264",
+          "P264+P265",
+          "P270",
+          "P271",
+          "P280",
+          "P301+P316",
+          "P303+P361+P353",
+          "P304+P340",
+          "P305+P351+P338",
+          "P318",
+          "P319"
+        ]
+      },
+      "critical_codes": [
+        "H225",
+        "H372"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/180",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "乙酸",
+      "name_en": "acetic acid",
+      "cas": "64-19-7",
+      "molecular_formula": "C2H4O2",
+      "molecular_weight": "60.05",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [
+          "Corrosive",
+          "Flammable",
+          "Health Hazard",
+          "Irritant"
+        ],
+        "hazard_codes": [
+          "H226",
+          "H303",
+          "H312",
+          "H314",
+          "H318",
+          "H334",
+          "H370",
+          "H371"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H226",
+            "text": "易燃液体和蒸气"
+          },
+          {
+            "code": "H303",
+            "text": "吞咽可能有害"
+          },
+          {
+            "code": "H312",
+            "text": "皮肤接触有害"
+          },
+          {
+            "code": "H314",
+            "text": "造成严重皮肤灼伤和眼损伤"
+          },
+          {
+            "code": "H318",
+            "text": "造成严重眼损伤"
+          },
+          {
+            "code": "H334",
+            "text": "吸入可能导致过敏或哮喘症状或呼吸困难"
+          },
+          {
+            "code": "H370",
+            "text": "对器官造成损害"
+          },
+          {
+            "code": "H371",
+            "text": "可能对器官造成损害"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": [
+          "P210",
+          "P233",
+          "P240",
+          "P241",
+          "P242",
+          "P243",
+          "P260",
+          "P264",
+          "P264+P265",
+          "P270",
+          "P271",
+          "P280",
+          "P284",
+          "P301+P317",
+          "P301+P330+P331",
+          "P302+P352",
+          "P302+P361+P354",
+          "P303+P361+P353",
+          "P304+P340",
+          "P305+P354+P338"
+        ]
+      },
+      "critical_codes": [
+        "H314",
+        "H318",
+        "H370"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/176",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "三氯甲烷",
+      "name_en": "chloroform",
+      "cas": "67-66-3",
+      "molecular_formula": "CHCl3",
+      "molecular_weight": "119.37",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [
+          "Acute Toxic",
+          "Corrosive",
+          "Environmental Hazard",
+          "Health Hazard",
+          "Irritant"
+        ],
+        "hazard_codes": [
+          "H302",
+          "H314",
+          "H315",
+          "H318",
+          "H319",
+          "H331",
+          "H332",
+          "H336",
+          "H341",
+          "H351",
+          "H361",
+          "H370",
+          "H372",
+          "H373",
+          "H402",
+          "H410"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H302",
+            "text": "吞咽有害"
+          },
+          {
+            "code": "H314",
+            "text": "造成严重皮肤灼伤和眼损伤"
+          },
+          {
+            "code": "H315",
+            "text": "造成皮肤刺激"
+          },
+          {
+            "code": "H318",
+            "text": "造成严重眼损伤"
+          },
+          {
+            "code": "H319",
+            "text": "造成严重眼刺激"
+          },
+          {
+            "code": "H331",
+            "text": "吸入会中毒"
+          },
+          {
+            "code": "H332",
+            "text": "吸入有害"
+          },
+          {
+            "code": "H336",
+            "text": "可能引起昏昏欲睡或眩晕"
+          },
+          {
+            "code": "H341",
+            "text": "怀疑造成遗传性缺陷"
+          },
+          {
+            "code": "H351",
+            "text": "怀疑致癌"
+          },
+          {
+            "code": "H361",
+            "text": "怀疑对生育力或未出生的胎儿造成伤害"
+          },
+          {
+            "code": "H370",
+            "text": "对器官造成损害"
+          },
+          {
+            "code": "H372",
+            "text": "长期或反复接触会对器官造成损害"
+          },
+          {
+            "code": "H373",
+            "text": "长期或反复接触可能对器官造成损害"
+          },
+          {
+            "code": "H402",
+            "text": "对水生生物有害"
+          },
+          {
+            "code": "H410",
+            "text": "对水生生物毒性极大并具有长期持续影响"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": [
+          "P203",
+          "P260",
+          "P261",
+          "P264",
+          "P264+P265",
+          "P270",
+          "P271",
+          "P273",
+          "P280",
+          "P301+P317",
+          "P301+P330+P331",
+          "P302+P352",
+          "P302+P361+P354",
+          "P304+P340",
+          "P305+P351+P338",
+          "P305+P354+P338",
+          "P308+P316",
+          "P316",
+          "P317",
+          "P318"
+        ]
+      },
+      "critical_codes": [
+        "H314",
+        "H318",
+        "H331",
+        "H370",
+        "H372"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/6212",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "二甲基亚砜",
+      "name_en": "dimethyl sulfoxide",
+      "cas": "67-68-5",
+      "molecular_formula": "C2H6OS",
+      "molecular_weight": "78.14",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Warning",
+        "pictograms": [
+          "Flammable",
+          "Health Hazard",
+          "Irritant"
+        ],
+        "hazard_codes": [
+          "H227",
+          "H315",
+          "H319",
+          "H335",
+          "H371"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H315",
+            "text": "造成皮肤刺激"
+          },
+          {
+            "code": "H319",
+            "text": "造成严重眼刺激"
+          },
+          {
+            "code": "H335",
+            "text": "可能引起呼吸道刺激"
+          },
+          {
+            "code": "H371",
+            "text": "可能对器官造成损害"
+          }
+        ],
+        "unmapped_codes": [
+          "H227"
+        ],
+        "precautionary_codes": [
+          "P210",
+          "P260",
+          "P261",
+          "P264",
+          "P264+P265",
+          "P270",
+          "P271",
+          "P280",
+          "P302+P352",
+          "P304+P340",
+          "P305+P351+P338",
+          "P308+P316",
+          "P319",
+          "P321",
+          "P332+P317",
+          "P337+P317",
+          "P362+P364",
+          "P370+P378",
+          "P403",
+          "P403+P233"
+        ]
+      },
+      "critical_codes": [],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/679",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "甘油",
+      "name_en": "glycerol",
+      "cas": "56-81-5",
+      "molecular_formula": "C3H8O3",
+      "molecular_weight": "92.09",
+      "data_status": "NO_GHS_CLASSIFICATION",
+      "ghs": {
+        "signal_word": null,
+        "pictograms": [],
+        "hazard_codes": [],
+        "hazard_statements_zh": [],
+        "unmapped_codes": [],
+        "precautionary_codes": []
+      },
+      "critical_codes": [],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/753",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": [
+        "PubChem无GHS分类数据"
+      ]
+    },
+    {
+      "name_zh": "苯酚",
+      "name_en": "phenol",
+      "cas": "108-95-2",
+      "molecular_formula": "C6H6O",
+      "molecular_weight": "94.11",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [
+          "Acute Toxic",
+          "Corrosive",
+          "Environmental Hazard",
+          "Health Hazard",
+          "Irritant"
+        ],
+        "hazard_codes": [
+          "H301",
+          "H302",
+          "H311",
+          "H314",
+          "H318",
+          "H331",
+          "H340",
+          "H341",
+          "H360",
+          "H370",
+          "H372",
+          "H373",
+          "H401",
+          "H411",
+          "H412"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H301",
+            "text": "吞咽会中毒"
+          },
+          {
+            "code": "H302",
+            "text": "吞咽有害"
+          },
+          {
+            "code": "H311",
+            "text": "皮肤接触会中毒"
+          },
+          {
+            "code": "H314",
+            "text": "造成严重皮肤灼伤和眼损伤"
+          },
+          {
+            "code": "H318",
+            "text": "造成严重眼损伤"
+          },
+          {
+            "code": "H331",
+            "text": "吸入会中毒"
+          },
+          {
+            "code": "H340",
+            "text": "可能造成遗传性缺陷"
+          },
+          {
+            "code": "H341",
+            "text": "怀疑造成遗传性缺陷"
+          },
+          {
+            "code": "H360",
+            "text": "可能对生育力或未出生的胎儿造成伤害"
+          },
+          {
+            "code": "H370",
+            "text": "对器官造成损害"
+          },
+          {
+            "code": "H372",
+            "text": "长期或反复接触会对器官造成损害"
+          },
+          {
+            "code": "H373",
+            "text": "长期或反复接触可能对器官造成损害"
+          },
+          {
+            "code": "H401",
+            "text": "对水生生物有毒"
+          },
+          {
+            "code": "H411",
+            "text": "对水生生物有毒并具有长期持续影响"
+          },
+          {
+            "code": "H412",
+            "text": "对水生生物有害并具有长期持续影响"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": [
+          "P203",
+          "P260",
+          "P261",
+          "P262",
+          "P264",
+          "P264+P265",
+          "P270",
+          "P271",
+          "P273",
+          "P280",
+          "P301+P316",
+          "P301+P317",
+          "P301+P330+P331",
+          "P302+P352",
+          "P302+P361+P354",
+          "P304+P340",
+          "P305+P354+P338",
+          "P308+P316",
+          "P316",
+          "P317"
+        ]
+      },
+      "critical_codes": [
+        "H301",
+        "H311",
+        "H314",
+        "H318",
+        "H331",
+        "H340",
+        "H360",
+        "H370",
+        "H372"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/996",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "EDTA",
+      "name_en": "ethylenediaminetazetic acid",
+      "cas": "60-00-4",
+      "molecular_formula": null,
+      "molecular_weight": null,
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": null,
+        "pictograms": [],
+        "hazard_codes": [
+          "H302",
+          "H303",
+          "H312",
+          "H315",
+          "H318",
+          "H319",
+          "H320",
+          "H332",
+          "H333",
+          "H335",
+          "H373"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H302",
+            "text": "吞咽有害"
+          },
+          {
+            "code": "H303",
+            "text": "吞咽可能有害"
+          },
+          {
+            "code": "H312",
+            "text": "皮肤接触有害"
+          },
+          {
+            "code": "H315",
+            "text": "造成皮肤刺激"
+          },
+          {
+            "code": "H318",
+            "text": "造成严重眼损伤"
+          },
+          {
+            "code": "H319",
+            "text": "造成严重眼刺激"
+          },
+          {
+            "code": "H320",
+            "text": "造成眼刺激"
+          },
+          {
+            "code": "H332",
+            "text": "吸入有害"
+          },
+          {
+            "code": "H333",
+            "text": "吸入可能有害"
+          },
+          {
+            "code": "H335",
+            "text": "可能引起呼吸道刺激"
+          },
+          {
+            "code": "H373",
+            "text": "长期或反复接触可能对器官造成损害"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": []
+      },
+      "critical_codes": [
+        "H318"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/6049",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "十二烷基硫酸钠",
+      "name_en": "sodium dodecyl sulfate",
+      "cas": "151-21-3",
+      "molecular_formula": "C12H25NaO4S",
+      "molecular_weight": "288.38",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [
+          "Acute Toxic",
+          "Corrosive",
+          "Environmental Hazard",
+          "Flammable",
+          "Health Hazard",
+          "Irritant"
+        ],
+        "hazard_codes": [
+          "H228",
+          "H302",
+          "H310",
+          "H311",
+          "H312",
+          "H315",
+          "H318",
+          "H319",
+          "H332",
+          "H335",
+          "H370",
+          "H373",
+          "H400",
+          "H401",
+          "H412"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H228",
+            "text": "易燃固体"
+          },
+          {
+            "code": "H302",
+            "text": "吞咽有害"
+          },
+          {
+            "code": "H310",
+            "text": "皮肤接触致命"
+          },
+          {
+            "code": "H311",
+            "text": "皮肤接触会中毒"
+          },
+          {
+            "code": "H312",
+            "text": "皮肤接触有害"
+          },
+          {
+            "code": "H315",
+            "text": "造成皮肤刺激"
+          },
+          {
+            "code": "H318",
+            "text": "造成严重眼损伤"
+          },
+          {
+            "code": "H319",
+            "text": "造成严重眼刺激"
+          },
+          {
+            "code": "H332",
+            "text": "吸入有害"
+          },
+          {
+            "code": "H335",
+            "text": "可能引起呼吸道刺激"
+          },
+          {
+            "code": "H370",
+            "text": "对器官造成损害"
+          },
+          {
+            "code": "H373",
+            "text": "长期或反复接触可能对器官造成损害"
+          },
+          {
+            "code": "H400",
+            "text": "对水生生物毒性极大"
+          },
+          {
+            "code": "H401",
+            "text": "对水生生物有毒"
+          },
+          {
+            "code": "H412",
+            "text": "对水生生物有害并具有长期持续影响"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": [
+          "P210",
+          "P240",
+          "P241",
+          "P260",
+          "P261",
+          "P262",
+          "P264",
+          "P264+P265",
+          "P270",
+          "P271",
+          "P273",
+          "P280",
+          "P301+P317",
+          "P302+P352",
+          "P304+P340",
+          "P305+P351+P338",
+          "P305+P354+P338",
+          "P308+P316",
+          "P316",
+          "P317"
+        ]
+      },
+      "critical_codes": [
+        "H310",
+        "H311",
+        "H318",
+        "H370"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/3423265",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "溴化乙锭",
+      "name_en": "ethidium bromide",
+      "cas": "1239-45-8",
+      "molecular_formula": "C21H20BrN3",
+      "molecular_weight": "394.3",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [
+          "Acute Toxic",
+          "Health Hazard",
+          "Irritant"
+        ],
+        "hazard_codes": [
+          "H302",
+          "H330",
+          "H331",
+          "H341"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H302",
+            "text": "吞咽有害"
+          },
+          {
+            "code": "H330",
+            "text": "吸入致命"
+          },
+          {
+            "code": "H331",
+            "text": "吸入会中毒"
+          },
+          {
+            "code": "H341",
+            "text": "怀疑造成遗传性缺陷"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": [
+          "P203",
+          "P260",
+          "P261",
+          "P264",
+          "P270",
+          "P271",
+          "P280",
+          "P284",
+          "P301+P317",
+          "P304+P340",
+          "P316",
+          "P318",
+          "P320",
+          "P321",
+          "P330",
+          "P403+P233",
+          "P405",
+          "P501"
+        ]
+      },
+      "critical_codes": [
+        "H330",
+        "H331"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/14710",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "吐温20",
+      "name_en": "polysorbate 20",
+      "cas": null,
+      "molecular_formula": null,
+      "molecular_weight": null,
+      "data_status": "NOT_FOUND",
+      "ghs": {
+        "signal_word": null,
+        "pictograms": [],
+        "hazard_codes": [],
+        "hazard_statements_zh": [],
+        "unmapped_codes": [],
+        "precautionary_codes": []
+      },
+      "critical_codes": [],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": null,
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": [
+        "基础属性获取失败: HTTPError: HTTP Error 404: PUGREST.NotFound"
+      ]
+    },
+    {
+      "name_zh": "甲醛",
+      "name_en": "formaldehyde",
+      "cas": "50-00-0",
+      "molecular_formula": "CH2O",
+      "molecular_weight": "30.026",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [
+          "Acute Toxic",
+          "Compressed Gas",
+          "Corrosive",
+          "Flammable",
+          "Health Hazard",
+          "Irritant"
+        ],
+        "hazard_codes": [
+          "H220",
+          "H227",
+          "H280",
+          "H301",
+          "H302",
+          "H311",
+          "H314",
+          "H315",
+          "H317",
+          "H318",
+          "H319",
+          "H330",
+          "H331",
+          "H334",
+          "H341",
+          "H350",
+          "H351",
+          "H370",
+          "H372",
+          "H401",
+          "H402",
+          "H412"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H280",
+            "text": "内装加压气体，遇热可能爆炸"
+          },
+          {
+            "code": "H301",
+            "text": "吞咽会中毒"
+          },
+          {
+            "code": "H302",
+            "text": "吞咽有害"
+          },
+          {
+            "code": "H311",
+            "text": "皮肤接触会中毒"
+          },
+          {
+            "code": "H314",
+            "text": "造成严重皮肤灼伤和眼损伤"
+          },
+          {
+            "code": "H315",
+            "text": "造成皮肤刺激"
+          },
+          {
+            "code": "H317",
+            "text": "可能造成皮肤过敏反应"
+          },
+          {
+            "code": "H318",
+            "text": "造成严重眼损伤"
+          },
+          {
+            "code": "H319",
+            "text": "造成严重眼刺激"
+          },
+          {
+            "code": "H330",
+            "text": "吸入致命"
+          },
+          {
+            "code": "H331",
+            "text": "吸入会中毒"
+          },
+          {
+            "code": "H334",
+            "text": "吸入可能导致过敏或哮喘症状或呼吸困难"
+          },
+          {
+            "code": "H341",
+            "text": "怀疑造成遗传性缺陷"
+          },
+          {
+            "code": "H350",
+            "text": "可能致癌"
+          },
+          {
+            "code": "H351",
+            "text": "怀疑致癌"
+          },
+          {
+            "code": "H370",
+            "text": "对器官造成损害"
+          },
+          {
+            "code": "H372",
+            "text": "长期或反复接触会对器官造成损害"
+          },
+          {
+            "code": "H401",
+            "text": "对水生生物有毒"
+          },
+          {
+            "code": "H402",
+            "text": "对水生生物有害"
+          },
+          {
+            "code": "H412",
+            "text": "对水生生物有害并具有长期持续影响"
+          }
+        ],
+        "unmapped_codes": [
+          "H220",
+          "H227"
+        ],
+        "precautionary_codes": [
+          "P203",
+          "P210",
+          "P222",
+          "P233",
+          "P260",
+          "P261",
+          "P262",
+          "P264",
+          "P264+P265",
+          "P270",
+          "P271",
+          "P272",
+          "P273",
+          "P280",
+          "P284",
+          "P301+P316",
+          "P301+P317",
+          "P301+P330+P331",
+          "P302+P352",
+          "P302+P361+P354"
+        ]
+      },
+      "critical_codes": [
+        "H301",
+        "H311",
+        "H314",
+        "H318",
+        "H330",
+        "H331",
+        "H350",
+        "H370",
+        "H372"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/712",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "多聚甲醛",
+      "name_en": "paraformaldehyde",
+      "cas": null,
+      "molecular_formula": null,
+      "molecular_weight": null,
+      "data_status": "NOT_FOUND",
+      "ghs": {
+        "signal_word": null,
+        "pictograms": [],
+        "hazard_codes": [],
+        "hazard_statements_zh": [],
+        "unmapped_codes": [],
+        "precautionary_codes": []
+      },
+      "critical_codes": [],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": null,
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": [
+        "基础属性获取失败: HTTPError: HTTP Error 404: PUGREST.NotFound"
+      ]
+    },
+    {
+      "name_zh": "β-巯基乙醇",
+      "name_en": "2-mercaptoethanol",
+      "cas": "60-24-2",
+      "molecular_formula": "C2H6OS",
+      "molecular_weight": "78.14",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [
+          "Acute Toxic",
+          "Corrosive",
+          "Environmental Hazard",
+          "Flammable",
+          "Health Hazard",
+          "Irritant"
+        ],
+        "hazard_codes": [
+          "H227",
+          "H301",
+          "H302",
+          "H310",
+          "H311",
+          "H314",
+          "H315",
+          "H317",
+          "H318",
+          "H319",
+          "H331",
+          "H332",
+          "H361",
+          "H371",
+          "H373",
+          "H400",
+          "H410",
+          "H411"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H301",
+            "text": "吞咽会中毒"
+          },
+          {
+            "code": "H302",
+            "text": "吞咽有害"
+          },
+          {
+            "code": "H310",
+            "text": "皮肤接触致命"
+          },
+          {
+            "code": "H311",
+            "text": "皮肤接触会中毒"
+          },
+          {
+            "code": "H314",
+            "text": "造成严重皮肤灼伤和眼损伤"
+          },
+          {
+            "code": "H315",
+            "text": "造成皮肤刺激"
+          },
+          {
+            "code": "H317",
+            "text": "可能造成皮肤过敏反应"
+          },
+          {
+            "code": "H318",
+            "text": "造成严重眼损伤"
+          },
+          {
+            "code": "H319",
+            "text": "造成严重眼刺激"
+          },
+          {
+            "code": "H331",
+            "text": "吸入会中毒"
+          },
+          {
+            "code": "H332",
+            "text": "吸入有害"
+          },
+          {
+            "code": "H361",
+            "text": "怀疑对生育力或未出生的胎儿造成伤害"
+          },
+          {
+            "code": "H371",
+            "text": "可能对器官造成损害"
+          },
+          {
+            "code": "H373",
+            "text": "长期或反复接触可能对器官造成损害"
+          },
+          {
+            "code": "H400",
+            "text": "对水生生物毒性极大"
+          },
+          {
+            "code": "H410",
+            "text": "对水生生物毒性极大并具有长期持续影响"
+          },
+          {
+            "code": "H411",
+            "text": "对水生生物有毒并具有长期持续影响"
+          }
+        ],
+        "unmapped_codes": [
+          "H227"
+        ],
+        "precautionary_codes": [
+          "P203",
+          "P210",
+          "P260",
+          "P261",
+          "P262",
+          "P264",
+          "P264+P265",
+          "P270",
+          "P271",
+          "P272",
+          "P273",
+          "P280",
+          "P301+P316",
+          "P301+P317",
+          "P301+P330+P331",
+          "P302+P352",
+          "P302+P361+P354",
+          "P304+P340",
+          "P305+P351+P338",
+          "P305+P354+P338"
+        ]
+      },
+      "critical_codes": [
+        "H301",
+        "H310",
+        "H311",
+        "H314",
+        "H318",
+        "H331"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/1567",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "氯化镁",
+      "name_en": "magnesium chloride",
+      "cas": "7786-30-3",
+      "molecular_formula": "Cl2Mg",
+      "molecular_weight": "95.21",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [
+          "Corrosive",
+          "Irritant"
+        ],
+        "hazard_codes": [
+          "H290",
+          "H302",
+          "H315",
+          "H318",
+          "H319",
+          "H335"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H290",
+            "text": "可能腐蚀金属"
+          },
+          {
+            "code": "H302",
+            "text": "吞咽有害"
+          },
+          {
+            "code": "H315",
+            "text": "造成皮肤刺激"
+          },
+          {
+            "code": "H318",
+            "text": "造成严重眼损伤"
+          },
+          {
+            "code": "H319",
+            "text": "造成严重眼刺激"
+          },
+          {
+            "code": "H335",
+            "text": "可能引起呼吸道刺激"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": [
+          "P234",
+          "P261",
+          "P264",
+          "P264+P265",
+          "P270",
+          "P271",
+          "P280",
+          "P301+P317",
+          "P302+P352",
+          "P304+P340",
+          "P305+P351+P338",
+          "P305+P354+P338",
+          "P317",
+          "P319",
+          "P321",
+          "P330",
+          "P332+P317",
+          "P337+P317",
+          "P362+P364",
+          "P390"
+        ]
+      },
+      "critical_codes": [
+        "H318"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/5360315",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "氯化钾",
+      "name_en": "potassium chloride",
+      "cas": "7447-40-7",
+      "molecular_formula": "ClK",
+      "molecular_weight": "74.55",
+      "data_status": "NO_GHS_CLASSIFICATION",
+      "ghs": {
+        "signal_word": null,
+        "pictograms": [],
+        "hazard_codes": [],
+        "hazard_statements_zh": [],
+        "unmapped_codes": [],
+        "precautionary_codes": []
+      },
+      "critical_codes": [],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/4873",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": [
+        "PubChem无GHS分类数据"
+      ]
+    },
+    {
+      "name_zh": "尿素",
+      "name_en": "urea",
+      "cas": "57-13-6",
+      "molecular_formula": "CH4N2O",
+      "molecular_weight": "60.056",
+      "data_status": "NO_GHS_CLASSIFICATION",
+      "ghs": {
+        "signal_word": null,
+        "pictograms": [],
+        "hazard_codes": [],
+        "hazard_statements_zh": [],
+        "unmapped_codes": [],
+        "precautionary_codes": []
+      },
+      "critical_codes": [],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/1176",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": [
+        "PubChem无GHS分类数据"
+      ]
+    },
+    {
+      "name_zh": "重铬酸钾",
+      "name_en": "potassium dichromate",
+      "cas": "7778-50-9",
+      "molecular_formula": "Cr2K2O7",
+      "molecular_weight": "294.18",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [
+          "Acute Toxic",
+          "Corrosive",
+          "Environmental Hazard",
+          "Health Hazard",
+          "Irritant",
+          "Oxidizer"
+        ],
+        "hazard_codes": [
+          "H272",
+          "H300",
+          "H301",
+          "H310",
+          "H311",
+          "H312",
+          "H314",
+          "H317",
+          "H318",
+          "H330",
+          "H334",
+          "H340",
+          "H350",
+          "H360",
+          "H370",
+          "H372",
+          "H400",
+          "H410"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H272",
+            "text": "可能加剧燃烧；氧化剂"
+          },
+          {
+            "code": "H300",
+            "text": "吞咽致命"
+          },
+          {
+            "code": "H301",
+            "text": "吞咽会中毒"
+          },
+          {
+            "code": "H310",
+            "text": "皮肤接触致命"
+          },
+          {
+            "code": "H311",
+            "text": "皮肤接触会中毒"
+          },
+          {
+            "code": "H312",
+            "text": "皮肤接触有害"
+          },
+          {
+            "code": "H314",
+            "text": "造成严重皮肤灼伤和眼损伤"
+          },
+          {
+            "code": "H317",
+            "text": "可能造成皮肤过敏反应"
+          },
+          {
+            "code": "H318",
+            "text": "造成严重眼损伤"
+          },
+          {
+            "code": "H330",
+            "text": "吸入致命"
+          },
+          {
+            "code": "H334",
+            "text": "吸入可能导致过敏或哮喘症状或呼吸困难"
+          },
+          {
+            "code": "H340",
+            "text": "可能造成遗传性缺陷"
+          },
+          {
+            "code": "H350",
+            "text": "可能致癌"
+          },
+          {
+            "code": "H360",
+            "text": "可能对生育力或未出生的胎儿造成伤害"
+          },
+          {
+            "code": "H370",
+            "text": "对器官造成损害"
+          },
+          {
+            "code": "H372",
+            "text": "长期或反复接触会对器官造成损害"
+          },
+          {
+            "code": "H400",
+            "text": "对水生生物毒性极大"
+          },
+          {
+            "code": "H410",
+            "text": "对水生生物毒性极大并具有长期持续影响"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": [
+          "P203",
+          "P210",
+          "P220",
+          "P233",
+          "P260",
+          "P261",
+          "P262",
+          "P264",
+          "P264+P265",
+          "P270",
+          "P271",
+          "P272",
+          "P273",
+          "P280",
+          "P284",
+          "P301+P316",
+          "P301+P330+P331",
+          "P302+P352",
+          "P302+P361+P354",
+          "P304+P340"
+        ]
+      },
+      "critical_codes": [
+        "H300",
+        "H301",
+        "H310",
+        "H311",
+        "H314",
+        "H318",
+        "H330",
+        "H340",
+        "H350",
+        "H360",
+        "H370",
+        "H372"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/24502",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "高锰酸钾",
+      "name_en": "potassium permanganate",
+      "cas": "7722-64-7",
+      "molecular_formula": "KMnO4",
+      "molecular_weight": "158.034",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [
+          "Corrosive",
+          "Environmental Hazard",
+          "Health Hazard",
+          "Irritant",
+          "Oxidizer"
+        ],
+        "hazard_codes": [
+          "H272",
+          "H302",
+          "H314",
+          "H318",
+          "H335",
+          "H341",
+          "H361",
+          "H370",
+          "H372",
+          "H373",
+          "H400",
+          "H410"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H272",
+            "text": "可能加剧燃烧；氧化剂"
+          },
+          {
+            "code": "H302",
+            "text": "吞咽有害"
+          },
+          {
+            "code": "H314",
+            "text": "造成严重皮肤灼伤和眼损伤"
+          },
+          {
+            "code": "H318",
+            "text": "造成严重眼损伤"
+          },
+          {
+            "code": "H335",
+            "text": "可能引起呼吸道刺激"
+          },
+          {
+            "code": "H341",
+            "text": "怀疑造成遗传性缺陷"
+          },
+          {
+            "code": "H361",
+            "text": "怀疑对生育力或未出生的胎儿造成伤害"
+          },
+          {
+            "code": "H370",
+            "text": "对器官造成损害"
+          },
+          {
+            "code": "H372",
+            "text": "长期或反复接触会对器官造成损害"
+          },
+          {
+            "code": "H373",
+            "text": "长期或反复接触可能对器官造成损害"
+          },
+          {
+            "code": "H400",
+            "text": "对水生生物毒性极大"
+          },
+          {
+            "code": "H410",
+            "text": "对水生生物毒性极大并具有长期持续影响"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": [
+          "P203",
+          "P210",
+          "P220",
+          "P260",
+          "P261",
+          "P264",
+          "P264+P265",
+          "P270",
+          "P271",
+          "P273",
+          "P280",
+          "P301+P317",
+          "P301+P330+P331",
+          "P302+P361+P354",
+          "P304+P340",
+          "P305+P354+P338",
+          "P308+P316",
+          "P316",
+          "P317",
+          "P318"
+        ]
+      },
+      "critical_codes": [
+        "H314",
+        "H318",
+        "H370",
+        "H372"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/516875",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "硫代硫酸钠",
+      "name_en": "sodium thiosulfate",
+      "cas": "7772-98-7",
+      "molecular_formula": "Na2O3S2",
+      "molecular_weight": "158.11",
+      "data_status": "NO_GHS_CLASSIFICATION",
+      "ghs": {
+        "signal_word": null,
+        "pictograms": [],
+        "hazard_codes": [],
+        "hazard_statements_zh": [],
+        "unmapped_codes": [],
+        "precautionary_codes": []
+      },
+      "critical_codes": [],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/24477",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": [
+        "PubChem无GHS分类数据"
+      ]
+    },
+    {
+      "name_zh": "碘",
+      "name_en": "iodine",
+      "cas": "7553-56-2",
+      "molecular_formula": "I2",
+      "molecular_weight": "253.8089",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [
+          "Acute Toxic",
+          "Environmental Hazard",
+          "Health Hazard",
+          "Irritant"
+        ],
+        "hazard_codes": [
+          "H302",
+          "H312",
+          "H315",
+          "H317",
+          "H319",
+          "H330",
+          "H332",
+          "H335",
+          "H372",
+          "H400",
+          "H410"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H302",
+            "text": "吞咽有害"
+          },
+          {
+            "code": "H312",
+            "text": "皮肤接触有害"
+          },
+          {
+            "code": "H315",
+            "text": "造成皮肤刺激"
+          },
+          {
+            "code": "H317",
+            "text": "可能造成皮肤过敏反应"
+          },
+          {
+            "code": "H319",
+            "text": "造成严重眼刺激"
+          },
+          {
+            "code": "H330",
+            "text": "吸入致命"
+          },
+          {
+            "code": "H332",
+            "text": "吸入有害"
+          },
+          {
+            "code": "H335",
+            "text": "可能引起呼吸道刺激"
+          },
+          {
+            "code": "H372",
+            "text": "长期或反复接触会对器官造成损害"
+          },
+          {
+            "code": "H400",
+            "text": "对水生生物毒性极大"
+          },
+          {
+            "code": "H410",
+            "text": "对水生生物毒性极大并具有长期持续影响"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": [
+          "P260",
+          "P261",
+          "P264",
+          "P264+P265",
+          "P270",
+          "P271",
+          "P272",
+          "P273",
+          "P280",
+          "P284",
+          "P301+P317",
+          "P302+P352",
+          "P304+P340",
+          "P305+P351+P338",
+          "P316",
+          "P317",
+          "P319",
+          "P320",
+          "P321",
+          "P330"
+        ]
+      },
+      "critical_codes": [
+        "H330",
+        "H372"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/807",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "草酸",
+      "name_en": "oxalic acid",
+      "cas": "144-62-7",
+      "molecular_formula": "C2H2O4",
+      "molecular_weight": "90.03",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [
+          "Corrosive",
+          "Health Hazard",
+          "Irritant"
+        ],
+        "hazard_codes": [
+          "H302",
+          "H312",
+          "H314",
+          "H315",
+          "H318",
+          "H335",
+          "H361",
+          "H370",
+          "H371",
+          "H372",
+          "H373",
+          "H402",
+          "H412"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H302",
+            "text": "吞咽有害"
+          },
+          {
+            "code": "H312",
+            "text": "皮肤接触有害"
+          },
+          {
+            "code": "H314",
+            "text": "造成严重皮肤灼伤和眼损伤"
+          },
+          {
+            "code": "H315",
+            "text": "造成皮肤刺激"
+          },
+          {
+            "code": "H318",
+            "text": "造成严重眼损伤"
+          },
+          {
+            "code": "H335",
+            "text": "可能引起呼吸道刺激"
+          },
+          {
+            "code": "H361",
+            "text": "怀疑对生育力或未出生的胎儿造成伤害"
+          },
+          {
+            "code": "H370",
+            "text": "对器官造成损害"
+          },
+          {
+            "code": "H371",
+            "text": "可能对器官造成损害"
+          },
+          {
+            "code": "H372",
+            "text": "长期或反复接触会对器官造成损害"
+          },
+          {
+            "code": "H373",
+            "text": "长期或反复接触可能对器官造成损害"
+          },
+          {
+            "code": "H402",
+            "text": "对水生生物有害"
+          },
+          {
+            "code": "H412",
+            "text": "对水生生物有害并具有长期持续影响"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": [
+          "P203",
+          "P260",
+          "P261",
+          "P264",
+          "P264+P265",
+          "P270",
+          "P271",
+          "P273",
+          "P280",
+          "P301+P317",
+          "P301+P330+P331",
+          "P302+P352",
+          "P302+P361+P354",
+          "P304+P340",
+          "P305+P354+P338",
+          "P308+P316",
+          "P316",
+          "P317",
+          "P318",
+          "P319"
+        ]
+      },
+      "critical_codes": [
+        "H314",
+        "H318",
+        "H370",
+        "H372"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/971",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "硝酸银",
+      "name_en": "silver nitrate",
+      "cas": "7761-88-8",
+      "molecular_formula": "AgNO3",
+      "molecular_weight": "169.873",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [
+          "Acute Toxic",
+          "Corrosive",
+          "Environmental Hazard",
+          "Health Hazard",
+          "Irritant",
+          "Oxidizer"
+        ],
+        "hazard_codes": [
+          "H272",
+          "H290",
+          "H300",
+          "H302",
+          "H314",
+          "H318",
+          "H335",
+          "H360",
+          "H361",
+          "H370",
+          "H372",
+          "H400",
+          "H410"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H272",
+            "text": "可能加剧燃烧；氧化剂"
+          },
+          {
+            "code": "H290",
+            "text": "可能腐蚀金属"
+          },
+          {
+            "code": "H300",
+            "text": "吞咽致命"
+          },
+          {
+            "code": "H302",
+            "text": "吞咽有害"
+          },
+          {
+            "code": "H314",
+            "text": "造成严重皮肤灼伤和眼损伤"
+          },
+          {
+            "code": "H318",
+            "text": "造成严重眼损伤"
+          },
+          {
+            "code": "H335",
+            "text": "可能引起呼吸道刺激"
+          },
+          {
+            "code": "H360",
+            "text": "可能对生育力或未出生的胎儿造成伤害"
+          },
+          {
+            "code": "H361",
+            "text": "怀疑对生育力或未出生的胎儿造成伤害"
+          },
+          {
+            "code": "H370",
+            "text": "对器官造成损害"
+          },
+          {
+            "code": "H372",
+            "text": "长期或反复接触会对器官造成损害"
+          },
+          {
+            "code": "H400",
+            "text": "对水生生物毒性极大"
+          },
+          {
+            "code": "H410",
+            "text": "对水生生物毒性极大并具有长期持续影响"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": [
+          "P203",
+          "P210",
+          "P220",
+          "P234",
+          "P260",
+          "P261",
+          "P264",
+          "P264+P265",
+          "P270",
+          "P271",
+          "P273",
+          "P280",
+          "P301+P316",
+          "P301+P317",
+          "P301+P330+P331",
+          "P302+P361+P354",
+          "P304+P340",
+          "P305+P354+P338",
+          "P308+P316",
+          "P316"
+        ]
+      },
+      "critical_codes": [
+        "H300",
+        "H314",
+        "H318",
+        "H360",
+        "H370",
+        "H372"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/24470",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "氯化钡",
+      "name_en": "barium chloride",
+      "cas": "10361-37-2",
+      "molecular_formula": "BaCl2",
+      "molecular_weight": "208.23",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [
+          "Acute Toxic",
+          "Health Hazard",
+          "Irritant"
+        ],
+        "hazard_codes": [
+          "H301",
+          "H315",
+          "H319",
+          "H332",
+          "H335",
+          "H336",
+          "H370",
+          "H371",
+          "H372",
+          "H373",
+          "H402",
+          "H412",
+          "H413"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H301",
+            "text": "吞咽会中毒"
+          },
+          {
+            "code": "H315",
+            "text": "造成皮肤刺激"
+          },
+          {
+            "code": "H319",
+            "text": "造成严重眼刺激"
+          },
+          {
+            "code": "H332",
+            "text": "吸入有害"
+          },
+          {
+            "code": "H335",
+            "text": "可能引起呼吸道刺激"
+          },
+          {
+            "code": "H336",
+            "text": "可能引起昏昏欲睡或眩晕"
+          },
+          {
+            "code": "H370",
+            "text": "对器官造成损害"
+          },
+          {
+            "code": "H371",
+            "text": "可能对器官造成损害"
+          },
+          {
+            "code": "H372",
+            "text": "长期或反复接触会对器官造成损害"
+          },
+          {
+            "code": "H373",
+            "text": "长期或反复接触可能对器官造成损害"
+          },
+          {
+            "code": "H402",
+            "text": "对水生生物有害"
+          },
+          {
+            "code": "H412",
+            "text": "对水生生物有害并具有长期持续影响"
+          },
+          {
+            "code": "H413",
+            "text": "可能对水生生物造成长期持续有害影响"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": [
+          "P260",
+          "P261",
+          "P264",
+          "P264+P265",
+          "P270",
+          "P271",
+          "P273",
+          "P280",
+          "P301+P316",
+          "P302+P352",
+          "P304+P340",
+          "P305+P351+P338",
+          "P308+P316",
+          "P317",
+          "P319",
+          "P321",
+          "P330",
+          "P332+P317",
+          "P337+P317",
+          "P362+P364"
+        ]
+      },
+      "critical_codes": [
+        "H301",
+        "H370",
+        "H372"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/25204",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "硫酸亚铁",
+      "name_en": "iron(II) sulfate",
+      "cas": "7720-78-7",
+      "molecular_formula": "FeO4S",
+      "molecular_weight": "151.91",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Warning",
+        "pictograms": [
+          "Irritant"
+        ],
+        "hazard_codes": [
+          "H302",
+          "H315",
+          "H319"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H302",
+            "text": "吞咽有害"
+          },
+          {
+            "code": "H315",
+            "text": "造成皮肤刺激"
+          },
+          {
+            "code": "H319",
+            "text": "造成严重眼刺激"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": [
+          "P264",
+          "P264+P265",
+          "P270",
+          "P280",
+          "P301+P317",
+          "P302+P352",
+          "P305+P351+P338",
+          "P321",
+          "P330",
+          "P332+P317",
+          "P337+P317",
+          "P362+P364",
+          "P501"
+        ]
+      },
+      "critical_codes": [],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/24393",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "葡萄糖",
+      "name_en": "glucose",
+      "cas": "50-99-7",
+      "molecular_formula": "C6H12O6",
+      "molecular_weight": "180.16",
+      "data_status": "NO_GHS_CLASSIFICATION",
+      "ghs": {
+        "signal_word": null,
+        "pictograms": [],
+        "hazard_codes": [],
+        "hazard_statements_zh": [],
+        "unmapped_codes": [],
+        "precautionary_codes": []
+      },
+      "critical_codes": [],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/5793",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": [
+        "PubChem无GHS分类数据"
+      ]
+    },
+    {
+      "name_zh": "蔗糖",
+      "name_en": "sucrose",
+      "cas": "57-50-1",
+      "molecular_formula": "C12H22O11",
+      "molecular_weight": "342.30",
+      "data_status": "NO_GHS_CLASSIFICATION",
+      "ghs": {
+        "signal_word": null,
+        "pictograms": [],
+        "hazard_codes": [],
+        "hazard_statements_zh": [],
+        "unmapped_codes": [],
+        "precautionary_codes": []
+      },
+      "critical_codes": [],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/5988",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": [
+        "PubChem无GHS分类数据"
+      ]
+    },
+    {
+      "name_zh": "甲基橙",
+      "name_en": "methyl orange",
+      "cas": "547-58-0",
+      "molecular_formula": "C14H14N3NaO3S",
+      "molecular_weight": "327.34",
+      "data_status": "NO_GHS_CLASSIFICATION",
+      "ghs": {
+        "signal_word": null,
+        "pictograms": [],
+        "hazard_codes": [],
+        "hazard_statements_zh": [],
+        "unmapped_codes": [],
+        "precautionary_codes": []
+      },
+      "critical_codes": [],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/23673835",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": [
+        "PubChem无GHS分类数据"
+      ]
+    },
+    {
+      "name_zh": "溴百里酚蓝",
+      "name_en": "bromothymol blue",
+      "cas": "76-59-5",
+      "molecular_formula": "C27H28Br2O5S",
+      "molecular_weight": "624.4",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Warning",
+        "pictograms": [
+          "Irritant"
+        ],
+        "hazard_codes": [
+          "H302",
+          "H315",
+          "H319"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H302",
+            "text": "吞咽有害"
+          },
+          {
+            "code": "H315",
+            "text": "造成皮肤刺激"
+          },
+          {
+            "code": "H319",
+            "text": "造成严重眼刺激"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": [
+          "P264",
+          "P264+P265",
+          "P270",
+          "P280",
+          "P301+P317",
+          "P302+P352",
+          "P305+P351+P338",
+          "P321",
+          "P330",
+          "P332+P317",
+          "P337+P317",
+          "P362+P364",
+          "P501"
+        ]
+      },
+      "critical_codes": [],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": "https://pubchem.ncbi.nlm.nih.gov/compound/6450",
+        "fetched_at": "2026-08-14T21:05:39.077794+08:00",
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    }
+  ]
+}

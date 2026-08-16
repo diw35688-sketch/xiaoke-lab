@@ -44,6 +44,16 @@ RECORDINGS_DIR = (
     / "recordings"
 )
 
+DATA_DIR = PROJECT_DIR / "data"
+
+# 试剂安全知识库（PubChem 事实数据 + GB 30000 中文表述）
+HAZMAT_FILE = (
+    DATA_DIR
+    / "hazmat"
+    / "reagent_safety.json"
+)
+HAZMAT_SCHEMA_VERSION = 1
+
 RESULTS_DIR = PROJECT_DIR / "results"
 
 RESULTS_FILE = (
@@ -73,6 +83,16 @@ TEST_AUDIO = (
 SAMPLE_RATE = 16_000
 CHANNELS = 1
 DTYPE = "float32"
+
+
+# ==================================================
+# TTS 配置
+# ==================================================
+
+TTS_BACKEND = os.getenv(
+    "TTS_BACKEND",
+    "null",
+).strip().lower()
 
 
 # ==================================================
@@ -106,6 +126,10 @@ def read_bool(variable_name: str, default: str = "false") -> bool:
     raise RuntimeError(
         f"{variable_name} 必须是 true 或 false，当前值为：{raw_value!r}"
     )
+
+
+TTS_ENABLED = read_bool("TTS_ENABLED")
+
 
 
 # ==================================================

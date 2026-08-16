@@ -7,12 +7,13 @@ from src.core.unified_prompts import (
     build_unified_understanding_user_prompt,
 )
 from src.core.unified_understanding import (
+    UnifiedUnderstandingError,
     UnifiedUnderstandingInput,
     UnifiedUnderstandingResult,
     build_degraded_understanding,
     parse_unified_understanding,
 )
-from src.llm.client import LLMClient
+from src.llm.client import LLMClient, LLMClientError
 from src.llm.processor import ProcessOutcome
 
 
@@ -45,20 +46,42 @@ class UnifiedUnderstandingProcessor:
                 llm_attempts=generation.attempts,
                 llm_processing_seconds=generation.processing_seconds,
             )
+        except (LLMClientError, UnifiedUnderstandingError) as error:
+            # 预期内失败：外部服务不可用或模型输出违反合同。
+            # 这是设计好的降级路径，安静处理。
+            return self._degrade(request, generation, error)
         except Exception as error:
-            attempts, seconds = self._read_metrics(generation, error)
-            return ProcessOutcome(
-                value=build_degraded_understanding(
-                    raw_text=request.raw_text,
-                    session_id=request.session_id,
-                    segment_id=request.segment_id,
-                    reason=f"{type(error).__name__}: {error}",
-                ),
-                degraded=True,
-                error=f"{type(error).__name__}: {error}",
-                llm_attempts=attempts,
-                llm_processing_seconds=seconds,
+            # 预期外失败：走到这里说明本模块存在缺陷，
+            # 而不是外部环境的问题。仍然降级以保护主流程，
+            # 但必须显式暴露，否则代码缺陷会被伪装成网络故障。
+            print(
+                "[统一理解] 非契约异常，疑似代码缺陷："
+                f"{type(error).__name__}: {error}"
             )
+            return self._degrade(request, generation, error)
+
+    def _degrade(
+        self,
+        request: UnifiedUnderstandingInput,
+        generation,
+        error: Exception,
+    ) -> ProcessOutcome[UnifiedUnderstandingResult]:
+        """统一的降级出口：保存未分类NOTE并带回真实指标。"""
+
+        attempts, seconds = self._read_metrics(generation, error)
+        reason = f"{type(error).__name__}: {error}"
+        return ProcessOutcome(
+            value=build_degraded_understanding(
+                raw_text=request.raw_text,
+                session_id=request.session_id,
+                segment_id=request.segment_id,
+                reason=reason,
+            ),
+            degraded=True,
+            error=reason,
+            llm_attempts=attempts,
+            llm_processing_seconds=seconds,
+        )
 
     @staticmethod
     def _read_metrics(generation, error: Exception) -> tuple[int, float]:

@@ -1,0 +1,321 @@
+# 实验语音助手 · 项目交接文档
+
+> 交接时间：2026-08-15
+> 仓库：`https://github.com/diw35688-sketch/ai107`
+> 分支：`codex/asr-demo-unified-understanding`
+> 本地路径：`D:\me\ai107`
+> 比赛：中国科学技术大学「107 杯」智能体开发大赛，**截止 8 月 31 日**
+
+---
+
+## 一、这个产品是什么
+
+**一句话**：学生做实验时边操作边口述，系统自动形成结构化实验记录，并对缺失的关键参数主动追问。
+
+**要解决的真实问题**：做实验时双手被占用。纸笔记录会打断操作；普通录音只能存声音，无法检索、无法生成报告；**当场漏记的参数（温度、时长、浓度）事后永远补不回来**。
+
+**与"录音转文字"工具的本质区别**，这两条是整个项目的立身之本：
+
+1. **结构化** —— "加入五毫升缓冲液" → `{action:加入, object:缓冲液, amount_value:5, amount_unit:毫升}`
+2. **按方案主动追问** —— 系统知道你在做哪个实验、当前第几步、这一步必须记录什么，缺了就当场问
+
+**形态**：浏览器网页应用（FastAPI + 原生 JS）。命令行版是开发期产物，不是交付形态。
+
+---
+
+## 二、五分钟跑起来
+
+```powershell
+cd D:\me\ai107\web
+..\.venv\Scripts\python.exe -m uvicorn app:app --host 127.0.0.1 --port 8000
+```
+
+浏览器打开 `http://127.0.0.1:8000`，**点左侧「⚙ 模型与语音」填 API 密钥** → 点「测试连接」变绿 → 保存。就能用了。
+
+- 环境已就绪：`D:\me\ai107\.venv`（Python 3.12），依赖已装齐，**不需要重装**
+- 模型密钥存在 `web/settings.json`（已 gitignore，不进版本库）
+- 团队用的是校内接口 `https://api.llm.ustc.edu.cn/v1`，模型 `deepseek-v4-pro`
+
+跑测试：
+
+```powershell
+cd D:\me\ai107
+.\.venv\Scripts\python.exe -B -m unittest discover      # 应为 600 tests OK
+```
+
+离线看核心能力（**不需要密钥、不需要麦克风、不需要联网**）：
+
+```powershell
+$env:PYTHONPATH='.'
+.\.venv\Scripts\python.exe -B scripts\demo_lab_session.py
+```
+
+---
+
+## 三、架构总览
+
+```
+浏览器
+ ├─ 左侧栏      实验进行中 / 实验方案 / 试剂安全库 / 本次记录 / 模型与语音
+ ├─ 中间画布    步骤时间线 · 当前步骤卡片（大步骤+小步骤）· 安全提示
+ │              · 思维链（Think 折叠行）· 工具调用卡片
+ └─ 右侧对话    消息流 + composer（输入框 / 麦克风 / 模型选择 / 发送）
+        │
+        ▼
+FastAPI (web/)
+ ├─ /settings          模型与语音配置（运行时可改，无需重启）
+ ├─ /chat/stream       对话流式接口（转发思维链、工具卡片）
+ ├─ /protocols/*       方案列表、选择、步骤推进、确定性判断、编辑
+ ├─ /asr/transcribe    WAV 上传 → SenseVoice 转写
+ ├─ /record            完整链路：口述 → 抽实体 → 按方案判断
+ └─ /tts               语音合成（5 种供应商可选）
+        │
+        ▼
+领域层 (src/)   ← 这层有 600 项测试，是项目最可靠的部分
+ ├─ protocol*.py           方案契约、步骤游标、缺失字段、偏差检测
+ ├─ rule_entity_extraction 规则实体抽取（不依赖大模型）
+ ├─ hazmat_store           试剂安全知识库
+ ├─ asr/                   ASR 后端抽象 + SenseVoice 适配
+ ├─ llm/                   统一理解、严格解析、保真降级
+ └─ audio/                 唤醒词、VAD、可打断 TTS 契约
+```
+
+**分层铁律**：`web/` 不做任何业务判断，只负责装配和转译；所有业务规则在 `src/`，由测试保护。
+
+---
+
+## 四、目录与模块职责
+
+| 路径 | 职责 | 规模 |
+|---|---|---|
+| `src/core/protocol*.py` | 方案契约、会话状态、缺失字段、偏差检测、步骤游标 | 核心 |
+| `src/core/rule_entity_extraction.py` | 规则抽取（数量/单位/浓度/温度/时长） | 降级路径 |
+| `src/storage/protocol_store.py` | 方案库严格解析（未知字段拒绝、版本校验） | — |
+| `src/storage/hazmat_store.py` | 试剂安全库读取与文本匹配 | — |
+| `src/llm/` | 统一理解 Prompt、严格校验、保真降级 | 已有测试 |
+| `src/asr/`、`src/audio/` | ASR 抽象、唤醒词、VAD、可打断 TTS 契约 | 已有测试 |
+| `web/app.py` | FastAPI 入口，只注册路由和注入前端脚本 | 60 行 |
+| `web/domain.py` | web→src 的桥，不含业务判断 | — |
+| `web/lab_tools.py` | **工具注册表**，模型可调用的能力 | 6 个工具 |
+| `web/settings_store.py` | 运行时设置（模型/语音），支持热生效 | — |
+| `web/tts_providers.py` | 5 种语音合成供应商 | — |
+| `web/frontend/*.js` | 外壳、画布、composer、编辑器、设置 | 2141 行 |
+| `data/protocols/` | 6 份方案 / 34 步 + 10 份外部抓取原始数据 | — |
+| `data/hazmat/reagent_safety.json` | 49 种试剂（PubChem 数据，可溯源） | — |
+
+**代码量**：`src` 12902 行、`tests` 13001 行（**测试比生产代码多**）、`web` 2704 行 Python + 2141 行 JS。
+
+---
+
+## 五、六个核心概念（不懂这些改不动代码）
+
+### 1. 方案已定 vs 现场必测（最重要）
+
+```python
+protocol_values  # 方案作者写死的目标值 → 永不追问
+must_record      # 只有现场才能产生的实测值 → 缺失才追问
+```
+
+**为什么**：方案第3步写着「加热到60℃保持10分钟」，学生说「将溶液加热」，系统**不该**追问"加热到多少度" —— 那等于让学生背诵方案。只该问方案不可能知道的东西：实际称了多少、观察到什么现象。
+
+**实验记录的价值恰恰在第二类**。方案说称 3.58 g，记一百遍也没意义；「我实际称了 3.61 g」才是本次实验独有的事实。
+
+同一字段可同时出现在两边（目标 vs 事实），不矛盾。
+
+### 2. 缺失 ≠ 偏差
+
+| | 含义 | 系统行为 |
+|---|---|---|
+| **缺失** | 你漏说了 | 追问「实际称了多少克？」 |
+| **偏差** | 你说的和方案不一致 | 提示「方案是3.58，你说3.61，确认？」 |
+
+两者必须分开，混在一条追问里会产生"既要补充又要确认"的混乱输出。
+
+### 3. 三级实体抽取
+
+```
+1. LLM 抽取     最完整，需配模型
+2. 规则抽取     离线、零成本，抽数量/单位/浓度/温度/时长
+3. 原文保真     兜底，绝不丢数据
+```
+
+**没配模型时追问依然完整可用**，因为「缺什么字段」是程序按方案算的，不依赖 LLM。
+
+### 4. 值来源标记
+
+```python
+SPOKEN            # 学生亲口说的
+PROTOCOL_DEFAULT  # 按方案自动填的
+DEVIATION         # 学生说的与方案不一致
+```
+
+**按方案填充的值绝不能伪装成学生说过的话**。即使学生说的值恰好等于方案值，来源仍是 `SPOKEN`。这是记录真实性的底线。
+
+### 5. 步骤推进是显式的
+
+只支持 `next / prev / jump`，**不让模型猜当前第几步**。
+
+**为什么**：专业 ELN（Benchling、LabArchives）和制药 MES 一律用显式推进。模型对齐错误是**静默的** —— 参数记到错误步骤，记录看起来仍然合法，但事实已污染，比没有步骤跟踪更危险。
+
+### 6. 工具即插件
+
+参考 deepseek-harness 的「Everything is a Plugin」：
+
+```python
+@tool("check_reagent_safety", "查询试剂危险性…", {schema},
+      kind="read", title="查询试剂安全：{reagent}",
+      present=lambda a, r: [...])          # 卡片摘要行
+def _check_reagent_safety(reagent): ...
+```
+
+**加能力只要加一个装饰器**，自动出现在模型工具列表和 UI 卡片里，不用改调用处。
+
+---
+
+## 六、已完成 / 未完成
+
+### 已完成并验证
+
+| 能力 | 状态 |
+|---|---|
+| 方案契约（方案已定/现场必测/追问话术/大步骤+小步骤） | 600 项测试覆盖 |
+| 会话级方案状态、步骤游标、缺失字段、偏差检测 | 纯函数，测试完备 |
+| 试剂安全库 49 种（PubChem，含 CAS/GHS/H码中文） | 可逐条溯源 |
+| 三级实体抽取（LLM / 规则 / 原文） | 实测通过 |
+| 6 份实验方案（3 自建 + 3 从 protocols.io 转换） | 严格校验通过 |
+| 网页应用：三列外壳、工作画布、composer、方案编辑器 | 可运行 |
+| 模型配置界面（预设/密钥/测试/热生效） | 实测 401/404 均能正确识别 |
+| 语音合成 5 种供应商（浏览器/Edge/OpenAI兼容/百炼/本机Qwen） | Edge 实测 2.3 秒 |
+| ASR：SenseVoice 服务端转写（浏览器录 16kHz WAV 上传） | 实测转写正确 |
+| 工具调用 13 个（7 个队友的 + 6 个实验室能力） | 卡片渲染 |
+| 思维链转发与折叠渲染 | 解析逻辑已验证 |
+
+### 未完成
+
+| 缺口 | 影响 | 建议优先级 |
+|---|---|---|
+| **实验记录未落盘** | 现在只在内存，刷新就没了 | **最高** |
+| **会话总结与报告导出** | 学生要的是实验报告，最后一公里没打通 | **高** |
+| 本机 Qwen3-TTS 未接通 | 需装 CUDA 版 torch + 下模型（机器有 RTX 4060） | 中 |
+| 中文方案只有 6 份 | 演示够用，规模不够 | 中 |
+| 上传讲义 + OCR 建方案 | 调研已完成（见下），未实现 | 低 |
+| 常驻音频总线 | 现在录音要手动点，不能连续听 | 低 |
+| Live2D 形象 | 队友 C 负责 | — |
+
+---
+
+## 七、已知问题与坑（**接手前必读**）
+
+### 1. 句首截断缺陷（未修复，有实测证据）
+
+`docs/PROJECT_TASK_CHECKLIST.md` 记录：真实验收 9 句里 **4 句句首被截断**。
+
+根因在 `src/audio/vad_recorder.py`：预缓冲区在麦克风流打开**之后**才开始填充，对"流还没开时说的话"无能为力。**要根治必须改成常驻音频流**（浏览器端目前是手动点录音，绕过了这个问题）。
+
+### 2. PubChem 数据会过度报警
+
+PubChem 聚合**所有厂商 SDS 的并集**，氯化钠（食盐）被标 H318 严重眼损伤、乙醇被标 H350 致癌。
+
+**已处理**：定义了 `critical_codes` 白名单，现场只播报高危项。**不要去掉这个过滤** —— 警告太多学生就会全部忽略，比不报警更危险。
+
+### 3. 安全数据全部 `UNREVIEWED`
+
+试剂库和方案译文都标着 `review_status: UNREVIEWED`。**正式用于教学前必须由实验教师复核**。这不是形式主义：AI 生成或聚合的安全信息出错会伤人。
+
+### 4. 编码事故（已修，但要防）
+
+Codex agent 向大型 markdown 文档追加中文时会把中文写成 `?`（源码文件不受影响）。已发生 3 次，都是人工重写修复的。
+
+**约定**：文档更新不要交给 agent 直接写入；每轮收尾的编码扫描必须覆盖 `.md` 和 `.json`，不能只扫 `.py`。
+
+```powershell
+# 编码体检
+.\.venv\Scripts\python.exe -c "import pathlib,glob; print([f for f in glob.glob('src/**/*.py',recursive=True)+glob.glob('web/**/*.py',recursive=True)+glob.glob('docs/**/*.md',recursive=True) if '????' in pathlib.Path(f).read_text(encoding='utf-8',errors='replace')] or '干净')"
+```
+
+### 5. 隐藏元素要写在样式表里
+
+队友的 `settings.js` 有定时刷新会重设按钮样式，**用 JS 设 `element.style.display='none'` 会被覆盖**（曾导致界面出现两个对话框）。长期隐藏一律写进 `web/frontend/theme.css`。
+
+### 6. 兼容层是陷阱
+
+曾为了"保持旧测试全绿"加过一个字段兼容层，结果**把已判定为错误的行为原样保留了**。
+
+**教训**：语义变更时，编码了错误语义的旧测试应该被**改写**，而不是用兼容层保护。
+
+### 7. C 盘已满
+
+`C:` 242G 用满，任何需要大依赖的操作都必须重定向到 D 盘：
+
+```powershell
+$env:TMP='D:\me\.pip-tmp'; $env:PIP_CACHE_DIR='D:\me\.pip-cache'
+# 模型缓存已在 .env 里指向 D:\me\.modelscope
+```
+
+### 8. 思维链依赖模型档位
+
+`deepseek-chat` 不返回 `reasoning_content`，**看不到思维链是正常的**，不是 bug。要看思维链得用 `deepseek-reasoner` / `deepseek-v4-pro` 推理档。
+
+---
+
+## 八、团队现状
+
+| 分支 | 作者 | 提交 | 内容 |
+|---|---|---|---|
+| `codex/asr-demo-unified-understanding` | Kyra25906 | 41 | 语音链路 + 统一理解（**主线，已合并本文所述工作**） |
+| `my-agent` | libao-ber | 2 | FastAPI + 前端 + SQLite + 本机 Qwen3-TTS（**已并入 `web/`**） |
+| — | 队友 C | — | 前端 / Live2D（计划中） |
+
+**当前所有改动未提交**（43 个文件）。接手后建议先按能力边界拆分提交，不要压成一次。
+
+队友的冲刺计划在 `docs/PLAN_2026-08-14_31.md`，其中 `SAFETY-TYPES-01`、`KNOWLEDGE-PROTOCOLS-01`、`TTS-01~05` **已经由本文所述工作完成**，需要和他对齐避免重复。
+
+---
+
+## 九、下一步建议（按投入产出排序）
+
+1. **实验记录落盘** —— 现在记录只在内存，刷新即失。这是演示时最容易翻车的点。落到 SQLite（`web/database/` 已有现成的连接层）或 JSONL。
+2. **会话总结 + 报告导出** —— 学生要的是实验报告。有了落盘数据，导出 Markdown/PDF 是直接的。
+3. **和队友对齐** —— 告诉 Kyra 哪些计划项已完成，避免 8/17 重做。
+4. **中文方案扩到 10-15 份** —— 自己写最干净（法律上无风险），参考 `data/protocols/undergraduate_basic_protocols.json` 的格式。
+5. **接本机 Qwen3-TTS** —— 机器有 RTX 4060，装 CUDA 版 torch + `qwen-tts`，改 `web/local_tts/.env` 里的模型路径（现在是队友机器的 `E:\`）。
+
+---
+
+## 十、关键参考
+
+| 文档 | 内容 |
+|---|---|
+| `docs/PROTOCOL_SOURCING_RESEARCH.md` | 477 行：方案来源版权红线、OCR 选型、上传流程、工作量估算 |
+| `docs/PROJECT_ARCHITECTURE.md` | 队友写的架构文档 |
+| `docs/PLAN_2026-08-14_31.md` | 冲刺计划 |
+| `data/protocols/external/LICENSE_LEDGER.md` | 10 份抓取方案的许可台账（含源 PDF SHA-256） |
+| `CLAUDE.md` | 项目开发约定（每轮收尾检查、文档维护、测试要求） |
+| `D:\me\_ref\dsh` | deepseek-harness 源码（7412 文件），UI 与工具范式的参考来源 |
+
+**版权红线**（来自调研报告，务必遵守）：Nature Protocols、JoVE、Springer Protocols、丁香园、高校讲义**不能抓取再分发**。可用：protocols.io 公开 CC BY、PMC Open Access Subset、MIT OCW、自己写。
+
+---
+
+## 十一、验收清单
+
+接手后跑一遍确认环境正常：
+
+```powershell
+cd D:\me\ai107
+
+# 1. 测试
+.\.venv\Scripts\python.exe -B -m unittest discover          # 600 tests OK
+
+# 2. 离线核心能力（无需密钥）
+$env:PYTHONPATH='.'
+.\.venv\Scripts\python.exe -B scripts\demo_lab_session.py   # 方案+安全+追问+偏差
+
+# 3. 启动网页
+cd web
+..\.venv\Scripts\python.exe -m uvicorn app:app --port 8000  # http://127.0.0.1:8000
+
+# 4. 编码体检（防中文乱码）
+```
+
+**预期**：600 测试全绿；演示脚本输出安全提示、追问话术、偏差提示；网页三列布局正常，左侧 5 个页面可切换。

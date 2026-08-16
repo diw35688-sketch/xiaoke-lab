@@ -1,0 +1,868 @@
+{
+  "protocols": [
+    {
+      "protocol_id": "phosphate-buffer-0.1m-ph7.4",
+      "title": "0.1 mol/L pH 7.4 磷酸缓冲液配制",
+      "source": "本科基础生物化学实验教学通用步骤示例",
+      "version": "1.0",
+      "schema_version": 1,
+      "steps": [
+        {
+          "step_number": 1,
+          "title": "称量磷酸盐",
+          "instruction": "称取方案规定质量的磷酸盐，目标质量为3.58 g，并记录实际称量值。",
+          "protocol_values": {
+            "action": "称量",
+            "object": "磷酸二氢盐和磷酸氢二盐",
+            "amount_unit": "g",
+            "amount_value": "3.58"
+          },
+          "must_record": [
+            "amount_value"
+          ],
+          "terms": [
+            "磷酸二氢盐",
+            "磷酸氢二盐",
+            "分析天平"
+          ],
+          "hazard_note": "称量时佩戴护目镜和实验手套，避免粉末扬散。",
+          "field_prompts": {
+            "amount_value": "实际称了多少克磷酸盐？"
+          }
+        },
+        {
+          "step_number": 2,
+          "title": "溶解试剂",
+          "instruction": "将称量后的磷酸盐加入烧杯，用部分去离子水充分溶解，并记录现场观察到的溶解现象。",
+          "protocol_values": {
+            "action": "溶解",
+            "object": "磷酸盐"
+          },
+          "must_record": [
+            "observation"
+          ],
+          "terms": [
+            "去离子水",
+            "磁力搅拌器"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "observation": "磷酸盐加水溶解后，现场看到的溶解现象是什么？"
+          }
+        },
+        {
+          "step_number": 3,
+          "title": "调节酸碱度",
+          "instruction": "用校准后的pH计监测，并缓慢调节溶液至pH 7.4，记录实际读数。",
+          "protocol_values": {
+            "action": "调节",
+            "instrument": "pH计",
+            "condition": "pH 7.4"
+          },
+          "must_record": [
+            "condition"
+          ],
+          "terms": [
+            "pH计",
+            "校准",
+            "酸碱度"
+          ],
+          "hazard_note": "酸碱调节液应逐滴加入，防止局部浓度过高和飞溅。",
+          "field_prompts": {
+            "condition": "pH计最后测到的实际读数是多少？"
+          }
+        },
+        {
+          "step_number": 4,
+          "title": "转移定容",
+          "instruction": "将溶液定量转移到容量瓶，加去离子水至目标刻度，并记录实际使用的容量瓶规格。",
+          "protocol_values": {
+            "action": "定容",
+            "instrument": "容量瓶",
+            "amount_unit": "mL"
+          },
+          "must_record": [
+            "amount_value"
+          ],
+          "terms": [
+            "定量转移",
+            "容量瓶",
+            "定容"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "amount_value": "这一步实际用了多少毫升容量瓶？"
+          }
+        },
+        {
+          "step_number": 5,
+          "title": "混匀标记",
+          "instruction": "将容量瓶倒转混匀，记录溶液名称、方案浓度以及实际保存条件。",
+          "protocol_values": {
+            "action": "混匀",
+            "object": "磷酸缓冲液",
+            "concentration": "0.1 mol/L"
+          },
+          "must_record": [
+            "observation",
+            "condition"
+          ],
+          "terms": [
+            "倒转混匀",
+            "标签",
+            "保存条件"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "observation": "倒转混匀后，溶液看起来是什么状态？",
+            "condition": "这瓶溶液准备在什么条件下保存？"
+          }
+        }
+      ]
+    },
+    {
+      "protocol_id": "acid-base-titration-naoh-hcl",
+      "title": "氢氧化钠滴定盐酸",
+      "source": "本科分析化学酸碱滴定基础实验通用步骤示例",
+      "version": "1.0",
+      "schema_version": 1,
+      "steps": [
+        {
+          "step_number": 1,
+          "title": "润洗滴定管",
+          "instruction": "先用少量氢氧化钠标准溶液润洗滴定管两到三次，并记录实际润洗次数。",
+          "protocol_values": {
+            "action": "润洗",
+            "object": "氢氧化钠标准溶液",
+            "instrument": "碱式滴定管",
+            "duration": "两到三次"
+          },
+          "must_record": [
+            "observation"
+          ],
+          "terms": [
+            "润洗",
+            "碱式滴定管",
+            "标准溶液"
+          ],
+          "hazard_note": "氢氧化钠具有腐蚀性，操作时佩戴护目镜和手套。",
+          "field_prompts": {
+            "observation": "滴定管实际润洗了几次？润洗后管壁看起来是否均匀？"
+          },
+          "substeps": [
+            {
+              "order": 1,
+              "text": "取少量标准液倒入",
+              "note": null
+            },
+            {
+              "order": 2,
+              "text": "转动润湿内壁",
+              "note": null
+            },
+            {
+              "order": 3,
+              "text": "弃去废液",
+              "note": "不可倒回试剂瓶"
+            },
+            {
+              "order": 4,
+              "text": "重复两到三次",
+              "note": null
+            }
+          ]
+        },
+        {
+          "step_number": 2,
+          "title": "移取待测液",
+          "instruction": "用移液管准确移取盐酸待测液到锥形瓶中，并记录实际移取体积。",
+          "protocol_values": {
+            "action": "移取",
+            "object": "盐酸待测液",
+            "instrument": "移液管",
+            "amount_unit": "mL"
+          },
+          "must_record": [
+            "amount_value"
+          ],
+          "terms": [
+            "移液管",
+            "待测液",
+            "锥形瓶"
+          ],
+          "hazard_note": "禁止用嘴吸取移液管中的液体。",
+          "field_prompts": {
+            "amount_value": "实际移取了多少毫升盐酸待测液？"
+          },
+          "substeps": [
+            {
+              "order": 1,
+              "text": "用洗耳球吸取盐酸待测液至刻度线以上",
+              "note": "禁止用嘴吸取"
+            },
+            {
+              "order": 2,
+              "text": "擦干管外壁，调节液面至刻度线",
+              "note": null
+            },
+            {
+              "order": 3,
+              "text": "将待测液放入锥形瓶",
+              "note": null
+            }
+          ]
+        },
+        {
+          "step_number": 3,
+          "title": "加入指示剂",
+          "instruction": "向锥形瓶中加入适量酚酞指示剂并轻轻摇匀，记录颜色变化。",
+          "protocol_values": {
+            "action": "加入",
+            "object": "酚酞指示剂",
+            "amount_unit": "滴"
+          },
+          "must_record": [
+            "observation"
+          ],
+          "terms": [
+            "酚酞",
+            "指示剂"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "observation": "加入酚酞并摇匀后，溶液变成什么颜色？"
+          },
+          "substeps": [
+            {
+              "order": 1,
+              "text": "向锥形瓶中滴加酚酞指示剂",
+              "note": null
+            },
+            {
+              "order": 2,
+              "text": "轻轻摇匀，观察初始颜色",
+              "note": null
+            }
+          ]
+        },
+        {
+          "step_number": 4,
+          "title": "进行滴定",
+          "instruction": "用已知浓度的氢氧化钠标准溶液滴定，同时持续摇动锥形瓶。",
+          "protocol_values": {
+            "action": "滴定",
+            "object": "氢氧化钠标准溶液",
+            "concentration": "0.1000 mol/L",
+            "instrument": "碱式滴定管"
+          },
+          "must_record": [
+            "amount_value",
+            "observation"
+          ],
+          "terms": [
+            "滴定",
+            "标准溶液",
+            "滴定终点"
+          ],
+          "hazard_note": "接近终点时应逐滴加入，避免过量滴定。",
+          "field_prompts": {
+            "amount_value": "滴定到接近终点时，实际消耗了多少毫升氢氧化钠？",
+            "observation": "滴定过程中溶液出现了什么颜色变化或现象？"
+          },
+          "substeps": [
+            {
+              "order": 1,
+              "text": "记录滴定管初始读数",
+              "note": "视线与凹液面最低点平齐"
+            },
+            {
+              "order": 2,
+              "text": "边滴加边摇动锥形瓶",
+              "note": null
+            },
+            {
+              "order": 3,
+              "text": "接近终点时改为逐滴加入",
+              "note": "半滴操作可提高精度"
+            }
+          ]
+        },
+        {
+          "step_number": 5,
+          "title": "记录终点读数",
+          "instruction": "溶液出现持续约30秒的浅粉红色时停止滴定，并记录实际滴定体积与观察到的终点现象。",
+          "protocol_values": {
+            "action": "停止滴定",
+            "duration": "约30秒",
+            "amount_unit": "mL"
+          },
+          "must_record": [
+            "amount_value",
+            "observation"
+          ],
+          "terms": [
+            "浅粉红色",
+            "终点读数",
+            "滴定体积"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "amount_value": "到终点时实际滴定体积是多少毫升？",
+            "observation": "终点时持续约30秒的溶液颜色是什么？"
+          },
+          "substeps": [
+            {
+              "order": 1,
+              "text": "溶液出现浅粉红色且30秒不褪色即为终点",
+              "note": null
+            },
+            {
+              "order": 2,
+              "text": "记录滴定管终点读数",
+              "note": null
+            },
+            {
+              "order": 3,
+              "text": "计算消耗体积",
+              "note": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "protocol_id": "copper-sulfate-spectrophotometry",
+      "title": "硫酸铜溶液分光光度测定",
+      "source": "本科普通化学分光光度法基础实验通用步骤示例",
+      "version": "1.0",
+      "schema_version": 1,
+      "steps": [
+        {
+          "step_number": 1,
+          "title": "配制标准系列",
+          "instruction": "按梯度移取硫酸铜标准溶液并分别定容，得到标准系列，记录各管实际移取体积。",
+          "protocol_values": {
+            "action": "定容",
+            "object": "硫酸铜标准溶液",
+            "amount_unit": "mL"
+          },
+          "must_record": [
+            "amount_value"
+          ],
+          "terms": [
+            "标准系列",
+            "梯度浓度",
+            "定容"
+          ],
+          "hazard_note": "硫酸铜溶液不得直接排入水槽，应按含重金属废液处理。",
+          "field_prompts": {
+            "amount_value": "这组标准系列中，各管实际移取了多少毫升标准溶液？"
+          }
+        },
+        {
+          "step_number": 2,
+          "title": "设置测量波长",
+          "instruction": "开启分光光度计并设置实验指定的测量波长，记录仪器实际设置值。",
+          "protocol_values": {
+            "action": "设置",
+            "instrument": "分光光度计",
+            "condition": "510 nm"
+          },
+          "must_record": [
+            "condition"
+          ],
+          "terms": [
+            "分光光度计",
+            "测量波长",
+            "预热"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "condition": "分光光度计最后实际设置的波长是多少？"
+          }
+        },
+        {
+          "step_number": 3,
+          "title": "空白调零",
+          "instruction": "使用去离子水作为空白样品，对仪器进行调零，并记录调零后的仪器状态。",
+          "protocol_values": {
+            "action": "调零",
+            "object": "去离子水",
+            "instrument": "分光光度计"
+          },
+          "must_record": [
+            "observation"
+          ],
+          "terms": [
+            "空白样品",
+            "调零",
+            "比色皿"
+          ],
+          "hazard_note": "拿取比色皿时避免触碰透光面。",
+          "field_prompts": {
+            "observation": "用空白调零后，仪器显示或状态有什么变化？"
+          }
+        },
+        {
+          "step_number": 4,
+          "title": "测量标准液",
+          "instruction": "依次测量各标准液的吸光度，并记录每个标准液的实际浓度与对应读数。",
+          "protocol_values": {
+            "action": "测量",
+            "object": "硫酸铜标准溶液",
+            "instrument": "分光光度计"
+          },
+          "must_record": [
+            "concentration",
+            "observation"
+          ],
+          "terms": [
+            "吸光度",
+            "标准液",
+            "校准曲线"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "concentration": "本次测量的标准液实际浓度分别是多少？",
+            "observation": "各标准液测得的吸光度读数分别是多少？"
+          }
+        },
+        {
+          "step_number": 5,
+          "title": "测量待测液",
+          "instruction": "用相同条件测量待测硫酸铜溶液的吸光度，并记录实际读数。",
+          "protocol_values": {
+            "action": "测量",
+            "object": "待测硫酸铜溶液",
+            "instrument": "分光光度计"
+          },
+          "must_record": [
+            "observation"
+          ],
+          "terms": [
+            "待测液",
+            "吸光度"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "observation": "待测硫酸铜溶液测得的吸光度是多少？"
+          }
+        },
+        {
+          "step_number": 6,
+          "title": "计算待测浓度",
+          "instruction": "根据校准曲线计算待测液浓度并记录计算结果。",
+          "protocol_values": {
+            "action": "计算"
+          },
+          "must_record": [
+            "concentration"
+          ],
+          "terms": [
+            "校准曲线",
+            "线性回归",
+            "待测浓度"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "concentration": "根据校准曲线算出的待测液实际浓度是多少？"
+          }
+        }
+      ]
+    },
+    {
+      "protocol_id": "protocolsio-cell-counting-ecoli",
+      "title": "细胞计数（大肠杆菌吸光度标准曲线的绘制）",
+      "source": "protocols.io / Laura Sánchez / Creative Commons Attribution License (CC BY; version not stated in PDF export)（中文为翻译改编版，未经复核）",
+      "version": "1.0-zh",
+      "schema_version": 1,
+      "steps": [
+        {
+          "step_number": 1,
+          "title": "开机预热",
+          "instruction": "打开分光光度计，将波长设置为 425 nm。预热至少 15 min。",
+          "protocol_values": {
+            "instrument": "分光光度计",
+            "condition": "波长425 nm",
+            "duration": "至少15 min"
+          },
+          "must_record": [
+            "condition"
+          ],
+          "terms": [
+            "分光光度计",
+            "波长"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "condition": "分光光度计实际设置的波长是多少纳米？"
+          }
+        },
+        {
+          "step_number": 2,
+          "title": "配制稀释系列",
+          "instruction": "将培养管编号为 1 – 21。使用不同的移液器，按表中给出的体积向各管加入浑浊的大肠杆菌培养液和 TSB（胰酪大豆胨肉汤）。",
+          "protocol_values": {
+            "action": "配制",
+            "object": "大肠杆菌培养液和TSB"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit"
+          ],
+          "terms": [
+            "大肠杆菌",
+            "TSB",
+            "移液器"
+          ],
+          "hazard_note": "操作产气或含菌培养物时须在生物安全柜内进行。",
+          "field_prompts": {
+            "amount_value": "各管实际加入的培养液体积是多少？",
+            "amount_unit": "体积单位是毫升还是微升？"
+          }
+        },
+        {
+          "step_number": 3,
+          "title": "混匀",
+          "instruction": "用涡旋混合器将每管涡旋 1 – 2 sec，充分混匀。",
+          "protocol_values": {
+            "action": "涡旋混匀",
+            "duration": "1–2 sec"
+          },
+          "must_record": [
+            "observation"
+          ],
+          "terms": [
+            "涡旋混合器"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "observation": "涡旋后各管是否均匀，有无沉淀或气泡？"
+          }
+        },
+        {
+          "step_number": 4,
+          "title": "调零",
+          "instruction": "分光光度计中不放任何比色管，设定 0%T。",
+          "protocol_values": {
+            "action": "调零",
+            "instrument": "分光光度计",
+            "condition": "0%T"
+          },
+          "must_record": [
+            "observation"
+          ],
+          "terms": [
+            "分光光度计"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "observation": "调零后仪器读数是否稳定在零？"
+          }
+        },
+        {
+          "step_number": 5,
+          "title": "空白校准",
+          "instruction": "从 21 号管（不含大肠杆菌的 TSB）中取 3 – 4 ml 培养基转入比色皿，用 Kimwipe 无尘纸小心擦拭管外壁，放入仪器，设定 100%T（对分光光度计调空白）。随后将仪器切换到 Absorbance（吸光度）模式。",
+          "protocol_values": {
+            "action": "校准",
+            "object": "TSB空白",
+            "amount_value": "3–4",
+            "amount_unit": "ml",
+            "condition": "100%T"
+          },
+          "must_record": [
+            "observation"
+          ],
+          "terms": [
+            "比色皿",
+            "TSB",
+            "Kimwipe"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "observation": "用空白管校准后，仪器是否正常显示100%T？"
+          }
+        },
+        {
+          "step_number": 6,
+          "title": "回收与废弃处理",
+          "instruction": "取出比色皿，将培养基倒回 21 号管。小心地把比色皿口沿残留的最后几滴液体沥到 Kimwipe 无尘纸上。将被污染的无尘纸投入生物危害废弃物袋。",
+          "protocol_values": {
+            "action": "回收"
+          },
+          "must_record": [
+            "observation"
+          ],
+          "terms": [
+            "生物危害废弃物袋"
+          ],
+          "hazard_note": "接触菌液的废弃物须按微生物实验室规范处理。",
+          "field_prompts": {
+            "observation": "比色皿是否已擦净，污染擦拭纸是否投入生物危害袋？"
+          }
+        },
+        {
+          "step_number": 7,
+          "title": "逐管测定",
+          "instruction": "从 20 号管开始，倒序测至 1 号管，重复步骤 5-6。",
+          "protocol_values": {
+            "action": "测定",
+            "instrument": "分光光度计"
+          },
+          "must_record": [
+            "observation"
+          ],
+          "terms": [
+            "分光光度计",
+            "比色皿"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "observation": "从20号管倒序测到1号管，各管的吸光度读数分别是多少？"
+          }
+        },
+        {
+          "step_number": 8,
+          "title": "数据录入",
+          "instruction": "将数据转入 Microsoft Excel 表格。表格应包含以下列：大肠杆菌培养液体积、培养基体积、稀释倍数、实测吸光度。",
+          "protocol_values": {
+            "action": "录入"
+          },
+          "must_record": [
+            "observation"
+          ],
+          "terms": [
+            "Microsoft Excel"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "observation": "表格是否已包含培养液体积、培养基体积、稀释倍数和吸光度四列？"
+          }
+        },
+        {
+          "step_number": 9,
+          "title": "作散点图",
+          "instruction": "在表格中制作稀释倍数对吸光度的 X-Y 散点图。注意：所有图表必须作为独立工作表添加到工作簿中，不得直接粘贴到含数据列的工作表内。",
+          "protocol_values": {
+            "action": "作图"
+          },
+          "must_record": [
+            "observation"
+          ],
+          "terms": [],
+          "hazard_note": null,
+          "field_prompts": {
+            "observation": "稀释倍数对吸光度的散点图是否已作为独立工作表添加？"
+          }
+        },
+        {
+          "step_number": 10,
+          "title": "添加二次多项式趋势线",
+          "instruction": "为图表添加二阶多项式趋势线，并在趋势线选项中勾选显示方程和相关系数。",
+          "protocol_values": {
+            "action": "添加趋势线"
+          },
+          "must_record": [
+            "observation"
+          ],
+          "terms": [],
+          "hazard_note": null,
+          "field_prompts": {
+            "observation": "二阶多项式趋势线的方程和相关系数分别是多少？"
+          }
+        },
+        {
+          "step_number": 11,
+          "title": "确定线性范围",
+          "instruction": "从图中找出吸光度与细菌浓度成正比的范围。仅用该线性范围的数据，绘制第二张稀释倍数对吸光度的图。",
+          "protocol_values": {
+            "action": "确定线性范围"
+          },
+          "must_record": [
+            "observation"
+          ],
+          "terms": [],
+          "hazard_note": null,
+          "field_prompts": {
+            "observation": "吸光度与菌浓度成正比的线性范围是从哪到哪？"
+          }
+        },
+        {
+          "step_number": 12,
+          "title": "添加线性趋势线",
+          "instruction": "为第二张图添加线性趋势线，并在趋势线选项中勾选显示方程和相关系数。",
+          "protocol_values": {
+            "action": "添加趋势线"
+          },
+          "must_record": [
+            "observation"
+          ],
+          "terms": [],
+          "hazard_note": null,
+          "field_prompts": {
+            "observation": "线性趋势线的方程和相关系数分别是多少？"
+          }
+        }
+      ]
+    },
+    {
+      "protocol_id": "protocolsio-agarose-gel-instructor",
+      "title": "琼脂糖凝胶电泳（教师用方案）",
+      "source": "protocols.io / Brian Teague / Creative Commons Attribution License (CC BY; version not stated in PDF export)（中文为翻译改编版，未经复核）",
+      "version": "1.0-zh",
+      "schema_version": 1,
+      "steps": [
+        {
+          "step_number": 1,
+          "title": "配制 LAB 缓冲液",
+          "instruction": "按配方配制 LAB 缓冲液（配方见原方案中链接的独立协议 “LAB Agarose Gel Electrophoresis Buffer Recipe”）。\n\n对于 24 人的班级，我通常配制 6 瓶 1 L 的 1X LAB 缓冲液。用量很大——整个学期要跑三次胶，还不算重做的。",
+          "protocol_values": {
+            "action": "配制",
+            "object": "LAB缓冲液",
+            "amount_value": "1",
+            "amount_unit": "L"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit"
+          ],
+          "terms": [
+            "LAB buffer",
+            "乙酸锂",
+            "硼酸"
+          ],
+          "hazard_note": "硼酸可能损害生育力，乙酸锂有刺激性；配制时佩戴实验服、丁腈手套和护目镜。",
+          "field_prompts": {
+            "amount_value": "实际配了多少缓冲液？",
+            "amount_unit": "单位是升还是毫升？"
+          }
+        },
+        {
+          "step_number": 2,
+          "title": "教师提示",
+          "instruction": "使用 LAB 缓冲液的好处是可以在更高电压下跑胶——我们的“mini”电泳槽在 120 V 下跑 20 minutes 就能得到相当不错的胶。在 2 hours 内完成灌胶、上样和电泳是完全可行的。\n\n我通常会示范电泳槽的正确组装方法。\n\n加了 Sybr Safe 的胶在冰箱里放 48 hours 没问题，但再久染料就降解得太厉害了。也就是说：周二灌的胶周四上课能用，反过来不行。保存时把胶装进自封袋，加一点点（不要多）LAB 缓冲液，贴好标签后于 4 °C 冰箱保存。\n\n一个常见的学生错误是忘记加 DNA 染料。但还有救——这些胶可以后染。把胶放进小容器（枪头盒盖通常就行），用 LAB 缓冲液没过，加入 5 µL Sybr Safe，然后放在慢速摇床或轨道摇床上。",
+          "protocol_values": {
+            "action": "灌胶电泳",
+            "instrument": "mini电泳槽",
+            "condition": "120 V",
+            "duration": "20 minutes",
+            "temperature": "4 °C"
+          },
+          "must_record": [
+            "observation"
+          ],
+          "terms": [
+            "Sybr Safe",
+            "琼脂糖",
+            "电泳槽"
+          ],
+          "hazard_note": "加了Sybr Safe的胶在4 °C冰箱最多存放48小时，超时染料降解。",
+          "field_prompts": {
+            "observation": "灌好的胶是否完全透明、没有絮状物？如需保存请说明存放条件。"
+          }
+        },
+        {
+          "step_number": 3,
+          "title": "学生常见错误",
+          "instruction": "· 忘记加 DNA 染料\n· 琼脂糖没有 100% 溶解（应该像水一样清澈，不能有悬浮的絮状物）\n· 电泳方向接反了（记住口诀 “run to red”，即 DNA 向红色正极迁移）\n· 只上样了 1 µL 酶切产物（而不是整个酶切体系）\n· 反过来，把整个 PCR 产物全部上样（而不是只取 1 µL），导致剩余量不够做纯化",
+          "protocol_values": {
+            "action": "上样电泳",
+            "amount_value": "1",
+            "amount_unit": "µL"
+          },
+          "must_record": [
+            "amount_value",
+            "observation"
+          ],
+          "terms": [
+            "酶切产物",
+            "PCR产物"
+          ],
+          "hazard_note": "常见错误：忘加DNA染料、琼脂糖未完全溶解、电泳方向接反、上样量用错。",
+          "field_prompts": {
+            "amount_value": "实际上样了多少体积？",
+            "observation": "电泳方向是否正确（run to red），条带是否正常迁移？"
+          }
+        }
+      ]
+    },
+    {
+      "protocol_id": "protocolsio-0-1x-bwt-buffer",
+      "title": "0.1xBWT 缓冲液配制",
+      "source": "protocols.io / Anna Schmidt、Sarah Nagel、Matthias Meyer / Creative Commons Attribution License (CC BY; version not stated in PDF export)（中文为翻译改编版，未经复核）",
+      "version": "1.0-zh",
+      "schema_version": 1,
+      "steps": [
+        {
+          "step_number": 1,
+          "title": "配制缓冲液",
+          "instruction": "在 500 ml 方形试剂瓶中按下表加入各试剂配制缓冲液。转移大体积（> 1 ml）时使用玻璃移液管。通过摇动瓶子混匀试剂。\n\n试剂 / 体积 / 反应中终浓度：\n· Water — 483.75 ml\n· 5 M NaCl — 10 ml — 100 mM\n· 1 M Tris-HCl, pH 8.0 — 5 ml — 10 mM\n· 0.5 M EDTA, pH 8.0 — 1 ml — 1 mM\n· 100% Tween-20 — 0.25 ml — 0.05%\n· 合计 — 500 ml",
+          "protocol_values": {
+            "action": "配制",
+            "object": "0.1xBWT缓冲液",
+            "amount_value": "500",
+            "amount_unit": "ml",
+            "concentration": "NaCl 100 mM / Tris-HCl 10 mM / EDTA 1 mM / Tween-20 0.05%"
+          },
+          "must_record": [
+            "amount_value",
+            "observation"
+          ],
+          "terms": [
+            "NaCl",
+            "Tris-HCl",
+            "EDTA",
+            "Tween-20",
+            "血清移液管"
+          ],
+          "hazard_note": "EDTA与Tris有刺激性；转移大体积时使用玻璃移液管，避免飞溅。",
+          "field_prompts": {
+            "amount_value": "实际配制了多少体积？",
+            "observation": "各试剂加入后是否完全混匀、有无沉淀？"
+          }
+        },
+        {
+          "step_number": 2,
+          "title": "确认是否需要紫外去污",
+          "instruction": "查阅使用该缓冲液的具体方案，确定是否需要对缓冲液进行紫外（UV）去污处理。紫外去污的操作说明见附录。",
+          "protocol_values": {
+            "action": "紫外去污"
+          },
+          "must_record": [
+            "observation"
+          ],
+          "terms": [
+            "UV"
+          ],
+          "hazard_note": "紫外灯对眼睛和皮肤有害，照射期间不得直视或暴露皮肤。",
+          "field_prompts": {
+            "observation": "本次是否做了紫外去污？处理时长和设备是什么？"
+          }
+        },
+        {
+          "step_number": 3,
+          "title": "保存",
+          "instruction": "缓冲液在室温下保存至使用。自配制之日起保质期至少一年。",
+          "protocol_values": {
+            "action": "保存",
+            "condition": "室温",
+            "duration": "保质期至少一年"
+          },
+          "must_record": [
+            "condition",
+            "observation"
+          ],
+          "terms": [
+            "批次编号"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "condition": "实际存放在什么位置和温度？",
+            "observation": "瓶身是否已标注名称、批次编号、日期和配制人？"
+          }
+        }
+      ]
+    }
+  ]
+}
