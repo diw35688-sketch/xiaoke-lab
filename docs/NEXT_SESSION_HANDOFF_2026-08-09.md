@@ -328,10 +328,14 @@ git diff --check
 
 `UX-MODE-01` 已完成 AUTO_OK：`UI_MODE` 校验、Renderer 分流、生产 print 清理均已完成；
 user 模式会话级 DEBUG 写入 `results/debug_<session>.log`，新会话替换旧 handler；
-`src/llm/unified_processor.py` 非契约异常从 print 迁到 logging。全量 728 项通过。
+`src/llm/unified_processor.py` 非契约异常从 print 迁到 logging。
 
-**当前唯一下一项**：`SYNC-UI-CLAIMS-01`。逐项核查用户可见文案与真实行为一致，
-重点清理“立即继续监听”“提交 M 段实验口述”等历史承诺。
+`SYNC-UI-CLAIMS-01` 已完成 AUTO_OK：新增 `tests/test_ui_claims.py` 守护测试，
+锁定“旧流程继续/立即继续监听/提交 M 段实验口述”等历史误导文案不得回归；
+确认“无需等待”有 `OrderedTaskQueue` 实现支撑。全量 731 项通过。
+
+**当前唯一下一项**：`PRESENT-RECORD-PREVIEW-01`。用户屏幕显示规范记录预览，
+原始 ASR 不再逐段占据主界面。
 
 ---
 
@@ -534,3 +538,12 @@ docs/                 任务清单、交接和学习记录
   admin 来源口述追加，此前已随 PRESENT 子步 B 落地。
 - 测试：新增 4 项；全量 `Ran 728 tests ... OK`。
 - 下一步：`SYNC-UI-CLAIMS-01`。
+
+## 17. 2026-08-16 SYNC-UI-CLAIMS-01 AUTO_OK
+
+- 修复：历史误导文案“旧流程继续”“系统将立即继续监听”“提交 M 段实验口述”
+  在生产代码中零残留；`src/main.py` 当前用户可见承诺与真实行为一致。
+- 守护：新增 `tests/test_ui_claims.py`，扫描用户可见源文件，禁止上述文案回归；
+  确认“现在可以连续口述，无需等待 LLM 处理完成”由 `OrderedTaskQueue` 支撑。
+- 测试：新增 3 项；全量 `Ran 731 tests ... OK`。
+- 下一步：`PRESENT-RECORD-PREVIEW-01`。
