@@ -22,14 +22,19 @@ SETTINGS_FILE = BASE_DIR / "settings.json"
 # 常见服务商预设，方便用户一键填好地址和模型名
 PRESETS = [
     {"id": "ustc", "label": "中科大校内 LLM",
-     "base_url": "https://api.llm.ustc.edu.cn/v1", "model": "deepseek-v4-pro"},
+     "base_url": "https://api.llm.ustc.edu.cn/v1", "model": "deepseek-v4-pro",
+     "api_url": "https://api.llm.ustc.edu.cn"},
     {"id": "deepseek", "label": "DeepSeek 官方",
-     "base_url": "https://api.deepseek.com/v1", "model": "deepseek-chat"},
+     "base_url": "https://api.deepseek.com/v1", "model": "deepseek-chat",
+     "api_url": "https://platform.deepseek.com/api_keys"},
     {"id": "openai", "label": "OpenAI",
-     "base_url": "https://api.openai.com/v1", "model": "gpt-4o-mini"},
+     "base_url": "https://api.openai.com/v1", "model": "gpt-4o-mini",
+     "api_url": "https://platform.openai.com/api-keys"},
     {"id": "dashscope", "label": "阿里百炼（通义）",
-     "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "model": "qwen-plus"},
-    {"id": "custom", "label": "自定义", "base_url": "", "model": ""},
+     "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "model": "qwen-plus",
+     "api_url": "https://bailian.console.aliyun.com/?tab=apiKey"},
+    {"id": "custom", "label": "自定义", "base_url": "", "model": "",
+     "api_url": ""},
 ]
 
 

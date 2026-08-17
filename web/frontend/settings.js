@@ -8,7 +8,8 @@
     '    <div id="settings-status" class="settings-status"></div>',
     '    <div style="font-size:13px;font-weight:700;color:#0f172a;margin:18px 0 10px">文字模型</div>',
     '    <label class="settings-field"><span>服务商预设</span>',
-    '      <select id="settings-preset"></select>',
+    '      <div class="preset-row"><select id="settings-preset"></select>',
+    '        <a id="settings-api-url" href="#" target="_blank" rel="noopener" class="api-link">获取 API</a></div>',
     '      <em>选择后自动填好地址和模型名，也可以选自定义手动填。</em></label>',
     '    <label class="settings-field"><span>接口地址 Base URL</span>',
     '      <input id="settings-base-url" type="text" /></label>',
@@ -50,6 +51,10 @@
     '.settings-inline input{width:auto}',
     '.settings-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}',
     '.settings-actions button{padding:9px 18px;border-radius:9px;font-size:14px;cursor:pointer;border:1px solid transparent;font-family:inherit}',
+    '.preset-row{display:flex;gap:8px;align-items:center}',
+    '.preset-row select{flex:1}',
+    '.api-link{display:inline-flex;align-items:center;padding:8px 12px;border-radius:9px;border:1px solid #cbd5e1;background:#fff;color:#2563eb;text-decoration:none;font-size:13px;white-space:nowrap}',
+    '.api-link:hover{border-color:#2563eb;background:#eff6ff}',
     '.model-row{display:flex;gap:8px}',
     '.model-row input{flex:1}',
     '.model-row button{white-space:nowrap;padding:9px 12px;border-radius:9px;border:1px solid #cbd5e1;background:#fff;color:#334155;cursor:pointer;font-size:13px;font-family:inherit}',
@@ -94,6 +99,12 @@
         : '请填写 API 密钥';
       var hit = presets.filter(function (p) { return p.base_url === data.settings.base_url; })[0];
       if (hit) el('settings-preset').value = hit.id;
+      var selected = hit || presets[0];
+      if (selected) {
+        var link = el('settings-api-url');
+        link.href = selected.api_url || '#';
+        link.style.visibility = selected.api_url ? 'visible' : 'hidden';
+      }
       setStatus(data.ready, data.missing);
     });
   }
@@ -141,9 +152,14 @@
     };
     el('settings-preset').onchange = function (e) {
       var p = presets.filter(function (x) { return x.id === e.target.value; })[0];
-      if (p && p.id !== 'custom') {
-        el('settings-base-url').value = p.base_url;
-        el('settings-model').value = p.model;
+      if (p) {
+        var link = el('settings-api-url');
+        link.href = p.api_url || '#';
+        link.style.visibility = p.api_url ? 'visible' : 'hidden';
+        if (p.id !== 'custom') {
+          el('settings-base-url').value = p.base_url;
+          el('settings-model').value = p.model;
+        }
       }
     };
     el('settings-fetch-models').onclick = function () {
