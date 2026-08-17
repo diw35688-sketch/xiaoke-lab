@@ -20,7 +20,11 @@
     '</div>',
     '<div id="tts-model-row" class="settings-field" style="display:none">',
     '  <span style="display:block;font-size:13px;color:#334155;margin-bottom:6px;font-weight:600">合成模型</span>',
-    '  <input id="tts-model" type="text" />',
+    '  <div class="model-row"><input id="tts-model" type="text" list="tts-model-list" />',
+    '    <button id="tts-fetch-models" class="ghost" type="button">拉取模型</button></div>',
+    '  <datalist id="tts-model-list"></datalist>',
+    '  <select id="tts-model-select" style="display:none;width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #cbd5e1;border-radius:9px;font-size:14px;font-family:inherit;margin-top:8px"></select>',
+    '  <em id="tts-models-msg" style="display:block;font-style:normal;font-size:12px;color:#64748b;margin-top:5px"></em>',
     '</div>',
     '<div id="tts-voice-row" class="settings-field" style="display:none">',
     '  <span style="display:block;font-size:13px;color:#334155;margin-bottom:6px;font-weight:600">音色</span>',
@@ -102,6 +106,40 @@
     el('tts-provider').onchange = function (e) { applyProvider(e.target.value); };
     el('tts-speed').oninput = function (e) {
       el('tts-speed-label').textContent = parseFloat(e.target.value).toFixed(1);
+    };
+    el('tts-fetch-models').onclick = function () {
+      var button = el('tts-fetch-models');
+      var msg = el('tts-models-msg');
+      button.disabled = true;
+      msg.textContent = '正在拉取语音模型…';
+      var payload = {
+        provider: el('tts-provider').value,
+        base_url: el('tts-base-url').value.trim(),
+        api_key: el('tts-key').value.trim()
+      };
+      fetch('/tts/models', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+        .then(function (res) {
+          if (!res.ok) { msg.textContent = res.d.detail || '拉取失败'; return; }
+          var list = res.d.models || [];
+          el('tts-model-list').innerHTML = list.map(function (m) {
+            return '<option value="' + m + '">';
+          }).join('');
+          var select = el('tts-model-select');
+          select.style.display = list.length ? 'block' : 'none';
+          select.innerHTML = '<option value="">选择模型…</option>' + list.map(function (m) {
+            return '<option value="' + m + '">' + m + '</option>';
+          }).join('');
+          msg.textContent = '拉到 ' + list.length + ' 个语音模型';
+        })
+        .catch(function (err) { msg.textContent = String(err); })
+        .then(function () { button.disabled = false; });
+    };
+    el('tts-model-select').onchange = function (e) {
+      if (e.target.value) el('tts-model').value = e.target.value;
     };
     el('tts-test').onclick = function () {
       var button = el('tts-test');
