@@ -93,6 +93,8 @@ def copy_for_intent(
         return _copy_clarification(intent, ui_mode)
     if intent.kind == MessageKind.CONFIRMATION_ACK:
         return _copy_confirmation_ack(intent, ui_mode)
+    if intent.kind == MessageKind.NO_ACTION_FEEDBACK:
+        return _copy_no_action_feedback(intent, ui_mode)
     if intent.kind == MessageKind.CLARIFICATION_DEFERRED:
         return _copy_deferred(intent, ui_mode)
     if intent.kind == MessageKind.CLARIFICATION_REVIEW:
@@ -235,6 +237,25 @@ def _copy_answered(display_number: int, args: Mapping[str, object]) -> str:
         labels = "、".join(_translate_fields(remaining_fields))
         return f"已补充问题 {display_number}，仍需补充：{labels}"
     return f"已补充问题 {display_number}，仍需确认"
+
+
+def _copy_no_action_feedback(intent: PresentationIntent, ui_mode: str) -> str:
+    reason = intent.args.get("reason")
+    if not isinstance(reason, str) or not reason.strip():
+        raise ValueError("NO_ACTION_FEEDBACK 必须包含非空 reason。")
+
+    if "编号不存在" in reason:
+        base = "没有找到你指定的问题编号，请先查看当前待确认问题"
+    elif "缺少答案" in reason:
+        base = "请说明要回答的内容，例如“问题1，50毫升”"
+    elif "当前没有" in reason:
+        base = "当前没有可以执行这个操作的问题"
+    elif "弃权" in reason or "没把握" in reason:
+        base = "我听到了，但没把握安全地执行，请换个说法试试"
+    else:
+        base = "我听到了，但暂时无法处理这句话"
+
+    return _with_source(base, intent, ui_mode)
 
 
 def _copy_deferred(intent: PresentationIntent, ui_mode: str) -> str:

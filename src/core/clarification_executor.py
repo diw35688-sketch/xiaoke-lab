@@ -112,8 +112,11 @@ class ClarificationExecutor:
         self._validate_action(action)
 
         if action.action_type == ClarificationActionType.NO_ACTION:
-            return self._result(action, state_changed=False,
-                                reason="NO_ACTION 无需状态变更。")
+            return self._result(
+                action,
+                state_changed=False,
+                reason=action.reason,
+            )
 
         if action.action_type == ClarificationActionType.REVIEW:
             return self._result(action, state_changed=False,
