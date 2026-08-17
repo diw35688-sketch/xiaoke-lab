@@ -123,6 +123,12 @@ def current() -> ModelSettings:
                     model_name=raw.get("model_name", ""),
                     tts_enabled=bool(raw.get("tts_enabled", False)),
                     tts_url=raw.get("tts_url", "http://127.0.0.1:8001/tts"),
+                    tts_provider=raw.get("tts_provider", "browser"),
+                    tts_api_key=raw.get("tts_api_key", ""),
+                    tts_base_url=raw.get("tts_base_url", ""),
+                    tts_model=raw.get("tts_model", ""),
+                    tts_voice=raw.get("tts_voice", ""),
+                    tts_speed=float(raw.get("tts_speed", 1.0) or 1.0),
                 )
             except (json.JSONDecodeError, OSError):
                 _cache = _from_env()

@@ -89,11 +89,18 @@
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload())
-    }).then(function (r) { return r.json(); });
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      // 保存后同步前端朗读开关（对话回答朗读读取它）
+      window.ttsEnabled = !!payload().tts_enabled;
+      return d;
+    });
   }
 
   function attach() {
-    var box = document.querySelector('#settings-modal .settings-box');
+    // 查找设置面板内容区。历史上 views.js 曾把面板整体搬进画布内嵌显示，
+    // 限定在 #settings-modal 内会找不到被搬走的 box 而静默放弃注入（"没有语音合成"）。
+    // 改为全局查找 .settings-box，无论面板在弹窗里还是内嵌都能注入。
+    var box = document.querySelector('.settings-box');
     if (!box || document.getElementById('tts-provider')) return;
     var holder = document.createElement('div');
     holder.innerHTML = HTML;

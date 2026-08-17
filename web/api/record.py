@@ -50,6 +50,16 @@ def _next_record_segment(session_id: str) -> int:
         return next_segment_id(session_id)
 
 
+def _recent_context(session_id: str, count: int = 5) -> tuple[str, ...]:
+    """最近几条口述原文，供统一理解链理解指代；旧段在前。"""
+    records = list_records(session_id)
+    return tuple(
+        item["transcript"].strip()
+        for item in records[-count:]
+        if item.get("transcript") and item["transcript"].strip()
+    )
+
+
 @router.post("")
 def record(payload: RecordPayload):
     """处理一段口述，返回结构化结果与确定性追问。"""
@@ -65,7 +75,12 @@ def record(payload: RecordPayload):
     extraction_source = "none"
     if payload.extract:
         try:
-            extraction = llm_bridge.extract(text, session_id, segment_id)
+            extraction = llm_bridge.extract(
+                text,
+                session_id,
+                segment_id,
+                recent_context=_recent_context(session_id),
+            )
             for event in extraction["events"]:
                 for name, value in event["entities"].items():
                     if value and not entities.get(name):

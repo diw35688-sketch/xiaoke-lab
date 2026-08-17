@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VAD 可行性验证（2b 探针）</title>
+<style>
+  body{font-family:system-ui,"Microsoft YaHei","PingFang SC",sans-serif;margin:24px auto;max-width:760px;padding:0 16px;background:#f6f7fb;color:#18212f}
+  h1{font-size:20px;margin:0 0 4px}
+  .sub{color:#697586;font-size:13px;margin:0 0 16px;line-height:1.7}
+  .card{background:#fff;border-radius:14px;padding:18px 22px;box-shadow:0 8px 24px rgba(28,39,65,.06);margin-bottom:14px}
+  #status{font-size:14px;margin:0 0 12px;padding:10px 14px;border-radius:10px;background:#f1f5f9}
+  #status.ok{background:#dcfce7;color:#166534}
+  #status.err{background:#fee2e2;color:#991b1b}
+  button{font-size:14px;padding:9px 20px;border:0;border-radius:999px;background:#2563eb;color:#fff;cursor:pointer;margin-right:10px}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .counts{font-size:13px;color:#334155}
+  .log{font-size:12.5px;line-height:1.85;max-height:340px;overflow:auto;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 14px;font-family:Consolas,Menlo,monospace}
+  .log .t{color:#94a3b8}
+  .ok{color:#16a34a}.warn{color:#d97706}.err{color:#dc2626}.info{color:#2563eb}
+</style>
+</head>
+<body>
+<h1>VAD 可行性验证（浏览器端 WASM）</h1>
+<p class="sub">目标：验证浏览器能否加载 WASM 版 Silero VAD，并自动检测"开口 / 闭嘴"。<br>
+操作：点「开始监听」→ 允许麦克风 → 对着麦克风说几句话（每句之间停顿 1~2 秒）→ 看日志里是否出现「开口」「闭嘴」。</p>
+
+<div class="card">
+  <p id="status">尚未初始化</p>
+  <button id="toggle" disabled>开始监听</button>
+  <span class="counts">开口 <b id="cStart">0</b> 次 ｜ 闭嘴 <b id="cEnd">0</b> 次 ｜ 误触发 <b id="cMisfire">0</b> 次</span>
+</div>
+
+<div class="card"><div class="log" id="log"></div></div>
+
+<!-- 官方标准用法：先加载 onnxruntime-web（UMD 全局 ort），再加载 vad-web（UMD 全局 vad）。
+     版本必须对齐：ort 运行时用 1.19.2，并显式让 vad-web 从 1.19.2 目录加载 WASM 文件
+     （vad-web 默认指向 1.14.0，但 1.14.0 缺少 ort 1.19 需要的 .jsep.mjs，会导致加载失败）。 -->
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.22/dist/bundle.min.js"></script>
+
+<script>
+(function () {
+  var statusEl = document.getElementById("status");
+  var toggleBtn = document.getElementById("toggle");
+  var logEl = document.getElementById("log");
+  var counts = { start: 0, end: 0, misfire: 0 };
+  // 注意：不能声明名为 vad 的局部变量，会遮蔽 window.vad（bundle.min.js 提供的全局）。
+  var myVad = null;
+  var listening = false;
+
+  function stamp() {
+    var d = new Date();
+    return d.toTimeString().slice(0, 8) + "." + String(d.getMilliseconds()).padStart(3, "0");
+  }
+
+  function log(level, text) {
+    var line = document.createElement("div");
+    line.innerHTML = '<span class="t">[' + stamp() + ']</span> <span class="' + level + '">' + text + "</span>";
+    logEl.appendChild(line);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function setStatus(text, cls) {
+    statusEl.textContent = text;
+    statusEl.className = cls || "";
+  }
+
+  async function init() {
+    if (typeof window.ort === "undefined") {
+      setStatus("onnxruntime-web 加载失败：全局 ort 不存在（网络或 CDN 问题）", "err");
+      log("err", "ort.js 未加载成功，请检查网络后刷新页面（Ctrl+F5）");
+      return;
+    }
+    if (typeof window.vad === "undefined" || !window.vad.MicVAD) {
+      setStatus("vad-web 加载失败：全局 vad 不存在", "err");
+      log("err", "bundle.min.js 未加载成功，请检查网络后刷新页面");
+      return;
+    }
+    setStatus("正在加载 WASM 版 VAD 模型（约 2.3MB，来自 jsdelivr CDN）…");
+    log("info", "onnxruntime-web 与 vad-web 均加载成功，开始初始化 MicVAD…");
+    try {
+      myVad = await window.vad.MicVAD.new({
+        model: "v5",
+        // 与上方 ort.min.js 的版本对齐（1.19.2），否则 ort 动态加载 WASM 会失败。
+        onnxWASMBasePath: "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/",
+        onSpeechStart: function () {
+          counts.start += 1;
+          document.getElementById("cStart").textContent = counts.start;
+          log("ok", "【开口】检测到语音开始");
+        },
+        onSpeechEnd: function (audio) {
+          counts.end += 1;
+          document.getElementById("cEnd").textContent = counts.end;
+          var seconds = (audio.length / 16000).toFixed(2);
+          log("ok", "【闭嘴】检测到语音结束，时长 " + seconds + " 秒");
+        },
+        onVADMisfire: function () {
+          counts.misfire += 1;
+          document.getElementById("cMisfire").textContent = counts.misfire;
+          log("warn", "【误触发】疑似语音但太短，已忽略");
+        },
+        onError: function (error) {
+          log("err", "VAD 错误：" + (error && error.message ? error.message : String(error)));
+        },
+      });
+    } catch (error) {
+      setStatus("初始化失败：" + (error && error.message ? error.message : String(error)), "err");
+      log("err", "初始化失败：" + (error && error.message ? error.message : String(error)));
+      return;
+    }
+    setStatus("VAD 已就绪，点「开始监听」后说话试试", "ok");
+    log("info", "VAD 初始化成功（Silero v5，WASM 版）");
+    toggleBtn.disabled = false;
+  }
+
+  toggleBtn.onclick = function () {
+    if (!myVad) return;
+    if (!listening) {
+      myVad.start();
+      listening = true;
+      toggleBtn.textContent = "停止监听";
+      setStatus("监听中：开口自动记录，安静约 2 秒自动判断一句结束", "ok");
+      log("info", "已开始监听麦克风");
+    } else {
+      myVad.pause();
+      listening = false;
+      toggleBtn.textContent = "开始监听";
+      setStatus("已停止监听");
+      log("info", "已停止监听");
+    }
+  };
+
+  init();
+})();
+</script>
+</body>
+</html>
