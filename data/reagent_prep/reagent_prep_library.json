@@ -213,6 +213,428 @@
       "source": "本科实验教学通用配方，待补充原始公开来源",
       "source_url": null,
       "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "tae-1x",
+      "name_zh": "1× TAE 电泳缓冲液",
+      "purpose": "琼脂糖凝胶电泳工作液",
+      "target_concentration": "1×",
+      "target_volume": "1 L",
+      "solvent": "去离子水",
+      "steps": [
+        "量取 20 mL 50× TAE 母液",
+        "加去离子水定容至 1 L",
+        "混匀后使用"
+      ],
+      "storage_condition": "室温",
+      "expiry": "建议 1 周内使用",
+      "hazard_reagents": [
+        "乙酸",
+        "EDTA"
+      ],
+      "source": "本科实验教学通用配方",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "tbe-10x",
+      "name_zh": "10× TBE 电泳缓冲液",
+      "purpose": "核酸电泳缓冲液母液",
+      "target_concentration": "10×",
+      "target_volume": "1 L",
+      "solvent": "去离子水",
+      "steps": [
+        "称取 108 g Tris 碱、55 g 硼酸",
+        "加入 40 mL 0.5 mol/L EDTA（pH 8.0）",
+        "加去离子水定容至 1 L，混匀"
+      ],
+      "storage_condition": "室温",
+      "expiry": "建议 6 个月内使用",
+      "hazard_reagents": [
+        "硼酸",
+        "EDTA"
+      ],
+      "source": "本科实验教学通用配方",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "tris-hcl-1.5m-ph8.8",
+      "name_zh": "1.5 mol/L Tris-HCl（pH 8.8）",
+      "purpose": "SDS-PAGE 分离胶缓冲液",
+      "target_concentration": "1.5 mol/L",
+      "target_volume": "100 mL",
+      "solvent": "去离子水",
+      "steps": [
+        "称取 18.15 g Tris 碱",
+        "加约 80 mL 去离子水溶解",
+        "用浓盐酸调 pH 至 8.8",
+        "定容至 100 mL"
+      ],
+      "storage_condition": "4°C 冷藏",
+      "expiry": "建议 3 个月内使用",
+      "hazard_reagents": [
+        "盐酸"
+      ],
+      "source": "本科实验教学通用配方",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "tris-hcl-1m-ph6.8",
+      "name_zh": "1 mol/L Tris-HCl（pH 6.8）",
+      "purpose": "SDS-PAGE 浓缩胶缓冲液",
+      "target_concentration": "1 mol/L",
+      "target_volume": "100 mL",
+      "solvent": "去离子水",
+      "steps": [
+        "称取 12.11 g Tris 碱",
+        "加约 80 mL 去离子水溶解",
+        "用浓盐酸调 pH 至 6.8",
+        "定容至 100 mL"
+      ],
+      "storage_condition": "4°C 冷藏",
+      "expiry": "建议 3 个月内使用",
+      "hazard_reagents": [
+        "盐酸"
+      ],
+      "source": "本科实验教学通用配方",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "aps-10pct",
+      "name_zh": "10% 过硫酸铵（APS）",
+      "purpose": "SDS-PAGE 凝胶聚合催化剂",
+      "target_concentration": "10% (w/v)",
+      "target_volume": "10 mL",
+      "solvent": "去离子水",
+      "steps": [
+        "称取 1 g 过硫酸铵",
+        "加去离子水定容至 10 mL",
+        "分装后冷冻保存"
+      ],
+      "storage_condition": "-20°C 避光",
+      "expiry": "建议 1 个月内使用",
+      "hazard_reagents": [
+        "过硫酸铵"
+      ],
+      "source": "本科实验教学通用配方",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "acrylamide-30pct",
+      "name_zh": "30% 丙烯酰胺/甲叉双丙烯酰胺",
+      "purpose": "SDS-PAGE 凝胶储备液",
+      "target_concentration": "30% (w/v)",
+      "target_volume": "100 mL",
+      "solvent": "去离子水",
+      "steps": [
+        "称取 29 g 丙烯酰胺、1 g 甲叉双丙烯酰胺",
+        "加去离子水溶解并定容至 100 mL",
+        "0.45 µm 滤膜过滤",
+        "4°C 避光保存"
+      ],
+      "storage_condition": "4°C 避光",
+      "expiry": "建议 1 个月内使用",
+      "hazard_reagents": [
+        "丙烯酰胺",
+        "甲叉双丙烯酰胺"
+      ],
+      "source": "本科实验教学通用配方",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "sds-page-running-10x",
+      "name_zh": "10× SDS-PAGE 电泳缓冲液",
+      "purpose": "SDS-PAGE 电泳工作液母液",
+      "target_concentration": "10×",
+      "target_volume": "1 L",
+      "solvent": "去离子水",
+      "steps": [
+        "称取 30.3 g Tris 碱、144 g 甘氨酸、10 g SDS",
+        "加去离子水溶解并定容至 1 L"
+      ],
+      "storage_condition": "室温",
+      "expiry": "建议 6 个月内使用",
+      "hazard_reagents": [
+        "SDS"
+      ],
+      "source": "本科实验教学通用配方",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "sds-loading-5x",
+      "name_zh": "5× SDS-PAGE 上样缓冲液",
+      "purpose": "蛋白样品变性上样",
+      "target_concentration": "5×",
+      "target_volume": "10 mL",
+      "solvent": "去离子水",
+      "steps": [
+        "量取 2.5 mL 1 mol/L Tris-HCl（pH 6.8）",
+        "加入 1 g SDS、50 mg 溴酚蓝、5 mL 甘油",
+        "加入 0.5 mL β-巯基乙醇",
+        "加去离子水定容至 10 mL，分装冷冻保存"
+      ],
+      "storage_condition": "-20°C",
+      "expiry": "建议 6 个月内使用",
+      "hazard_reagents": [
+        "SDS"
+      ],
+      "source": "本科实验教学通用配方",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "coomassie-r250-stain",
+      "name_zh": "考马斯亮蓝 R-250 染液",
+      "purpose": "SDS-PAGE 蛋白染色",
+      "target_concentration": "工作液",
+      "target_volume": "100 mL",
+      "solvent": "甲醇-乙酸-水",
+      "steps": [
+        "称取 0.25 g 考马斯亮蓝 R-250",
+        "加入 45 mL 甲醇、10 mL 冰醋酸、45 mL 去离子水",
+        "搅拌溶解后过滤"
+      ],
+      "storage_condition": "室温避光",
+      "expiry": "建议 3 个月内使用",
+      "hazard_reagents": [
+        "甲醇",
+        "乙酸"
+      ],
+      "source": "本科实验教学通用配方",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "destain-solution",
+      "name_zh": "SDS-PAGE 脱色液",
+      "purpose": "凝胶脱色",
+      "target_concentration": "工作液",
+      "target_volume": "1 L",
+      "solvent": "去离子水",
+      "steps": [
+        "量取 300 mL 甲醇、100 mL 冰醋酸",
+        "加去离子水定容至 1 L"
+      ],
+      "storage_condition": "室温",
+      "expiry": "建议 3 个月内使用",
+      "hazard_reagents": [
+        "甲醇",
+        "乙酸"
+      ],
+      "source": "本科实验教学通用配方",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "transfer-buffer",
+      "name_zh": "Western blot 转膜缓冲液",
+      "purpose": "蛋白湿转",
+      "target_concentration": "1×",
+      "target_volume": "1 L",
+      "solvent": "去离子水",
+      "steps": [
+        "称取 3.03 g Tris 碱、14.4 g 甘氨酸",
+        "加入 200 mL 甲醇",
+        "加去离子水定容至 1 L，4°C 预冷"
+      ],
+      "storage_condition": "4°C",
+      "expiry": "建议 1 周内使用",
+      "hazard_reagents": [
+        "甲醇"
+      ],
+      "source": "本科实验教学通用配方",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "pbs-10x",
+      "name_zh": "10× PBS 磷酸盐缓冲液",
+      "purpose": "PBS 母液",
+      "target_concentration": "10×",
+      "target_volume": "1 L",
+      "solvent": "去离子水",
+      "steps": [
+        "称取 80 g 氯化钠、2 g 氯化钾、14.4 g 磷酸氢二钠、2.4 g 磷酸二氢钾",
+        "加去离子水溶解并定容至 1 L"
+      ],
+      "storage_condition": "室温",
+      "expiry": "建议 3 个月内使用",
+      "hazard_reagents": [],
+      "source": "本科实验教学通用配方",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "pbst-1x",
+      "name_zh": "1× PBST 洗涤缓冲液",
+      "purpose": "ELISA/Western 洗涤",
+      "target_concentration": "1×",
+      "target_volume": "1 L",
+      "solvent": "去离子水",
+      "steps": [
+        "量取 100 mL 10× PBS",
+        "加入 0.5 mL Tween-20",
+        "加去离子水定容至 1 L，混匀"
+      ],
+      "storage_condition": "4°C",
+      "expiry": "建议 1 周内使用",
+      "hazard_reagents": [],
+      "source": "本科实验教学通用配方",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "blocking-buffer-5pct",
+      "name_zh": "5% 脱脂奶粉封闭液",
+      "purpose": "Western/ELISA 封闭",
+      "target_concentration": "5% (w/v)",
+      "target_volume": "50 mL",
+      "solvent": "1× PBST",
+      "steps": [
+        "称取 2.5 g 脱脂奶粉",
+        "加入 50 mL 1× PBST，搅拌溶解"
+      ],
+      "storage_condition": "4°C",
+      "expiry": "建议 24 小时内使用",
+      "hazard_reagents": [],
+      "source": "本科实验教学通用配方",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "sodium-acetate-3m-ph5.2",
+      "name_zh": "3 mol/L 乙酸钠（pH 5.2）",
+      "purpose": "核酸沉淀",
+      "target_concentration": "3 mol/L",
+      "target_volume": "100 mL",
+      "solvent": "去离子水",
+      "steps": [
+        "称取 24.6 g 无水乙酸钠",
+        "加去离子水溶解",
+        "用冰醋酸调 pH 至 5.2",
+        "定容至 100 mL"
+      ],
+      "storage_condition": "室温",
+      "expiry": "建议 6 个月内使用",
+      "hazard_reagents": [
+        "乙酸"
+      ],
+      "source": "本科实验教学通用配方",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "te-buffer",
+      "name_zh": "TE 缓冲液",
+      "purpose": "核酸溶解保存",
+      "target_concentration": "1×",
+      "target_volume": "100 mL",
+      "solvent": "去离子水",
+      "steps": [
+        "量取 1 mL 1 mol/L Tris-HCl（pH 8.0）",
+        "加入 0.2 mL 0.5 mol/L EDTA（pH 8.0）",
+        "加去离子水定容至 100 mL"
+      ],
+      "storage_condition": "室温",
+      "expiry": "建议 6 个月内使用",
+      "hazard_reagents": [
+        "EDTA"
+      ],
+      "source": "本科实验教学通用配方",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "ampicillin-100mg-ml",
+      "name_zh": "氨苄青霉素母液（100 mg/mL）",
+      "purpose": "细菌筛选抗生素",
+      "target_concentration": "100 mg/mL",
+      "target_volume": "10 mL",
+      "solvent": "灭菌去离子水",
+      "steps": [
+        "称取 1 g 氨苄青霉素钠盐",
+        "加入灭菌去离子水定容至 10 mL",
+        "0.22 µm 滤膜过滤除菌",
+        "分装后 -20°C 保存"
+      ],
+      "storage_condition": "-20°C",
+      "expiry": "建议 3 个月内使用",
+      "hazard_reagents": [
+        "氨苄青霉素"
+      ],
+      "source": "本科实验教学通用配方",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "kanamycin-50mg-ml",
+      "name_zh": "卡那霉素母液（50 mg/mL）",
+      "purpose": "细菌筛选抗生素",
+      "target_concentration": "50 mg/mL",
+      "target_volume": "10 mL",
+      "solvent": "灭菌去离子水",
+      "steps": [
+        "称取 0.5 g 卡那霉素",
+        "加入灭菌去离子水定容至 10 mL",
+        "0.22 µm 滤膜过滤除菌",
+        "分装后 -20°C 保存"
+      ],
+      "storage_condition": "-20°C",
+      "expiry": "建议 3 个月内使用",
+      "hazard_reagents": [
+        "卡那霉素"
+      ],
+      "source": "本科实验教学通用配方",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "chloramphenicol-34mg-ml",
+      "name_zh": "氯霉素母液（34 mg/mL）",
+      "purpose": "细菌筛选抗生素",
+      "target_concentration": "34 mg/mL",
+      "target_volume": "10 mL",
+      "solvent": "无水乙醇",
+      "steps": [
+        "称取 0.34 g 氯霉素",
+        "加入无水乙醇定容至 10 mL",
+        "分装后 -20°C 避光保存"
+      ],
+      "storage_condition": "-20°C 避光",
+      "expiry": "建议 6 个月内使用",
+      "hazard_reagents": [
+        "氯霉素",
+        "乙醇"
+      ],
+      "source": "本科实验教学通用配方",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "iptg-1m",
+      "name_zh": "IPTG 母液（1 mol/L）",
+      "purpose": "诱导蛋白表达",
+      "target_concentration": "1 mol/L",
+      "target_volume": "10 mL",
+      "solvent": "灭菌去离子水",
+      "steps": [
+        "称取 2.38 g IPTG",
+        "加入灭菌去离子水定容至 10 mL",
+        "0.22 µm 滤膜过滤除菌",
+        "分装后 -20°C 保存"
+      ],
+      "storage_condition": "-20°C",
+      "expiry": "建议 6 个月内使用",
+      "hazard_reagents": [],
+      "source": "本科实验教学通用配方",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
     }
   ]
 }

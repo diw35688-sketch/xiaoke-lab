@@ -1075,3 +1075,12 @@ matched_term 以后存知识库匹配到的标准术语（如 ASR 的"一液枪"
 - 修改/添加步骤：`POST /protocols/step` 在方案末尾追加大步骤（严格契约校验）；
   方案编辑器底部新增“新增步骤”按钮。
 - 测试：新增 2 项；全量 `Ran 768 tests ... OK`。
+
+## 2026-08-16 本轮维护记录：库容量批量扩充
+
+- Protocol：6 → 12 份，64 个步骤（新增 Bradford 蛋白浓度测定、质粒 DNA 提取、革兰氏染色、ELISA 教学简化、CTAB 植物 DNA 提取、SDS-PAGE 蛋白电泳）。
+- 危化品库：49 → 68 种（新增氯化钠、氯化钾、Tris、SDS、APS、TEMED、丙烯酰胺、甲醇、异丙醇、氯仿、苯酚、硫酸、硝酸、氨苄青霉素、卡那霉素、氯霉素等）。
+- 试剂配置库：10 → 30 条（新增 1× TAE、10× TBE、Tris-HCl 系列、SDS-PAGE 系列、Western 系列、抗生素母液、IPTG 等）。
+- 所有新增数据均为 `UNREVIEWED`，使用前必须教师复核。
+- 批量脚本：`scripts/expand_libraries.py`。
+- 测试：全量 `Ran 768 tests ... OK`。
