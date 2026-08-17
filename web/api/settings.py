@@ -71,13 +71,10 @@ def test_settings(payload: SettingsPayload | None = None):
 def fetch_models(payload: ModelsPayload | None = None):
     """从当前/候选接口地址拉取可用模型列表。"""
     try:
-        if payload and payload.api_key:
-            models = settings_store.fetch_models(
-                base_url=payload.base_url,
-                api_key=payload.api_key,
-            )
-        else:
-            models = settings_store.fetch_models()
+        models = settings_store.fetch_models(
+            base_url=payload.base_url if payload else None,
+            api_key=payload.api_key if payload else None,
+        )
         return {"models": models}
     except Exception as error:
         from fastapi import HTTPException

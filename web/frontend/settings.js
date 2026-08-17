@@ -17,6 +17,7 @@
     '      <div class="model-row"><input id="settings-model" type="text" list="settings-model-list" />',
     '        <button id="settings-fetch-models" class="ghost" type="button">拉取模型</button></div>',
     '      <datalist id="settings-model-list"></datalist>',
+    '      <select id="settings-model-select" style="display:none;width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #cbd5e1;border-radius:9px;font-size:14px;font-family:inherit;margin-top:8px"></select>',
     '      <em id="settings-models-msg" style="display:block;font-style:normal;font-size:12px;color:#64748b;margin-top:5px"></em></label>',
     '    <label class="settings-field"><span>API 密钥</span>',
     '      <input id="settings-key" type="password" autocomplete="off" />',
@@ -162,6 +163,9 @@
         }
       }
     };
+    el('settings-model-select').onchange = function (e) {
+      if (e.target.value) el('settings-model').value = e.target.value;
+    };
     el('settings-fetch-models').onclick = function () {
       var button = el('settings-fetch-models');
       var msg = el('settings-models-msg');
@@ -182,7 +186,12 @@
           el('settings-model-list').innerHTML = list.map(function (m) {
             return '<option value="' + m + '">';
           }).join('');
-          msg.textContent = '拉到 ' + list.length + ' 个模型，输入框会自动补全';
+          var select = el('settings-model-select');
+          select.style.display = list.length ? 'block' : 'none';
+          select.innerHTML = '<option value="">选择模型…</option>' + list.map(function (m) {
+            return '<option value="' + m + '">' + m + '</option>';
+          }).join('');
+          msg.textContent = '已从 ' + el('settings-base-url').value.trim() + ' 拉到 ' + list.length + ' 个模型';
         })
         .catch(function (err) { msg.textContent = String(err); })
         .then(function () { button.disabled = false; });
