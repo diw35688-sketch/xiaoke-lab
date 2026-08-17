@@ -13,6 +13,7 @@ class ModelsPayload(BaseModel):
     base_url: str | None = None
     api_key: str | None = None
     provider_id: str | None = None
+    provider_label: str | None = None
 
 
 class SettingsPayload(BaseModel):

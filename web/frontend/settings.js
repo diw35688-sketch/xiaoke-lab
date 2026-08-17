@@ -70,6 +70,7 @@
 
   var presets = [];
   var providerKeys = {};
+  var providerProfiles = {};
   function el(id) { return document.getElementById(id); }
 
   function setStatus(ready, missing) {
@@ -91,6 +92,14 @@
     return fetch('/settings').then(function (r) { return r.json(); }).then(function (data) {
       presets = data.presets || [];
       providerKeys = data.settings.provider_keys || {};
+      providerProfiles = data.settings.provider_profiles || {};
+      var providers = presets.slice();
+      Object.keys(providerProfiles).forEach(function (id) {
+        if (!providers.some(function (p) { return p.id === id; })) {
+          providers.push({ id: id, label: providerProfiles[id].label || id, base_url: providerProfiles[id].base_url, model: providerProfiles[id].model });
+        }
+      });
+      presets = providers;
       el('settings-preset').innerHTML = presets.map(function (p) {
         return '<option value="' + p.id + '">' + p.label + '</option>';
       }).join('');
@@ -101,6 +110,9 @@
         ? ('已保存 ' + data.settings.api_key + '，留空表示不修改')
         : '请填写 API 密钥';
       var hit = presets.filter(function (p) { return p.base_url === data.settings.base_url; })[0];
+      if (!hit && data.settings.model_name) {
+        hit = presets.filter(function (p) { return p.model === data.settings.model_name; })[0];
+      }
       if (hit) el('settings-preset').value = hit.id;
       var selected = hit || presets[0];
       if (selected) {
@@ -116,11 +128,14 @@
   }
 
   function body() {
+    var selectedProviderId = el('settings-preset').value;
+    var selectedProvider = presets.filter(function (p) { return p.id === selectedProviderId; })[0] || {};
     var payload = {
       base_url: el('settings-base-url').value.trim(),
       model_name: el('settings-model').value.trim(),
       tts_enabled: el('settings-tts').checked,
-      provider_id: el('settings-preset').value
+      provider_id: selectedProviderId,
+      provider_label: selectedProvider.label || selectedProviderId
     };
     var key = el('settings-key').value.trim();
     if (key) payload.api_key = key;
