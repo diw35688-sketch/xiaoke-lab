@@ -76,6 +76,66 @@ def provider_meta(provider_id: str) -> dict:
     return PROVIDERS[0]
 
 
+# 百炼等供应商没有稳定的 /models 列表，提供经过验证的常用模型。
+_STATIC_TTS_MODELS = {
+    "dashscope": ["cosyvoice-v2", "cosyvoice-v1", "sambert-zhichu-v1"],
+    "openai": ["tts-1", "tts-1-hd"],
+    "local_qwen": ["qwen3-tts-flash", "qwen3-tts-12hz"],
+    "edge": [],
+    "browser": [],
+}
+
+
+def fetch_models(
+    provider_id: str,
+    base_url: str | None = None,
+    api_key: str | None = None,
+) -> list[str]:
+    """拉取语音合成模型。
+
+    OpenAI 兼容供应商会真实请求 /models 并优先返回 tts 前缀模型；
+    其他供应商返回已验证的静态模型列表。
+    """
+
+    if provider_id in {"browser", "edge"}:
+        return []
+
+    static_models = _STATIC_TTS_MODELS.get(provider_id, [])
+    if provider_id != "openai":
+        return static_models
+
+    url = (base_url or "https://api.openai.com/v1").rstrip("/")
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = "Bearer " + api_key
+    try:
+        response = httpx.get(
+            url + "/models",
+            headers=headers,
+            timeout=httpx.Timeout(20, connect=8),
+        )
+    except Exception as error:
+        # 拉不到时回退到静态已知模型，不阻塞用户保存。
+        return static_models
+    if response.status_code != 200:
+        return static_models
+    try:
+        data = response.json()
+        items = data.get("data", data)
+        models = [
+            item.get("id", "")
+            for item in items
+            if isinstance(item, dict)
+        ]
+        models = [m for m in models if m]
+    except Exception:
+        return static_models
+    tts_models = [m for m in models if m.startswith("tts")]
+    if tts_models:
+        return sorted(set(tts_models))
+    return sorted(set(models)) if models else static_models
+
+
 async def _edge(text: str, voice: str, speed: float) -> bytes:
     import edge_tts
 

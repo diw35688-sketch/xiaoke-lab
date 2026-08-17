@@ -19,6 +19,12 @@ class TTSRequest(BaseModel):
     text: str = Field(min_length=1, max_length=2000)
 
 
+class TTSModelsPayload(BaseModel):
+    provider: str | None = None
+    base_url: str | None = None
+    api_key: str | None = None
+
+
 @router.get("/providers")
 def providers():
     """可选供应商、音色与当前配置。"""
@@ -35,6 +41,20 @@ def providers():
             "api_key_set": bool(current.tts_api_key),
         },
     }
+
+
+@router.post("/models")
+def models(payload: TTSModelsPayload | None = None):
+    """拉取当前语音供应商可用的合成模型。"""
+    settings = settings_store.current()
+    provider = (payload.provider if payload else None) or settings.tts_provider or "browser"
+    base_url = (payload.base_url if payload else None) or settings.tts_base_url
+    api_key = (payload.api_key if payload else None) or settings.tts_api_key
+    try:
+        models = tts_providers.fetch_models(provider, base_url, api_key)
+    except Exception as error:
+        raise HTTPException(status_code=502, detail=str(error))
+    return {"provider": provider, "models": models}
 
 
 @router.post("")
