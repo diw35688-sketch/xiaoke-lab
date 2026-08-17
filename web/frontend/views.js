@@ -148,21 +148,15 @@
     });
   });
 
-  // ---------- 设置页：复用已有面板，改为内嵌 ----------
+  // ---------- 设置页：以弹窗形式打开（不再把面板搬进画布，避免 box 被清空丢内容） ----------
   window.shellRegisterView('settings', function (host) {
-    host.innerHTML = '<div style="max-width:620px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:20px 22px" id="settings-inline"></div>';
     var modal = document.getElementById('settings-modal');
-    if (modal) {
-      var box = modal.querySelector('.settings-box');
-      if (box) {
-        box.style.boxShadow = 'none';
-        box.style.maxHeight = 'none';
-        box.style.width = '100%';
-        var head = box.querySelector('.settings-head');
-        if (head) head.style.display = 'none';
-        document.getElementById('settings-inline').appendChild(box);
-      }
+    if (!modal) {
+      host.innerHTML = '<div style="color:#94a3b8;font-size:13px">设置面板未初始化，请刷新页面。</div>';
+      return;
     }
+    host.innerHTML = '<div style="color:#94a3b8;font-size:13px">设置面板以弹窗形式打开，点右上角 × 或点击遮罩关闭。</div>';
+    modal.classList.add('show');
     if (window.__ttsAttach) window.__ttsAttach();
   });
 

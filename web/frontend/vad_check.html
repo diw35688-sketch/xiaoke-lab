@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>VAD 集成诊断页</title>
+<style>
+  body{font-family:system-ui,"Microsoft YaHei",sans-serif;margin:24px auto;max-width:720px;padding:0 16px;color:#18212f}
+  h1{font-size:20px}
+  .box{background:#f1f5f9;border-radius:10px;padding:12px 16px;font-size:14px;line-height:1.9;margin:12px 0;word-break:break-all}
+  .ok{color:#16a34a;font-weight:600}
+  .bad{color:#dc2626;font-weight:600}
+</style>
+</head>
+<body>
+<h1>VAD 集成诊断页</h1>
+<p>这个页面直接加载 /static/vad_mode.js（与主页同一个文件）。如果底部出现「自动模式」按钮，说明脚本本身没问题，问题出在主页面的加载；下方信息用于定位。</p>
+<div class="box" id="info">正在检测…</div>
+<script src="/static/vad_mode.js"></script>
+<script>
+  function check() {
+    var hasOrt = typeof window.ort !== "undefined";
+    var hasVad = typeof window.vad !== "undefined";
+    var asrBar = !!document.getElementById("asr-bar");
+    var vadBar = !!document.getElementById("vad-bar");
+    var vadBtn = !!document.getElementById("vad-mode-btn");
+    document.getElementById("info").innerHTML =
+      "当前地址：<b>" + location.href + "</b><br>" +
+      "onnxruntime（window.ort）：" + (hasOrt ? '<span class="ok">已加载</span>' : '<span class="bad">未加载</span>') + "<br>" +
+      "vad-web（window.vad）：" + (hasVad ? '<span class="ok">已加载</span>' : '<span class="bad">未加载</span>') + "<br>" +
+      "voice_asr 语音条（#asr-bar）：" + (asrBar ? '<span class="ok">存在</span>' : '<span class="bad">不存在</span>') + "<br>" +
+      "自动模式条（#vad-bar）：" + (vadBar ? '<span class="ok">存在</span>' : '<span class="bad">不存在</span>') + "<br>" +
+      "自动模式按钮（#vad-mode-btn）：" + (vadBtn ? '<span class="ok">存在</span>' : '<span class="bad">不存在</span>');
+  }
+  // 等 DOMContentLoaded 之后检查，确保 vad_mode.js 已执行。
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", check);
+  } else {
+    setTimeout(check, 300);
+  }
+</script>
+</body>
+</html>

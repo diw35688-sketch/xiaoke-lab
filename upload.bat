@@ -1,5 +1,5 @@
 @echo off
-cd /d D:\me\ai107
+cd /d C:\Users\dahli\Documents\107
 
 echo [1/4] 暂存当前源码（已自动忽略 dist/build/密钥/证书/音频缓存等）
 git add -A

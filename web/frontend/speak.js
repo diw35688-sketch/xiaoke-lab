@@ -23,6 +23,7 @@
 
   function speak(text) {
     if (!text) return Promise.resolve(false);
+    if (window.ttsMuted === true) return Promise.resolve(false); // 头像开关已关闭语音播报
     stop();
     if (localAvailable === false) return Promise.resolve(browserSpeak(text));
 

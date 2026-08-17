@@ -10,6 +10,14 @@
   let activeController = null, activeReply = null, requestId = 0;
   let activeThinkRow = null, toolRows = {};
 
+  // 朗读开关统一来源：通话模式强制勾选的 #auto-speak，或设置面板的 tts_enabled（后端）。
+  // 页面加载时读后端配置，避免"设置里开了播报、对话却不朗读"的断链。
+  window.ttsEnabled = window.ttsEnabled === true;
+  fetch('/settings').then(r => r.json()).then(d => {
+    window.ttsEnabled = !!(d.settings && d.settings.tts_enabled);
+  }).catch(() => {});
+  function shouldSpeak() { return autoSpeak.checked || window.ttsEnabled === true; }
+
   const stopButton = document.createElement('button');
   stopButton.type = 'button'; stopButton.className = 'mic'; stopButton.id = 'stop-response';
   stopButton.title = '停止生成'; stopButton.textContent = '■'; stopButton.disabled = true;
@@ -223,7 +231,7 @@
             answer += text;
             reply.textContent = answer;
             chat.scrollTop = chat.scrollHeight;
-            if (autoSpeak.checked) {
+            if (shouldSpeak()) {
               const extracted = takeCompletedSentences(speechBuffer + text);
               speechBuffer = extracted.buffer;
               extracted.sentences.forEach(sentence => window.enqueueSpeech?.(sentence));
@@ -231,7 +239,7 @@
           } else if (data.type === 'task_queued') {
             answer = data.answer; reply.textContent = answer;
             if (data.conversation_id) localStorage.setItem(conversationKey, data.conversation_id);
-            if (autoSpeak.checked) window.enqueueSpeech?.(answer);
+            if (shouldSpeak()) window.enqueueSpeech?.(answer);
             avatar('listening');
             window.refreshTaskPanel?.();
           } else if (data.type === 'done') {
@@ -242,7 +250,7 @@
               avatarThought('···');
             }
             if (data.conversation_id) localStorage.setItem(conversationKey, data.conversation_id);
-            if (autoSpeak.checked) {
+            if (shouldSpeak()) {
               const extracted = takeCompletedSentences(speechBuffer, true);
               extracted.sentences.forEach(sentence => window.enqueueSpeech?.(sentence));
             } else {

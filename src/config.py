@@ -109,6 +109,13 @@ ASR_SENSEVOICE_MODEL = os.getenv(
     "iic/SenseVoiceSmall",
 ).strip()
 
+# 生产链路默认固定中文，避免 language=auto 把中文口述误判成粤语
+# （真实案例："结束实验记录"→"要车翻圈啦"）。评测工具仍可显式传 auto 做对比。
+ASR_LANGUAGE = os.getenv(
+    "ASR_LANGUAGE",
+    "zh",
+).strip().lower()
+
 # 暂时保留旧名称，避免外部脚本在迁移期间中断。
 ASR_MODEL = ASR_SENSEVOICE_MODEL
 VAD_MODEL = "fsmn-vad"

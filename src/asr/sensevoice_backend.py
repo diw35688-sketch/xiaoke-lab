@@ -11,6 +11,7 @@ import soundfile as sf
 from src.asr.languages import SUPPORTED_SENSEVOICE_LANGUAGES
 from src.asr.schemas import ASRResult
 from src.config import (
+    ASR_LANGUAGE,
     ASR_SENSEVOICE_MODEL,
     DEVICE,
     VAD_MODEL,
@@ -80,7 +81,7 @@ class SenseVoiceBackend:
         self,
         audio_path: Path,
         *,
-        language: str = "auto",
+        language: str = ASR_LANGUAGE,
     ) -> ASRResult:
         audio_path = Path(audio_path)
 

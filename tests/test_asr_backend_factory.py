@@ -194,6 +194,28 @@ class SenseVoiceBackendTests(unittest.TestCase):
             ):
                 backend.recognize(audio_path)
 
+    def test_default_language_is_zh_from_config(self):
+        from src.config import ASR_LANGUAGE
+
+        self.assertEqual(ASR_LANGUAGE, "zh")
+
+    def test_recognize_default_language_is_zh(self):
+        """不传 language 时走配置默认 zh，而不是 auto（防粤语误判回归）。"""
+        engine = FakeEngine([{"text": "<|zh|>加热到60摄氏度"}])
+
+        with tempfile.TemporaryDirectory() as directory:
+            audio_path = Path(directory) / "sample.wav"
+            write_silent_wav(audio_path)
+            backend = SenseVoiceBackend(
+                model_engine=engine,
+                postprocess=lambda text: text,
+            )
+
+            result = backend.recognize(audio_path)
+
+        self.assertEqual(result.language, "zh")
+        self.assertEqual(engine.calls[0]["language"], "zh")
+
 
 if __name__ == "__main__":
     unittest.main()
