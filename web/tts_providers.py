@@ -113,6 +113,7 @@ def fetch_models(
             url + "/models",
             headers=headers,
             timeout=httpx.Timeout(20, connect=8),
+            trust_env=False,
         )
     except Exception as error:
         # 拉不到时回退到静态已知模型，不阻塞用户保存。

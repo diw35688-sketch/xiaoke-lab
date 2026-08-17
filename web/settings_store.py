@@ -225,6 +225,7 @@ def fetch_models(
             url,
             headers=headers,
             timeout=httpx.Timeout(20, connect=8),
+            trust_env=False,
         )
     except httpx.ConnectError:
         raise ValueError("连不上接口地址，请检查网络或 base_url 是否正确")
@@ -272,6 +273,7 @@ def test_connection(settings: ModelSettings | None = None) -> tuple[bool, str]:
                 "max_tokens": 1,
             },
             timeout=httpx.Timeout(20, connect=8),
+            trust_env=False,
         )
     except httpx.ConnectError:
         return False, "连不上接口地址，请检查网络或 base_url 是否正确"

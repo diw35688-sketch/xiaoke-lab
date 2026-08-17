@@ -63,6 +63,7 @@ def ocr_image(settings, image_bytes: bytes, mime: str = "image/png") -> str:
         headers=_auth_headers(settings),
         json=payload,
         timeout=httpx.Timeout(120, connect=10),
+        trust_env=False,
     )
     response.raise_for_status()
     data = response.json()
@@ -114,6 +115,7 @@ def extract_protocol_drafts(settings, ocr_text: str) -> list[dict]:
         headers=_auth_headers(settings),
         json=payload,
         timeout=httpx.Timeout(180, connect=10),
+        trust_env=False,
     )
     response.raise_for_status()
     data = response.json()
