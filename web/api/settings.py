@@ -12,10 +12,12 @@ router = APIRouter(prefix="/settings", tags=["设置"])
 class ModelsPayload(BaseModel):
     base_url: str | None = None
     api_key: str | None = None
+    provider_id: str | None = None
 
 
 class SettingsPayload(BaseModel):
     api_key: str | None = None
+    provider_id: str | None = None
     base_url: str | None = None
     model_name: str | None = None
     tts_enabled: bool | None = None
@@ -56,10 +58,11 @@ def save_settings(payload: SettingsPayload):
 def test_settings(payload: SettingsPayload | None = None):
     """真实调用一次接口，验证配置是否可用。"""
     if payload and (payload.api_key or payload.base_url or payload.model_name):
+        current = settings_store.current()
         candidate = settings_store.ModelSettings(
-            api_key=payload.api_key or settings_store.current().api_key,
-            base_url=payload.base_url or settings_store.current().base_url,
-            model_name=payload.model_name or settings_store.current().model_name,
+            api_key=payload.api_key or current.key_for(payload.provider_id),
+            base_url=payload.base_url or current.base_url,
+            model_name=payload.model_name or current.model_name,
         )
         ok, message = settings_store.test_connection(candidate)
     else:
@@ -74,6 +77,7 @@ def fetch_models(payload: ModelsPayload | None = None):
         models = settings_store.fetch_models(
             base_url=payload.base_url if payload else None,
             api_key=payload.api_key if payload else None,
+            provider_id=payload.provider_id if payload else None,
         )
         return {"models": models}
     except Exception as error:
