@@ -52,6 +52,31 @@ class FakeOutput:
 
 
 class PresentationPumpTests(unittest.TestCase):
+    def test_pump_calls_event_tone_player_for_delivered_intent(self):
+        coordinator = PresentationCoordinator()
+        renderer = FakeRenderer()
+        output = FakeOutput()
+        tones = []
+        pump = PresentationPump(
+            coordinator,
+            renderer,
+            output,
+            event_tone_player=tones.append,
+        )
+
+        pump.start()
+        try:
+            coordinator.submit([_record_ack("r1", 1)])
+            self.assertTrue(
+                _wait_until(lambda: len(tones) >= 1),
+                "pump 未在超时内触发事件提示音",
+            )
+        finally:
+            pump.stop(timeout=1)
+
+        self.assertEqual(len(tones), 1)
+        self.assertEqual(tones[0].kind, MessageKind.RECORD_ACK)
+
     def test_pump_renders_and_outputs_submitted_intents(self):
         coordinator = PresentationCoordinator()
         renderer = FakeRenderer()

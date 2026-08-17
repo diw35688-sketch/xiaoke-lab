@@ -412,6 +412,21 @@ class ConfirmationAckCopyTests(unittest.TestCase):
             copy_for_intent(intent, ui_mode="user")
 
 
+class AnswerHintCopyTests(unittest.TestCase):
+    def test_answer_hint_guides_question_number(self):
+        intent = _make_intent(
+            MessageKind.ANSWER_HINT,
+            args={},
+        )
+
+        text = copy_for_intent(intent, ui_mode="user")
+
+        self.assertEqual(
+            text,
+            "如果是在回答问题，请指定问题编号，例如“问题1，50毫升”。",
+        )
+
+
 class NoActionFeedbackCopyTests(unittest.TestCase):
     def test_missing_number_guides_to_review(self):
         intent = _make_intent(

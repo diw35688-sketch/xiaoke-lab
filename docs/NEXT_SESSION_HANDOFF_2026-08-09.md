@@ -339,10 +339,19 @@ user 模式会话级 DEBUG 写入 `results/debug_<session>.log`，新会话替�
 
 `PRESENT-DELIVERY-BOUNDARY-01` 已完成 AUTO_OK：输出边界护栏测试覆盖 PRESENT 全部六层，
 纯函数层无 I/O，coordinator/pump 不反向依赖终端或文案；`PRESENT_DESIGN.md` 增加
-第 14 节 Delivery Boundary 架构护栏。全量 740 项通过。
+第 14 节 Delivery Boundary 架构护栏。
 
-**当前唯一下一项**：`PRESENT-EXTENSION-SEAMS-01`。为 QUERY/DENY/WARNING/导出定义
-稳定接缝，禁止未来功能在 main.py 手写 if/elif 投影。
+`PRESENT-EXTENSION-SEAMS-01` 已完成 AUTO_OK：新增 QUERY_RESULT/DENY_RESULT/WARNING/
+EXPORT_RESULT 四类语义接缝与 Fake 合同；WARNING v1 跟随 FIFO 不抢占。
+
+`GAPS-FIX-ANSWER-HINT-01` 已完成 AUTO_OK：结构化实验与待确认问题并存时追加
+`ANSWER_HINT` 提示，引导用户回答带问题编号。
+
+`UX-FIX-TONE-01` 已完成 AUTO_OK：`PresentationPump` 支持 `event_tone_player`，
+main 已把 `play_event_tone` 挂到 pump 交付链。全量 754 项通过。
+
+**当前唯一下一项**：`PRESENT-FINAL-UX-VERIFY-01`。需要真实麦克风、真实 user/admin
+双模式会话，按九维表走查，把前 9 项从 AUTO_OK 升级到 REAL_OK/UX_CONFIRMED。
 
 ---
 
@@ -570,3 +579,14 @@ docs/                 任务清单、交接和学习记录
   coordinator/pump 不反向依赖终端或文案；FIFO/flush 由既有 pump 测试覆盖。
 - 测试：全量 `Ran 740 tests ... OK`。
 - 下一步：`PRESENT-EXTENSION-SEAMS-01`。
+
+## 20. 2026-08-16 PRESENT-EXTENSION-SEAMS / ANSWER-HINT / UX-FIX-TONE AUTO_OK
+
+- 7：QUERY/DENY/WARNING/EXPORT 四类 MessageKind + 投影 Fake 合同 + 文案渲染；
+  WARNING v1 调度规则=跟随 FIFO 不抢占。
+- 8：`UnifiedObservation.answer_hint` + `ANSWER_HINT` 投影与文案；
+  `UnifiedSegmentProcessor` 在结构化实验且存在待确认问题时置真。
+- 9：`src/audio/feedback.py` 新增 `play_event_tone`；`PresentationPump` 增加
+  可选 `event_tone_player`；main 两个 pump 均已接入。
+- 测试：新增 14 项；全量 `Ran 754 tests ... OK`。
+- 下一步：`PRESENT-FINAL-UX-VERIFY-01`。

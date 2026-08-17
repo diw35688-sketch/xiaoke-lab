@@ -114,6 +114,16 @@ def copy_for_intent(
         return _copy_review(intent)
     if intent.kind == MessageKind.SESSION_CLOSING_SUMMARY:
         return _copy_session_closing_summary(intent)
+    if intent.kind == MessageKind.ANSWER_HINT:
+        return _copy_answer_hint(intent, ui_mode)
+    if intent.kind == MessageKind.QUERY_RESULT:
+        return _copy_query_result(intent, ui_mode)
+    if intent.kind == MessageKind.DENY_RESULT:
+        return _copy_deny_result(intent, ui_mode)
+    if intent.kind == MessageKind.WARNING:
+        return _copy_warning(intent, ui_mode)
+    if intent.kind == MessageKind.EXPORT_RESULT:
+        return _copy_export_result(intent, ui_mode)
     raise ValueError(f"文案目录暂不支持消息类型 {intent.kind.value}。")
 
 
@@ -345,6 +355,56 @@ def _copy_session_closing_summary(intent: PresentationIntent) -> str:
         status = "已暂缓" if item.is_deferred else "待回答"
         lines.append(f"- 问题 {item.display_number}（{status}）：{item.question}")
     return "\n".join(lines)
+
+
+def _copy_answer_hint(intent: PresentationIntent, ui_mode: str) -> str:
+    base = "如果是在回答问题，请指定问题编号，例如“问题1，50毫升”"
+    return _with_source(base, intent, ui_mode)
+
+
+def _copy_query_result(intent: PresentationIntent, ui_mode: str) -> str:
+    title = intent.args.get("title")
+    summary = intent.args.get("summary")
+    if not isinstance(title, str) or not title.strip():
+        raise ValueError("QUERY_RESULT 必须包含非空 title。")
+    if not isinstance(summary, str) or not summary.strip():
+        raise ValueError("QUERY_RESULT 必须包含非空 summary。")
+    return f"查询结果：{title}\n{summary}"
+
+
+def _copy_deny_result(intent: PresentationIntent, ui_mode: str) -> str:
+    reason = intent.args.get("reason")
+    if not isinstance(reason, str) or not reason.strip():
+        raise ValueError("DENY_RESULT 必须包含非空 reason。")
+    base = f"无法执行：{reason}"
+    return _with_source(base, intent, ui_mode)
+
+
+def _copy_warning(intent: PresentationIntent, ui_mode: str) -> str:
+    message = intent.args.get("message")
+    if not isinstance(message, str) or not message.strip():
+        raise ValueError("WARNING 必须包含非空 message。")
+    base = f"安全提醒：{message}"
+    return _with_source(base, intent, ui_mode)
+
+
+def _copy_export_result(intent: PresentationIntent, ui_mode: str) -> str:
+    phase = intent.args.get("phase")
+    if phase not in {"started", "succeeded", "failed"}:
+        raise ValueError("EXPORT_RESULT 的 phase 必须是 started/succeeded/failed。")
+    detail = intent.args.get("detail", "")
+    if detail is not None and not isinstance(detail, str):
+        raise ValueError("EXPORT_RESULT 的 detail 必须是字符串或 null。")
+
+    if phase == "started":
+        base = "开始导出实验记录"
+    elif phase == "succeeded":
+        base = "实验记录导出成功"
+    else:
+        base = "实验记录导出失败"
+        if detail:
+            base += f"：{detail}"
+    return _with_source(base, intent, ui_mode)
 
 
 def _require_positive_int(args: Mapping[str, object], key: str) -> int:

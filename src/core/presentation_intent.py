@@ -24,6 +24,11 @@ class MessageKind(str, Enum):
     SYSTEM_ISSUE = "system_issue"
     STAGE_SUMMARY = "stage_summary"
     SESSION_CLOSING_SUMMARY = "session_closing_summary"
+    ANSWER_HINT = "answer_hint"
+    QUERY_RESULT = "query_result"
+    DENY_RESULT = "deny_result"
+    WARNING = "warning"
+    EXPORT_RESULT = "export_result"
     DEBUG = "debug"
 
 

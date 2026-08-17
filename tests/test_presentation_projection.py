@@ -183,6 +183,23 @@ class ObservationProjectionTests(unittest.TestCase):
             ["加入5毫升缓冲液。", "加热到60摄氏度。"],
         )
 
+    def test_answer_hint_appends_after_record_ack(self):
+        observation = _observation(
+            acceptance_kind="structured_experiment",
+            answer_hint=True,
+        )
+
+        messages = messages_for_observation(
+            observation, experiment_step_number=2
+        )
+
+        self.assertEqual(len(messages), 2)
+        self.assertEqual(messages[0].kind, MessageKind.RECORD_ACK)
+        self.assertEqual(messages[1].kind, MessageKind.ANSWER_HINT)
+        self.assertEqual(
+            messages[1].screen_target, ScreenTarget.DIALOGUE
+        )
+
     def test_degraded_record_ack_has_empty_previews(self):
         observation = _observation(
             acceptance_kind="degraded_evidence_note",
