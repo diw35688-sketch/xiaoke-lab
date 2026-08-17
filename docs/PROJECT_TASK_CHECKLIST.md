@@ -71,7 +71,7 @@ TODO → DESIGN → CODED → AUTO_OK → REAL_OK
 
 ## 2. 当前测试基线
 
-- 当前全量自动测试：`737 tests OK`（Python 3.11.9，2026-08-16；`PRESENT-RECORD-PREVIEW-01` 完成 AUTO_OK，新增 6 项规范预览/用户模式 ASR 分流测试）
+- 当前全量自动测试：`740 tests OK`（Python 3.11.9，2026-08-16；`PRESENT-DELIVERY-BOUNDARY-01` 完成 AUTO_OK，新增 3 项输出边界护栏测试）
 - 环境验证：核心依赖和 `src.main` 导入成功；首次沙箱内失败已确认是执行权限误判，不是 `.venv` 损坏
 - 最近 PRESENT 真实验收会话：`20260815_212615`（补充复验 `20260815_213926`）
 - 最近 PRESENT 双会话复验：`20260816_143151` → `20260816_143201`（同进程再次唤醒成功，零第三方泄漏）
@@ -89,7 +89,9 @@ cd C:\Users\dahli\Desktop\asr_demo
 
 ## 3. 当前唯一下一项
 
-**`PRESENT-DELIVERY-BOUNDARY-01`：Delivery Boundary 架构护栏。**
+**`PRESENT-EXTENSION-SEAMS-01`：QUERY/DENY/WARNING/导出扩展接缝。**
+
+`PRESENT-DELIVERY-BOUNDARY-01` 已完成 AUTO_OK：`tests/test_presentation_output_boundary.py` 新增 3 项护栏（PRESENT 各层无 print、纯函数层无 I/O、协调器/pump 不反向依赖终端或文案）；`docs/PRESENT_DESIGN.md` 增加第 14 节 Delivery Boundary 架构护栏。全量 740 项通过。
 
 `PRESENT-RECORD-PREVIEW-01` 已完成 AUTO_OK：`RECORD_ACK` 携带严格 `event_previews` 合同，user 模式逐段 ASR 不再上主界面，admin 模式仍保留 ASR 对照。全量 737 项通过。
 
@@ -185,7 +187,7 @@ PRESENT 之外的 Query/Safety/RAG 真实接入、ASR 路演稳定性和 LLM 格
 | 29 | `P1` | `PRESENT-FINAL-UX-VERIFY-01` PRESENT 最终真实验收 | `TODO` | user/admin 对照真实会话：反馈完整、无重复/泄漏、顺序正确、最后消息不丢，维1/7改善且维2/5/9不退化 | 下面“PRESENT 当前15项收口清单”核心项实现完成；记录 session_id、终端证据和九维结论 |
 | 30 | `P1` | `PRESENT-CLOSING-NAME-01` 收尾回执与正式 SessionSummary 消歧 | `AUTO_OK` | `MessageKind.SESSION_SUMMARY` 已改为 `SESSION_CLOSING_SUMMARY`，同步枚举值、copy 函数、main、测试与当前文档；`src/tests` 旧 PRESENT 名零残留，无兼容双名，无 SessionRecord/LLM 总结/导出扩张；专项41/41、全量571/571通过 | 自动闭环；真实输出随最终 PRESENT UX 会话统一复验 |
 | 31 | `P1` | `PRESENT-RECORD-PREVIEW-01` 规范记录预览替代 user 原始 ASR | `AUTO_OK` | `EventPreview` 合同已接入 `RECORD_ACK`；user 模式逐段 `TRANSCRIPT` 分流到 admin；原始 ASR 仍落盘并可在 admin/debug 查看。新增 6 项测试覆盖单/多事件、标点、空预览、降级、user/admin 分流 | 待真实 user/admin 对照会话验证；通过后升 REAL_OK |
-| 32 | `P1` | `PRESENT-DELIVERY-BOUNDARY-01` Coordinator/Renderer/Pump 架构合同与渐进扩展纪律 | `TODO` | 固定唯一链路与职责边界：结构化结果→projection→`PresentationIntent`→Coordinator（排序/去重/生命周期）→Pump（执行交付并回执）→Renderer（纯格式化）→Sink（唯一 I/O）；普通新消息不得要求修改 Coordinator/Pump，用户可见输出不得绕过链路。消息内容随业务增量扩展；WARNING 在真实接入前补最小调度子步；TTS/Web 等第二真实渠道接入前才专门提取有限 Delivery/Renderer 抽象，不因未来可能性提前建设框架 | 文档职责/变化归属明确；架构护栏覆盖直接 print 泄漏、FIFO、in-flight flush、Renderer 无 I/O；阶段收口检查确认无跨层业务分支和重复交付实现 |
+| 32 | `P1` | `PRESENT-DELIVERY-BOUNDARY-01` Coordinator/Renderer/Pump 架构合同与渐进扩展纪律 | `AUTO_OK` | 护栏测试扩展至 PRESENT 全部六层：运行路径无 print、PRESENT 各层无 print、纯函数层无 I/O、coordinator/pump 不反向依赖终端或文案；FIFO 与 flush 由既有 pump 测试覆盖；`PRESENT_DESIGN.md` 增加第 14 节。全量 740 项通过 | 阶段收口复核无跨层业务分支和重复交付实现；随最终 UX 验收关闭 |
 
 #### PRESENT 当前 15 项收口清单（用户 2026-08-16 确认）
 
@@ -207,7 +209,7 @@ PRESENT 之外的 Query/Safety/RAG 真实接入、ASR 路演稳定性和 LLM 格
 | 3 | `UX-MODE-01` user/admin 输出分层 | `AUTO_OK` |
 | 4 | `SYNC-UI-CLAIMS-01` 文案与真实状态一致性 | `AUTO_OK` |
 | 5 | `PRESENT-RECORD-PREVIEW-01` 规范记录预览 | `AUTO_OK` |
-| 6 | `PRESENT-DELIVERY-BOUNDARY-01` Delivery Boundary 架构护栏 | `TODO` |
+| 6 | `PRESENT-DELIVERY-BOUNDARY-01` Delivery Boundary 架构护栏 | `AUTO_OK` |
 | 7 | `PRESENT-EXTENSION-SEAMS-01` QUERY/DENY/WARNING/导出扩展接缝 | `TODO` |
 | 8 | `GAPS-FIX-ANSWER-HINT-01` 回答编号提示 | `TODO` |
 | 9 | `UX-FIX-TONE-01` 事件提示音 | `TODO` |

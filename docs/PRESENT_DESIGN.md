@@ -296,3 +296,20 @@ PRESENT 不是把旧 `print()` 原样搬进统一出口。任何信息进入用�
 该分类是后续 QUERY、DENY、WARNING 与 TTS 的共用时机接缝；新增消息必须先归类，
 不得仅因内部产生了事件就直接呈现。TTS 以后在 `DeliveryPlan` 决定是否播报，不能把
 “屏幕可见”等同于“必须朗读”。
+
+## 14. Delivery Boundary 架构护栏（2026-08-16 落地）
+
+`PRESENT-DELIVERY-BOUNDARY-01` 把第 2 节目的架构变成可自动检查的边界：
+
+| 护栏 | 检查方式 | 不允许 |
+|---|---|---|
+| 运行路径无直接 print | `tests/test_presentation_output_boundary.py` AST 扫描 | main/ASR/audio/wakeword/state/llm 直接 print |
+| PRESENT 各层无直接 print | 同上 | Intent/文案/协调器/投影/pump/终端渲染器直接 print |
+| 纯函数层无 I/O | 同上 | 文案、投影、终端渲染调用 open/input |
+| 协调器与 pump 不反向依赖终端/文案 | 同上 | coordinator 导入 pump/copy/projection/terminal；pump 导入 copy/projection/terminal |
+| FIFO + in-flight flush | `tests/test_presentation_pump.py` | 乱序、丢尾消息、flush 语义错误 |
+| 唯一 stdout 写入点 | pump 依赖 `Renderer` 协议 + `output` 注入 | 其他执行流自行输出 |
+
+新增消息只需扩展 `PresentationIntent` 的 kind/args、投影和文案目录；普通消息不得要求
+修改 Coordinator 或 Pump。WARNING 在真实接入前补最小调度子步；TTS/Web 等第二真实渠道
+接入前，才提取有限 Delivery/Renderer 抽象，不因未来可能性提前建设框架。
