@@ -69,6 +69,7 @@
   ].join('');
 
   var presets = [];
+  var providerKeys = {};
   function el(id) { return document.getElementById(id); }
 
   function setStatus(ready, missing) {
@@ -89,6 +90,7 @@
   function load() {
     return fetch('/settings').then(function (r) { return r.json(); }).then(function (data) {
       presets = data.presets || [];
+      providerKeys = data.settings.provider_keys || {};
       el('settings-preset').innerHTML = presets.map(function (p) {
         return '<option value="' + p.id + '">' + p.label + '</option>';
       }).join('');
@@ -105,6 +107,9 @@
         var link = el('settings-api-url');
         link.href = selected.api_url || '#';
         link.style.visibility = selected.api_url ? 'visible' : 'hidden';
+        el('settings-key').placeholder = providerKeys[selected.id]
+          ? ('已保存 ' + providerKeys[selected.id] + '，留空表示不修改')
+          : '请填写 API 密钥';
       }
       setStatus(data.ready, data.missing);
     });
@@ -114,7 +119,8 @@
     var payload = {
       base_url: el('settings-base-url').value.trim(),
       model_name: el('settings-model').value.trim(),
-      tts_enabled: el('settings-tts').checked
+      tts_enabled: el('settings-tts').checked,
+      provider_id: el('settings-preset').value
     };
     var key = el('settings-key').value.trim();
     if (key) payload.api_key = key;
@@ -157,6 +163,10 @@
         var link = el('settings-api-url');
         link.href = p.api_url || '#';
         link.style.visibility = p.api_url ? 'visible' : 'hidden';
+        el('settings-key').value = '';
+        el('settings-key').placeholder = providerKeys[p.id]
+          ? ('已保存 ' + providerKeys[p.id] + '，留空表示不修改')
+          : '请填写 API 密钥';
         if (p.id !== 'custom') {
           el('settings-base-url').value = p.base_url;
           el('settings-model').value = p.model;
@@ -173,7 +183,8 @@
       msg.textContent = '正在拉取模型列表…';
       var payload = {
         base_url: el('settings-base-url').value.trim(),
-        api_key: el('settings-key').value.trim()
+        api_key: el('settings-key').value.trim(),
+        provider_id: el('settings-preset').value
       };
       fetch('/settings/models', {
         method: 'POST',

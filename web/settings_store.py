@@ -53,10 +53,16 @@ class ModelSettings:
     tts_model: str = ""
     tts_voice: str = ""
     tts_speed: float = 1.0
+    api_keys: dict = field(default_factory=dict)
 
     def masked(self) -> dict:
         """给前端看的版本：密钥掩码，永不回传明文。"""
         data = asdict(self)
+        data["provider_keys"] = {
+            provider_id: _mask_key(key)
+            for provider_id, key in self.api_keys.items()
+            if key
+        }
         tts_key = self.tts_api_key
         if not tts_key:
             data["tts_api_key"] = ""
@@ -71,11 +77,16 @@ class ModelSettings:
             data["api_key"] = ""
             data["api_key_set"] = False
         else:
-            data["api_key"] = (
-                key[:4] + "*" * 8 + key[-4:] if len(key) > 8 else "*" * len(key)
-            )
+            data["api_key"] = _mask_key(key)
             data["api_key_set"] = True
         return data
+
+    def key_for(self, provider_id: str | None) -> str:
+        """按供应商取密钥；未单独保存时回退到当前主密钥。"""
+
+        if provider_id and self.api_keys.get(provider_id):
+            return self.api_keys[provider_id]
+        return self.api_key
 
     def is_ready(self) -> bool:
         return bool(self.api_key and self.base_url and self.model_name)
@@ -95,6 +106,10 @@ class ModelSettings:
 # 用普通 Lock 会自死锁。
 _lock = threading.RLock()
 _cache: ModelSettings | None = None
+
+
+def _mask_key(key: str) -> str:
+    return key[:4] + "*" * 8 + key[-4:] if len(key) > 8 else "*" * len(key)
 
 
 def _from_env() -> ModelSettings:
@@ -128,6 +143,7 @@ def current() -> ModelSettings:
                     model_name=raw.get("model_name", ""),
                     tts_enabled=bool(raw.get("tts_enabled", False)),
                     tts_url=raw.get("tts_url", "http://127.0.0.1:8001/tts"),
+                    api_keys=raw.get("api_keys", {}) or {},
                 )
             except (json.JSONDecodeError, OSError):
                 _cache = _from_env()
@@ -152,9 +168,14 @@ def update(**changes) -> ModelSettings:
                 settings.tts_speed = max(0.5, min(2.0, float(changes["tts_speed"])))
             except (TypeError, ValueError):
                 pass
+        provider_id = changes.get("provider_id")
         new_key = changes.get("api_key")
         if new_key:
-            settings.api_key = str(new_key).strip()
+            key = str(new_key).strip()
+            settings.api_key = key
+            if provider_id:
+                settings.api_keys = dict(settings.api_keys)
+                settings.api_keys[provider_id] = key
         new_tts_key = changes.get("tts_api_key")
         if new_tts_key:
             settings.tts_api_key = str(new_tts_key).strip()
@@ -183,12 +204,13 @@ def clear_api_key() -> ModelSettings:
 def fetch_models(
     base_url: str | None = None,
     api_key: str | None = None,
+    provider_id: str | None = None,
 ) -> list[str]:
     """从兼容 OpenAI 的 /models 接口拉取可用模型名。"""
 
     settings = current()
     base_url = (base_url or settings.base_url).strip()
-    api_key = api_key or settings.api_key
+    api_key = api_key or settings.key_for(provider_id)
     if not base_url:
         raise ValueError("请先填写接口地址 Base URL。")
 
