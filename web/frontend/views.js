@@ -47,7 +47,9 @@
           + '<div style="color:#64748b;font-size:12px;line-height:1.6">共 ' + p.total_steps + ' 步 · ' + esc(p.source) + '</div></div>';
       }).join('');
       host.innerHTML = '<div style="max-width:760px">'
-          + '<div style="margin-bottom:14px"><button class="sh-btn" id="ai-protocol-btn">AI 生成方案</button>'
+          + '<div style="margin-bottom:14px"><textarea id="protocol-text" rows="3" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--bd-2);border-radius:8px;font-size:13px;margin-bottom:8px" placeholder="粘贴实验步骤文字，例如：配制 100mL 0.1M pH7.4 磷酸盐缓冲液，先称量磷酸盐，再溶解、调 pH、定容、混匀"></textarea>'
+          + '<button class="sh-btn primary" id="ai-protocol-text-btn">AI 分析文字成方案</button>'
+          + '<button class="sh-btn" id="ai-protocol-btn">AI 生成方案（弹窗描述）</button>'
           + '<input type="file" id="protocol-file" accept=".json,application/json" style="margin-left:10px;font-size:12px">'
           + '<button class="sh-btn" id="protocol-upload-btn" style="margin-left:6px">上传 JSON</button>'
           + '<span id="protocol-upload-msg" style="color:#64748b;font-size:12px;margin-left:10px"></span>'
@@ -88,6 +90,31 @@
           });
         };
       });
+        var aiTextBtn = host.querySelector('#ai-protocol-text-btn');
+        if (aiTextBtn) aiTextBtn.onclick = function () {
+          var text = host.querySelector('#protocol-text').value.trim();
+          if (!text) { alert('请先粘贴实验步骤文字'); return; }
+          var box = host.querySelector('#ai-draft-box');
+          box.innerHTML = '<p style="color:#64748b;font-size:12px">AI 正在分析文字…</p>';
+          api('/protocols/ai-draft', 'POST', { text: text }).then(function (d) {
+            if (d && d.detail) throw new Error(d.detail);
+            box.innerHTML = '<pre style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px;white-space:pre-wrap;font-size:12px">'
+              + esc(JSON.stringify(d, null, 2)) + '</pre>'
+              + '<div style="margin-top:10px"><button class="sh-btn primary" id="ai-draft-save">确认保存此方案</button></div>'
+              + '<p id="ai-draft-msg" style="color:#64748b;font-size:12px;margin-top:8px"></p>';
+            host.querySelector('#ai-draft-save').onclick = function () {
+              api('/protocols/save-draft', 'POST', { protocol: d }).then(function (res) {
+                var msg = host.querySelector('#ai-draft-msg');
+                if (res && res.detail) { msg.style.color = '#c2410c'; msg.textContent = '保存失败：' + res.detail; return; }
+                msg.style.color = '#15803d'; msg.textContent = '方案已保存，已自动识别关联试剂';
+                window.shellShow('protocols');
+              });
+            };
+          }).catch(function (err) {
+            box.innerHTML = '<p style="color:#c2410c;font-size:12px">AI 分析失败：' + (err.message || err) + '</p>';
+          });
+        };
+
         var aiBtn = host.querySelector('#ai-protocol-btn');
         if (aiBtn) aiBtn.onclick = function () {
           var text = prompt('用自然语言描述你想做的实验，例如：配制100mL 0.1M pH7.4磷酸盐缓冲液');

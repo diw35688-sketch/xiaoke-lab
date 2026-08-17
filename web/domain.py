@@ -234,6 +234,8 @@ def add_protocol(raw_protocol: dict) -> dict:
         _protocol_store = None
         if _session is not None and _session.selection.protocol is None:
             pass
+
+    _sync_prep_requirements_for_protocol(raw_protocol)
     return raw_protocol
 
 
@@ -374,6 +376,42 @@ def add_reagent_preps(raw_preps: list) -> dict:
     }
 
 
+def analyze_reagents(texts: list) -> dict:
+    """识别文字中出现的危化品与试剂配置库条目。
+
+    试剂名采用最长名优先，避免“硫酸铜”命中后“五水硫酸铜”重复。
+    """
+
+    store = hazmat()
+    found = store.find_in_text(*texts)
+    prep_store = reagent_preps()
+    preps = [
+        prep
+        for prep in prep_store.list_all()
+        if any(prep.name_zh in text for text in texts if isinstance(text, str))
+    ]
+    return {
+        "hazmat": [
+            {
+                "name": r.name_zh,
+                "cas": r.cas,
+                "critical": r.is_critical,
+                "codes": list(r.critical_codes),
+                "statements": [s.text for s in r.critical_statements()],
+            }
+            for r in found
+        ],
+        "reagent_preps": [
+            {
+                "reagent_prep_id": p.reagent_prep_id,
+                "name_zh": p.name_zh,
+                "purpose": p.purpose,
+            }
+            for p in preps
+        ],
+    }
+
+
 def protocol_prep_requirements(protocol_id: str | None) -> dict:
     """读取方案需要的试剂配置列表；找不到方案返回空。"""
 
@@ -388,3 +426,98 @@ def protocol_prep_requirements(protocol_id: str | None) -> dict:
         if prep is not None:
             items.append(reagent_prep_view(prep))
     return {"protocol_id": protocol_id, "items": items}
+
+
+def _protocol_texts(raw_protocol: dict) -> list:
+    """提取一份方案中可用于试剂识别的文本。"""
+
+    texts = [raw_protocol.get("title", "")]
+    for step in raw_protocol.get("steps", []):
+        texts.append(step.get("instruction", ""))
+        texts.append(step.get("title", ""))
+        texts.extend(step.get("terms", []) or [])
+    return [str(t) for t in texts if str(t).strip()]
+
+
+def _sync_prep_requirements_for_protocol(raw_protocol: dict) -> None:
+    """把方案中命中的试剂配置自动写入 prep_requirements 映射。"""
+
+    protocol_id = raw_protocol.get("protocol_id", "")
+    if not protocol_id:
+        return
+    texts = _protocol_texts(raw_protocol)
+    analysis = analyze_reagents(texts)
+    prep_ids = [item["reagent_prep_id"] for item in analysis["reagent_preps"]]
+
+    raw = json.loads(PREP_REQUIREMENTS_FILE.read_text(encoding="utf-8"))
+    requirements = raw.setdefault("requirements", {})
+    requirements[protocol_id] = prep_ids
+    PREP_REQUIREMENTS_FILE.write_text(
+        json.dumps(raw, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+
+def add_protocol_step(payload: dict) -> dict:
+    """在方案末尾追加一个大步骤，严格校验后落盘。"""
+
+    from src.core.protocol import ProtocolStep, ProtocolSubStep
+
+    protocol_id = payload["protocol_id"]
+    raw = json.loads(PROTOCOL_FILE.read_text(encoding="utf-8"))
+    target_protocol = None
+    for item in raw["protocols"]:
+        if item["protocol_id"] == protocol_id:
+            target_protocol = item
+            break
+    if target_protocol is None:
+        raise ValueError(f"找不到方案 {protocol_id}")
+
+    next_number = len(target_protocol["steps"]) + 1
+    step_data = {
+        "step_number": next_number,
+        "title": payload.get("title", ""),
+        "instruction": payload.get("instruction", ""),
+        "protocol_values": payload.get("protocol_values") or {},
+        "must_record": list(payload.get("must_record") or ()),
+        "terms": list(payload.get("terms") or ()),
+        "hazard_note": payload.get("hazard_note") or None,
+        "field_prompts": payload.get("field_prompts") or {},
+        "substeps": [
+            {"order": i, "text": x.get("text", ""), "note": x.get("note") or None}
+            for i, x in enumerate(payload.get("substeps") or [], start=1)
+            if str(x.get("text", "")).strip()
+        ],
+    }
+
+    ProtocolStep(
+        step_number=step_data["step_number"],
+        title=step_data["title"],
+        instruction=step_data["instruction"],
+        protocol_values=step_data["protocol_values"],
+        must_record=tuple(step_data["must_record"]),
+        terms=tuple(step_data["terms"]),
+        hazard_note=step_data["hazard_note"],
+        field_prompts=step_data["field_prompts"],
+        substeps=tuple(
+            ProtocolSubStep(order=x["order"], text=x["text"], note=x.get("note"))
+            for x in step_data["substeps"]
+        ),
+    )
+
+    target_protocol["steps"].append(step_data)
+    PROTOCOL_FILE.write_text(
+        json.dumps(raw, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+    global _protocol_store, _session
+    with _lock:
+        _protocol_store = None
+        if _session is not None and _session.selection.protocol is not None:
+            if _session.selection.protocol.protocol_id == protocol_id:
+                current = _session.step_number
+                _session = ProtocolSessionState.start(
+                    select_protocol(protocols(), protocol_id)
+                )
+                if current:
+                    _session = _session.jump_to(current)
+    return step_view(session())

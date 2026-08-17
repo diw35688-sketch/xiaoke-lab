@@ -5,12 +5,21 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 import domain
+import llm_bridge
 
 router = APIRouter(prefix="/reagent-prep", tags=["试剂配置库"])
 
 
 class UploadPayload(BaseModel):
     reagent_preps: list
+
+
+class AiDraftPayload(BaseModel):
+    text: str
+
+
+class SaveDraftPayload(BaseModel):
+    reagent_prep: dict
 
 
 @router.get("")
@@ -31,6 +40,24 @@ def read_reagent_prep(reagent_prep_id: str):
     if prep is None:
         raise HTTPException(status_code=404, detail="没有这种试剂配置。")
     return domain.reagent_prep_view(prep)
+
+
+@router.post("/ai-draft")
+def ai_draft(payload: AiDraftPayload):
+    """用户粘贴/上传文字，AI 生成试剂配置草稿，不落盘。"""
+    try:
+        return llm_bridge.generate_reagent_prep_draft(payload.text)
+    except Exception as error:
+        raise HTTPException(status_code=400, detail=str(error))
+
+
+@router.post("/save-draft")
+def save_draft(payload: SaveDraftPayload):
+    """确认保存 AI 生成的试剂配置草稿。"""
+    try:
+        return domain.add_reagent_prep(payload.reagent_prep)
+    except Exception as error:
+        raise HTTPException(status_code=400, detail=str(error))
 
 
 @router.post("/upload")

@@ -3794,3 +3794,16 @@ Codex 向大型 markdown 文档追加中文内容时会把中文写成 `?`（源
   把“准备材料”建模成独立数据对象后，LLM 才能在选择方案后调用工具说出“先配什么”，
   用户也能在 UI 里维护配方。上传接口保留用户自己维护库的能力，严格校验后落盘。
 - **验收**：新增 12 项测试；全量 `Ran 766 tests ... OK`。
+
+## 2026-08-16：文字生成结构化 JSON + 试剂自动识别——用户只负责描述，系统负责契约
+
+- **问题**：用户不想手写 JSON，也不该手写；试剂配置和实验方案最好从自然语言直接生成，
+  并且方案里提到的试剂要自动被危化品库和试剂配置库识别、关联。
+- **修复**：新增 `POST /reagent-prep/ai-draft` 和 `POST /protocols/ai-draft`；
+  `domain.analyze_reagents` 用最长名优先匹配危化品和试剂配置；
+  `domain.add_protocol` 保存时自动把命中的试剂配置写入 `prep_requirements.json`；
+  `POST /protocols/step` 支持追加实验步骤。
+- **知识点：AI 生成草稿，但落盘必须过严格契约**。模型只负责把文字变成候选 JSON，
+  真正写库前仍走 `ReagentPrep.from_dict` / `ProtocolStore._parse_protocol` 的严格校验。
+  生成和校验分离，模型不会破坏数据库。
+- **验收**：新增 2 项测试；全量 `Ran 768 tests ... OK`。
