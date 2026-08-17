@@ -4380,6 +4380,793 @@
       "review_status": "UNREVIEWED",
       "reviewed_by": null,
       "fetch_errors": []
+    },
+    {
+      "name_zh": "磷酸二氢钾",
+      "name_en": "potassium dihydrogen phosphate",
+      "cas": "7778-77-0",
+      "molecular_formula": "H2KO4P",
+      "molecular_weight": "136.09",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": null,
+        "pictograms": [],
+        "hazard_codes": [],
+        "hazard_statements_zh": [],
+        "unmapped_codes": [],
+        "precautionary_codes": []
+      },
+      "critical_codes": [],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": null,
+        "fetched_at": null,
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "氯化钙",
+      "name_en": "calcium chloride",
+      "cas": "10043-52-4",
+      "molecular_formula": "CaCl2",
+      "molecular_weight": "110.98",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Warning",
+        "pictograms": [],
+        "hazard_codes": [
+          "H319"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H319",
+            "text": "造成严重眼刺激"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": []
+      },
+      "critical_codes": [],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": null,
+        "fetched_at": null,
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "硫酸镁",
+      "name_en": "magnesium sulfate",
+      "cas": "7487-88-9",
+      "molecular_formula": "MgO4S",
+      "molecular_weight": "120.37",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": null,
+        "pictograms": [],
+        "hazard_codes": [],
+        "hazard_statements_zh": [],
+        "unmapped_codes": [],
+        "precautionary_codes": []
+      },
+      "critical_codes": [],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": null,
+        "fetched_at": null,
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "琼脂糖",
+      "name_en": "agarose",
+      "cas": "9012-36-6",
+      "molecular_formula": null,
+      "molecular_weight": null,
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": null,
+        "pictograms": [],
+        "hazard_codes": [],
+        "hazard_statements_zh": [],
+        "unmapped_codes": [],
+        "precautionary_codes": []
+      },
+      "critical_codes": [],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": null,
+        "fetched_at": null,
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "甘氨酸",
+      "name_en": "glycine",
+      "cas": "56-40-6",
+      "molecular_formula": "C2H5NO2",
+      "molecular_weight": "75.07",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": null,
+        "pictograms": [],
+        "hazard_codes": [],
+        "hazard_statements_zh": [],
+        "unmapped_codes": [],
+        "precautionary_codes": []
+      },
+      "critical_codes": [],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": null,
+        "fetched_at": null,
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "Tris",
+      "name_en": "tris(hydroxymethyl)aminomethane",
+      "cas": "77-86-1",
+      "molecular_formula": "C4H11NO3",
+      "molecular_weight": "121.14",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Warning",
+        "pictograms": [],
+        "hazard_codes": [
+          "H315",
+          "H319",
+          "H335"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H315",
+            "text": "造成皮肤刺激"
+          },
+          {
+            "code": "H319",
+            "text": "造成严重眼刺激"
+          },
+          {
+            "code": "H335",
+            "text": "可能引起呼吸道刺激"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": []
+      },
+      "critical_codes": [],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": null,
+        "fetched_at": null,
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "SDS",
+      "name_en": "sodium dodecyl sulfate",
+      "cas": "151-21-3",
+      "molecular_formula": "C12H25NaO4S",
+      "molecular_weight": "288.38",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [],
+        "hazard_codes": [
+          "H228",
+          "H302",
+          "H311",
+          "H315",
+          "H319",
+          "H335"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H228",
+            "text": "H228"
+          },
+          {
+            "code": "H302",
+            "text": "吞咽有害"
+          },
+          {
+            "code": "H311",
+            "text": "皮肤接触有毒"
+          },
+          {
+            "code": "H315",
+            "text": "造成皮肤刺激"
+          },
+          {
+            "code": "H319",
+            "text": "造成严重眼刺激"
+          },
+          {
+            "code": "H335",
+            "text": "可能引起呼吸道刺激"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": []
+      },
+      "critical_codes": [],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": null,
+        "fetched_at": null,
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "过硫酸铵",
+      "name_en": "ammonium persulfate",
+      "cas": "7727-54-0",
+      "molecular_formula": "H8N2O8S2",
+      "molecular_weight": "228.20",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [],
+        "hazard_codes": [
+          "H272",
+          "H302",
+          "H319",
+          "H335"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H272",
+            "text": "可能加剧燃烧；氧化性"
+          },
+          {
+            "code": "H302",
+            "text": "吞咽有害"
+          },
+          {
+            "code": "H319",
+            "text": "造成严重眼刺激"
+          },
+          {
+            "code": "H335",
+            "text": "可能引起呼吸道刺激"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": []
+      },
+      "critical_codes": [],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": null,
+        "fetched_at": null,
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "TEMED",
+      "name_en": "N,N,N',N'-tetramethylethylenediamine",
+      "cas": "110-18-9",
+      "molecular_formula": "C6H16N2",
+      "molecular_weight": "116.20",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [],
+        "hazard_codes": [
+          "H225",
+          "H302",
+          "H314",
+          "H332"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H225",
+            "text": "高度易燃液体和蒸气"
+          },
+          {
+            "code": "H302",
+            "text": "吞咽有害"
+          },
+          {
+            "code": "H314",
+            "text": "造成严重皮肤灼伤和眼损伤"
+          },
+          {
+            "code": "H332",
+            "text": "吸入有害"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": []
+      },
+      "critical_codes": [
+        "H314"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": null,
+        "fetched_at": null,
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "丙烯酰胺",
+      "name_en": "acrylamide",
+      "cas": "79-06-1",
+      "molecular_formula": "C3H5NO",
+      "molecular_weight": "71.08",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [],
+        "hazard_codes": [
+          "H302",
+          "H312",
+          "H315",
+          "H319",
+          "H340",
+          "H350",
+          "H361"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H302",
+            "text": "吞咽有害"
+          },
+          {
+            "code": "H312",
+            "text": "皮肤接触有害"
+          },
+          {
+            "code": "H315",
+            "text": "造成皮肤刺激"
+          },
+          {
+            "code": "H319",
+            "text": "造成严重眼刺激"
+          },
+          {
+            "code": "H340",
+            "text": "可能引起遗传缺陷"
+          },
+          {
+            "code": "H350",
+            "text": "可能致癌"
+          },
+          {
+            "code": "H361",
+            "text": "怀疑可能对生育能力或胎儿造成伤害"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": []
+      },
+      "critical_codes": [
+        "H340",
+        "H350"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": null,
+        "fetched_at": null,
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "甲叉双丙烯酰胺",
+      "name_en": "N,N'-methylenebisacrylamide",
+      "cas": "110-26-9",
+      "molecular_formula": "C7H10N2O2",
+      "molecular_weight": "154.17",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Warning",
+        "pictograms": [],
+        "hazard_codes": [
+          "H302",
+          "H319"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H302",
+            "text": "吞咽有害"
+          },
+          {
+            "code": "H319",
+            "text": "造成严重眼刺激"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": []
+      },
+      "critical_codes": [],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": null,
+        "fetched_at": null,
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "考马斯亮蓝G-250",
+      "name_en": "Coomassie Brilliant Blue G-250",
+      "cas": "6104-58-1",
+      "molecular_formula": "C47H48N3NaO7S2",
+      "molecular_weight": "854.02",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Warning",
+        "pictograms": [],
+        "hazard_codes": [
+          "H315",
+          "H319",
+          "H335"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H315",
+            "text": "造成皮肤刺激"
+          },
+          {
+            "code": "H319",
+            "text": "造成严重眼刺激"
+          },
+          {
+            "code": "H335",
+            "text": "可能引起呼吸道刺激"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": []
+      },
+      "critical_codes": [],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": null,
+        "fetched_at": null,
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "考马斯亮蓝R-250",
+      "name_en": "Coomassie Brilliant Blue R-250",
+      "cas": "6104-59-2",
+      "molecular_formula": "C45H44N3NaO7S2",
+      "molecular_weight": "825.97",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Warning",
+        "pictograms": [],
+        "hazard_codes": [
+          "H315",
+          "H319",
+          "H335"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H315",
+            "text": "造成皮肤刺激"
+          },
+          {
+            "code": "H319",
+            "text": "造成严重眼刺激"
+          },
+          {
+            "code": "H335",
+            "text": "可能引起呼吸道刺激"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": []
+      },
+      "critical_codes": [],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": null,
+        "fetched_at": null,
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "氯仿",
+      "name_en": "chloroform",
+      "cas": "67-66-3",
+      "molecular_formula": "CHCl3",
+      "molecular_weight": "119.38",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [],
+        "hazard_codes": [
+          "H302",
+          "H315",
+          "H331",
+          "H351",
+          "H361",
+          "H372"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H302",
+            "text": "吞咽有害"
+          },
+          {
+            "code": "H315",
+            "text": "造成皮肤刺激"
+          },
+          {
+            "code": "H331",
+            "text": "吸入有毒"
+          },
+          {
+            "code": "H351",
+            "text": "怀疑可能致癌"
+          },
+          {
+            "code": "H361",
+            "text": "怀疑可能对生育能力或胎儿造成伤害"
+          },
+          {
+            "code": "H372",
+            "text": "长期或反复接触对器官造成损害"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": []
+      },
+      "critical_codes": [
+        "H372"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": null,
+        "fetched_at": null,
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "过氧化氢",
+      "name_en": "hydrogen peroxide",
+      "cas": "7722-84-1",
+      "molecular_formula": "H2O2",
+      "molecular_weight": "34.01",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [],
+        "hazard_codes": [
+          "H271",
+          "H302",
+          "H314",
+          "H332",
+          "H335"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H271",
+            "text": "可能引起火灾或爆炸；强氧化性"
+          },
+          {
+            "code": "H302",
+            "text": "吞咽有害"
+          },
+          {
+            "code": "H314",
+            "text": "造成严重皮肤灼伤和眼损伤"
+          },
+          {
+            "code": "H332",
+            "text": "吸入有害"
+          },
+          {
+            "code": "H335",
+            "text": "可能引起呼吸道刺激"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": []
+      },
+      "critical_codes": [
+        "H314"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": null,
+        "fetched_at": null,
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "次氯酸钠",
+      "name_en": "sodium hypochlorite",
+      "cas": "7681-52-9",
+      "molecular_formula": "ClNaO",
+      "molecular_weight": "74.44",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [],
+        "hazard_codes": [
+          "H314",
+          "H400"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H314",
+            "text": "造成严重皮肤灼伤和眼损伤"
+          },
+          {
+            "code": "H400",
+            "text": "对水生生物毒性极大"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": []
+      },
+      "critical_codes": [
+        "H314"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": null,
+        "fetched_at": null,
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "氨苄青霉素",
+      "name_en": "ampicillin",
+      "cas": "69-53-4",
+      "molecular_formula": "C16H19N3O4S",
+      "molecular_weight": "349.40",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [],
+        "hazard_codes": [
+          "H317",
+          "H334"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H317",
+            "text": "可能引起皮肤过敏反应"
+          },
+          {
+            "code": "H334",
+            "text": "吸入可能引起过敏或哮喘症状或呼吸困难"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": []
+      },
+      "critical_codes": [],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": null,
+        "fetched_at": null,
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "卡那霉素",
+      "name_en": "kanamycin",
+      "cas": "25389-94-0",
+      "molecular_formula": "C18H36N4O11",
+      "molecular_weight": "484.50",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Warning",
+        "pictograms": [],
+        "hazard_codes": [
+          "H317"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H317",
+            "text": "可能引起皮肤过敏反应"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": []
+      },
+      "critical_codes": [],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": null,
+        "fetched_at": null,
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
+    },
+    {
+      "name_zh": "氯霉素",
+      "name_en": "chloramphenicol",
+      "cas": "56-75-7",
+      "molecular_formula": "C11H12Cl2N2O5",
+      "molecular_weight": "323.13",
+      "data_status": "CLASSIFIED",
+      "ghs": {
+        "signal_word": "Danger",
+        "pictograms": [],
+        "hazard_codes": [
+          "H350"
+        ],
+        "hazard_statements_zh": [
+          {
+            "code": "H350",
+            "text": "可能致癌"
+          }
+        ],
+        "unmapped_codes": [],
+        "precautionary_codes": []
+      },
+      "critical_codes": [
+        "H350"
+      ],
+      "provenance": {
+        "source": "PubChem (NIH) PUG REST / PUG-View",
+        "url": null,
+        "fetched_at": null,
+        "hazard_statement_zh_basis": "GB 30000 系列（我国采纳的 GHS 国家标准）"
+      },
+      "review_status": "UNREVIEWED",
+      "reviewed_by": null,
+      "fetch_errors": []
     }
   ]
 }

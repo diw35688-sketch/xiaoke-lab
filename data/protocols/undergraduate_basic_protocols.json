@@ -863,6 +863,699 @@
           }
         }
       ]
+    },
+    {
+      "protocol_id": "bradford-protein-assay",
+      "title": "Bradford 法蛋白浓度测定",
+      "source": "本科实验教学通用方案整理",
+      "version": "1.0",
+      "schema_version": 1,
+      "steps": [
+        {
+          "step_number": 1,
+          "title": "准备标准品",
+          "instruction": "用牛血清白蛋白（BSA）配制系列浓度标准品，并对待测样品做适当稀释。",
+          "protocol_values": {
+            "action": "稀释",
+            "object": "BSA 标准品"
+          },
+          "must_record": [
+            "observation"
+          ],
+          "terms": [
+            "BSA",
+            "标准曲线"
+          ],
+          "hazard_note": "避免产生气泡。",
+          "field_prompts": {
+            "observation": "标准品和样品稀释后的状态如何？"
+          },
+          "substeps": []
+        },
+        {
+          "step_number": 2,
+          "title": "加入显色液",
+          "instruction": "在标准品和样品中加入 Bradford 工作液，混匀后室温静置反应。",
+          "protocol_values": {
+            "action": "加入",
+            "object": "Bradford 工作液"
+          },
+          "must_record": [
+            "duration"
+          ],
+          "terms": [
+            "Bradford 工作液"
+          ],
+          "hazard_note": "考马斯亮蓝染液避免接触皮肤。",
+          "field_prompts": {
+            "duration": "室温反应了多少分钟？"
+          },
+          "substeps": []
+        },
+        {
+          "step_number": 3,
+          "title": "测定吸光度",
+          "instruction": "用分光光度计在 595 nm 处测定各管吸光度。",
+          "protocol_values": {
+            "action": "测定",
+            "instrument": "分光光度计",
+            "condition": "595 nm"
+          },
+          "must_record": [
+            "condition"
+          ],
+          "terms": [
+            "分光光度计",
+            "595 nm"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "condition": "实际测定波长是多少？"
+          },
+          "substeps": []
+        },
+        {
+          "step_number": 4,
+          "title": "计算浓度",
+          "instruction": "绘制标准曲线，根据样品吸光度计算蛋白浓度。",
+          "protocol_values": {
+            "action": "计算",
+            "object": "蛋白浓度"
+          },
+          "must_record": [
+            "observation"
+          ],
+          "terms": [
+            "标准曲线"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "observation": "样品蛋白浓度计算结果是多少？"
+          },
+          "substeps": []
+        }
+      ]
+    },
+    {
+      "protocol_id": "plasmid-dna-miniprep",
+      "title": "质粒 DNA 提取（碱裂解法，教学简化）",
+      "source": "本科实验教学通用方案整理",
+      "version": "1.0",
+      "schema_version": 1,
+      "steps": [
+        {
+          "step_number": 1,
+          "title": "收集菌体",
+          "instruction": "取培养好的菌液离心收集菌体，弃上清。",
+          "protocol_values": {
+            "action": "离心",
+            "object": "菌液"
+          },
+          "must_record": [
+            "duration",
+            "condition"
+          ],
+          "terms": [
+            "离心机",
+            "菌体"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "duration": "离心了多少分钟？",
+            "condition": "离心转速是多少？"
+          },
+          "substeps": []
+        },
+        {
+          "step_number": 2,
+          "title": "重悬菌体",
+          "instruction": "加入重悬缓冲液充分重悬菌体。",
+          "protocol_values": {
+            "action": "重悬",
+            "object": "菌体"
+          },
+          "must_record": [
+            "observation"
+          ],
+          "terms": [
+            "重悬缓冲液"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "observation": "菌体是否完全重悬？"
+          },
+          "substeps": []
+        },
+        {
+          "step_number": 3,
+          "title": "裂解",
+          "instruction": "加入裂解缓冲液，温和颠倒混匀，使菌体裂解。",
+          "protocol_values": {
+            "action": "裂解",
+            "object": "菌体"
+          },
+          "must_record": [
+            "duration"
+          ],
+          "terms": [
+            "裂解缓冲液"
+          ],
+          "hazard_note": "裂解时间不宜过长。",
+          "field_prompts": {
+            "duration": "裂解了多长时间？"
+          },
+          "substeps": []
+        },
+        {
+          "step_number": 4,
+          "title": "中和沉淀",
+          "instruction": "加入中和缓冲液，颠倒混匀后离心沉淀蛋白和基因组 DNA。",
+          "protocol_values": {
+            "action": "中和",
+            "object": "裂解液"
+          },
+          "must_record": [
+            "condition"
+          ],
+          "terms": [
+            "中和缓冲液",
+            "离心机"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "condition": "离心转速和时间是多少？"
+          },
+          "substeps": []
+        },
+        {
+          "step_number": 5,
+          "title": "过柱纯化",
+          "instruction": "将上清过吸附柱，洗涤后洗脱质粒 DNA。",
+          "protocol_values": {
+            "action": "纯化",
+            "object": "质粒 DNA"
+          },
+          "must_record": [
+            "observation"
+          ],
+          "terms": [
+            "吸附柱",
+            "洗脱液"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "observation": "洗脱液是否澄清？"
+          },
+          "substeps": []
+        },
+        {
+          "step_number": 6,
+          "title": "保存",
+          "instruction": "将洗脱得到的质粒 DNA 分装保存，并记录体积。",
+          "protocol_values": {
+            "action": "保存",
+            "object": "质粒 DNA"
+          },
+          "must_record": [
+            "amount_value",
+            "condition"
+          ],
+          "terms": [
+            "保存条件"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "amount_value": "得到多少体积的质粒 DNA？",
+            "condition": "保存在什么温度条件下？"
+          },
+          "substeps": []
+        }
+      ]
+    },
+    {
+      "protocol_id": "gram-staining",
+      "title": "细菌革兰氏染色",
+      "source": "本科实验教学通用方案整理",
+      "version": "1.0",
+      "schema_version": 1,
+      "steps": [
+        {
+          "step_number": 1,
+          "title": "制片",
+          "instruction": "取少量菌液涂片，干燥后热固定。",
+          "protocol_values": {
+            "action": "涂片",
+            "object": "菌液"
+          },
+          "must_record": [
+            "observation"
+          ],
+          "terms": [
+            "载玻片",
+            "热固定"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "observation": "涂片是否均匀？"
+          },
+          "substeps": []
+        },
+        {
+          "step_number": 2,
+          "title": "初染",
+          "instruction": "滴加结晶紫染液染色，水洗。",
+          "protocol_values": {
+            "action": "染色",
+            "object": "结晶紫"
+          },
+          "must_record": [
+            "duration"
+          ],
+          "terms": [
+            "结晶紫"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "duration": "结晶紫染色了多少分钟？"
+          },
+          "substeps": []
+        },
+        {
+          "step_number": 3,
+          "title": "媒染",
+          "instruction": "滴加碘液媒染，水洗。",
+          "protocol_values": {
+            "action": "媒染",
+            "object": "碘液"
+          },
+          "must_record": [
+            "duration"
+          ],
+          "terms": [
+            "碘液"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "duration": "碘液媒染了多少分钟？"
+          },
+          "substeps": []
+        },
+        {
+          "step_number": 4,
+          "title": "脱色",
+          "instruction": "用 95% 乙醇或丙酮脱色，水洗。",
+          "protocol_values": {
+            "action": "脱色",
+            "object": "乙醇"
+          },
+          "must_record": [
+            "duration"
+          ],
+          "terms": [
+            "乙醇",
+            "丙酮"
+          ],
+          "hazard_note": "脱色时间过长会导致假阴性。",
+          "field_prompts": {
+            "duration": "脱色进行了多少秒？"
+          },
+          "substeps": []
+        },
+        {
+          "step_number": 5,
+          "title": "复染",
+          "instruction": "滴加番红染液复染，水洗吸干后镜检。",
+          "protocol_values": {
+            "action": "复染",
+            "object": "番红"
+          },
+          "must_record": [
+            "duration",
+            "observation"
+          ],
+          "terms": [
+            "番红",
+            "显微镜"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "duration": "复染了多少分钟？",
+            "observation": "镜检结果是什么颜色？"
+          },
+          "substeps": []
+        }
+      ]
+    },
+    {
+      "protocol_id": "elisa-teaching",
+      "title": "ELISA 酶联免疫吸附实验（教学简化）",
+      "source": "本科实验教学通用方案整理",
+      "version": "1.0",
+      "schema_version": 1,
+      "steps": [
+        {
+          "step_number": 1,
+          "title": "包被",
+          "instruction": "用包被缓冲液稀释抗原，加入酶标板孔中，4°C 过夜包被。",
+          "protocol_values": {
+            "action": "包被",
+            "object": "抗原"
+          },
+          "must_record": [
+            "duration",
+            "condition"
+          ],
+          "terms": [
+            "包被缓冲液",
+            "酶标板"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "duration": "包被了多长时间？",
+            "condition": "包被温度是多少？"
+          },
+          "substeps": []
+        },
+        {
+          "step_number": 2,
+          "title": "洗涤",
+          "instruction": "弃包被液，用 PBST 洗涤酶标板。",
+          "protocol_values": {
+            "action": "洗涤",
+            "object": "酶标板"
+          },
+          "must_record": [
+            "observation"
+          ],
+          "terms": [
+            "PBST"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "observation": "洗涤是否充分？"
+          },
+          "substeps": []
+        },
+        {
+          "step_number": 3,
+          "title": "封闭",
+          "instruction": "加入封闭液，室温封闭。",
+          "protocol_values": {
+            "action": "封闭",
+            "object": "酶标板"
+          },
+          "must_record": [
+            "duration"
+          ],
+          "terms": [
+            "封闭液"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "duration": "封闭了多长时间？"
+          },
+          "substeps": []
+        },
+        {
+          "step_number": 4,
+          "title": "加样孵育",
+          "instruction": "加入待测样品或标准品，孵育后洗涤。",
+          "protocol_values": {
+            "action": "加样",
+            "object": "样品"
+          },
+          "must_record": [
+            "duration",
+            "condition"
+          ],
+          "terms": [
+            "孵育"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "duration": "孵育了多长时间？",
+            "condition": "孵育温度是多少？"
+          },
+          "substeps": []
+        },
+        {
+          "step_number": 5,
+          "title": "加酶标抗体",
+          "instruction": "加入酶标抗体，孵育后洗涤。",
+          "protocol_values": {
+            "action": "加样",
+            "object": "酶标抗体"
+          },
+          "must_record": [
+            "duration"
+          ],
+          "terms": [
+            "酶标抗体"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "duration": "酶标抗体孵育了多长时间？"
+          },
+          "substeps": []
+        },
+        {
+          "step_number": 6,
+          "title": "显色读数",
+          "instruction": "加入底物显色，终止后用酶标仪读数。",
+          "protocol_values": {
+            "action": "显色",
+            "object": "底物"
+          },
+          "must_record": [
+            "duration",
+            "condition"
+          ],
+          "terms": [
+            "底物",
+            "酶标仪"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "duration": "显色了多少分钟？",
+            "condition": "酶标仪读数波长是多少？"
+          },
+          "substeps": []
+        }
+      ]
+    },
+    {
+      "protocol_id": "ctab-dna-extraction",
+      "title": "植物基因组 DNA 提取（CTAB 法教学简化）",
+      "source": "本科实验教学通用方案整理",
+      "version": "1.0",
+      "schema_version": 1,
+      "steps": [
+        {
+          "step_number": 1,
+          "title": "研磨",
+          "instruction": "取植物材料液氮研磨成细粉。",
+          "protocol_values": {
+            "action": "研磨",
+            "object": "植物材料"
+          },
+          "must_record": [
+            "observation"
+          ],
+          "terms": [
+            "液氮",
+            "研钵"
+          ],
+          "hazard_note": "液氮操作注意防冻伤。",
+          "field_prompts": {
+            "observation": "研磨是否充分？"
+          },
+          "substeps": []
+        },
+        {
+          "step_number": 2,
+          "title": "裂解",
+          "instruction": "加入 CTAB 裂解缓冲液，混匀后水浴裂解。",
+          "protocol_values": {
+            "action": "裂解",
+            "object": "植物材料"
+          },
+          "must_record": [
+            "duration",
+            "condition"
+          ],
+          "terms": [
+            "CTAB",
+            "水浴"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "duration": "水浴裂解了多长时间？",
+            "condition": "水浴温度是多少？"
+          },
+          "substeps": []
+        },
+        {
+          "step_number": 3,
+          "title": "抽提",
+          "instruction": "用氯仿-异戊醇抽提，离心取上清。",
+          "protocol_values": {
+            "action": "抽提",
+            "object": "裂解液"
+          },
+          "must_record": [
+            "condition"
+          ],
+          "terms": [
+            "氯仿",
+            "异戊醇",
+            "离心机"
+          ],
+          "hazard_note": "氯仿有毒，通风橱操作。",
+          "field_prompts": {
+            "condition": "离心转速和时间是多少？"
+          },
+          "substeps": []
+        },
+        {
+          "step_number": 4,
+          "title": "沉淀",
+          "instruction": "加入异丙醇沉淀 DNA，离心弃上清。",
+          "protocol_values": {
+            "action": "沉淀",
+            "object": "DNA"
+          },
+          "must_record": [
+            "condition"
+          ],
+          "terms": [
+            "异丙醇",
+            "离心机"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "condition": "离心转速和时间是多少？"
+          },
+          "substeps": []
+        },
+        {
+          "step_number": 5,
+          "title": "洗涤溶解",
+          "instruction": "用 70% 乙醇洗涤沉淀，干燥后加 TE 缓冲液溶解。",
+          "protocol_values": {
+            "action": "溶解",
+            "object": "DNA"
+          },
+          "must_record": [
+            "amount_value",
+            "observation"
+          ],
+          "terms": [
+            "乙醇",
+            "TE 缓冲液"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "amount_value": "加入多少体积 TE 溶解？",
+            "observation": "沉淀是否完全溶解？"
+          },
+          "substeps": []
+        }
+      ]
+    },
+    {
+      "protocol_id": "sds-page",
+      "title": "SDS-PAGE 蛋白电泳（教学简化）",
+      "source": "本科实验教学通用方案整理",
+      "version": "1.0",
+      "schema_version": 1,
+      "steps": [
+        {
+          "step_number": 1,
+          "title": "制胶",
+          "instruction": "配制分离胶和浓缩胶，插入梳子等待凝固。",
+          "protocol_values": {
+            "action": "制胶",
+            "object": "聚丙烯酰胺凝胶"
+          },
+          "must_record": [
+            "observation"
+          ],
+          "terms": [
+            "分离胶",
+            "浓缩胶",
+            "APS",
+            "TEMED"
+          ],
+          "hazard_note": "丙烯酰胺未聚合时有神经毒性。",
+          "field_prompts": {
+            "observation": "凝胶是否凝固完全？"
+          },
+          "substeps": []
+        },
+        {
+          "step_number": 2,
+          "title": "上样",
+          "instruction": "将蛋白样品与上样缓冲液混合变性后，加入凝胶孔。",
+          "protocol_values": {
+            "action": "上样",
+            "object": "蛋白样品"
+          },
+          "must_record": [
+            "amount_value"
+          ],
+          "terms": [
+            "上样缓冲液"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "amount_value": "每孔上样体积是多少？"
+          },
+          "substeps": []
+        },
+        {
+          "step_number": 3,
+          "title": "电泳",
+          "instruction": "连接电泳仪，先低压后高压进行电泳。",
+          "protocol_values": {
+            "action": "电泳",
+            "object": "蛋白样品"
+          },
+          "must_record": [
+            "condition",
+            "duration"
+          ],
+          "terms": [
+            "电泳仪"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "condition": "电泳电压是多少？",
+            "duration": "电泳进行了多长时间？"
+          },
+          "substeps": []
+        },
+        {
+          "step_number": 4,
+          "title": "染色脱色",
+          "instruction": "取出凝胶，考马斯亮蓝染色后脱色至条带清晰。",
+          "protocol_values": {
+            "action": "染色",
+            "object": "凝胶"
+          },
+          "must_record": [
+            "observation"
+          ],
+          "terms": [
+            "考马斯亮蓝",
+            "脱色液"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "observation": "条带是否清晰？"
+          },
+          "substeps": []
+        }
+      ]
     }
   ]
 }
