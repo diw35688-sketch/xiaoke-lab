@@ -3,19 +3,24 @@
   var PANEL_HTML = [
     '<div id="settings-modal" class="settings-mask">',
     '  <div class="settings-box">',
-    '    <header class="settings-head"><h2>模型设置</h2>',
+    '    <header class="settings-head"><h2>模型与语音服务</h2>',
     '      <button id="settings-close" title="close">x</button></header>',
     '    <div id="settings-status" class="settings-status"></div>',
+    '    <div style="font-size:13px;font-weight:700;color:#0f172a;margin:18px 0 10px">文字模型</div>',
     '    <label class="settings-field"><span>服务商预设</span>',
     '      <select id="settings-preset"></select>',
     '      <em>选择后自动填好地址和模型名，也可以选自定义手动填。</em></label>',
     '    <label class="settings-field"><span>接口地址 Base URL</span>',
     '      <input id="settings-base-url" type="text" /></label>',
     '    <label class="settings-field"><span>模型名称</span>',
-    '      <input id="settings-model" type="text" /></label>',
+    '      <div class="model-row"><input id="settings-model" type="text" list="settings-model-list" />',
+    '        <button id="settings-fetch-models" class="ghost" type="button">拉取模型</button></div>',
+    '      <datalist id="settings-model-list"></datalist>',
+    '      <em id="settings-models-msg" style="display:block;font-style:normal;font-size:12px;color:#64748b;margin-top:5px"></em></label>',
     '    <label class="settings-field"><span>API 密钥</span>',
     '      <input id="settings-key" type="password" autocomplete="off" />',
     '      <em>密钥只保存在本机服务器，页面上始终以掩码显示。</em></label>',
+    '    <div style="font-size:13px;font-weight:700;color:#0f172a;margin:18px 0 10px">语音模型</div>',
     '    <label class="settings-field settings-inline">',
     '      <input id="settings-tts" type="checkbox" />',
     '      <span>启用语音播报（需本机 TTS 服务在 8001 端口运行）</span></label>',
@@ -45,6 +50,9 @@
     '.settings-inline input{width:auto}',
     '.settings-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}',
     '.settings-actions button{padding:9px 18px;border-radius:9px;font-size:14px;cursor:pointer;border:1px solid transparent;font-family:inherit}',
+    '.model-row{display:flex;gap:8px}',
+    '.model-row input{flex:1}',
+    '.model-row button{white-space:nowrap;padding:9px 12px;border-radius:9px;border:1px solid #cbd5e1;background:#fff;color:#334155;cursor:pointer;font-size:13px;font-family:inherit}',
     '.settings-actions .ghost{background:#fff;border-color:#cbd5e1;color:#334155}',
     '.settings-actions .primary{background:#2563eb;color:#fff}',
     '.settings-result{font-size:13px;margin:14px 0 0;min-height:19px}',
@@ -137,6 +145,31 @@
         el('settings-base-url').value = p.base_url;
         el('settings-model').value = p.model;
       }
+    };
+    el('settings-fetch-models').onclick = function () {
+      var button = el('settings-fetch-models');
+      var msg = el('settings-models-msg');
+      button.disabled = true;
+      msg.textContent = '正在拉取模型列表…';
+      var payload = {
+        base_url: el('settings-base-url').value.trim(),
+        api_key: el('settings-key').value.trim()
+      };
+      fetch('/settings/models', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+        .then(function (res) {
+          if (!res.ok) { msg.textContent = res.d.detail || '拉取失败'; return; }
+          var list = res.d.models || [];
+          el('settings-model-list').innerHTML = list.map(function (m) {
+            return '<option value="' + m + '">';
+          }).join('');
+          msg.textContent = '拉到 ' + list.length + ' 个模型，输入框会自动补全';
+        })
+        .catch(function (err) { msg.textContent = String(err); })
+        .then(function () { button.disabled = false; });
     };
     el('settings-test').onclick = function () {
       var button = el('settings-test');
