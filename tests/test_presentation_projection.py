@@ -242,6 +242,29 @@ class ObservationProjectionTests(unittest.TestCase):
         )
         self.assertEqual(messages[0].args["display_number"], 2)
 
+
+    def test_confirm_with_remaining_fields_projects_confirmation_ack(self):
+        observation = _observation(
+            clarification_action="confirm",
+            executed=True,
+            pending_action=_update_action(
+                ClarificationActionType.CONFIRM, display_number=2
+            ),
+            answer_remaining_fields=("duration",),
+            answer_resolved=False,
+        )
+
+        messages = messages_for_observation(
+            observation, experiment_step_number=0
+        )
+
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(
+            messages[0].args["result"], ConfirmationAckResult.CONFIRMED
+        )
+        self.assertEqual(messages[0].args["remaining_fields"], ("duration",))
+        self.assertFalse(messages[0].args["resolved"])
+
     def test_defer_projects_deferred(self):
         observation = _observation(
             clarification_action="defer",

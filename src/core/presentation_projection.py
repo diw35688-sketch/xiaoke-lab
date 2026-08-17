@@ -111,6 +111,8 @@ def messages_for_observation(
                     observation,
                     ConfirmationAckResult.CONFIRMED,
                     display_number=pending.target_display_number,
+                    remaining_fields=observation.answer_remaining_fields,
+                    resolved=observation.answer_resolved,
                 )
             )
         elif action == "defer" and pending is not None:
@@ -196,7 +198,10 @@ def _confirmation_ack(
         "result": result,
         "display_number": display_number,
     }
-    if result == ConfirmationAckResult.ANSWERED:
+    if result in {
+        ConfirmationAckResult.ANSWERED,
+        ConfirmationAckResult.CONFIRMED,
+    }:
         args["remaining_fields"] = remaining_fields
         args["resolved"] = resolved
     return PresentationIntent(

@@ -194,11 +194,29 @@ def _copy_confirmation_ack(intent: PresentationIntent, ui_mode: str) -> str:
     display_number = _require_positive_int(intent.args, "display_number")
 
     if result == ConfirmationAckResult.CONFIRMED:
-        base = f"已确认问题 {display_number}"
+        base = _copy_confirmed(display_number, intent.args)
     else:
         base = _copy_answered(display_number, intent.args)
 
     return _with_source(base, intent, ui_mode)
+
+
+def _copy_confirmed(display_number: int, args: Mapping[str, object]) -> str:
+    resolved = args.get("resolved", False)
+    if not isinstance(resolved, bool):
+        raise ValueError("CONFIRMED 的 resolved 必须是布尔值。")
+    remaining_fields = args.get("remaining_fields", ())
+    if not _is_field_tuple(remaining_fields):
+        raise ValueError(
+            "CONFIRMED 的 remaining_fields 必须是字段名字符串元组。"
+        )
+
+    if resolved:
+        return f"已确认并补充问题 {display_number}，问题已解决"
+    if remaining_fields:
+        labels = "、".join(_translate_fields(remaining_fields))
+        return f"已确认问题 {display_number}，仍需补充：{labels}"
+    return f"已确认问题 {display_number}"
 
 
 def _copy_answered(display_number: int, args: Mapping[str, object]) -> str:
