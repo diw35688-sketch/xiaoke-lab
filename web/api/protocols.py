@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 """实验方案接口：选方案、走步骤、按方案做确定性判断与安全提示。"""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
 import domain
 import llm_bridge
+import ocr_bridge
+import settings_store
 
 router = APIRouter(prefix="/protocols", tags=["实验方案"])
 
@@ -68,6 +70,30 @@ def save_draft(payload: SaveDraftPayload):
     except Exception as error:
         raise HTTPException(status_code=400, detail=f"保存方案失败：{error}")
     return {"ok": True, "protocol": saved}
+
+
+@router.post("/upload-file")
+async def upload_file(file: UploadFile = File(...)):
+    """上传 PDF/图片版 Protocol，OCR 后拆成多份结构化方案草稿。"""
+    try:
+        raw = await file.read()
+        filename = (file.filename or "").lower()
+        settings = settings_store.current()
+        if filename.endswith(".pdf"):
+            text = ocr_bridge.ocr_pdf(settings, raw)
+        elif filename.endswith((".png", ".jpg", ".jpeg")):
+            text = ocr_bridge.ocr_image(settings, raw)
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="只支持 PDF / PNG / JPG / JPEG 文件。",
+            )
+        drafts = ocr_bridge.extract_protocol_drafts(settings, text)
+        return {"ocr_text": text, "drafts": drafts}
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise HTTPException(status_code=502, detail=str(error))
 
 
 @router.post("/upload")
