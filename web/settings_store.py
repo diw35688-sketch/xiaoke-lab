@@ -54,10 +54,12 @@ class ModelSettings:
     tts_voice: str = ""
     tts_speed: float = 1.0
     api_keys: dict = field(default_factory=dict)
+    provider_profiles: dict = field(default_factory=dict)
 
     def masked(self) -> dict:
         """给前端看的版本：密钥掩码，永不回传明文。"""
         data = asdict(self)
+        data["provider_profiles"] = dict(self.provider_profiles)
         data["provider_keys"] = {
             provider_id: _mask_key(key)
             for provider_id, key in self.api_keys.items()
@@ -144,6 +146,7 @@ def current() -> ModelSettings:
                     tts_enabled=bool(raw.get("tts_enabled", False)),
                     tts_url=raw.get("tts_url", "http://127.0.0.1:8001/tts"),
                     api_keys=raw.get("api_keys", {}) or {},
+                    provider_profiles=raw.get("provider_profiles", {}) or {},
                 )
             except (json.JSONDecodeError, OSError):
                 _cache = _from_env()
@@ -176,6 +179,13 @@ def update(**changes) -> ModelSettings:
             if provider_id:
                 settings.api_keys = dict(settings.api_keys)
                 settings.api_keys[provider_id] = key
+        if provider_id and (changes.get("base_url") or changes.get("model_name")):
+            settings.provider_profiles = dict(settings.provider_profiles)
+            settings.provider_profiles[provider_id] = {
+                "label": str(changes.get("provider_label") or provider_id),
+                "base_url": settings.base_url,
+                "model": settings.model_name,
+            }
         new_tts_key = changes.get("tts_api_key")
         if new_tts_key:
             settings.tts_api_key = str(new_tts_key).strip()
