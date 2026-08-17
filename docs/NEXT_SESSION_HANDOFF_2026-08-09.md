@@ -332,10 +332,14 @@ user 模式会话级 DEBUG 写入 `results/debug_<session>.log`，新会话替�
 
 `SYNC-UI-CLAIMS-01` 已完成 AUTO_OK：新增 `tests/test_ui_claims.py` 守护测试，
 锁定“旧流程继续/立即继续监听/提交 M 段实验口述”等历史误导文案不得回归；
-确认“无需等待”有 `OrderedTaskQueue` 实现支撑。全量 731 项通过。
+确认“无需等待”有 `OrderedTaskQueue` 实现支撑。
 
-**当前唯一下一项**：`PRESENT-RECORD-PREVIEW-01`。用户屏幕显示规范记录预览，
-原始 ASR 不再逐段占据主界面。
+`PRESENT-RECORD-PREVIEW-01` 已完成 AUTO_OK：`RECORD_ACK` 携带严格 `event_previews`
+合同，user 模式不再逐段显示原始 ASR，admin 模式保留 ASR 对照；原始 ASR 仍落盘。
+全量 737 项通过。
+
+**当前唯一下一项**：`PRESENT-DELIVERY-BOUNDARY-01`。固定 Coordinator/Renderer/Pump
+的职责边界，并加架构护栏防止未来绕过消息链路直接输出。
 
 ---
 
@@ -547,3 +551,10 @@ docs/                 任务清单、交接和学习记录
   确认“现在可以连续口述，无需等待 LLM 处理完成”由 `OrderedTaskQueue` 支撑。
 - 测试：新增 3 项；全量 `Ran 731 tests ... OK`。
 - 下一步：`PRESENT-RECORD-PREVIEW-01`。
+
+## 18. 2026-08-16 PRESENT-RECORD-PREVIEW-01 AUTO_OK
+
+- 修复：`EventPreview` 合同接入 `RECORD_ACK`；user 模式 `TRANSCRIPT` 只在 admin 显示；
+  原始 ASR 继续落盘 JSONL，并在 admin/debug 可查。
+- 测试：新增 6 项（投影 3、文案 3、main 分流 1，总数 +6）；全量 `Ran 737 tests ... OK`。
+- 下一步：`PRESENT-DELIVERY-BOUNDARY-01`。

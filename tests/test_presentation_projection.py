@@ -28,6 +28,26 @@ from src.core.unified_observer import (
 from src.core.unified_segment_processor import PendingClarificationSummary
 
 
+class _FakeEvent:
+    def __init__(self, normalized_text):
+        self.normalized_text = normalized_text
+
+
+class _FakeAnalysis:
+    def __init__(self, events):
+        self.events = events
+
+
+class _FakeAccepted:
+    def __init__(self, normalized_texts):
+        self._analysis = _FakeAnalysis(
+            [_FakeEvent(text) for text in normalized_texts]
+        )
+
+    def materialize_analysis(self):
+        return self._analysis
+
+
 def _observation(**overrides):
     defaults = {
         "request_id": "unified-s-1",
@@ -143,6 +163,36 @@ class ObservationProjectionTests(unittest.TestCase):
         self.assertEqual(messages[0].args["result"], RecordAckResult.RECORDED)
         self.assertEqual(messages[0].args["step_number"], 3)
         self.assertEqual(messages[0].source_segment_id, 1)
+        self.assertEqual(messages[0].args["event_previews"], ())
+
+    def test_recorded_projects_normalized_event_previews(self):
+        observation = _observation(
+            acceptance_kind="structured_experiment",
+            accepted_analysis=_FakeAccepted(
+                ("加入5毫升缓冲液。", "加热到60摄氏度。")
+            ),
+        )
+
+        messages = messages_for_observation(
+            observation, experiment_step_number=3
+        )
+
+        previews = messages[0].args["event_previews"]
+        self.assertEqual(
+            [item.normalized_text for item in previews],
+            ["加入5毫升缓冲液。", "加热到60摄氏度。"],
+        )
+
+    def test_degraded_record_ack_has_empty_previews(self):
+        observation = _observation(
+            acceptance_kind="degraded_evidence_note",
+        )
+
+        messages = messages_for_observation(
+            observation, experiment_step_number=0
+        )
+
+        self.assertEqual(messages[0].args["event_previews"], ())
 
     def test_create_projects_clarification_with_question(self):
         observation = _observation(

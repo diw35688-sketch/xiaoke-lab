@@ -52,6 +52,19 @@ class ReviewItem:
             raise ValueError("question 不能为空。")
 
 
+@dataclass(frozen=True)
+class EventPreview:
+    """规范记录预览：只透传 normalized_text，不新增模型调用。"""
+
+    normalized_text: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.normalized_text, str):
+            raise TypeError("normalized_text 必须是字符串。")
+        if not self.normalized_text.strip():
+            raise ValueError("normalized_text 不能为空。")
+
+
 _FIELD_LABELS = {
     "action": "操作",
     "object": "对象",
@@ -152,6 +165,8 @@ def _with_source(base: str, intent: PresentationIntent, ui_mode: str) -> str:
 
     if ui_mode == "admin" and intent.source_segment_id is not None:
         return f"{base}（来源口述 {intent.source_segment_id}）。"
+    if base.endswith(("。", "！", "？", "；")):
+        return base
     return f"{base}。"
 
 
@@ -165,7 +180,18 @@ def _copy_record_ack(intent: PresentationIntent, ui_mode: str) -> str:
 
     if result == RecordAckResult.RECORDED:
         step_number = _require_positive_int(intent.args, "step_number")
-        base = f"已记录实验步骤 {step_number}"
+        previews = intent.args.get("event_previews", ())
+        if not _is_event_preview_tuple(previews):
+            raise ValueError(
+                "RECORD_ACK 的 event_previews 必须是 EventPreview 元组。"
+            )
+        if previews:
+            preview_text = "；".join(
+                item.normalized_text for item in previews
+            )
+            base = f"已记录实验步骤 {step_number}：{preview_text}"
+        else:
+            base = f"已记录实验步骤 {step_number}"
     elif result == RecordAckResult.DEGRADED:
         base = "原始记录已保存，结构化处理暂时不可用"
     else:
@@ -332,6 +358,12 @@ def _is_field_tuple(value: object) -> bool:
     if not isinstance(value, tuple):
         return False
     return all(isinstance(item, str) and item.strip() for item in value)
+
+
+def _is_event_preview_tuple(value: object) -> bool:
+    return isinstance(value, tuple) and all(
+        isinstance(item, EventPreview) for item in value
+    )
 
 
 def _translate_fields(fields: tuple[str, ...]) -> tuple[str, ...]:

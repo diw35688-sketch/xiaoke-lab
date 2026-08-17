@@ -112,6 +112,47 @@ class FakeConfirmationStore:
 
 
 class NonBlockingIntegrationTest(unittest.TestCase):
+    def _run_short_session(self, ui_mode):
+        asr_1 = ASRResult(
+            asr_transcript="加入缓冲液",
+            asr_model_raw_text="加入缓冲液",
+        )
+        asr_end = ASRResult(
+            asr_transcript="结束实验记录",
+            asr_model_raw_text="结束实验记录",
+        )
+        observer = BlockingFakeObserver(_failed_observation(1))
+        recorder = FakeRecorder(["p1", "p2"], observer)
+        recognizer = FakeRecognizer({
+            "p1": asr_1,
+            "p2": asr_end,
+        })
+
+        with patch("builtins.print") as output, patch(
+            "src.main.UI_MODE", ui_mode
+        ), patch("src.main._attach_session_debug_log"):
+            run_experiment_session(
+                recorder=recorder,
+                recognizer=recognizer,
+                asr_store=FakeAsrStore(),
+                event_store=FakeEventStore(),
+                confirmation_store=FakeConfirmationStore(),
+                state_manager=StateManager(),
+                observer=observer,
+                executor=FakeExecutor(),
+            )
+
+        return "\n".join(
+            call.args[0] for call in output.call_args_list
+        )
+
+    def test_transcript_respects_ui_mode(self):
+        user_rendered = self._run_short_session("user")
+        self.assertNotIn("本段 ASR 识别完成", user_rendered)
+
+        admin_rendered = self._run_short_session("admin")
+        self.assertIn("本段 ASR 识别完成：加入缓冲液", admin_rendered)
+
     def test_recording_continues_while_llm_processes(self):
         # Arrange：3 段口述，第 3 段是结束命令
         asr_1 = ASRResult(
