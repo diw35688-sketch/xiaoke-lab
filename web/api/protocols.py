@@ -32,6 +32,10 @@ class SaveDraftPayload(BaseModel):
     protocol: dict
 
 
+class UploadPayload(BaseModel):
+    protocols: list
+
+
 @router.get("")
 def list_protocols():
     """可选实验方案列表；含自由记录模式。"""
@@ -64,6 +68,18 @@ def save_draft(payload: SaveDraftPayload):
     except Exception as error:
         raise HTTPException(status_code=400, detail=f"保存方案失败：{error}")
     return {"ok": True, "protocol": saved}
+
+
+@router.post("/upload")
+def upload_protocols(payload: UploadPayload):
+    """用户上传协议 JSON 数组，严格校验后逐份写库。"""
+    added = []
+    try:
+        for item in payload.protocols:
+            added.append(domain.add_protocol(item))
+    except Exception as error:
+        raise HTTPException(status_code=400, detail=str(error))
+    return {"added": len(added), "protocols": added}
 
 
 @router.get("/session")

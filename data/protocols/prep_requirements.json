@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "requirements": {
+    "phosphate-buffer-0.1m-ph7.4": [
+      "phosphate-buffer-0.1m-ph7.4"
+    ],
+    "acid-base-titration-naoh-hcl": [
+      "naoh-1m",
+      "hcl-1m"
+    ],
+    "copper-sulfate-spectrophotometry": [
+      "naoh-1m",
+      "hcl-1m"
+    ],
+    "protocolsio-agarose-gel-instructor": [
+      "tae-50x",
+      "agarose-gel-1pct"
+    ],
+    "protocolsio-cell-counting-ecoli": [
+      "pbs-1x"
+    ],
+    "protocolsio-0-1x-bwt-buffer": [
+      "bwt-0.1x"
+    ]
+  }
+}

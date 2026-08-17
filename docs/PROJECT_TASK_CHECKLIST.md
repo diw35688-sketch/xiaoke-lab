@@ -71,7 +71,7 @@ TODO → DESIGN → CODED → AUTO_OK → REAL_OK
 
 ## 2. 当前测试基线
 
-- 当前全量自动测试：`754 tests OK`（Python 3.11.9，2026-08-16；`PRESENT-EXTENSION-SEAMS-01`、`GAPS-FIX-ANSWER-HINT-01`、`UX-FIX-TONE-01` 完成 AUTO_OK，新增 14 项扩展接缝/回答提示/提示音测试）
+- 当前全量自动测试：`766 tests OK`（Python 3.11.9，2026-08-16；新增试剂配置库契约/存储 12 项测试）
 - 环境验证：核心依赖和 `src.main` 导入成功；首次沙箱内失败已确认是执行权限误判，不是 `.venv` 损坏
 - 最近 PRESENT 真实验收会话：`20260815_212615`（补充复验 `20260815_213926`）
 - 最近 PRESENT 双会话复验：`20260816_143151` → `20260816_143201`（同进程再次唤醒成功，零第三方泄漏）
@@ -1050,3 +1050,17 @@ matched_term 以后存知识库匹配到的标准术语（如 ASR 的"一液枪"
 - 设计边界：取消检查放在每个音频块进入sink之前；单写者+多读者前提下不加锁；有意不实现真实播放接入所需的过时输出丢弃队列。
 - 验收边界：本轮不修改`src/main.py`、`InteractionCommandType`、`AssistantState`接线，不引入sounddevice输出流或任何真实TTS依赖，不接模型、不碰声卡；因此状态为`AUTO_OK`，不是`REAL_OK`。
 - 下一步：`PROTOCOL-INTEGRATION-01`仍是项目主线；TTS方向下一步再评估真实后端和播放设备接入，必须先补半双工状态、输出协调和真实设备验收方案。
+
+## 2026-08-16 本轮维护记录：试剂配置库 + Protocol 准备材料 + 上传接口
+
+- 任务：新增试剂配置库（`data/reagent_prep/reagent_prep_library.json`，首批 10 条）；
+  契约 `src/core/reagent_prep.py`；严格读取/写回 `src/storage/reagent_prep_store.py`；
+  web 层 `domain.reagent_preps()` + `/reagent-prep` API + `web/lab_tools.py` 三个工具
+  （`list_reagent_preps`、`get_reagent_prep`、`get_protocol_prep_requirements`）。
+- 关联：新增 `data/protocols/prep_requirements.json`，把 6 份方案映射到所需试剂配置；
+  `select_protocol` / `get_current_step` 之后可自然提示“先准备材料”。
+- 上传：`POST /reagent-prep/upload` 与 `POST /protocols/upload` 接受用户 JSON 文件内容；
+  前端“试剂配置库”页和“实验方案”页均有上传按钮；严格校验，不通过不落盘。
+- 测试：新增 12 项（契约 7 + 存储 5）；全量 `Ran 766 tests ... OK`。
+- 数据来源状态：全部 `UNREVIEWED`；0.1× BWT 有 protocols.io 来源 URL，其余为教学通用配方，
+  待补充原始公开来源；使用前必须教师复核。

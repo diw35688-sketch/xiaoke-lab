@@ -47,7 +47,11 @@
           + '<div style="color:#64748b;font-size:12px;line-height:1.6">共 ' + p.total_steps + ' 步 · ' + esc(p.source) + '</div></div>';
       }).join('');
       host.innerHTML = '<div style="max-width:760px">'
-          + '<div style="margin-bottom:14px"><button class="sh-btn" id="ai-protocol-btn">AI 生成方案</button><span style="color:#94a3b8;font-size:12px;margin-left:10px">用自然语言描述实验，先生成草稿，确认后再保存</span></div>'
+          + '<div style="margin-bottom:14px"><button class="sh-btn" id="ai-protocol-btn">AI 生成方案</button>'
+          + '<input type="file" id="protocol-file" accept=".json,application/json" style="margin-left:10px;font-size:12px">'
+          + '<button class="sh-btn" id="protocol-upload-btn" style="margin-left:6px">上传 JSON</button>'
+          + '<span id="protocol-upload-msg" style="color:#64748b;font-size:12px;margin-left:10px"></span>'
+          + '<span style="color:#94a3b8;font-size:12px;margin-left:10px">JSON：{"protocols":[{...}]}</span></div>'
           + '<div id="ai-draft-box"></div>'
         + '<div class="p-card" data-id="" style="background:#fff;border:1px solid '
         + (session && session.mode === 'free' ? '#2563eb' : '#e2e8f0')
@@ -55,6 +59,26 @@
         + '<div style="font-weight:600;color:#0f172a">自由记录模式</div>'
         + '<div style="color:#64748b;font-size:12px;margin-top:4px">不按方案，只做记录，不产生方案性追问</div></div>'
         + cards + '</div>';
+      var uploadBtn = host.querySelector('#protocol-upload-btn');
+      if (uploadBtn) uploadBtn.onclick = function () {
+        var input = host.querySelector('#protocol-file');
+        var msg = host.querySelector('#protocol-upload-msg');
+        if (!input.files || !input.files[0]) { msg.textContent = '请先选择 JSON 文件'; return; }
+        var reader = new FileReader();
+        reader.onload = function () {
+          try {
+            var data = JSON.parse(reader.result);
+            var payload = { protocols: data.protocols || [data] };
+            api('/protocols/upload', 'POST', payload).then(function (res) {
+              if (res && res.detail) { msg.textContent = '上传失败：' + res.detail; return; }
+              msg.textContent = '已新增 ' + (res.added || 0) + ' 份方案';
+              window.shellShow('protocols');
+            }).catch(function (e) { msg.textContent = '上传失败：' + e.message; });
+          } catch (e) { msg.textContent = 'JSON 解析失败：' + e.message; }
+        };
+        reader.readAsText(input.files[0]);
+      };
+
       Array.prototype.forEach.call(host.querySelectorAll('.p-card'), function (card) {
         card.onclick = function () {
           api('/protocols/session', 'POST', { protocol_id: card.dataset.id || null }).then(function () {
