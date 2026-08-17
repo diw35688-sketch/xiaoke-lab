@@ -320,10 +320,14 @@ git diff --check
 
 `CLARIFICATION-COMPOUND-CONFIRM-ANSWER-01` 已完成 AUTO_OK：CONFIRM 执行器现在会把
 “确认”和“实体补充”作为一个原子结果处理，PRESENT 回执按最终 remaining_fields 显示
-“问题已解决”或“仍需补充”。全量 715 项通过，待真实会话复验后升 REAL_OK。
+“问题已解决”或“仍需补充”。
 
-**当前唯一下一项**：`PRESENT-NOACTION-FEEDBACK-01`。让问题编号不存在、无目标回答、
-无法暂缓/弃权等 no_action 场景不再沉默。
+`PRESENT-NOACTION-FEEDBACK-01` 已完成 AUTO_OK：控制类 no_action 现在会投递
+`NO_ACTION_FEEDBACK` 语义意图，文案按原因引导用户（编号不存在/缺答案/无当前目标/弃权）。
+执行器 NO_ACTION 透传 planner reason。全量 724 项通过。
+
+**当前唯一下一项**：`UX-MODE-01`。终端输出分层：user 模式只显示对话/回执/状态/待确认/
+指引，DEBUG 层单独写日志；admin 模式显示全部。
 
 ---
 
@@ -503,3 +507,16 @@ docs/                 任务清单、交接和学习记录
   user 文案支持“已确认并补充问题 N，问题已解决”和“已确认问题 N，仍需补充：...”。
 - 测试：新增 7 项（执行器 4、投影 1、文案 2）；全量 `Ran 715 tests ... OK`。
 - 下一步：`PRESENT-NOACTION-FEEDBACK-01`。
+
+## 15. 2026-08-16 PRESENT-NOACTION-FEEDBACK-01 AUTO_OK
+
+- 修复：新增 `MessageKind.NO_ACTION_FEEDBACK`；投影层在 control 类 no_action 时生成可见反馈，
+  且不会与降级 NOTE / 实验记录回执重复；执行器 NO_ACTION 透传 planner 的真实原因。
+- 文案：按 reason 映射——
+  编号不存在→“没有找到你指定的问题编号，请先查看当前待确认问题”；
+  缺答案→“请说明要回答的内容，例如‘问题1，50毫升’”；
+  无当前目标→“当前没有可以执行这个操作的问题”；
+  弃权→“我听到了，但没把握安全地执行，请换个说法试试”；
+  未知原因→“我听到了，但暂时无法处理这句话”。
+- 测试：新增 9 项；全量 `Ran 724 tests ... OK`。
+- 下一步：`UX-MODE-01`。

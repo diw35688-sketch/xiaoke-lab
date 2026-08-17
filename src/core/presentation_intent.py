@@ -16,6 +16,7 @@ class MessageKind(str, Enum):
     TRANSCRIPT = "transcript"
     RECORD_ACK = "record_ack"
     CONFIRMATION_ACK = "confirmation_ack"
+    NO_ACTION_FEEDBACK = "no_action_feedback"
     CLARIFICATION = "clarification"
     CLARIFICATION_DEFERRED = "clarification_deferred"
     CLARIFICATION_REVIEW = "clarification_review"

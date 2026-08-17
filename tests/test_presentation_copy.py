@@ -364,6 +364,73 @@ class ConfirmationAckCopyTests(unittest.TestCase):
             copy_for_intent(intent, ui_mode="user")
 
 
+class NoActionFeedbackCopyTests(unittest.TestCase):
+    def test_missing_number_guides_to_review(self):
+        intent = _make_intent(
+            MessageKind.NO_ACTION_FEEDBACK,
+            args={"reason": "指定的问题编号不存在。"},
+        )
+
+        text = copy_for_intent(intent, ui_mode="user")
+
+        self.assertEqual(
+            text,
+            "没有找到你指定的问题编号，请先查看当前待确认问题。",
+        )
+
+    def test_missing_answer_guides_targeted_answer(self):
+        intent = _make_intent(
+            MessageKind.NO_ACTION_FEEDBACK,
+            args={"reason": "指定问题答复缺少答案内容。"},
+        )
+
+        text = copy_for_intent(intent, ui_mode="user")
+
+        self.assertEqual(
+            text,
+            "请说明要回答的内容，例如“问题1，50毫升”。",
+        )
+
+    def test_no_current_target_feedback(self):
+        intent = _make_intent(
+            MessageKind.NO_ACTION_FEEDBACK,
+            args={"reason": "当前没有可确认或否定的ACTIVE建议。"},
+        )
+
+        text = copy_for_intent(intent, ui_mode="user")
+
+        self.assertEqual(
+            text,
+            "当前没有可以执行这个操作的问题。",
+        )
+
+    def test_abstention_feedback(self):
+        intent = _make_intent(
+            MessageKind.NO_ACTION_FEEDBACK,
+            args={"reason": "风险策略明确弃权，不能根据模型候选修改待确认状态。"},
+        )
+
+        text = copy_for_intent(intent, ui_mode="user")
+
+        self.assertEqual(
+            text,
+            "我听到了，但没把握安全地执行，请换个说法试试。",
+        )
+
+    def test_unknown_reason_uses_fallback(self):
+        intent = _make_intent(
+            MessageKind.NO_ACTION_FEEDBACK,
+            args={"reason": "未知原因。"},
+        )
+
+        text = copy_for_intent(intent, ui_mode="user")
+
+        self.assertEqual(
+            text,
+            "我听到了，但暂时无法处理这句话。",
+        )
+
+
 class DeferredCopyTests(unittest.TestCase):
     def test_deferred_uses_plain_ack(self):
         intent = _make_intent(
