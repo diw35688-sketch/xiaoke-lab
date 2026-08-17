@@ -47,20 +47,23 @@
           + '<div style="color:#64748b;font-size:12px;line-height:1.6">共 ' + p.total_steps + ' 步 · ' + esc(p.source) + '</div></div>';
       }).join('');
       host.innerHTML = '<div style="max-width:760px">'
-          + '<div style="margin-bottom:14px"><textarea id="protocol-text" rows="3" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--bd-2);border-radius:8px;font-size:13px;margin-bottom:8px" placeholder="粘贴实验步骤文字，例如：配制 100mL 0.1M pH7.4 磷酸盐缓冲液，先称量磷酸盐，再溶解、调 pH、定容、混匀"></textarea>'
-          + '<button class="sh-btn primary" id="ai-protocol-text-btn">AI 分析文字成方案</button>'
-          + '<button class="sh-btn" id="ai-protocol-btn">AI 生成方案（弹窗描述）</button>'
-          + '<input type="file" id="protocol-file" accept=".json,application/json" style="margin-left:10px;font-size:12px">'
-          + '<button class="sh-btn" id="protocol-upload-btn" style="margin-left:6px">上传 JSON</button>'
-          + '<span id="protocol-upload-msg" style="color:#64748b;font-size:12px;margin-left:10px"></span>'
-          + '<span style="color:#94a3b8;font-size:12px;margin-left:10px">JSON：{"protocols":[{...}]}</span></div>'
-          + '<div id="ai-draft-box"></div>'
         + '<div class="p-card" data-id="" style="background:#fff;border:1px solid '
         + (session && session.mode === 'free' ? '#2563eb' : '#e2e8f0')
         + ';border-radius:12px;padding:15px 17px;margin-bottom:11px;cursor:pointer">'
         + '<div style="font-weight:600;color:#0f172a">自由记录模式</div>'
         + '<div style="color:#64748b;font-size:12px;margin-top:4px">不按方案，只做记录，不产生方案性追问</div></div>'
-        + cards + '</div>';
+        + cards
+        + '<div style="margin-top:18px;border-top:1px dashed #cbd5e1;padding-top:14px">'
+        + '<div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:8px">新增方案</div>'
+        + '<textarea id="protocol-text" rows="3" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--bd-2);border-radius:8px;font-size:13px;margin-bottom:8px" placeholder="粘贴实验步骤文字，例如：配制 100mL 0.1M pH7.4 磷酸盐缓冲液，先称量磷酸盐，再溶解、调 pH、定容、混匀"></textarea>'
+        + '<button class="sh-btn primary" id="ai-protocol-text-btn">AI 分析文字成方案</button>'
+        + '<button class="sh-btn" id="ai-protocol-btn">AI 生成方案（弹窗描述）</button>'
+        + '<input type="file" id="protocol-file" accept=".json,application/json" style="margin-left:10px;font-size:12px">'
+        + '<button class="sh-btn" id="protocol-upload-btn" style="margin-left:6px">上传 JSON</button>'
+        + '<span id="protocol-upload-msg" style="color:#64748b;font-size:12px;margin-left:10px"></span>'
+        + '<span style="color:#94a3b8;font-size:12px;margin-left:10px">JSON：{"protocols":[{...}]}</span></div>'
+        + '<div id="ai-draft-box"></div>'
+        + '</div>';
       var uploadBtn = host.querySelector('#protocol-upload-btn');
       if (uploadBtn) uploadBtn.onclick = function () {
         var input = host.querySelector('#protocol-file');
