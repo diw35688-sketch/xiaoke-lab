@@ -125,6 +125,34 @@ class RecordAckCopyTests(unittest.TestCase):
 
         self.assertEqual(text, "本段结构化处理失败，原始记录已保存。")
 
+    def test_confirmed_with_remaining_fields_lists_missing(self):
+        intent = _make_intent(
+            MessageKind.CONFIRMATION_ACK,
+            args={
+                "result": ConfirmationAckResult.CONFIRMED,
+                "display_number": 2,
+                "remaining_fields": ("duration",),
+            },
+        )
+
+        text = copy_for_intent(intent, ui_mode="user")
+
+        self.assertEqual(text, "已确认问题 2，仍需补充：时间。")
+
+    def test_confirmed_resolved_uses_compound_copy(self):
+        intent = _make_intent(
+            MessageKind.CONFIRMATION_ACK,
+            args={
+                "result": ConfirmationAckResult.CONFIRMED,
+                "display_number": 2,
+                "resolved": True,
+            },
+        )
+
+        text = copy_for_intent(intent, ui_mode="user")
+
+        self.assertEqual(text, "已确认并补充问题 2，问题已解决。")
+
     def test_missing_result_is_rejected(self):
         intent = _make_intent(
             MessageKind.RECORD_ACK,

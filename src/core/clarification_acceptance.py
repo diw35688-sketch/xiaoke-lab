@@ -178,10 +178,11 @@ class ClarificationAction:
         if self.supplied_entity_fields:
             if self.action_type not in {
                 ClarificationActionType.ANSWER,
+                ClarificationActionType.CONFIRM,
                 ClarificationActionType.REJECT_SUGGESTION,
             }:
                 raise ValueError(
-                    "只有ANSWER/REJECT_SUGGESTION可携带supplied_entity_fields。"
+                    "只有ANSWER/CONFIRM/REJECT_SUGGESTION可携带supplied_entity_fields。"
                 )
             if len(self.supplied_entity_fields) != len(
                 set(self.supplied_entity_fields)

@@ -569,6 +569,121 @@ class AnswerConfirmationPendingTests(unittest.TestCase):
         self.assertEqual(updated.missing_fields, ())
 
 
+
+class ConfirmCompoundTests(unittest.TestCase):
+    """同一句“确认 + 实体补充”必须原子地清确认标志并填字段。"""
+
+    def setUp(self):
+        self.coordinator = ReplyCoordinator()
+        self.executor = ClarificationExecutor(self.coordinator)
+        self.coordinator.register_clarification(
+            segment_id=1,
+            raw_text="一夜枪是移液枪吗？体积多少？",
+            question="请确认：一夜枪是移液枪吗？另外体积是多少？",
+            missing_fields=("amount_value", "amount_unit"),
+            requires_confirmation=True,
+        )
+        self.coordinator.pop_next_reply()
+        self.target = self.coordinator.current_clarification()
+
+    def _confirm_action(self, **overrides):
+        defaults = {
+            "segment_id": 2,
+            "action_type": ClarificationActionType.CONFIRM,
+            "mutation_permission": ClarificationMutationPermission.PREPARE_UPDATE,
+            "requires_evidence_persistence": True,
+            "target_clarification_id": self.target.clarification_id,
+            "target_display_number": self.target.display_number,
+            "expected_revision": self.target.revision,
+            "answer_text": "是的，体积为50毫升",
+        }
+        defaults.update(overrides)
+        return _action(**defaults)
+
+    def test_confirm_with_supplied_fields_fills_and_keeps_missing_remaining(self):
+        result = self.executor.execute(
+            self._confirm_action(
+                supplied_entity_fields=("amount_value",)
+            )
+        )
+
+        self.assertTrue(result.state_changed)
+        self.assertIn("仍需补充", result.reason)
+        self.assertEqual(result.remaining_fields, ("amount_unit",))
+        self.assertFalse(result.resolved)
+
+        updated = self.coordinator._find_clarification(
+            self.target.clarification_id
+        )
+        self.assertFalse(updated.requires_confirmation)
+        self.assertEqual(updated.missing_fields, ("amount_unit",))
+        self.assertTrue(updated.is_unresolved)
+
+    def test_confirm_with_all_supplied_fields_resolves(self):
+        result = self.executor.execute(
+            self._confirm_action(
+                supplied_entity_fields=("amount_value", "amount_unit")
+            )
+        )
+
+        self.assertTrue(result.state_changed)
+        self.assertIn("问题已解决", result.reason)
+        self.assertTrue(result.resolved)
+        self.assertEqual(result.remaining_fields, ())
+
+        updated = self.coordinator._find_clarification(
+            self.target.clarification_id
+        )
+        self.assertFalse(updated.is_unresolved)
+        self.assertEqual(updated.missing_fields, ())
+
+    def test_confirm_uses_entity_extractor_for_plain_affirm_with_entities(self):
+        extractor = FakeEntityExtractor({"amount_value", "amount_unit"})
+        executor = ClarificationExecutor(
+            self.coordinator,
+            entity_extractor=extractor,
+        )
+
+        result = executor.execute(self._confirm_action())
+
+        self.assertEqual(extractor.calls, ["是的，体积为50毫升"])
+        self.assertTrue(result.state_changed)
+        self.assertTrue(result.resolved)
+
+        updated = self.coordinator._find_clarification(
+            self.target.clarification_id
+        )
+        self.assertFalse(updated.is_unresolved)
+
+    def test_pure_confirm_with_empty_extraction_keeps_missing_fields(self):
+        extractor = FakeEntityExtractor(set())
+        executor = ClarificationExecutor(
+            self.coordinator,
+            entity_extractor=extractor,
+        )
+
+        result = executor.execute(
+            self._confirm_action(answer_text="是")
+        )
+
+        self.assertEqual(extractor.calls, ["是"])
+        self.assertTrue(result.state_changed)
+        self.assertFalse(result.resolved)
+        self.assertEqual(
+            result.remaining_fields,
+            ("amount_value", "amount_unit"),
+        )
+
+        updated = self.coordinator._find_clarification(
+            self.target.clarification_id
+        )
+        self.assertFalse(updated.requires_confirmation)
+        self.assertEqual(
+            updated.missing_fields,
+            ("amount_value", "amount_unit"),
+        )
+
+
 class SafetyGateTests(unittest.TestCase):
     def setUp(self):
         self.executor = ClarificationExecutor(ReplyCoordinator())
