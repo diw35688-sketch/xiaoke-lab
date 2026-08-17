@@ -174,6 +174,45 @@ def _make_processor(
 
 
 class UnifiedSegmentProcessorTest(unittest.TestCase):
+    def test_experiment_segment_sets_answer_hint_when_questions_active(self):
+        # Arrange：已有待确认问题，新段是结构化实验。
+        coordinator = ReplyCoordinator()
+        coordinator.register_clarification(
+            segment_id=1,
+            raw_text="加入缓冲液。",
+            question="实际加了多少毫升？",
+            missing_fields=("amount_value",),
+        )
+        asr = ASRResult(
+            asr_transcript="50毫升",
+            asr_model_raw_text="50毫升",
+        )
+        observer = FakeObserver([
+            _experiment_observation(2, _accepted_analysis("50毫升", 2)),
+        ])
+        processor = _make_processor(
+            observer,
+            coordinator=coordinator,
+            executor=FakeExecutor(
+                result=ClarificationExecutionResult(
+                    request_id="unified-s1-2",
+                    session_id="s1",
+                    segment_id=2,
+                    action_type=ClarificationActionType.NO_ACTION,
+                    state_changed=False,
+                    reason="实验分析不需要追问。",
+                )
+            ),
+        )
+
+        # Act
+        outcome = processor.process(
+            SegmentJob(segment_id=2, asr_result=asr)
+        )
+
+        # Assert
+        self.assertTrue(outcome.observation.answer_hint)
+
     def test_experiment_segment_persists_asr_event_and_context(self):
         # Arrange
         asr = ASRResult(

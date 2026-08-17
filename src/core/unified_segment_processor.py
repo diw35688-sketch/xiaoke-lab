@@ -272,6 +272,11 @@ class UnifiedSegmentProcessor:
             execution_reason=execution_reason,
             answer_remaining_fields=answer_remaining_fields,
             answer_resolved=answer_resolved,
+            answer_hint=(
+                observation.status == UnifiedObservationStatus.OBSERVED
+                and observation.acceptance_kind == "structured_experiment"
+                and bool(self._reply_coordinator.active_clarifications())
+            ),
         )
 
         outcome = SegmentOutcome(

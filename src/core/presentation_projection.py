@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from src.core.presentation_copy import (
     ConfirmationAckResult,
     EventPreview,
@@ -90,6 +92,8 @@ def messages_for_observation(
                 experiment_step_number,
             )
         )
+        if observation.answer_hint:
+            messages.append(_answer_hint(observation))
 
     action = observation.clarification_action
     if observation.executed:
@@ -262,5 +266,154 @@ def _deferred(
         args={"display_number": display_number},
         priority=MessagePriority.DIRECT_ACK,
         screen_target=ScreenTarget.STATUS,
+        source_segment_id=observation.segment_id,
+    )
+
+
+@dataclass(frozen=True)
+class QueryResultContract:
+    """QUERY 只读查询结果的投影输入（Fake 合同，真实来源后接）。"""
+
+    title: str
+    summary: str
+
+    def __post_init__(self) -> None:
+        if not self.title.strip():
+            raise ValueError("title 不能为空。")
+        if not self.summary.strip():
+            raise ValueError("summary 不能为空。")
+
+
+@dataclass(frozen=True)
+class DenyResultContract:
+    """DENY 拒绝执行结果的投影输入。"""
+
+    reason: str
+
+    def __post_init__(self) -> None:
+        if not self.reason.strip():
+            raise ValueError("reason 不能为空。")
+
+
+@dataclass(frozen=True)
+class WarningNotice:
+    """WARNING 安全提醒的投影输入。"""
+
+    message: str
+
+    def __post_init__(self) -> None:
+        if not self.message.strip():
+            raise ValueError("message 不能为空。")
+
+
+@dataclass(frozen=True)
+class ExportOutcome:
+    """导出结果的投影输入：PRESENT 只消费开始/成功/失败，不解析导出内容。"""
+
+    phase: str
+    detail: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.phase not in {"started", "succeeded", "failed"}:
+            raise ValueError("phase 必须是 started/succeeded/failed。")
+        if self.detail is not None and not self.detail.strip():
+            raise ValueError("detail 不能是空白字符串。")
+
+
+def messages_for_query_result(
+    result: QueryResultContract,
+    *,
+    request_id: str,
+    source_segment_id: int | None = None,
+) -> tuple[PresentationIntent, ...]:
+    """查询结果 → QUERY_RESULT 语义意图。"""
+
+    return (
+        PresentationIntent(
+            intent_id=f"{request_id}-query",
+            kind=MessageKind.QUERY_RESULT,
+            args={"title": result.title, "summary": result.summary},
+            priority=MessagePriority.ROUTINE,
+            screen_target=ScreenTarget.DIALOGUE,
+            source_segment_id=source_segment_id,
+        ),
+    )
+
+
+def messages_for_deny_result(
+    result: DenyResultContract,
+    *,
+    request_id: str,
+    source_segment_id: int | None = None,
+) -> tuple[PresentationIntent, ...]:
+    """拒绝执行结果 → DENY_RESULT 语义意图。"""
+
+    return (
+        PresentationIntent(
+            intent_id=f"{request_id}-deny",
+            kind=MessageKind.DENY_RESULT,
+            args={"reason": result.reason},
+            priority=MessagePriority.DIRECT_ACK,
+            screen_target=ScreenTarget.DIALOGUE,
+            source_segment_id=source_segment_id,
+        ),
+    )
+
+
+def messages_for_warning(
+    notice: WarningNotice,
+    *,
+    request_id: str,
+    source_segment_id: int | None = None,
+) -> tuple[PresentationIntent, ...]:
+    """安全提醒 → WARNING 语义意图。
+
+    v1 调度规则：WARNING 不抢占普通 FIFO，仍按投递顺序交付；
+    未来真实安全来源接入时，再评估是否需要在 Coordinator 内做优先调度。
+    """
+
+    return (
+        PresentationIntent(
+            intent_id=f"{request_id}-warning",
+            kind=MessageKind.WARNING,
+            args={"message": notice.message},
+            priority=MessagePriority.CRITICAL,
+            screen_target=ScreenTarget.ALERT,
+            source_segment_id=source_segment_id,
+        ),
+    )
+
+
+def messages_for_export_result(
+    outcome: ExportOutcome,
+    *,
+    request_id: str,
+    source_segment_id: int | None = None,
+) -> tuple[PresentationIntent, ...]:
+    """导出结果 → EXPORT_RESULT 语义意图；不解析导出文件内容。"""
+
+    return (
+        PresentationIntent(
+            intent_id=f"{request_id}-export",
+            kind=MessageKind.EXPORT_RESULT,
+            args={"phase": outcome.phase, "detail": outcome.detail},
+            priority=MessagePriority.ROUTINE,
+            screen_target=ScreenTarget.STATUS,
+            source_segment_id=source_segment_id,
+        ),
+    )
+
+
+def _answer_hint(
+    observation: UnifiedObservation,
+) -> PresentationIntent:
+    """结构化实验与待确认问题并存时，提示用户回答带问题编号。"""
+
+    return PresentationIntent(
+        intent_id=f"{observation.request_id}-answer-hint",
+        kind=MessageKind.ANSWER_HINT,
+        args={},
+        priority=MessagePriority.DIRECT_ACK,
+        screen_target=ScreenTarget.DIALOGUE,
         source_segment_id=observation.segment_id,
     )

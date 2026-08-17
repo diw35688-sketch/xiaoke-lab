@@ -55,6 +55,7 @@ class UnifiedObservation:
     end_confirmation_requested: bool = False
     answer_remaining_fields: tuple[str, ...] = ()
     answer_resolved: bool = False
+    answer_hint: bool = False
 
     def __post_init__(self) -> None:
         if self.status == UnifiedObservationStatus.OBSERVED:

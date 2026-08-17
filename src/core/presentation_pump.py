@@ -49,10 +49,14 @@ class PresentationPump:
         coordinator: PresentationCoordinator,
         renderer: Renderer,
         output: Callable[[str], None] = print,
+        event_tone_player: (
+            Callable[[PresentationIntent], None] | None
+        ) = None,
     ) -> None:
         self._coordinator = coordinator
         self._renderer = renderer
         self._output = output
+        self._event_tone_player = event_tone_player
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._failure_lock = threading.Lock()
@@ -100,6 +104,8 @@ class PresentationPump:
             for intent in intents:
                 try:
                     self._output(self._renderer.render(intent))
+                    if self._event_tone_player is not None:
+                        self._event_tone_player(intent)
                 except Exception as error:
                     with self._failure_lock:
                         self._failures.append(PresentationDeliveryFailure(

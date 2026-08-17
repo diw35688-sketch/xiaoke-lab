@@ -6,6 +6,7 @@ from src.asr.factory import (
     create_asr_backend,
 )
 from src.audio.feedback import (
+    play_event_tone,
     play_wake_tone,
 )
 from src.audio.vad_recorder import (
@@ -167,6 +168,12 @@ def recognize_one_segment(
         audio_path
     )
 
+def _play_event_tone(intent: PresentationIntent) -> None:
+    """按呈现意图播放提示音；未登记的事件类型不发声。"""
+
+    play_event_tone(intent.kind.value)
+
+
 def _attach_session_debug_log(session_id: str):
     """user 模式下为本次会话挂一个独立 DEBUG 文件。
 
@@ -276,7 +283,12 @@ def run_experiment_session(
     if owns_presentation:
         coordinator = PresentationCoordinator()
         renderer = TerminalRenderer(ui_mode=UI_MODE)
-        pump = PresentationPump(coordinator, renderer, output=print)
+        pump = PresentationPump(
+            coordinator,
+            renderer,
+            output=print,
+            event_tone_player=_play_event_tone,
+        )
         pump.start()
     else:
         if presentation_pump is None:
@@ -560,6 +572,7 @@ def main() -> None:
         presentation_coordinator,
         presentation_renderer,
         output=print,
+        event_tone_player=_play_event_tone,
     )
     presentation_pump.start()
     program_intent_counter = 0

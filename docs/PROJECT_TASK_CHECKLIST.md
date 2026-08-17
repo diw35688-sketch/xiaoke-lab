@@ -71,7 +71,7 @@ TODO → DESIGN → CODED → AUTO_OK → REAL_OK
 
 ## 2. 当前测试基线
 
-- 当前全量自动测试：`740 tests OK`（Python 3.11.9，2026-08-16；`PRESENT-DELIVERY-BOUNDARY-01` 完成 AUTO_OK，新增 3 项输出边界护栏测试）
+- 当前全量自动测试：`754 tests OK`（Python 3.11.9，2026-08-16；`PRESENT-EXTENSION-SEAMS-01`、`GAPS-FIX-ANSWER-HINT-01`、`UX-FIX-TONE-01` 完成 AUTO_OK，新增 14 项扩展接缝/回答提示/提示音测试）
 - 环境验证：核心依赖和 `src.main` 导入成功；首次沙箱内失败已确认是执行权限误判，不是 `.venv` 损坏
 - 最近 PRESENT 真实验收会话：`20260815_212615`（补充复验 `20260815_213926`）
 - 最近 PRESENT 双会话复验：`20260816_143151` → `20260816_143201`（同进程再次唤醒成功，零第三方泄漏）
@@ -89,7 +89,9 @@ cd C:\Users\dahli\Desktop\asr_demo
 
 ## 3. 当前唯一下一项
 
-**`PRESENT-EXTENSION-SEAMS-01`：QUERY/DENY/WARNING/导出扩展接缝。**
+**`PRESENT-FINAL-UX-VERIFY-01`：最终双模式真实 UX 验收。**
+
+`PRESENT-EXTENSION-SEAMS-01`、`GAPS-FIX-ANSWER-HINT-01`、`UX-FIX-TONE-01` 已完成 AUTO_OK：新增 QUERY/DENY/WARNING/EXPORT 四类语义接缝；结构化实验与待确认问题并存时提示带问题编号回答；pump 支持事件提示音回调，主流程接入 `play_event_tone`。全量 754 项通过。
 
 `PRESENT-DELIVERY-BOUNDARY-01` 已完成 AUTO_OK：`tests/test_presentation_output_boundary.py` 新增 3 项护栏（PRESENT 各层无 print、纯函数层无 I/O、协调器/pump 不反向依赖终端或文案）；`docs/PRESENT_DESIGN.md` 增加第 14 节 Delivery Boundary 架构护栏。全量 740 项通过。
 
@@ -163,10 +165,10 @@ PRESENT 之外的 Query/Safety/RAG 真实接入、ASR 路演稳定性和 LLM 格
 | 6 | `P1` | `ASR-ROBUSTNESS-RULE-GAPS-02` 鲁棒性复验补充观察（112047/112445，用户已逐项决策） | `TODO` | 5 项补充观察按决策执行 | 用户 2026-08-14 决策：**A**（"问题一先跳过"→answer 漏 DEFER）→ **修**；**B**（"暂缓问题一"→abstention 漏 DEFER）→ **修**（与 A 同根因：意图 schema 无"按编号暂缓"，需新增 defer_targeted 或等效处理）；**C**（"不对，应该是7.4"→no_action）→ **纠正记录**：不是 deny 大模型问题，定性为"修正历史记录"类需求，先不做、当实验记录展示；**D**（自然结束语→观察失败 ValueError）→ **方案二：固定结束语**（LLM 识别结束意图时提示"请说'结束实验记录'"，只有精确命令结束；方案一"确认后关闭"留待有时间再做）；**E**（"仍需补充：空"）→ **已修**（显示一致性轮），**再测**并入下次真实会话；**F**（"再加50毫升"→abstention）→ **先不管**。另：段9"一夜枪"未触发确认（缺口②不稳定复现）随②走 ASR 层 |
 | 7 | `P1` | `GAPS-FIX-END-01` 结束语非精准命中 → 追问 → 肯定后结束（用户 2026-08-14 晚改方案一） | **REAL_OK** | 旁路对 `end_session_confirmation` 产出"请求结束确认"信号（不再抛 ValueError）→ 观察器/工人传递 `end_confirmation_requested` → 后台显示"是否结束？"+ 置会话级标志 → 主循环下一段 affirm 命中即结束 | 会话 20260815_111049：段6"今天先记录到这里吧"→"是否结束？"→段7"是的是"→"确认结束"正常收尾，不再崩 ValueError |
 | 8 | `P1` | `GAPS-FIX-DEFER-01` DEFER 可逆候选接上下文校验 + 按编号暂缓真实验收（用户 2026-08-14 晚） | **REAL_OK** | ①`intent_policy.py` reversible 的 `LLM_CANDIDATE` 也走 `REQUIRE_CONTEXT`；②根因修复：`register_clarification` 创建即"当前问题"；③`defer_targeted` 按编号暂缓（新增 `DEFER_TARGETED` 命令类型 + 解析模式"问题N先跳过/第N个问题先跳过" + 规划器 `find_by_number`） | 会话 112341：暂缓生效；defer_targeted 单测（解析器+旁路）覆盖 |
-| 9 | `P1` | `GAPS-FIX-ANSWER-HINT-01` ① 回答需指定编号提示 | `TODO` | 存在待确认问题时，被当实验处理的短句旁提示"回答请指定问题编号（如'问题一，…'）" | 用户决策（2026-08-14）：① 接受当实验（LLM 自由判断），但加显示提示引导用户回答时带编号；纯显示层小改动 |
+| 9 | `P1` | `GAPS-FIX-ANSWER-HINT-01` ① 回答需指定编号提示 | `AUTO_OK` | `UnifiedObservation.answer_hint` 在结构化实验且存在待确认问题时置真；投影层追加 `ANSWER_HINT`，文案为“如果是在回答问题，请指定问题编号，例如‘问题1，50毫升’”。全量 754 项通过 | 真实会话验证提示出现且不干扰正常实验记录；随最终 UX 验收关闭 |
 | 10 | `P1` | `GAPS-REVERIFY-01` ③⑤E 复验 + ②现状复查 | **REAL_OK** | 真实旁路 21/31 一致：③ PH 大小写（段17）不再过度确认、⑤ 电流80毫安（段25）正确判实验、D 自然结束语（段28）正确识别 end_session；真实会话 115134：E"仍需补充：duration"、③"PH值是7.2"无过度确认、D 完整"追问→是→结束"全部闭环 | ② 同音错词仍不稳定（段7/14/29），按用户决策走 ASR 层，不在此轮 |
 | 11 | `P0` | `UX-BASELINE-01` 体验基线走查（用户 2026-08-14 提出"终端看不出体验"后建立） | **完成（UX_ISSUES）** | 九维体验走查表已建（`docs/UX_WALKTHROUGH_CHECKLIST.md`）；会话 `20260814_174441` 基线走查完成，10 项问题登记 UX-01~10（8 项走查发现 + 提示音/嘈杂识别为用户补充），5 项正向确认；原始输出 `results/walkthrough_baseline_session_20260814_174441.txt`，逐行标注版 `results/walkthrough_baseline_annotated_20260814_174441.md` | 10 项 UX 问题留待输出层/ASR 任务自然闭环（用户 2026-08-14：暂不与 PRESENT 强制绑定）；每闭环一项可复走九维表对比 |
-| 12 | `P1` | `UX-FIX-TONE-01` 事件提示音（UX-09，用户 2026-08-14 提出） | `TODO` | 需要用户注意的事件（追问/确认回执/降级/识别失败/结束语未识别）播放提示音，用户听到声音再看屏幕；复用 `play_wake_tone` 设施（`src/audio/feedback.py` 扩展事件音）+ 消息链路触发点；提示音≠TTS 朗读 | **用户决策（2026-08-14 更新）：顺延到 PRESENT-INTEGRATE-01 之后做**——触发点直接挂在 PRESENT 建好的消息链路上，输出层只动一次避免返工；完成后按九维表走查（重点验维6 ✗→✓） |
+| 12 | `P1` | `UX-FIX-TONE-01` 事件提示音（UX-09，用户 2026-08-14 提出） | `AUTO_OK` | `src/audio/feedback.py` 新增 `play_event_tone`；`PresentationPump` 支持 `event_tone_player` 回调；main 将提示音挂到 pump 交付链。提示音≠TTS 朗读 | 真实会话确认追问/回执/失败等事件有提示音；随最终 UX 验收关闭 |
 | 13 | `P1` | `ASR-NOISE-SAMPLES-01` 嘈杂识别样例入语料（UX-10，用户 2026-08-14 提出） | **完成** | 20260814_174441 三个真实噪声样例已入 `evaluation/narration_robustness/narration_plan.json` 段 29/30/31（'防生缓冲液'/'제가.'/'.别束实验记录.'），schema 21 项 + 全量 468 项通过；修复走既有 ASR 线（AUDIO-PREROLL 截音/热词/后处理） | 样例已可被 `evaluate_narration_robustness.py` 评测；修复时机由 ASR 任务线决定 |
 | 14 | `P1` | `UX-MODE-01` 终端输出分层：用户版/管理员版（UX-11，用户 2026-08-14 提出） | `AUTO_OK` | `UI_MODE` 校验、Renderer 分流、生产 print 清理均已完成；user 模式新增会话级 `results/debug_<session>.log`，新会话替换旧 handler。`src/llm/unified_processor.py` 非契约异常改 logging。新增 4 项测试；全量 728 项通过 | 待真实 user/admin 对照会话九维走查（重点维1/7 ✗→✓）后升 REAL_OK |
 | 15 | `P0` | `RESTORE-NONBLOCK-01` 恢复非阻塞录音（评委 2026-08-14 发现：main.py 已无后台线程） | **REAL_OK** | 新建 `OrderedTaskQueue`（通用单线程队列+背压4）+ `UnifiedSegmentProcessor`（六步业务流水线）；main 主循环改为"录音→提交后台→显示"，入口文件不再堆业务规则；拆两句谎话（111行"旧流程继续"→"ASR 原文已保存"；320行"无需等待"现为真）。全量 483 项通过（+15）；集成测试证明"录音期间 LLM 在后台跑"；真实会话 20260815_094954 连说 10 段不卡、计数正确（共10段/提交8段/上下文8=事件数） | 已恢复。体验裁决=用户接受当前"结果延后显示"节奏；前瞻要求 TTS 不乱序朗读（登记 TIMING-02） |
@@ -182,7 +184,7 @@ PRESENT 之外的 Query/Safety/RAG 真实接入、ASR 路演稳定性和 LLM 格
 | 24 | `P1` | `PRESENT-ADMISSION-01` 用户呈现准入与去重复 | `AUTO_OK` | 四刀完成：会话提示去重复、基础设施转 logging、`IdleNoticeTracker`、`END_ONLY` 单一结束摘要。结束摘要合并实验步骤数与待确认明细，零待确认也明确显示。专项41/41、全量571/571通过 | 自动闭环；真实会话九维走查统一并入 `PRESENT-FINAL-UX-VERIFY-01` |
 | 25 | `P1` | `PRESENT-FEEDBACK-REGRESSION-01` 程序级与零待确认反馈补回 | `AUTO_OK` | 新增结构化 `PROGRAM_STATUS`（starting/ready/exited）和 keyword 合同化 `WAKE_ACK`；程序级 Coordinator/Pump 在初始化前启动，会话复用同一链路；启动期间和待机期间 Ctrl+C 都交付退出反馈；零待确认已由 END_ONLY 明确显示；程序状态与唤醒事实均经 projection→Intent。专项56/56、全量578/578通过 | 自动闭环；真实 user 模式可见性与去重复并入 `PRESENT-FINAL-UX-VERIFY-01` |
 | 26 | `P1` | `PRESENT-PUMP-FLUSH-01` pump 完成交付合同 | `AUTO_OK` | Coordinator 用原子 unfinished 计数覆盖 pending/deferred/in-flight；Pump 在 output 返回后 `mark_completed()`；`flush(timeout)` 区分超时与结构化交付失败，失败后继续交付后续消息 | 慢 output、失败隔离、去重/deferred 计数测试通过；专项24/24、全量584/584通过；真实尾消息复验并入最终 UX 验收 |
-| 27 | `P1` | `PRESENT-EXTENSION-SEAMS-01` QUERY/DENY/WARNING/导出呈现接缝 | `TODO` | 禁止未来功能不断在 `main.py` 手写 if/elif 投影；各自结构化结果经 projection→Intent；定义 WARNING 是否及如何抢占普通 FIFO；导出只读 SessionRecord，PRESENT 只消费开始/成功/失败结果 | Fake 合同覆盖四类来源；WARNING 调度规则明确且不破坏普通 FIFO；不解析 PRESENT 文案做导出 |
+| 27 | `P1` | `PRESENT-EXTENSION-SEAMS-01` QUERY/DENY/WARNING/导出呈现接缝 | `AUTO_OK` | 新增 QUERY_RESULT/DENY_RESULT/WARNING/EXPORT_RESULT 四种 MessageKind；投影层提供 QueryResultContract/DenyResultContract/WarningNotice/ExportOutcome 四个 Fake 合同；文案目录已支持渲染；WARNING v1 调度规则=跟随 FIFO 不抢占。全量 754 项通过 | 真实 QUERY/DENY/WARNING/导出来源接入时直接使用接缝；随最终 UX 验收关闭 |
 | 28 | `P1` | `PRESENT-LEGACY-MESSAGE-CLEANUP-01` 删除旧 PresentationMessage 双轨 | `AUTO_OK` | 三个现役语义枚举归位到 `presentation_intent.py`；删除旧模块、旧对象、channel/status/speech policy 与专属 10 项测试，不留兼容别名 | `src/tests` 旧引用为0；专项86/86、删除后全量574/574通过；TTS/Web 交付模型留待第二真实渠道 |
 | 29 | `P1` | `PRESENT-FINAL-UX-VERIFY-01` PRESENT 最终真实验收 | `TODO` | user/admin 对照真实会话：反馈完整、无重复/泄漏、顺序正确、最后消息不丢，维1/7改善且维2/5/9不退化 | 下面“PRESENT 当前15项收口清单”核心项实现完成；记录 session_id、终端证据和九维结论 |
 | 30 | `P1` | `PRESENT-CLOSING-NAME-01` 收尾回执与正式 SessionSummary 消歧 | `AUTO_OK` | `MessageKind.SESSION_SUMMARY` 已改为 `SESSION_CLOSING_SUMMARY`，同步枚举值、copy 函数、main、测试与当前文档；`src/tests` 旧 PRESENT 名零残留，无兼容双名，无 SessionRecord/LLM 总结/导出扩张；专项41/41、全量571/571通过 | 自动闭环；真实输出随最终 PRESENT UX 会话统一复验 |
@@ -210,9 +212,9 @@ PRESENT 之外的 Query/Safety/RAG 真实接入、ASR 路演稳定性和 LLM 格
 | 4 | `SYNC-UI-CLAIMS-01` 文案与真实状态一致性 | `AUTO_OK` |
 | 5 | `PRESENT-RECORD-PREVIEW-01` 规范记录预览 | `AUTO_OK` |
 | 6 | `PRESENT-DELIVERY-BOUNDARY-01` Delivery Boundary 架构护栏 | `AUTO_OK` |
-| 7 | `PRESENT-EXTENSION-SEAMS-01` QUERY/DENY/WARNING/导出扩展接缝 | `TODO` |
-| 8 | `GAPS-FIX-ANSWER-HINT-01` 回答编号提示 | `TODO` |
-| 9 | `UX-FIX-TONE-01` 事件提示音 | `TODO` |
+| 7 | `PRESENT-EXTENSION-SEAMS-01` QUERY/DENY/WARNING/导出扩展接缝 | `AUTO_OK` |
+| 8 | `GAPS-FIX-ANSWER-HINT-01` 回答编号提示 | `AUTO_OK` |
+| 9 | `UX-FIX-TONE-01` 事件提示音 | `AUTO_OK` |
 | 10 | `PRESENT-FINAL-UX-VERIFY-01` 最终双模式真实 UX 验收 | `TODO` |
 
 > 上表取代此前按阶段排列的剩余施工顺序。未经用户重新确认不得跳项；若确需调整，必须先同步
@@ -226,12 +228,12 @@ PRESENT 之外的 Query/Safety/RAG 真实接入、ASR 路演稳定性和 LLM 格
 | 4 | `PRESENT-LEGACY-MESSAGE-CLEANUP-01` 删除旧消息双轨 | `AUTO_OK` | 旧模块、旧对象、专属 channel/status/speech policy 和 10 项旧测试已删除；现役枚举归位 Intent；专项86/86、全量574/574通过 |
 | 5 | `PRESENT-FIX-LEAK-01` 开发输出泄漏收尾 | `REAL_OK` | 会话142945确认全程零泄漏；双会话143151→143201进一步确认同进程再次唤醒、两个新会话编号、WAITING/EXITED与程序级Pump生命周期均正确；专项63/63、全量576/576通过 |
 | 6 | `PRESENT-NOACTION-FEEDBACK-01` no_action 容错反馈 | `AUTO_OK` | 控制类 no_action 统一投递 NO_ACTION_FEEDBACK，用户不再看到沉默；真实 UX 随最终验收 |
-| 7 | `PRESENT-EXTENSION-SEAMS-01` 扩展接缝 | `TODO` | QUERY/DENY/WARNING/导出结果统一 projection→Intent；定义 WARNING 抢占规则 |
+| 7 | `PRESENT-EXTENSION-SEAMS-01` 扩展接缝 | `AUTO_OK` | QUERY/DENY/WARNING/导出四类接缝已定义；WARNING v1 跟随 FIFO 不抢占 |
 | 8 | `UX-MODE-01` user/admin 输出分层 | `AUTO_OK` | 程序级反馈分层与按会话 DEBUG 日志已完成；真实 user/admin 对照验收并入最终 UX 走查 |
 | 9 | `SYNC-UI-CLAIMS-01` 文案与行为一致 | `AUTO_OK` | 历史误导文案零残留，新增 3 项守护测试；真实 UX 随最终验收 |
 | 10 | `PRESENT-FINAL-UX-VERIFY-01` 最终真实验收 | `TODO` | 验证反馈完整、无重复/泄漏、顺序正确、尾消息不丢及九维不退化 |
-| 11 | `GAPS-FIX-ANSWER-HINT-01` 回答编号提示 | `TODO` | 存在待确认项时，引导用户用“问题一，……”明确回答目标 |
-| 12 | `UX-FIX-TONE-01` 事件提示音 | `TODO` | 追问/回执/降级/失败等需注意事件播放提示音；提示音不等于 TTS |
+| 11 | `GAPS-FIX-ANSWER-HINT-01` 回答编号提示 | `AUTO_OK` | 结构化实验与待确认项并存时提示“如果是在回答问题，请指定问题编号” |
+| 12 | `UX-FIX-TONE-01` 事件提示音 | `AUTO_OK` | pump 支持 event_tone_player；main 已接入 play_event_tone；提示音不等于 TTS |
 | 13 | `PRESENT-CLOSING-NAME-01` 收尾回执命名消歧 | `AUTO_OK` | 已统一为 `SESSION_CLOSING_SUMMARY`，无兼容双名和旧 PRESENT 引用；专项 41/41、全量 571/571 通过 |
 | 14 | `PRESENT-RECORD-PREVIEW-01` 规范记录预览 | `AUTO_OK` | `RECORD_ACK` 携带 `event_previews`；user 模式不再逐段显示原始 ASR；原始 ASR 继续落盘；禁止自由 assistant_reply 和额外 LLM 调用 |
 | 15 | `PRESENT-DELIVERY-BOUNDARY-01` 交付链路架构合同 | `AUTO_OK` | 输出边界护栏测试覆盖 PRESENT 各层；`PRESENT_DESIGN.md` 第 14 节固化职责与变化归属；QUERY/DENY 等随业务扩，WARNING 按真实调度需求扩；禁止过早通用化，也禁止绕过统一链路 |
