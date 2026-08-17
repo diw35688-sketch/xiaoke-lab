@@ -25,6 +25,9 @@
     if (document.querySelector('#assistant-avatar')) return;
     const style = document.createElement('style'); style.textContent = `
       #assistant-avatar{position:fixed;right:18px;bottom:72px;z-index:25;width:225px;background:transparent;user-select:none;touch-action:none;cursor:grab;filter:drop-shadow(0 12px 14px rgba(32,58,107,.22));transition:filter .2s ease}
+      #avatar-tts-btn{position:absolute;left:2px;top:4px;z-index:3;width:32px;height:32px;border-radius:50%;border:1px solid rgba(88,128,204,.35);background:rgba(255,253,248,.92);font-size:15px;line-height:1;cursor:pointer;display:grid;place-items:center;box-shadow:0 2px 8px rgba(37,66,122,.15);font-family:inherit}
+      #avatar-tts-btn:hover{background:#fff}
+      #avatar-tts-btn.muted{background:#fef2f2;border-color:#fecaca}
       #assistant-avatar.is-dragging{cursor:grabbing;filter:drop-shadow(0 17px 20px rgba(32,58,107,.3))}#assistant-avatar .portrait{position:relative;width:100%;height:278px;overflow:visible;pointer-events:none}
       #assistant-avatar .portrait img{display:block;width:100%;height:100%;object-fit:contain;object-position:center bottom;transform-origin:50% 88%;animation:avatarBreathe 3.2s ease-in-out infinite;transition:opacity .12s ease}
       #assistant-avatar .avatar-info{display:flex;align-items:center;justify-content:center;gap:7px;width:max-content;min-height:29px;margin:-4px auto 0;padding:5px 11px;border:1px solid rgba(88,128,204,.3);border-radius:999px;background:rgba(255,253,248,.88);box-shadow:0 4px 15px rgba(37,66,122,.14);color:#25477e;font-size:12px;backdrop-filter:blur(6px);pointer-events:none}
@@ -33,9 +36,29 @@
       @keyframes avatarBreathe{50%{transform:translateY(-3px) scale(1.012)}}@keyframes avatarTalk{to{transform:translateY(-4px) scale(1.03)}}@keyframes avatarPulse{50%{transform:scale(1.35);box-shadow:0 0 0 8px rgba(64,130,226,.07)}}@keyframes avatarBlink{50%{opacity:.2}}@keyframes avatarThought{50%{transform:translateY(-3px);opacity:.65}}@media(max-width:720px){#assistant-avatar{right:4px;bottom:61px;width:150px}#assistant-avatar .portrait{height:187px}#assistant-avatar .avatar-info{min-height:25px;padding:4px 8px;font-size:10px}}
     `; document.head.appendChild(style);
     const widget = document.createElement('aside'); widget.id = 'assistant-avatar'; widget.className = 'is-idle'; widget.setAttribute('aria-label', '可拖动的实验助手虚拟形象');
-    widget.innerHTML = '<div class="portrait"><img src="/static/assets/assistant_portrait_transparent.png" alt="小科实验助手"><span class="avatar-thought">···</span></div><div class="avatar-info"><span class="avatar-name">小科</span><span><i class="avatar-dot"></i><span class="avatar-label">准备就绪</span></span></div>';
-    document.body.appendChild(widget); Object.values(portraits).forEach(src => { const image = new Image(); image.src = src; }); restorePosition(widget); enableDragging(widget);
+    widget.innerHTML = '<div class="portrait"><img src="/static/assets/assistant_portrait_transparent.png" alt="小科实验助手"><span class="avatar-thought">···</span></div><div class="avatar-info"><span class="avatar-name">小科</span><span><i class="avatar-dot"></i><span class="avatar-label">准备就绪</span></span></div><button id="avatar-tts-btn" type="button" title="语音播报开关" aria-label="语音播报开关">🔊</button>';
+    document.body.appendChild(widget); Object.values(portraits).forEach(src => { const image = new Image(); image.src = src; }); restorePosition(widget); enableDragging(widget); initTtsToggle();
       widget.addEventListener('click', () => { if (widget.dataset.moved !== '1' && window.phoneCallToggle) window.phoneCallToggle(); });
+  }
+  // 头像上的语音播报开关：演示现场一键开启/关闭 TTS，无需进设置面板。
+  // 状态存 localStorage（浏览器记住），播报入口（enqueueSpeech/labSpeak）读取 window.ttsMuted。
+  function initTtsToggle() {
+    const btn = document.getElementById('avatar-tts-btn');
+    if (!btn) return;
+    try { window.ttsMuted = localStorage.getItem('tts-muted') === '1'; } catch (_) { window.ttsMuted = false; }
+    function update() {
+      const muted = window.ttsMuted === true;
+      btn.textContent = muted ? '🔇' : '🔊';
+      btn.classList.toggle('muted', muted);
+      btn.title = muted ? '语音播报已关闭（点击开启）' : '语音播报已开启（点击关闭）';
+    }
+    update();
+    btn.addEventListener('click', function (event) {
+      event.stopPropagation(); // 不能触发头像的"通话模式"切换
+      window.ttsMuted = !(window.ttsMuted === true);
+      try { localStorage.setItem('tts-muted', window.ttsMuted ? '1' : '0'); } catch (_) { /* 忽略 */ }
+      update();
+    });
   }
   function setState(nextState) {
     if (!labels[nextState]) nextState = 'idle'; const widget = document.querySelector('#assistant-avatar'); if (!widget) return;
@@ -43,5 +66,7 @@
     const image = widget.querySelector('.portrait img'); if (image.getAttribute('src') !== portraits[nextState]) image.src = portraits[nextState]; clearTimeout(settleTimer);
   }
   window.setAvatarState = setState; window.dispatchAvatarState = nextState => window.dispatchEvent(new CustomEvent('avatar-state', { detail: { state: nextState } })); window.addEventListener('avatar-state', event => setState(event.detail?.state || event.detail));
-  document.addEventListener('DOMContentLoaded', () => { create(); setTimeout(() => { setState('listening'); settleTimer = setTimeout(() => setState('idle'), 1200); }, 180); });
+  // 开机不再播放"正在聆听"动画：它没有真实开麦克风，却让人误以为自动开始识别。
+  // 头像默认保持 idle（准备就绪），只有用户主动进入通话/识别时才变 listening。
+  document.addEventListener('DOMContentLoaded', () => { create(); });
 })();

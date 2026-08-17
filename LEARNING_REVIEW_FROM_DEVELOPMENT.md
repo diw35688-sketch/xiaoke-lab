@@ -3722,3 +3722,144 @@ Codex 向大型 markdown 文档追加中文内容时会把中文写成 `?`（源
   “你听见了、你为什么不处理、我下次可以怎么说”。
 - **验收**：新增 9 项测试；全量 `Ran 724 tests ... OK`。待真实会话复验“制业枪”等
   no_action 场景有可见回应后升 REAL_OK。
+## 2026-08-16：WEB-BRIDGE-01——把网页桥从"将删组件"迁到统一理解链
+### 本轮目的
+`web/llm_bridge.py` 一直桥接 `src/llm/processor.py` 的旧 `ExperimentLLMProcessor`，
+而 `src/` 自己的主入口早在多轮前就切换到统一理解链（`UnifiedUnderstandingProcessor`），
+并在 `PROJECT_ARCHITECTURE.md` §5.1/§5.3 明确标注旧链"待删除、不再作为目标架构"。
+网页端等于长期依赖一个 src 自己判了死刑的组件：行为与语音终端不一致、src 清理旧链时
+web 会直接断供。本轮把桥迁到统一链，并补齐 `recent_context` 上下文。
+
+### 关键设计
+- **换桥 ≠ 换消费端**：新旧链的实体卡片共用同一套 `src/llm/schemas.py` 合同
+  （`ExperimentEvent`/`ExperimentEntities`），且统一链 experiment 分支的
+  `analysis.events` 格式与旧链完全一致。因此 `llm_bridge.extract()` 只要从
+  `result.experiment.analysis` 取 events、保留原返回外壳字段名，`web/api/record.py`
+  的实体合并逻辑与前端渲染**一行都不用改**。改动面从"桥+消费+前端"收窄到"桥+上下文"。
+- **统一链要求上下文，web 原本没有**：`UnifiedUnderstandingInput` 需要
+  `session_active/recent_context/pending_question_numbers`。web 没有"待确认问题编号"
+  机制，编号上下文填空；`recent_context` 从 `lab_records` 取最近 5 条口述原文
+  （先 strip 再过滤空串——合同校验拒绝空白文本）。
+- **control/uncertain 分支的裁剪决策**：统一链能识别控制命令（review/defer/affirm…），
+  但 web 没有命令执行器。设计上明确"web 只取 experiment 分支实体卡片；control/uncertain
+  只回 `input_kind` 标签，不执行动作"，并把这条写进迁移对照表 §5.6，防止以后有人误以为
+  web 能执行命令。
+- **降级路径天然等价**：旧链降级返回带 NOTE 事件的 `LLMAnalysisResult`
+  （`_fallback_analysis`），统一链降级返回带 NOTE 事件的 experiment 分支
+  （`build_degraded_understanding`），两者都是"一条 entities 全空的 NOTE 卡片 +
+  degraded 标志"，前端只渲染 degraded 提示语，不渲染 NOTE 文案——迁移后降级行为对等。
+
+### 可复用知识（三段式）
+1. **桥接不要接"将删组件"**：
+   - 白话：给新车间引机器，得先看旧机器是不是贴了报废标签；引一台待拆的机器，拆的那天车间就停产。
+   - 专业术语：耦合到已废弃组件（coupling to a deprecated component）；架构演进需要同步所有消费者（consumer migration）。
+   - 项目实际体现：`web/llm_bridge.py` 原本桥接 `ExperimentLLMProcessor`，而 src 已标旧链待删（§5.1）——这次人肉发现的根源。迁移后桥接 `UnifiedUnderstandingProcessor`。
+2. **输出合同兼容迁移**：
+   - 白话：换造卡片的机器，只要卡片格子不变，看卡片的人不用动。
+   - 专业术语：保持下游契约（consumer contract stability）的前提下替换实现（implementation swap）。
+   - 项目实际体现：新旧链共用 `src/llm/schemas.py`，`extract()` 保留 `events/degraded/llm_attempts/llm_seconds/assistant_reply` 字段名，前端 `lab_panel.js`/`voice_asr.js` 零改动。
+3. **测试绿 ≠ 正式路径**：
+   - 白话：报废的机器只要还通电、还有测试保养，看起来照样健康——但它不是你要用的那台。
+   - 专业术语：测试覆盖 ≠ 架构方向（test coverage vs architectural direction）；遗留代码可能被测试保护得很好（well-tested legacy code）。
+   - 项目实际体现：旧链有 `test_llm_v1.py` 10+ 个用例天天跑绿，掩盖了"它不是目标架构"的事实；src 演进没有自动通知 web，只能靠人肉对比发现。
+4. **环境缺依赖与测试基线**：
+   - 白话：测试报错先分"代码坏了"还是"环境没装齐"，别一看到红就慌。
+   - 专业术语：环境可复现性（reproducible environment）；显式依赖声明（explicit dependency declaration）。
+   - 项目实际体现：基线 15 errors 全是 `.venv` 缺 numpy/sounddevice/soundfile/sherpa-onnx，与代码无关；`requirements.txt` 补 numpy 显式声明；funasr/torch 未被测试直接 import，无需安装 GB 级大包——按实际 import 面装依赖，别盲装。
+
+### 验收证据
+- 新增 `tests/test_web_llm_bridge.py` 7 项（Fake 客户端注入：experiment/control/uncertain/客户端失败降级/非法 JSON 降级/recent_context 过滤与透传），全绿。
+- 全量：`Ran 715 tests ... OK`（相对上轮基线新增；含 6 个此前因缺依赖无法加载的音频测试文件解锁）。
+- 真实验收（会话 `20260816_200646`，deepseek-v4-pro @ api.deepseek.com/v1）：5 条口述全部无降级、实体抽取准确；「帮我看看待确认的问题」识别为 `input_kind=control` 且零错误卡片（旧链会硬拆）；「离心机八百转运行十分钟」多字段含 duration；「溶液颜色变蓝」observation 事件。缺时长未追问对应当前未定案争议 `LLM-FOLLOWUP-STRICT-01`，非迁移退化。
+- 功能验收 REAL_OK；体验验收（UX 九维走查）待用户确认。
+
+### 明确未做
+- 未下沉 web 业务（planner/tools/agent/tasks/database 仍在 web/，按用户路线决策留待后续轮次）。
+- 未改前端（输出合同未变，无需改；若真实验收发现话术问题再动）。
+- 未执行 control 命令（明确裁剪：web 只回标签）。
+- 未动 src 旧链删除（顺序锁死：先迁 web，再执行 VERIFY-01 删旧链）。
+
+## 2026-08-16：WEB-AGENT-FAKE-RECORD-01——聊天 agent 的"假记录"与提示词契约测试
+### 本轮目的
+用户在聊天区实测输入「离心机八百转运行十分钟」，agent 回复"已记录：离心机 800 转运行 10 分钟"，
+但数据库 `lab_records` 没有任何新记录——agent 口头承诺保存、实际没保存，属于数据丢失隐患。
+根因不是缺工具（`lab_tools.py` 里有 `record_observation`，调了会真实落盘），而是
+`agent/core.py` 的 INSTRUCTIONS（给模型的角色规则）**根本没教它用这个工具**——模型看到
+工具栏里有"记录实验口述"，但上下文没引导，就自己口头应承"已记录"。
+
+### 关键设计
+- **修"话术约束"而非"话术本身"**：不改 agent 的回复文本（"已记录：…"话术本身没问题），
+  而是加行为铁律——"描述实验操作/数据必须调用 record_observation 并传原文；
+  禁止不调工具就回复已记录；只有工具返回成功才能确认；失败须如实说明"。
+  这样"已记录"从模型自由发挥变成有事实依据的承诺。
+- **提示词也要有测试**：`tests/test_web_agent_prompts.py` 5 项断言 INSTRUCTIONS 含
+  强制规则关键句 + `record_observation` 在 TOOLS 注册 + schema 要求 transcript。
+  提示词是"代码"，规则被删会导致行为静默回退——测试把它变成显式契约。
+- **验收要跨"异步后台任务"**：`/chat` 走 `task_manager` 后台队列，立即返回
+  "已交给后台处理"，落盘发生在异步任务里——验收必须轮询 `lab_records` 而不是只看即时响应。
+
+### 可复用知识（三段式）
+1. **模型"口头承诺"不等于"实际执行"**：
+   - 白话：让 AI 干活，得先确认它有"干活的工具"、有"被要求干活的规则"，否则它只是嘴上答应。
+   - 专业术语：function-calling 的引导缺失（missing tool guidance）；LLM 幻觉式承诺（hallucinated commitment）。
+   - 项目实际体现：agent 有 `record_observation` 工具但 INSTRUCTIONS 没引导 → 口头"已记录"零落盘；加规则后 task 77ce319c 真实写入 lab_records id=10。
+2. **提示词是代码，规则要测试保护**：
+   - 白话：给模型写的"员工守则"也是代码，删掉一条规则系统不会报错，但行为会悄悄变坏。
+   - 专业术语：提示词合同测试（prompt contract testing）；静默行为回退（silent behavior regression）。
+   - 项目实际体现：`test_web_agent_prompts.py` 断言 INSTRUCTIONS 关键句，防止以后有人"精简提示词"时把强制规则删掉。
+3. **异步链路验收要看最终状态，不是即时响应**：
+   - 白话：命令进了后台队列，先收到的"收到"不代表活干完了，要等一会儿查"结果"。
+   - 专业术语：异步验收（async acceptance）；最终一致性检查（eventual consistency check）。
+   - 项目实际体现：`/chat` 立即返回"已交给后台处理（任务 #…）"，真实验收轮询 `lab_records` 120 秒才看到 id=10 落盘。
+
+### 验收证据
+- 修复前（task 6830ffe4）：回复"已记录"但 lab_records 无新增；修复后（task 77ce319c）：
+  回复"已记录"且 lab_records 新增 id=10「离心机八百转运行十分钟」（extraction_source=rule）。
+- 新增 `tests/test_web_agent_prompts.py` 5 项全绿；全量 `Ran 739 tests ... OK`。
+- 历史 4 条假记录（加热/离心机/溶液/查看）在对话历史中留存、未落盘的事实已登记，用户可重输补录。
+
+## 2026-08-17：手机演示页——"扫码即用"的部署与交互坑
+
+### 知识 1：为什么"扫码即用"必须 HTTPS
+- 白话：手机浏览器只在两种页面允许网页调用麦克风——https 开头的页面，或 localhost。同一 WiFi 下用 `http://192.168.x.x` 打开，Chrome 会直接禁用麦克风，这不是代码 bug，是浏览器安全规则。
+- 专业术语：安全上下文（secure context）；`getUserMedia` 权限策略。
+- 项目实际体现：`web/app.py` 的 `/m` 页、`start_phone_server.py` 的自签证书、cloudflared 隧道，全都在解决同一件事——给手机一个 https 页面。
+
+### 知识 2：局域网 IP 探测会踩"虚拟网卡"的坑
+- 白话：程序"找自己的局域网地址"用的是 UDP 发包选路法，谁在默认路由上就选谁；装了 Clash/Mihomo 这类代理后，虚拟网卡（198.18.0.1）会抢先当选，二维码指向一个手机永远连不上的地址。
+- 专业术语：出口网卡选择（egress interface selection）；UDP connect 选路法；TUN 虚拟网卡；RFC 2544 保留段。
+- 项目实际体现：`phone_access.lan_ip()` 在本机选中 198.18.0.1，导致第一次起的局域网服务手机无法访问；已登记 `WEB-DEMO-IP-DETECT-01`。
+
+### 知识 3：演示页选"独立极简页"而不是"给桌面页做响应式"
+- 白话：把大页面改成小屏适配，要照顾一堆队友写的 JS 布局，容易改一处坏三处；比赛演示要的是"手机上有一个大按钮"，独立做一页最稳。
+- 专业术语：移动优先（mobile-first）vs 响应式改造（responsive retrofit）；关注点分离。
+- 项目实际体现：`web/frontend/mobile.html` 只含录音按钮 + 消息流，复用 `/asr/transcribe` 与 `/record`，桌面版零改动。
+
+## 2026-08-17（火山 TTS）：用"厂商云服务"补上演示 TTS，以及"工具测网不可信"的教训
+
+### 知识 1：诊断网络，先确认工具本身可信
+- 白话：一个命令测出"全网不通"，要先怀疑是命令被环境限制，而不是网络真断了——curl 在这个执行环境连本机回环都连不上，但它测外网的结果却被当成了"电脑没网"的结论。
+- 专业术语：假阴性（false negative）；工具与环境的信任边界。
+- 项目实际体现：curl 测百度/Cloudflare 全 000，python urllib 实测 pypi/github/deepseek/baidu 全通；后续一律用 python 验证网络。
+
+### 知识 2：第三方 TTS 的接入模式 = "供应商 + 密钥 + 音色"三件套
+- 白话：每个云 TTS 都是"填接口地址、填密钥、选音色"，封装成供应商后前端不用改，设置面板自动出现。
+- 专业术语：适配器模式（adapter pattern）；供应商注册表（provider registry）。
+- 项目实际体现：`web/tts_providers.py` 的 PROVIDERS 列表 + synthesize() 分支；新增 volcano 后前端 `tts_settings.js` 零改动自动显示。
+
+## 2026-08-17（ASR 固定中文）：默认值就是"生产路径的全局开关"
+- 白话：不传参的调用（main、web 接口）全部吃函数签名里的默认值，所以改一处默认值 = 改所有生产路径；显式传参的评测工具不受影响。
+- 专业术语：默认参数（default argument）作为配置注入点；显式优于隐式（explicit over implicit）的边界。
+- 项目实际体现：`src/asr/sensevoice_backend.py` 默认 `language=ASR_LANGUAGE`（config 集中管理），main 和 `web/api/asr.py` 都不传参自动生效；`compare_asr_languages.py` 显式传 auto 保留对比能力。
+
+## 2026-08-17（前端修复）："写两遍打架"的三个特征和排查法
+- 白话：两个脚本操作同一个界面元素时，一个"搬走"、一个"按原位置找"，后者就永远找不到——表现是"功能静默消失"，不报错。
+- 专业术语：DOM 移动节点（appendChild 移动）与选择器缓存失效；静默失败（silent failure）比报错更难查。
+- 项目实际体现：`views.js` 把 `#settings-modal .settings-box` 搬进画布后，`tts_settings.js` 仍按 `#settings-modal .settings-box` 查询 → null → return，"语音合成"区块消失。修复 = 注入方改为全局查 `.settings-box` + 面板不再被搬走。
+- 排查法：功能"没有"先看**注入方与宿主方的选择器是否一致**，再看**宿主是否被别的脚本移动/重建**（git blame/搜索 appendChild 即可发现）。
+
+## 2026-08-17（火山 401）：第三方接口报错 = 逐层实证，别猜文档
+- 白话：鉴权 401 不一定是凭据错。把报错消息当线索，一次试遍各种格式（段数/分隔符/顺序），从"invalid amount of parts: 3"（格式错）到"not granted"（资源没开通）——错误信息本身就在告诉你答案。
+- 专业术语：错误信息驱动的诊断（error-message-driven debugging）；HTTP 401 vs 403 语义（未认证 vs 已认证但无权限）。
+- 项目实际体现：`Bearer;token;appid`（3段）→ 401 格式错；`Bearer;token`（2段）→ 通过鉴权但 403 资源未开通。401→403 的转变证明代码修对了，剩的是控制台操作。
+

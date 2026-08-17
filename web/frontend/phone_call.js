@@ -32,13 +32,14 @@
 
   const PRE_SEC = 0.45;        // 保留开口前 0.45s 的预缓冲，避免句首被截断
   const SILENCE_SEC = 0.9;     // 停顿 0.9s 视为一句话结束
-  const MIN_SPEECH_SEC = 0.45; // 太短的噪声不送 ASR
+  const MIN_SPEECH_SEC = 0.6;  // 太短的噪声（<0.6s）不送 ASR，抗噪音误触
   const MAX_SPEECH_SEC = 15;   // 单段上限，超长自动切断
   const SAMPLE_RATE = 16000;   // SenseVoice 固定 16kHz
 
   let segmentQueue = [];
   let processingQueue = false;
   let autoSpeakWas = false;
+  let idleFrames = 0;          // 连续静音帧计数，用于自动重新校准噪音基线
 
   function hint(text) {
     const node = document.querySelector(HINT_SELECTOR);
@@ -140,37 +141,51 @@
   function handleFrame(frame) {
     if (!active) return;
 
-    // 前 0.5s 只校准环境噪音，不产生语音段。
+    // 校准环境噪音基线；校准期间也继续检测语音，避免重校准漏话。
     if (!calibrated) {
       calibFrames += 1; calibSum += rms(frame);
       if (calibFrames >= 18) {
         const noise = calibSum / calibFrames;
-        threshold = Math.max(0.005, Math.min(0.022, noise * 3.5 + 0.002));
+        threshold = Math.max(0.008, Math.min(0.03, noise * 3.5 + 0.003));
         calibrated = true;
         hint('正在听你说话…');
       } else {
         hint('正在校准环境噪音…');
-        return;
       }
     }
 
-    const loud = rms(frame) > threshold;
-    if (!loud) pushPre(frame);
+    const frameRms = rms(frame);
+    // 滞后回滞（hysteresis）：未开始语音时需明显高于阈值才触发（抗噪音突刺），
+    // 已进入语音后以较低阈值保持（防止句中断音）。
+    const loud = frameRms > (speechFrames.length > 0 ? threshold * 0.85 : threshold * 1.2);
 
-    if (loud) {
-      // 开口瞬间：把预缓冲并入本段，保证句首不丢字。
-      if (speechFrames.length === 0) {
-          window.stopSpeech?.(); // 用户一开口立即打断正在播放的旧回答（barge-in）
-        for (const item of preFrames) { speechFrames.push(item); speechLen += item.length; }
-        preFrames = []; preLen = 0;
+    if (!loud) {
+      pushPre(frame);
+      if (speechFrames.length > 0) {
+        speechFrames.push(frame); speechLen += frame.length; silenceLen += frame.length;
+        if (silenceLen >= SILENCE_SEC * sampleRate) finalizeSegment();
+      } else {
+        // 长时间静音后自动重新校准噪音基线（空调/风扇等环境变化时自适应）
+        idleFrames += 1;
+        if (idleFrames > 64) { // 约 3 秒静音（48k/1024 ≈ 21ms/帧）
+          calibFrames = 0; calibSum = 0; calibrated = false;
+          idleFrames = 0;
+        }
       }
-      speechFrames.push(frame); speechLen += frame.length; silenceLen = 0;
-
-      if (speechLen >= MAX_SPEECH_SEC * sampleRate) finalizeSegment();
-    } else if (speechFrames.length > 0) {
-      speechFrames.push(frame); speechLen += frame.length; silenceLen += frame.length;
-      if (silenceLen >= SILENCE_SEC * sampleRate) finalizeSegment();
+      return;
     }
+
+    idleFrames = 0;
+    // 开口瞬间：把预缓冲并入本段，保证句首不丢字。
+    if (speechFrames.length === 0) {
+        window.stopSpeech?.(); // 用户一开口立即打断正在播放的旧回答（barge-in）
+        setAvatar('listening'); // 开口立即切回"正在聆听"（回答播放完会归位 idle）
+      for (const item of preFrames) { speechFrames.push(item); speechLen += item.length; }
+      preFrames = []; preLen = 0;
+    }
+    speechFrames.push(frame); speechLen += frame.length; silenceLen = 0;
+
+    if (speechLen >= MAX_SPEECH_SEC * sampleRate) finalizeSegment();
   }
 
   function resetVad() {
@@ -214,7 +229,8 @@
         await new Promise(resolve => setTimeout(resolve, 350));
       } catch (error) {
         hint('语音识别失败：' + error.message);
-        setAvatar('idle');
+        // 通话仍在监听，头像保持聆听等待用户重试
+        setAvatar('listening');
       }
     }
     processingQueue = false;
@@ -228,10 +244,15 @@
     if (autoSpeak) { autoSpeakWas = autoSpeak.checked; autoSpeak.checked = true; }
 
     try {
-      // 先预热 ASR，避免第一句话等模型加载。
-      hint('正在准备语音引擎…');
-      const warm = await fetch('/asr/warmup', { method: 'POST' });
-      if (!warm.ok) throw new Error('ASR 模型加载失败');
+      // 只有模型未加载时才提示"正在准备"并预热；已加载直接开始，
+      // 避免每次进通话都闪"正在准备语音引擎"误导（预热接口是幂等的，秒回）。
+      const statusRes = await fetch('/asr/status');
+      const asrStatus = await statusRes.json();
+      if (asrStatus && !asrStatus.loaded) {
+        hint('首次使用正在加载语音模型，约需 1 分钟…');
+        const warm = await fetch('/asr/warmup', { method: 'POST' });
+        if (!warm.ok) throw new Error('ASR 模型加载失败');
+      }
 
       stream = await navigator.mediaDevices.getUserMedia({
         audio: {

@@ -2,6 +2,14 @@
   let currentAudio = null, requestController = null, queue = [], running = false, jobId = 0;
   const status = document.querySelector('#voice-status');
   const avatar = state => window.dispatchAvatarState?.(state);
+  // 通话模式进行中：回答播完应回到"正在聆听"，而不是归位"准备就绪"。
+  function isCallActive() {
+    const btn = document.getElementById('sh-call');
+    return btn ? btn.classList.contains('active') : false;
+  }
+  function settleAvatar() {
+    avatar(isCallActive() ? 'listening' : 'idle');
+  }
   function cleanForSpeech(text) {
     return text.replace(/```[\s\S]*?```/g, '代码内容已省略。').replace(/https?:\/\/\S+/g, '链接')
       .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu, '')
@@ -14,7 +22,7 @@
     if (current) result.push(current); return result;
   }
   function stopSpeech() {
-    jobId += 1; queue = []; requestController?.abort(); currentAudio?.pause(); currentAudio = null; window.speechSynthesis?.cancel(); avatar('idle');
+    jobId += 1; queue = []; requestController?.abort(); currentAudio?.pause(); currentAudio = null; window.speechSynthesis?.cancel(); settleAvatar();
   }
   function play(blob, expectedJob) {
     return new Promise((resolve, reject) => {
@@ -35,10 +43,13 @@
         const error = response.ok ? null : await response.json(); if (!response.ok) throw new Error(error.detail || '语音生成失败');
         await play(await response.blob(), expectedJob);
       }
-      if (expectedJob === jobId) { status.textContent = '朗读完成'; avatar('idle'); }
-    } catch (error) { if (error.name !== 'AbortError' && expectedJob === jobId) { status.textContent = `本地语音失败：${error.message}`; avatar('idle'); } }
+      if (expectedJob === jobId) { status.textContent = '朗读完成'; settleAvatar(); }
+    } catch (error) { if (error.name !== 'AbortError' && expectedJob === jobId) { status.textContent = `本地语音失败：${error.message}`; settleAvatar(); } }
     finally { running = false; if (queue.length && expectedJob === jobId) processQueue(expectedJob); }
   }
-  function addToQueue(text, replace) { if (replace) stopSpeech(); const clean = cleanForSpeech(text); if (!clean) return; const expectedJob = jobId; queue.push(...splitText(clean)); processQueue(expectedJob); }
+  function addToQueue(text, replace) {
+    if (window.ttsMuted === true) return; // 头像开关已关闭语音播报
+    if (replace) stopSpeech(); const clean = cleanForSpeech(text); if (!clean) return; const expectedJob = jobId; queue.push(...splitText(clean)); processQueue(expectedJob);
+  }
   window.stopSpeech = stopSpeech; window.speak = text => addToQueue(text, true); window.enqueueSpeech = text => addToQueue(text, false);
 })();

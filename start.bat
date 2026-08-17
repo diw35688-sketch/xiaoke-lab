@@ -1,5 +1,5 @@
 @echo off
-cd /d D:\me\ai107
+cd /d C:\Users\dahli\Documents\107
 
 if exist .venv\Scripts\python.exe (
   .venv\Scripts\python.exe scripts\start_best.py

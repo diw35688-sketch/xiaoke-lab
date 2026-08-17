@@ -80,3 +80,20 @@ Ran 422 tests in 1.562s — OK
 SenseVoice 和 FunASR VAD 模型缓存在用户目录的 ModelScope 缓存中，不保存在项目仓库。
 当前 `AutoModel` 使用模型名和 `master` 修订，启动时可能联网检查模型文件。
 后续任务将固定模型修订并关闭不必要的更新检查，以支持更快、更稳定的离线启动。
+
+## 6. 本机可用工具
+
+本机已安装 LibreOffice，可用其无头模式（headless）做文档格式转换（如
+docx/pptx → pdf），路径固定为：
+
+```text
+C:\Users\dahli\LibreOffice\program\soffice.exe
+```
+
+验证记录：2026-08-16 确认该文件存在（2026-07-23 安装）。
+命令行转换示例（PowerShell）：
+
+```powershell
+& 'C:\Users\dahli\LibreOffice\program\soffice.exe' `
+    --headless --convert-to pdf --outdir <输出目录> <输入文件>
+```

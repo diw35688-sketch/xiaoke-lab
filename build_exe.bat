@@ -1,4 +1,4 @@
 @echo off
-cd /d D:\me\ai107
+cd /d C:\Users\dahli\Documents\107
 .venv\Scripts\python.exe scripts\build_exe.py
 pause
