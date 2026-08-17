@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from src.core.unified_prompts import (
     UNIFIED_UNDERSTANDING_SYSTEM_PROMPT,
     build_unified_understanding_user_prompt,
@@ -15,6 +17,8 @@ from src.core.unified_understanding import (
 )
 from src.llm.client import LLMClient, LLMClientError
 from src.llm.processor import ProcessOutcome
+
+logger = logging.getLogger(__name__)
 
 
 class UnifiedUnderstandingProcessor:
@@ -54,9 +58,11 @@ class UnifiedUnderstandingProcessor:
             # 预期外失败：走到这里说明本模块存在缺陷，
             # 而不是外部环境的问题。仍然降级以保护主流程，
             # 但必须显式暴露，否则代码缺陷会被伪装成网络故障。
-            print(
-                "[统一理解] 非契约异常，疑似代码缺陷："
-                f"{type(error).__name__}: {error}"
+            logger.error(
+                "[统一理解] 非契约异常，疑似代码缺陷：%s: %s",
+                type(error).__name__,
+                error,
+                exc_info=True,
             )
             return self._degrade(request, generation, error)
 

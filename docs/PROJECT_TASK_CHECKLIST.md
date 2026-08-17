@@ -71,7 +71,7 @@ TODO → DESIGN → CODED → AUTO_OK → REAL_OK
 
 ## 2. 当前测试基线
 
-- 当前全量自动测试：`724 tests OK`（Python 3.11.9，2026-08-16；`PRESENT-NOACTION-FEEDBACK-01` 完成 AUTO_OK，新增 9 项 no_action 反馈测试）
+- 当前全量自动测试：`728 tests OK`（Python 3.11.9，2026-08-16；`UX-MODE-01` 完成 AUTO_OK，新增 4 项输出分层/会话 DEBUG 文件测试）
 - 环境验证：核心依赖和 `src.main` 导入成功；首次沙箱内失败已确认是执行权限误判，不是 `.venv` 损坏
 - 最近 PRESENT 真实验收会话：`20260815_212615`（补充复验 `20260815_213926`）
 - 最近 PRESENT 双会话复验：`20260816_143151` → `20260816_143201`（同进程再次唤醒成功，零第三方泄漏）
@@ -89,7 +89,9 @@ cd C:\Users\dahli\Desktop\asr_demo
 
 ## 3. 当前唯一下一项
 
-**`UX-MODE-01`：user/admin 输出分层。**
+**`SYNC-UI-CLAIMS-01`：文案与真实状态一致性。**
+
+`UX-MODE-01` 已完成 AUTO_OK：`UI_MODE=user|admin` 配置与渲染器校验已存在；生产模块意外异常从 print 迁到 logging；user 模式会话级 DEBUG 写入 `results/debug_<session>.log`，新会话自动替换旧会话日志。新增 4 项测试；全量 728 项通过。真实 user/admin 对照验收随最终 UX 走查执行。
 
 `PRESENT-NOACTION-FEEDBACK-01` 已完成 AUTO_OK：控制类 no_action 现在会投递一条 `NO_ACTION_FEEDBACK` 语义消息，用户文案按原因分别引导（编号不存在/缺答案/无当前目标/弃权/兜底）。 新增测试覆盖执行器原因透传、投影去重和文案映射；全量 724 项通过。
 
@@ -160,7 +162,7 @@ PRESENT 之外的 Query/Safety/RAG 真实接入、ASR 路演稳定性和 LLM 格
 | 11 | `P0` | `UX-BASELINE-01` 体验基线走查（用户 2026-08-14 提出"终端看不出体验"后建立） | **完成（UX_ISSUES）** | 九维体验走查表已建（`docs/UX_WALKTHROUGH_CHECKLIST.md`）；会话 `20260814_174441` 基线走查完成，10 项问题登记 UX-01~10（8 项走查发现 + 提示音/嘈杂识别为用户补充），5 项正向确认；原始输出 `results/walkthrough_baseline_session_20260814_174441.txt`，逐行标注版 `results/walkthrough_baseline_annotated_20260814_174441.md` | 10 项 UX 问题留待输出层/ASR 任务自然闭环（用户 2026-08-14：暂不与 PRESENT 强制绑定）；每闭环一项可复走九维表对比 |
 | 12 | `P1` | `UX-FIX-TONE-01` 事件提示音（UX-09，用户 2026-08-14 提出） | `TODO` | 需要用户注意的事件（追问/确认回执/降级/识别失败/结束语未识别）播放提示音，用户听到声音再看屏幕；复用 `play_wake_tone` 设施（`src/audio/feedback.py` 扩展事件音）+ 消息链路触发点；提示音≠TTS 朗读 | **用户决策（2026-08-14 更新）：顺延到 PRESENT-INTEGRATE-01 之后做**——触发点直接挂在 PRESENT 建好的消息链路上，输出层只动一次避免返工；完成后按九维表走查（重点验维6 ✗→✓） |
 | 13 | `P1` | `ASR-NOISE-SAMPLES-01` 嘈杂识别样例入语料（UX-10，用户 2026-08-14 提出） | **完成** | 20260814_174441 三个真实噪声样例已入 `evaluation/narration_robustness/narration_plan.json` 段 29/30/31（'防生缓冲液'/'제가.'/'.别束实验记录.'），schema 21 项 + 全量 468 项通过；修复走既有 ASR 线（AUDIO-PREROLL 截音/热词/后处理） | 样例已可被 `evaluate_narration_robustness.py` 评测；修复时机由 ASR 任务线决定 |
-| 14 | `P1` | `UX-MODE-01` 终端输出分层：用户版/管理员版（UX-11，用户 2026-08-14 提出） | `TODO` | 用户模式屏幕只显示 SCREEN 层（对话/回执/状态/待确认/指引），DEBUG 层单独保留（写 `results/debug_<session>.log`，信息不丢）；管理员模式屏幕显示全部；main.py 42 处 print 归类分层 + 统一出口；`UI_MODE=user|admin` 配置开关 | **与 PRESENT-INTEGRATE-01 同源**（消息链路），随 PRESENT 落地（硬问题修完即进，不设固定日期），不单独提前实现；完成后按九维表走查（重点维1/7 ✗→✓） |
+| 14 | `P1` | `UX-MODE-01` 终端输出分层：用户版/管理员版（UX-11，用户 2026-08-14 提出） | `AUTO_OK` | `UI_MODE` 校验、Renderer 分流、生产 print 清理均已完成；user 模式新增会话级 `results/debug_<session>.log`，新会话替换旧 handler。`src/llm/unified_processor.py` 非契约异常改 logging。新增 4 项测试；全量 728 项通过 | 待真实 user/admin 对照会话九维走查（重点维1/7 ✗→✓）后升 REAL_OK |
 | 15 | `P0` | `RESTORE-NONBLOCK-01` 恢复非阻塞录音（评委 2026-08-14 发现：main.py 已无后台线程） | **REAL_OK** | 新建 `OrderedTaskQueue`（通用单线程队列+背压4）+ `UnifiedSegmentProcessor`（六步业务流水线）；main 主循环改为"录音→提交后台→显示"，入口文件不再堆业务规则；拆两句谎话（111行"旧流程继续"→"ASR 原文已保存"；320行"无需等待"现为真）。全量 483 项通过（+15）；集成测试证明"录音期间 LLM 在后台跑"；真实会话 20260815_094954 连说 10 段不卡、计数正确（共10段/提交8段/上下文8=事件数） | 已恢复。体验裁决=用户接受当前"结果延后显示"节奏；前瞻要求 TTS 不乱序朗读（登记 TIMING-02） |
 | 16 | `P1` | `RESTORE-DEGRADED-HINT-01` 恢复降级人话提示（评委 2026-08-14 发现） | **REAL_OK** | `display_observation` 在 `acceptance_kind=="degraded_evidence_note"` 时打印"原始记录已保存，结构化处理暂时不可用"（话术取自 `OUTPUT_PRESENTATION_POLICY.md` 第224行） | 冒烟测试确认输出含人话 |
 | 17 | `P1` | `SYNC-UI-CLAIMS-01` 用户文案与实际行为一致性核查（评委 2026-08-14 发现） | **硬谎话 2 处已拆（随 RESTORE-NONBLOCK-01）** | ①main.py:320"无需等待"→非阻塞后为真；②main.py:111"旧流程继续"→"ASR 原文已保存"。**误导 2 处**仍待 PRESENT 文案统一改：③"立即继续监听"（非阻塞后为真）；④"提交 M 段实验口述"（内部术语）。DEBUG 泄漏仍登记 UX-01/UX-11 | 误导 2 处随 PRESENT 文案统一改 |
@@ -198,7 +200,7 @@ PRESENT 之外的 Query/Safety/RAG 真实接入、ASR 路演稳定性和 LLM 格
 |---:|---|---|
 | 1 | `CLARIFICATION-COMPOUND-CONFIRM-ANSWER-01` P0 复合确认+回答不能丢字段 | `AUTO_OK` |
 | 2 | `PRESENT-NOACTION-FEEDBACK-01` NOACTION 容错反馈 | `AUTO_OK` |
-| 3 | `UX-MODE-01` user/admin 输出分层 | `部分完成，任务状态待校准` |
+| 3 | `UX-MODE-01` user/admin 输出分层 | `AUTO_OK` |
 | 4 | `SYNC-UI-CLAIMS-01` 文案与真实状态一致性 | `部分完成` |
 | 5 | `PRESENT-RECORD-PREVIEW-01` 规范记录预览 | `TODO` |
 | 6 | `PRESENT-DELIVERY-BOUNDARY-01` Delivery Boundary 架构护栏 | `TODO` |
@@ -219,7 +221,7 @@ PRESENT 之外的 Query/Safety/RAG 真实接入、ASR 路演稳定性和 LLM 格
 | 5 | `PRESENT-FIX-LEAK-01` 开发输出泄漏收尾 | `REAL_OK` | 会话142945确认全程零泄漏；双会话143151→143201进一步确认同进程再次唤醒、两个新会话编号、WAITING/EXITED与程序级Pump生命周期均正确；专项63/63、全量576/576通过 |
 | 6 | `PRESENT-NOACTION-FEEDBACK-01` no_action 容错反馈 | `AUTO_OK` | 控制类 no_action 统一投递 NO_ACTION_FEEDBACK，用户不再看到沉默；真实 UX 随最终验收 |
 | 7 | `PRESENT-EXTENSION-SEAMS-01` 扩展接缝 | `TODO` | QUERY/DENY/WARNING/导出结果统一 projection→Intent；定义 WARNING 抢占规则 |
-| 8 | `UX-MODE-01` user/admin 输出分层 | `部分完成，任务状态待校准` | 程序级反馈分层、按会话日志、user/admin 真实对照验收 |
+| 8 | `UX-MODE-01` user/admin 输出分层 | `AUTO_OK` | 程序级反馈分层与按会话 DEBUG 日志已完成；真实 user/admin 对照验收并入最终 UX 走查 |
 | 9 | `SYNC-UI-CLAIMS-01` 文案与行为一致 | `部分完成` | 删除“提交 M 段”等内部术语，统一核查用户承诺与真实行为 |
 | 10 | `PRESENT-FINAL-UX-VERIFY-01` 最终真实验收 | `TODO` | 验证反馈完整、无重复/泄漏、顺序正确、尾消息不丢及九维不退化 |
 | 11 | `GAPS-FIX-ANSWER-HINT-01` 回答编号提示 | `TODO` | 存在待确认项时，引导用户用“问题一，……”明确回答目标 |
