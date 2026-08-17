@@ -137,6 +137,22 @@ def reagents():
         })
     return {"note": store.authority_note, "count": len(items), "reagents": items}
 
+class AnalyzeReagentsPayload(BaseModel):
+    texts: list
+
+
+class AddStepPayload(BaseModel):
+    protocol_id: str
+    title: str
+    instruction: str = ""
+    hazard_note: str | None = None
+    protocol_values: dict | None = None
+    must_record: list | None = None
+    terms: list | None = None
+    field_prompts: dict | None = None
+    substeps: list | None = None
+
+
 class StepEditPayload(BaseModel):
     """一个大步骤的可编辑内容。"""
 
@@ -149,6 +165,21 @@ class StepEditPayload(BaseModel):
     must_record: list | None = None
     field_prompts: dict | None = None
     substeps: list | None = None
+
+
+@router.post("/analyze-reagents")
+def analyze_reagents(payload: AnalyzeReagentsPayload):
+    """识别文字中出现的危化品和试剂配置库条目。"""
+    return domain.analyze_reagents(payload.texts)
+
+
+@router.post("/step")
+def add_step(payload: AddStepPayload):
+    """在方案末尾添加一个新的大步骤，严格校验后落盘。"""
+    try:
+        return domain.add_protocol_step(payload.model_dump(exclude_none=True))
+    except Exception as error:
+        raise HTTPException(status_code=400, detail=f"{type(error).__name__}: {error}")
 
 
 @router.put("/step")

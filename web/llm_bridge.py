@@ -134,3 +134,27 @@ def generate_protocol_draft(description: str) -> dict:
         return json.loads(result.content)
     except json.JSONDecodeError as error:
         raise ValueError(f"AI 返回的不是合法 JSON：{error}") from error
+
+
+def generate_reagent_prep_draft(description: str) -> dict:
+    """用 LLM 生成一条试剂配置草稿（不落盘，确认后才保存）。"""
+
+    client = WebSettingsLLMClient()
+    system_prompt = (
+        "你是实验室试剂配制助手。请根据用户描述生成一条试剂配制方案，只输出 JSON，不要 Markdown，不要解释。"
+        "JSON 结构必须是："
+        '{"reagent_prep_id":"英文短横线id","name_zh":"试剂中文名","purpose":"用途",'
+        '"target_concentration":"目标浓度或null","target_volume":"目标体积或null","solvent":"溶剂或null",'
+        '"steps":["步骤1","步骤2"],"storage_condition":"保存条件或null","expiry":"有效期或null",'
+        '"hazard_reagents":["涉及危险试剂中文名"],"source":"AI生成草稿","source_url":null,'
+        '"review_status":"UNREVIEWED"}'
+        "步骤至少 2 步。"
+    )
+    result = client.generate_json(
+        system_prompt=system_prompt,
+        user_prompt=description,
+    )
+    try:
+        return json.loads(result.content)
+    except json.JSONDecodeError as error:
+        raise ValueError(f"AI 返回的不是合法 JSON：{error}") from error

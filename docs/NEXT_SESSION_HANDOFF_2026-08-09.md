@@ -600,3 +600,10 @@ docs/                 任务清单、交接和学习记录
 - Protocol 准备材料：`data/protocols/prep_requirements.json` 映射 6 份方案 → 试剂配置。
 - 上传：`POST /reagent-prep/upload`、`POST /protocols/upload`，前端均有 JSON 文件上传入口。
 - 测试：全量 `Ran 766 tests ... OK`。
+
+## 22. 2026-08-16 文字 AI 成 JSON + 试剂自动识别 + 添加步骤
+
+- 用户粘贴文字即可生成 Protocol / 试剂配置 JSON 草稿，确认后保存。
+- 保存 Protocol 时自动识别方案中的试剂，并同步到 prep_requirements.json。
+- `POST /protocols/step` 支持在方案末尾添加大步骤；编辑器新增“新增步骤”按钮。
+- 测试：全量 `Ran 768 tests ... OK`。

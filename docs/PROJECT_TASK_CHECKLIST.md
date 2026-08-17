@@ -71,7 +71,7 @@ TODO → DESIGN → CODED → AUTO_OK → REAL_OK
 
 ## 2. 当前测试基线
 
-- 当前全量自动测试：`766 tests OK`（Python 3.11.9，2026-08-16；新增试剂配置库契约/存储 12 项测试）
+- 当前全量自动测试：`768 tests OK`（Python 3.11.9，2026-08-16；新增试剂识别 2 项测试）
 - 环境验证：核心依赖和 `src.main` 导入成功；首次沙箱内失败已确认是执行权限误判，不是 `.venv` 损坏
 - 最近 PRESENT 真实验收会话：`20260815_212615`（补充复验 `20260815_213926`）
 - 最近 PRESENT 双会话复验：`20260816_143151` → `20260816_143201`（同进程再次唤醒成功，零第三方泄漏）
@@ -1064,3 +1064,14 @@ matched_term 以后存知识库匹配到的标准术语（如 ASR 的"一液枪"
 - 测试：新增 12 项（契约 7 + 存储 5）；全量 `Ran 766 tests ... OK`。
 - 数据来源状态：全部 `UNREVIEWED`；0.1× BWT 有 protocols.io 来源 URL，其余为教学通用配方，
   待补充原始公开来源；使用前必须教师复核。
+
+## 2026-08-16 本轮维护记录：文字 AI 成 JSON + 试剂自动识别 + 添加步骤
+
+- 文字生成：`POST /reagent-prep/ai-draft` 与 `POST /protocols/ai-draft` 接受用户粘贴的文字，
+  LLM 生成 JSON 草稿，确认后才保存；前端两个页面都加了“AI 分析文字”入口。
+- 试剂识别：`POST /protocols/analyze-reagents` 与 `domain.analyze_reagents` 从任意文本中
+  同时识别危化品库和试剂配置库；`domain.add_protocol` 保存方案时自动把命中的试剂配置
+  写入 `prep_requirements.json`。
+- 修改/添加步骤：`POST /protocols/step` 在方案末尾追加大步骤（严格契约校验）；
+  方案编辑器底部新增“新增步骤”按钮。
+- 测试：新增 2 项；全量 `Ran 768 tests ... OK`。

@@ -190,12 +190,26 @@
       + '<div id="pe-head"><h3 id="pe-title-text">编辑步骤</h3><button id="pe-close">×</button></div>'
       + '<div id="pe-body"></div>'
       + '<div id="pe-foot"><span id="pe-msg"></span>'
+      + '<button class="sh-btn" id="pe-add-step">新增步骤</button>'
       + '<button class="sh-btn" id="pe-cancel">取消</button>'
       + '<button class="sh-btn primary" id="pe-save">保存</button></div></div>';
     document.body.appendChild(mask);
     el('pe-close').onclick = close;
     el('pe-cancel').onclick = close;
     el('pe-save').onclick = save;
+    el('pe-add-step').onclick = function () {
+      var title = prompt('新步骤标题');
+      if (!title) return;
+      fetch('/protocols/step', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ protocol_id: state.protocol.id, title: title, instruction: '请补充步骤说明', must_record: [], terms: [] })
+      }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); }).then(function (res) {
+        if (!res.ok) { alert(res.d.detail || '新增失败'); return; }
+        close();
+        if (window.runReload) window.runReload();
+      });
+    };
     mask.onclick = function (e) { if (e.target.id === 'pe-mask') close(); };
   }
 
