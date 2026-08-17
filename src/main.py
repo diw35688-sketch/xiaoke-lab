@@ -167,6 +167,37 @@ def recognize_one_segment(
         audio_path
     )
 
+def _attach_session_debug_log(session_id: str):
+    """user 模式下为本次会话挂一个独立 DEBUG 文件。
+
+    不改变根日志级别，只新增 FileHandler；下一次会话会先摘掉旧 handler，
+    避免一次运行多个会话时日志互相污染。admin 模式维持屏幕输出，不加文件。
+    """
+
+    if UI_MODE != "user":
+        return None
+
+    RESULTS_DIR.mkdir(exist_ok=True)
+    root = logging.getLogger()
+
+    for handler in list(root.handlers):
+        if getattr(handler, "_ai107_session_debug_log", False):
+            root.removeHandler(handler)
+            handler.close()
+
+    handler = logging.FileHandler(
+        RESULTS_DIR / f"debug_{session_id}.log",
+        encoding="utf-8",
+    )
+    handler.setLevel(logging.DEBUG)
+    handler.setFormatter(logging.Formatter(
+        "%(asctime)s %(levelname)s %(name)s: %(message)s"
+    ))
+    setattr(handler, "_ai107_session_debug_log", True)
+    root.addHandler(handler)
+    return handler
+
+
 def account_completed_task(task) -> bool:
     """统计一个已完成的后台任务；失败时报错，返回它是否算实验段。"""
 
@@ -206,6 +237,9 @@ def run_experiment_session(
             "%Y%m%d_%H%M%S"
         )
     )
+
+    # user 模式：DEBUG 只进 results/debug_<session>.log，不上用户屏幕。
+    _attach_session_debug_log(session_id)
 
     session_context = (
         SessionContext(

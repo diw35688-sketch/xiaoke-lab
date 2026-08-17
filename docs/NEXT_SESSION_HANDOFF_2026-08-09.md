@@ -324,10 +324,14 @@ git diff --check
 
 `PRESENT-NOACTION-FEEDBACK-01` 已完成 AUTO_OK：控制类 no_action 现在会投递
 `NO_ACTION_FEEDBACK` 语义意图，文案按原因引导用户（编号不存在/缺答案/无当前目标/弃权）。
-执行器 NO_ACTION 透传 planner reason。全量 724 项通过。
+执行器 NO_ACTION 透传 planner reason。
 
-**当前唯一下一项**：`UX-MODE-01`。终端输出分层：user 模式只显示对话/回执/状态/待确认/
-指引，DEBUG 层单独写日志；admin 模式显示全部。
+`UX-MODE-01` 已完成 AUTO_OK：`UI_MODE` 校验、Renderer 分流、生产 print 清理均已完成；
+user 模式会话级 DEBUG 写入 `results/debug_<session>.log`，新会话替换旧 handler；
+`src/llm/unified_processor.py` 非契约异常从 print 迁到 logging。全量 728 项通过。
+
+**当前唯一下一项**：`SYNC-UI-CLAIMS-01`。逐项核查用户可见文案与真实行为一致，
+重点清理“立即继续监听”“提交 M 段实验口述”等历史承诺。
 
 ---
 
@@ -520,3 +524,13 @@ docs/                 任务清单、交接和学习记录
   未知原因→“我听到了，但暂时无法处理这句话”。
 - 测试：新增 9 项；全量 `Ran 724 tests ... OK`。
 - 下一步：`UX-MODE-01`。
+
+## 16. 2026-08-16 UX-MODE-01 AUTO_OK
+
+- 修复：`src/llm/unified_processor.py` 非契约异常 print → logger.error(exc_info=True)；
+  user 模式新增会话级 `results/debug_<session>.log`，通过 `_attach_session_debug_log`
+  挂接 FileHandler，新会话替换旧 handler；admin 模式不加文件，维持屏幕输出。
+- 现有基础：`UI_MODE` 配置校验、`TerminalRenderer` 分流、`copy_for_intent` 的
+  admin 来源口述追加，此前已随 PRESENT 子步 B 落地。
+- 测试：新增 4 项；全量 `Ran 728 tests ... OK`。
+- 下一步：`SYNC-UI-CLAIMS-01`。

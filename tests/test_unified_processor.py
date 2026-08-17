@@ -186,6 +186,17 @@ class UnifiedUnderstandingProcessorTests(unittest.TestCase):
         self.assertEqual(event.raw_text, RAW_TEXT)
         self.assertEqual(outcome.llm_attempts, 2)
 
+    def test_unexpected_error_is_logged_not_printed(self):
+        with self.assertLogs(
+            "src.llm.unified_processor", level="ERROR"
+        ) as captured:
+            outcome = UnifiedUnderstandingProcessor(
+                FakeLLMClient(error=RuntimeError("boom"))
+            ).understand(request())
+
+        self.assertTrue(outcome.degraded)
+        self.assertIn("非契约异常", "\n".join(captured.output))
+
     def test_client_failure_degrades_and_keeps_failure_metrics(self):
         error = LLMClientError(
             "timeout", attempts=2, processing_seconds=3.5
