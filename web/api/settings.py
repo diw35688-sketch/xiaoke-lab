@@ -80,7 +80,7 @@ def fetch_models(payload: ModelsPayload | None = None):
             api_key=payload.api_key if payload else None,
             provider_id=payload.provider_id if payload else None,
         )
-        return {"models": models}
+        return {"models": models, "catalog": settings_store.catalog_for_models(models)}
     except Exception as error:
         from fastapi import HTTPException
         raise HTTPException(status_code=400, detail=str(error))

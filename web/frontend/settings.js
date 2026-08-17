@@ -209,13 +209,17 @@
         .then(function (res) {
           if (!res.ok) { msg.textContent = res.d.detail || '拉取失败'; return; }
           var list = res.d.models || [];
+          var catalog = res.d.catalog || [];
+          var catalogById = {};
+          catalog.forEach(function (c) { catalogById[c.id] = c; });
           el('settings-model-list').innerHTML = list.map(function (m) {
             return '<option value="' + m + '">';
           }).join('');
           var select = el('settings-model-select');
           select.style.display = list.length ? 'block' : 'none';
           select.innerHTML = '<option value="">选择模型…</option>' + list.map(function (m) {
-            return '<option value="' + m + '">' + m + '</option>';
+            var meta = catalogById[m] || { label: m, category: '其他', context: '-' };
+            return '<option value="' + m + '">' + meta.label + ' · ' + meta.category + ' · ' + meta.context + '</option>';
           }).join('');
           msg.textContent = '已从 ' + el('settings-base-url').value.trim() + ' 拉到 ' + list.length + ' 个模型';
         })
