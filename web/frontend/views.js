@@ -60,10 +60,48 @@
         + '<button class="sh-btn" id="ai-protocol-btn">AI 生成方案（弹窗描述）</button>'
         + '<input type="file" id="protocol-file" accept=".json,application/json" style="margin-left:10px;font-size:12px">'
         + '<button class="sh-btn" id="protocol-upload-btn" style="margin-left:6px">上传 JSON</button>'
+        + '<input type="file" id="protocol-doc-file" accept=".pdf,.png,.jpg,.jpeg" style="margin-left:10px;font-size:12px">'
+        + '<button class="sh-btn primary" id="protocol-ocr-btn" style="margin-left:6px">识别 PDF/图片</button>'
+        + '<span id="protocol-ocr-msg" style="color:#64748b;font-size:12px;margin-left:10px"></span>'
         + '<span id="protocol-upload-msg" style="color:#64748b;font-size:12px;margin-left:10px"></span>'
         + '<span style="color:#94a3b8;font-size:12px;margin-left:10px">JSON：{"protocols":[{...}]}</span></div>'
         + '<div id="ai-draft-box"></div>'
+        + '<div id="ocr-draft-box"></div>'
         + '</div>';
+      var ocrBtn = host.querySelector('#protocol-ocr-btn');
+      if (ocrBtn) ocrBtn.onclick = function () {
+        var input = host.querySelector('#protocol-doc-file');
+        var msg = host.querySelector('#protocol-ocr-msg');
+        if (!input.files || !input.files[0]) { msg.textContent = '请先选择 PDF/图片文件'; return; }
+        var form = new FormData();
+        form.append('file', input.files[0]);
+        msg.textContent = 'OCR 识别中，可能需要 1-2 分钟…';
+        var box = host.querySelector('#ocr-draft-box');
+        box.innerHTML = '';
+        fetch('/protocols/upload-file', { method: 'POST', body: form }).then(function (r) {
+          return r.json().then(function (d) { return { ok: r.ok, d: d }; });
+        }).then(function (res) {
+          if (!res.ok) { msg.textContent = res.d.detail || '识别失败'; return; }
+          var drafts = res.d.drafts || [];
+          msg.textContent = '识别出 ' + drafts.length + ' 个实验，请逐个确认保存';
+          box.innerHTML = drafts.map(function (draft, index) {
+            return '<pre style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px;white-space:pre-wrap;font-size:12px;margin-top:10px">'
+              + esc(JSON.stringify(draft, null, 2)) + '</pre>'
+              + '<div style="margin-top:8px"><button class="sh-btn primary" data-ocr-save="' + index + '">确认保存此方案</button></div>';
+          }).join('');
+          Array.prototype.forEach.call(box.querySelectorAll('[data-ocr-save]'), function (btn) {
+            btn.onclick = function () {
+              btn.disabled = true;
+              api('/protocols/save-draft', 'POST', { protocol: drafts[parseInt(btn.dataset.ocrSave, 10)] }).then(function (saved) {
+                if (saved && saved.detail) { btn.textContent = '保存失败：' + saved.detail; btn.disabled = false; return; }
+                btn.textContent = '已保存';
+                window.shellShow('protocols');
+              });
+            };
+          });
+        }).catch(function (e) { msg.textContent = '识别失败：' + e.message; });
+      };
+
       var uploadBtn = host.querySelector('#protocol-upload-btn');
       if (uploadBtn) uploadBtn.onclick = function () {
         var input = host.querySelector('#protocol-file');
