@@ -209,6 +209,9 @@
         .then(function (res) {
           if (!res.ok) { msg.textContent = res.d.detail || '拉取失败'; return; }
           var list = res.d.models || [];
+          list = list.filter(function (m) {
+            return ['mineru', 'unlimited-ocr', 'qwen3-embedding', 'qwen3-reranker'].indexOf(m) < 0;
+          });
           var catalog = res.d.catalog || [];
           var catalogById = {};
           catalog.forEach(function (c) { catalogById[c.id] = c; });
