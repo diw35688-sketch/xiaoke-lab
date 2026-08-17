@@ -1,0 +1,218 @@
+{
+  "schema_version": 1,
+  "reagent_preps": [
+    {
+      "reagent_prep_id": "phosphate-buffer-0.1m-ph7.4",
+      "name_zh": "0.1 mol/L pH 7.4 磷酸缓冲液",
+      "purpose": "生化实验常用缓冲体系",
+      "target_concentration": "0.1 mol/L",
+      "target_volume": "1 L",
+      "solvent": "去离子水",
+      "steps": [
+        "称取方案规定质量的磷酸二氢盐和磷酸氢二盐（合计约 3.58 g，按配方比例）",
+        "加入约 800 mL 去离子水，搅拌至完全溶解",
+        "用 pH 计监测，缓慢调节至 pH 7.4",
+        "转移至 1 L 容量瓶，定容至刻度",
+        "倒转混匀，贴标签并记录保存条件"
+      ],
+      "storage_condition": "4°C 冷藏",
+      "expiry": "建议 1 周内使用",
+      "hazard_reagents": [
+        "磷酸二氢钠",
+        "磷酸氢二钠"
+      ],
+      "source": "从 undergraduate_basic_protocols.json 的磷酸缓冲液配制方案提取，待补充原始公开来源",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "bwt-0.1x",
+      "name_zh": "0.1× BWT 缓冲液",
+      "purpose": "低浓度洗涤缓冲液",
+      "target_concentration": "0.1×",
+      "target_volume": "按需配制",
+      "solvent": "去离子水",
+      "steps": [
+        "按 1:10 比例取 1× BWT 母液加入去离子水稀释",
+        "混匀后经 0.22 µm 滤膜过滤",
+        "分装并标注配制日期"
+      ],
+      "storage_condition": "4°C 冷藏",
+      "expiry": "建议 1 周内使用",
+      "hazard_reagents": [],
+      "source": "protocols.io 公开方案 0.1xBWT buffer",
+      "source_url": "https://www.protocols.io/view/0-1xbwt-buffer-c68izhue.pdf",
+      "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "naoh-1m",
+      "name_zh": "1 mol/L 氢氧化钠溶液",
+      "purpose": "调节 pH、中和酸性溶液",
+      "target_concentration": "1 mol/L",
+      "target_volume": "100 mL",
+      "solvent": "去离子水",
+      "steps": [
+        "称取 4.0 g 氢氧化钠",
+        "缓慢加入约 80 mL 去离子水，搅拌溶解并散热",
+        "定容至 100 mL",
+        "转移至耐碱容器，贴标签"
+      ],
+      "storage_condition": "室温、耐碱容器密封",
+      "expiry": "建议 1 个月内使用",
+      "hazard_reagents": [
+        "氢氧化钠"
+      ],
+      "source": "本科实验教学通用配方，待补充原始公开来源",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "hcl-1m",
+      "name_zh": "1 mol/L 盐酸溶液",
+      "purpose": "调节 pH、酸化样品",
+      "target_concentration": "1 mol/L",
+      "target_volume": "100 mL",
+      "solvent": "去离子水",
+      "steps": [
+        "量取约 8.6 mL 浓盐酸（约 12 mol/L）",
+        "缓慢加入约 80 mL 去离子水中，边加边搅拌",
+        "定容至 100 mL",
+        "转移至耐酸容器，贴标签"
+      ],
+      "storage_condition": "室温、耐酸容器密封",
+      "expiry": "建议 1 个月内使用",
+      "hazard_reagents": [
+        "盐酸"
+      ],
+      "source": "本科实验教学通用配方，待补充原始公开来源",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "edta-0.5m-ph8",
+      "name_zh": "0.5 mol/L EDTA（pH 8.0）",
+      "purpose": "螯合金属离子，核酸电泳常用",
+      "target_concentration": "0.5 mol/L",
+      "target_volume": "100 mL",
+      "solvent": "去离子水",
+      "steps": [
+        "称取 18.6 g EDTA 二钠盐",
+        "加入约 80 mL 去离子水，搅拌溶解",
+        "用氢氧化钠调节 pH 至 8.0（EDTA 完全溶解）",
+        "定容至 100 mL，贴标签"
+      ],
+      "storage_condition": "室温",
+      "expiry": "建议 3 个月内使用",
+      "hazard_reagents": [
+        "氢氧化钠"
+      ],
+      "source": "本科实验教学通用配方，待补充原始公开来源",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "tae-50x",
+      "name_zh": "50× TAE 电泳缓冲液",
+      "purpose": "琼脂糖凝胶电泳缓冲液母液",
+      "target_concentration": "50×",
+      "target_volume": "1 L",
+      "solvent": "去离子水",
+      "steps": [
+        "称取 242 g Tris 碱",
+        "加入 57.1 mL 冰醋酸",
+        "加入 100 mL 0.5 mol/L EDTA（pH 8.0）",
+        "加去离子水定容至 1 L，混匀",
+        "使用时稀释至 1×"
+      ],
+      "storage_condition": "室温",
+      "expiry": "建议 6 个月内使用",
+      "hazard_reagents": [
+        "乙酸",
+        "EDTA"
+      ],
+      "source": "本科实验教学通用配方，待补充原始公开来源",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "sds-10pct",
+      "name_zh": "10% SDS 溶液",
+      "purpose": "蛋白变性剂、电泳常用",
+      "target_concentration": "10% (w/v)",
+      "target_volume": "100 mL",
+      "solvent": "去离子水",
+      "steps": [
+        "称取 10 g SDS",
+        "加入约 80 mL 去离子水，缓慢搅拌溶解",
+        "定容至 100 mL，贴标签"
+      ],
+      "storage_condition": "室温",
+      "expiry": "建议 3 个月内使用",
+      "hazard_reagents": [],
+      "source": "本科实验教学通用配方，待补充原始公开来源",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "pbs-1x",
+      "name_zh": "1× PBS 磷酸盐缓冲液",
+      "purpose": "细胞与分子实验常用等渗缓冲液",
+      "target_concentration": "1×",
+      "target_volume": "1 L",
+      "solvent": "去离子水",
+      "steps": [
+        "称取 8 g 氯化钠、0.2 g 氯化钾、1.44 g 磷酸氢二钠、0.24 g 磷酸二氢钾",
+        "加入约 800 mL 去离子水，搅拌溶解",
+        "调节 pH 至 7.4",
+        "定容至 1 L，贴标签"
+      ],
+      "storage_condition": "4°C 冷藏",
+      "expiry": "建议 1 周内使用",
+      "hazard_reagents": [],
+      "source": "本科实验教学通用配方，待补充原始公开来源",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "agarose-gel-1pct",
+      "name_zh": "1% 琼脂糖凝胶",
+      "purpose": "核酸电泳分离介质",
+      "target_concentration": "1% (w/v)",
+      "target_volume": "按胶槽体积配制",
+      "solvent": "1× TAE 缓冲液",
+      "steps": [
+        "称取 1 g 琼脂糖，加入 100 mL 1× TAE 缓冲液",
+        "微波加热至完全溶解、透明无颗粒",
+        "冷却至约 60°C，加入核酸染料并混匀",
+        "倒入制胶槽，插入梳子，冷却凝固"
+      ],
+      "storage_condition": "现配现用",
+      "expiry": "建议当天使用",
+      "hazard_reagents": [],
+      "source": "本科实验教学通用配方，待补充原始公开来源",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "bradford-working-reagent",
+      "name_zh": "Bradford 工作液",
+      "purpose": "蛋白浓度测定显色液",
+      "target_concentration": "工作液",
+      "target_volume": "按试剂盒说明配制",
+      "solvent": "按试剂盒说明",
+      "steps": [
+        "按试剂盒说明将考马斯亮蓝储备液稀释至工作浓度",
+        "过滤除去不溶颗粒",
+        "避光保存，使用前恢复室温"
+      ],
+      "storage_condition": "4°C 避光",
+      "expiry": "按试剂盒说明",
+      "hazard_reagents": [
+        "考马斯亮蓝"
+      ],
+      "source": "本科实验教学通用配方，待补充原始公开来源",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
+    }
+  ]
+}

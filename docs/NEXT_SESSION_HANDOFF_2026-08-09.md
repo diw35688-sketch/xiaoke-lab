@@ -590,3 +590,13 @@ docs/                 任务清单、交接和学习记录
   可选 `event_tone_player`；main 两个 pump 均已接入。
 - 测试：新增 14 项；全量 `Ran 754 tests ... OK`。
 - 下一步：`PRESENT-FINAL-UX-VERIFY-01`。
+
+## 21. 2026-08-16 试剂配置库 + Protocol 准备材料 + 上传接口
+
+- 新增试剂配置库：`data/reagent_prep/reagent_prep_library.json`（10 条）、
+  `src/core/reagent_prep.py`、`src/storage/reagent_prep_store.py`；
+  API `/reagent-prep`；前端“试剂配置库”页；工具 `list_reagent_preps`、
+  `get_reagent_prep`、`get_protocol_prep_requirements`。
+- Protocol 准备材料：`data/protocols/prep_requirements.json` 映射 6 份方案 → 试剂配置。
+- 上传：`POST /reagent-prep/upload`、`POST /protocols/upload`，前端均有 JSON 文件上传入口。
+- 测试：全量 `Ran 766 tests ... OK`。

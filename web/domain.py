@@ -7,6 +7,7 @@ web/ 以自身为工作目录启动，src/ 在仓库根目录，因此这里显�
 
 from __future__ import annotations
 
+import json
 import sys
 import threading
 from pathlib import Path
@@ -18,15 +19,24 @@ if str(REPO_ROOT) not in sys.path:
 from src.core.protocol_segment_evaluation import evaluate_segment  # noqa: E402
 from src.core.protocol_selection import select_protocol  # noqa: E402
 from src.core.protocol_session import ProtocolSessionState  # noqa: E402
+from src.core.reagent_prep import ReagentPrep, ReagentPrepError  # noqa: E402
 from src.llm.schemas import ExperimentEntities  # noqa: E402
 from src.storage.hazmat_store import HazmatStore  # noqa: E402
 from src.storage.protocol_store import ProtocolStore  # noqa: E402
+from src.storage.reagent_prep_store import (  # noqa: E402
+    REAGENT_PREP_FILE,
+    ReagentPrepStore,
+)
 
 PROTOCOL_FILE = REPO_ROOT / "data" / "protocols" / "undergraduate_basic_protocols.json"
+PREP_REQUIREMENTS_FILE = (
+    REPO_ROOT / "data" / "protocols" / "prep_requirements.json"
+)
 
 _lock = threading.RLock()
 _protocol_store = None
 _hazmat_store = None
+_reagent_prep_store = None
 _session: ProtocolSessionState | None = None
 
 
@@ -44,6 +54,14 @@ def hazmat() -> HazmatStore:
         if _hazmat_store is None:
             _hazmat_store = HazmatStore()
         return _hazmat_store
+
+
+def reagent_preps() -> ReagentPrepStore:
+    global _reagent_prep_store
+    with _lock:
+        if _reagent_prep_store is None:
+            _reagent_prep_store = ReagentPrepStore(REAGENT_PREP_FILE)
+        return _reagent_prep_store
 
 
 def session() -> ProtocolSessionState:
@@ -298,3 +316,75 @@ def update_step(payload: dict) -> dict:
                 if current:
                     _session = _session.jump_to(current)
     return step_view(session())
+
+
+def reagent_prep_view(prep: ReagentPrep) -> dict:
+    """把一条试剂配置方案转成前端可渲染结构，并附带危险提示。"""
+
+    store = hazmat()
+    safety = []
+    for name in prep.hazard_reagents:
+        found = store.find(name)
+        if found is not None:
+            safety.append({
+                "name": found.name_zh,
+                "cas": found.cas,
+                "critical": found.is_critical,
+                "codes": list(found.critical_codes),
+                "statements": [s.text for s in found.critical_statements()],
+                "source_url": found.source_url,
+            })
+    return {
+        "reagent_prep_id": prep.reagent_prep_id,
+        "name_zh": prep.name_zh,
+        "purpose": prep.purpose,
+        "target_concentration": prep.target_concentration,
+        "target_volume": prep.target_volume,
+        "solvent": prep.solvent,
+        "steps": list(prep.steps),
+        "storage_condition": prep.storage_condition,
+        "expiry": prep.expiry,
+        "hazard_reagents": list(prep.hazard_reagents),
+        "source": prep.source,
+        "source_url": prep.source_url,
+        "review_status": prep.review_status,
+        "safety": safety,
+        "safety_note": hazmat().authority_note,
+    }
+
+
+def add_reagent_prep(raw_prep: dict) -> dict:
+    """校验并新增一条试剂配置；不通过绝不落盘。"""
+
+    prep = ReagentPrep.from_dict(raw_prep)
+    store = reagent_preps()
+    store.add(prep)
+    return reagent_prep_view(prep)
+
+
+def add_reagent_preps(raw_preps: list) -> dict:
+    """批量校验并新增；全部通过才写库。"""
+
+    preps = [ReagentPrep.from_dict(item) for item in raw_preps]
+    store = reagent_preps()
+    store.add_many(preps)
+    return {
+        "added": len(preps),
+        "ids": [p.reagent_prep_id for p in preps],
+    }
+
+
+def protocol_prep_requirements(protocol_id: str | None) -> dict:
+    """读取方案需要的试剂配置列表；找不到方案返回空。"""
+
+    if protocol_id is None:
+        return {"protocol_id": None, "items": []}
+    raw = json.loads(PREP_REQUIREMENTS_FILE.read_text(encoding="utf-8"))
+    ids = raw.get("requirements", {}).get(protocol_id, [])
+    store = reagent_preps()
+    items = []
+    for prep_id in ids:
+        prep = store.get_by_id(prep_id)
+        if prep is not None:
+            items.append(reagent_prep_view(prep))
+    return {"protocol_id": protocol_id, "items": items}

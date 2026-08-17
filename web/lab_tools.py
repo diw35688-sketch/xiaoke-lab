@@ -162,6 +162,58 @@ def _select_protocol(protocol_id=None):
 
 
 @tool(
+    "list_reagent_preps",
+    "列出所有可配制的试剂/缓冲液配方。用户在实验前问“要先配什么”“有什么溶液要准备”时调用。",
+    {"type": "object", "properties": {}, "additionalProperties": False},
+    kind="search", title="查看试剂配置库",
+    present=lambda a, r: [f"共 {len(r['items'])} 条试剂配置"]
+    + [f"· {x['name_zh']}（{x['target_concentration'] or '工作液'}）" for x in r["items"][:8]],
+)
+def _list_reagent_preps():
+    return {
+        "items": [domain.reagent_prep_view(p) for p in domain.reagent_preps().list_all()]
+    }
+
+
+@tool(
+    "get_reagent_prep",
+    "查看某一种试剂/缓冲液的具体配制方法、保存条件和危险提示。"
+    "用户问“怎么配 50× TAE”“PBS 怎么配”时调用。",
+    {
+        "type": "object",
+        "properties": {"reagent_prep_id": {"type": "string", "description": "试剂配置ID"}},
+        "required": ["reagent_prep_id"],
+        "additionalProperties": False,
+    },
+    kind="read", title="查看试剂配方 {reagent_prep_id}",
+    present=lambda a, r: [f"配方：{r['name_zh']}", f"目标：{r['target_concentration'] or '未指定'}，溶剂：{r['solvent'] or '未指定'}"]
+    + [f"步骤 {i}. {s}" for i, s in enumerate(r["steps"], start=1)]
+    + [f"⚠ {s['name']}：{'；'.join(s['statements'][:1])}" for s in r.get("safety", []) if s.get("critical")],
+)
+def _get_reagent_prep(reagent_prep_id):
+    prep = domain.reagent_preps().get_by_id(reagent_prep_id)
+    if prep is None:
+        raise ValueError("没有这种试剂配置：" + str(reagent_prep_id))
+    return domain.reagent_prep_view(prep)
+
+
+@tool(
+    "get_protocol_prep_requirements",
+    "查看当前所选实验方案在开始前需要准备哪些试剂/缓冲液。"
+    "用户问“做这个实验前要先配什么”时调用。",
+    {"type": "object", "properties": {}, "additionalProperties": False},
+    kind="read", title="查看实验前准备材料",
+    present=lambda a, r: ([f"方案 {r['protocol_id']} 需要准备："]
+                          + [f"· {x['name_zh']}：{x['purpose']}" for x in r["items"]])
+    if r["items"] else ["当前没有可用的准备材料清单。"],
+)
+def _get_protocol_prep_requirements():
+    state = domain.session()
+    protocol_id = state.selection.protocol.protocol_id if state.selection.protocol else None
+    return domain.protocol_prep_requirements(protocol_id)
+
+
+@tool(
     "get_current_step",
     "查看当前实验进行到第几步、这一步方案规定了什么参数、现场必须记录什么、"
     "以及涉及试剂的安全提示。用户问“现在做到哪了”“这步要注意什么”时调用。",
