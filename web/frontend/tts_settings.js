@@ -93,7 +93,7 @@
   }
 
   function attach() {
-    var box = document.querySelector('#settings-modal .settings-box');
+    var box = document.querySelector('.settings-box');
     if (!box || document.getElementById('tts-provider')) return;
     var holder = document.createElement('div');
     holder.innerHTML = HTML;
