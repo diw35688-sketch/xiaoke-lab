@@ -233,8 +233,8 @@ PRESENT 之外的 Query/Safety/RAG 真实接入、ASR 路演稳定性和 LLM 格
 | 11 | `GAPS-FIX-ANSWER-HINT-01` 回答编号提示 | `TODO` | 存在待确认项时，引导用户用“问题一，……”明确回答目标 |
 | 12 | `UX-FIX-TONE-01` 事件提示音 | `TODO` | 追问/回执/降级/失败等需注意事件播放提示音；提示音不等于 TTS |
 | 13 | `PRESENT-CLOSING-NAME-01` 收尾回执命名消歧 | `AUTO_OK` | 已统一为 `SESSION_CLOSING_SUMMARY`，无兼容双名和旧 PRESENT 引用；专项 41/41、全量 571/571 通过 |
-| 14 | `PRESENT-RECORD-PREVIEW-01` 规范记录预览 | `TODO` | user 用 `normalized_text` 核对系统最终采纳事实，原始 ASR 继续保存并转 admin/debug/按需详情；禁止自由 assistant_reply 和额外 LLM 调用 |
-| 15 | `PRESENT-DELIVERY-BOUNDARY-01` 交付链路架构合同 | `TODO` | 固定 Coordinator/Renderer/Pump/Sink 职责、生命周期和变化归属；QUERY/DENY 等随业务扩，WARNING 按真实调度需求扩，TTS/Web 在第二真实渠道接入前做有限架构子步；禁止过早通用化，也禁止绕过统一链路 |
+| 14 | `PRESENT-RECORD-PREVIEW-01` 规范记录预览 | `AUTO_OK` | `RECORD_ACK` 携带 `event_previews`；user 模式不再逐段显示原始 ASR；原始 ASR 继续落盘；禁止自由 assistant_reply 和额外 LLM 调用 |
+| 15 | `PRESENT-DELIVERY-BOUNDARY-01` 交付链路架构合同 | `AUTO_OK` | 输出边界护栏测试覆盖 PRESENT 各层；`PRESENT_DESIGN.md` 第 14 节固化职责与变化归属；QUERY/DENY 等随业务扩，WARNING 按真实调度需求扩；禁止过早通用化，也禁止绕过统一链路 |
 
 ### 3.1B 已完成看板（近期已闭环，证据详见维护日志）
 
