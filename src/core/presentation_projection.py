@@ -119,6 +119,12 @@ def messages_for_observation(
             messages.append(
                 _deferred(observation, pending.target_display_number)
             )
+    elif action == "no_action":
+        if (
+            observation.acceptance_kind is None
+            and not observation.end_confirmation_requested
+        ):
+            messages.append(_no_action_feedback(observation))
 
     if observation.end_confirmation_requested:
         messages.append(
@@ -210,6 +216,19 @@ def _confirmation_ack(
         args=args,
         priority=MessagePriority.DIRECT_ACK,
         screen_target=ScreenTarget.STATUS,
+        source_segment_id=observation.segment_id,
+    )
+
+
+def _no_action_feedback(
+    observation: UnifiedObservation,
+) -> PresentationIntent:
+    return PresentationIntent(
+        intent_id=f"{observation.request_id}-no-action",
+        kind=MessageKind.NO_ACTION_FEEDBACK,
+        args={"reason": observation.execution_reason or ""},
+        priority=MessagePriority.DIRECT_ACK,
+        screen_target=ScreenTarget.DIALOGUE,
         source_segment_id=observation.segment_id,
     )
 
