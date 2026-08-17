@@ -175,6 +175,53 @@ def clear_api_key() -> ModelSettings:
         return settings
 
 
+def fetch_models(
+    base_url: str | None = None,
+    api_key: str | None = None,
+) -> list[str]:
+    """从兼容 OpenAI 的 /models 接口拉取可用模型名。"""
+
+    settings = current()
+    base_url = (base_url or settings.base_url).strip()
+    api_key = api_key or settings.api_key
+    if not base_url:
+        raise ValueError("请先填写接口地址 Base URL。")
+
+    import httpx
+
+    url = base_url.rstrip("/") + "/models"
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = "Bearer " + api_key
+    try:
+        response = httpx.get(
+            url,
+            headers=headers,
+            timeout=httpx.Timeout(20, connect=8),
+        )
+    except httpx.ConnectError:
+        raise ValueError("连不上接口地址，请检查网络或 base_url 是否正确")
+    except httpx.TimeoutException:
+        raise ValueError("请求超时，接口地址可能不可达")
+    except Exception as error:
+        raise ValueError(type(error).__name__ + ": " + str(error)[:140])
+
+    if response.status_code != 200:
+        raise ValueError(
+            "HTTP " + str(response.status_code) + "：" + response.text[:140]
+        )
+    try:
+        data = response.json()
+        models = data.get("data", data)
+        names = [item.get("id", "") for item in models if isinstance(item, dict)]
+        names = [name for name in names if name]
+    except Exception as error:
+        raise ValueError("返回结果不是预期 JSON：" + str(error))
+    if not names:
+        raise ValueError("没有拉到模型，请检查接口地址和权限。")
+    return sorted(set(names))
+
+
 def test_connection(settings: ModelSettings | None = None) -> tuple[bool, str]:
     """用最小请求验证密钥、地址和模型名是否真的能用。"""
     settings = settings or current()

@@ -9,6 +9,11 @@ import settings_store
 router = APIRouter(prefix="/settings", tags=["设置"])
 
 
+class ModelsPayload(BaseModel):
+    base_url: str | None = None
+    api_key: str | None = None
+
+
 class SettingsPayload(BaseModel):
     api_key: str | None = None
     base_url: str | None = None
@@ -60,6 +65,23 @@ def test_settings(payload: SettingsPayload | None = None):
     else:
         ok, message = settings_store.test_connection()
     return {"ok": ok, "message": message}
+
+
+@router.post("/models")
+def fetch_models(payload: ModelsPayload | None = None):
+    """从当前/候选接口地址拉取可用模型列表。"""
+    try:
+        if payload and payload.api_key:
+            models = settings_store.fetch_models(
+                base_url=payload.base_url,
+                api_key=payload.api_key,
+            )
+        else:
+            models = settings_store.fetch_models()
+        return {"models": models}
+    except Exception as error:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail=str(error))
 
 
 @router.delete("/api-key")

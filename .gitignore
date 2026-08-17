@@ -50,6 +50,7 @@ dist/
 build/
 *.spec
 setup_log.txt
+uvicorn_*.log
 
 # 网页端运行时模型设置/敏感数据（不提交）
 web/certs/
