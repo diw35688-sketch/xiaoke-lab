@@ -2,6 +2,7 @@ import unittest
 
 from src.core.presentation_copy import (
     ConfirmationAckResult,
+    EventPreview,
     ProgramStatus,
     RecordAckResult,
     ReviewItem,
@@ -166,6 +167,53 @@ class RecordAckCopyTests(unittest.TestCase):
         intent = _make_intent(
             MessageKind.RECORD_ACK,
             args={"result": "unknown"},
+        )
+
+        with self.assertRaises(ValueError):
+            copy_for_intent(intent, ui_mode="user")
+
+    def test_recorded_with_previews_renders_normalized_texts(self):
+        intent = _make_intent(
+            MessageKind.RECORD_ACK,
+            args={
+                "result": RecordAckResult.RECORDED,
+                "step_number": 3,
+                "event_previews": (
+                    EventPreview("加入5毫升缓冲液。"),
+                    EventPreview("加热到60摄氏度。"),
+                ),
+            },
+        )
+
+        text = copy_for_intent(intent, ui_mode="user")
+
+        self.assertEqual(
+            text,
+            "已记录实验步骤 3：加入5毫升缓冲液。；加热到60摄氏度。",
+        )
+
+    def test_recorded_with_empty_previews_keeps_plain_ack(self):
+        intent = _make_intent(
+            MessageKind.RECORD_ACK,
+            args={
+                "result": RecordAckResult.RECORDED,
+                "step_number": 3,
+                "event_previews": (),
+            },
+        )
+
+        text = copy_for_intent(intent, ui_mode="user")
+
+        self.assertEqual(text, "已记录实验步骤 3。")
+
+    def test_recorded_rejects_non_event_preview_tuple(self):
+        intent = _make_intent(
+            MessageKind.RECORD_ACK,
+            args={
+                "result": RecordAckResult.RECORDED,
+                "step_number": 3,
+                "event_previews": ("加入5毫升缓冲液。",),
+            },
         )
 
         with self.assertRaises(ValueError):

@@ -71,7 +71,7 @@ TODO → DESIGN → CODED → AUTO_OK → REAL_OK
 
 ## 2. 当前测试基线
 
-- 当前全量自动测试：`731 tests OK`（Python 3.11.9，2026-08-16；`SYNC-UI-CLAIMS-01` 完成 AUTO_OK，新增 3 项文案一致性守护测试）
+- 当前全量自动测试：`737 tests OK`（Python 3.11.9，2026-08-16；`PRESENT-RECORD-PREVIEW-01` 完成 AUTO_OK，新增 6 项规范预览/用户模式 ASR 分流测试）
 - 环境验证：核心依赖和 `src.main` 导入成功；首次沙箱内失败已确认是执行权限误判，不是 `.venv` 损坏
 - 最近 PRESENT 真实验收会话：`20260815_212615`（补充复验 `20260815_213926`）
 - 最近 PRESENT 双会话复验：`20260816_143151` → `20260816_143201`（同进程再次唤醒成功，零第三方泄漏）
@@ -89,7 +89,9 @@ cd C:\Users\dahli\Desktop\asr_demo
 
 ## 3. 当前唯一下一项
 
-**`PRESENT-RECORD-PREVIEW-01`：规范记录预览。**
+**`PRESENT-DELIVERY-BOUNDARY-01`：Delivery Boundary 架构护栏。**
+
+`PRESENT-RECORD-PREVIEW-01` 已完成 AUTO_OK：`RECORD_ACK` 携带严格 `event_previews` 合同，user 模式逐段 ASR 不再上主界面，admin 模式仍保留 ASR 对照。全量 737 项通过。
 
 `SYNC-UI-CLAIMS-01` 已完成 AUTO_OK：生产代码中“旧流程继续”“立即继续监听”“提交 M 段实验口述”等历史误导文案零残留；新增 3 项守护测试锁定这些禁语不得回归，并确认“无需等待”承诺有 `OrderedTaskQueue` 实现支撑。全量 731 项通过。
 
@@ -182,7 +184,7 @@ PRESENT 之外的 Query/Safety/RAG 真实接入、ASR 路演稳定性和 LLM 格
 | 28 | `P1` | `PRESENT-LEGACY-MESSAGE-CLEANUP-01` 删除旧 PresentationMessage 双轨 | `AUTO_OK` | 三个现役语义枚举归位到 `presentation_intent.py`；删除旧模块、旧对象、channel/status/speech policy 与专属 10 项测试，不留兼容别名 | `src/tests` 旧引用为0；专项86/86、删除后全量574/574通过；TTS/Web 交付模型留待第二真实渠道 |
 | 29 | `P1` | `PRESENT-FINAL-UX-VERIFY-01` PRESENT 最终真实验收 | `TODO` | user/admin 对照真实会话：反馈完整、无重复/泄漏、顺序正确、最后消息不丢，维1/7改善且维2/5/9不退化 | 下面“PRESENT 当前15项收口清单”核心项实现完成；记录 session_id、终端证据和九维结论 |
 | 30 | `P1` | `PRESENT-CLOSING-NAME-01` 收尾回执与正式 SessionSummary 消歧 | `AUTO_OK` | `MessageKind.SESSION_SUMMARY` 已改为 `SESSION_CLOSING_SUMMARY`，同步枚举值、copy 函数、main、测试与当前文档；`src/tests` 旧 PRESENT 名零残留，无兼容双名，无 SessionRecord/LLM 总结/导出扩张；专项41/41、全量571/571通过 | 自动闭环；真实输出随最终 PRESENT UX 会话统一复验 |
-| 31 | `P1` | `PRESENT-RECORD-PREVIEW-01` 规范记录预览替代 user 原始 ASR | `TODO` | 将已存在的 `accepted_analysis.events[].normalized_text` 以严格 `event_previews` 合同透传到 `RECORD_ACK`，user 显示“已记录实验步骤N：……”；原始 ASR 不再逐段占据 user 主界面，但继续落盘并在 admin/debug 或按需详情可查；不启用自由 `assistant_reply`、不新增 LLM 调用 | 分三步：A 先显示 ASR+规范预览做对照；B 验证稳定后移除 user TRANSCRIPT Intent；C 真实语音核对 ASR JSONL/Event JSONL/user/admin/追问/降级。单事件、多事件、标点、空预览、降级和非阻塞测试齐全 |
+| 31 | `P1` | `PRESENT-RECORD-PREVIEW-01` 规范记录预览替代 user 原始 ASR | `AUTO_OK` | `EventPreview` 合同已接入 `RECORD_ACK`；user 模式逐段 `TRANSCRIPT` 分流到 admin；原始 ASR 仍落盘并可在 admin/debug 查看。新增 6 项测试覆盖单/多事件、标点、空预览、降级、user/admin 分流 | 待真实 user/admin 对照会话验证；通过后升 REAL_OK |
 | 32 | `P1` | `PRESENT-DELIVERY-BOUNDARY-01` Coordinator/Renderer/Pump 架构合同与渐进扩展纪律 | `TODO` | 固定唯一链路与职责边界：结构化结果→projection→`PresentationIntent`→Coordinator（排序/去重/生命周期）→Pump（执行交付并回执）→Renderer（纯格式化）→Sink（唯一 I/O）；普通新消息不得要求修改 Coordinator/Pump，用户可见输出不得绕过链路。消息内容随业务增量扩展；WARNING 在真实接入前补最小调度子步；TTS/Web 等第二真实渠道接入前才专门提取有限 Delivery/Renderer 抽象，不因未来可能性提前建设框架 | 文档职责/变化归属明确；架构护栏覆盖直接 print 泄漏、FIFO、in-flight flush、Renderer 无 I/O；阶段收口检查确认无跨层业务分支和重复交付实现 |
 
 #### PRESENT 当前 15 项收口清单（用户 2026-08-16 确认）
@@ -204,7 +206,7 @@ PRESENT 之外的 Query/Safety/RAG 真实接入、ASR 路演稳定性和 LLM 格
 | 2 | `PRESENT-NOACTION-FEEDBACK-01` NOACTION 容错反馈 | `AUTO_OK` |
 | 3 | `UX-MODE-01` user/admin 输出分层 | `AUTO_OK` |
 | 4 | `SYNC-UI-CLAIMS-01` 文案与真实状态一致性 | `AUTO_OK` |
-| 5 | `PRESENT-RECORD-PREVIEW-01` 规范记录预览 | `TODO` |
+| 5 | `PRESENT-RECORD-PREVIEW-01` 规范记录预览 | `AUTO_OK` |
 | 6 | `PRESENT-DELIVERY-BOUNDARY-01` Delivery Boundary 架构护栏 | `TODO` |
 | 7 | `PRESENT-EXTENSION-SEAMS-01` QUERY/DENY/WARNING/导出扩展接缝 | `TODO` |
 | 8 | `GAPS-FIX-ANSWER-HINT-01` 回答编号提示 | `TODO` |

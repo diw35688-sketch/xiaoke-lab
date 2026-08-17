@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from src.core.presentation_copy import (
     ConfirmationAckResult,
+    EventPreview,
     ProgramStatus,
     RecordAckResult,
     ReviewItem,
@@ -165,7 +166,10 @@ def _record_ack(
     result: RecordAckResult,
     step_number: int | None = None,
 ) -> PresentationIntent:
-    args: dict[str, object] = {"result": result}
+    args: dict[str, object] = {
+        "result": result,
+        "event_previews": _event_previews(observation),
+    }
     if step_number is not None:
         args["step_number"] = step_number
     return PresentationIntent(
@@ -217,6 +221,21 @@ def _confirmation_ack(
         priority=MessagePriority.DIRECT_ACK,
         screen_target=ScreenTarget.STATUS,
         source_segment_id=observation.segment_id,
+    )
+
+
+def _event_previews(
+    observation: UnifiedObservation,
+) -> tuple[EventPreview, ...]:
+    """从已采用分析生成规范记录预览，不做新模型调用。"""
+
+    accepted = observation.accepted_analysis
+    if accepted is None:
+        return ()
+    analysis = accepted.materialize_analysis()
+    return tuple(
+        EventPreview(event.normalized_text)
+        for event in analysis.events
     )
 
 

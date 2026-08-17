@@ -398,10 +398,11 @@ def run_experiment_session(
             )
             idle_notice_tracker.reset()
 
-            emit(
-                MessageKind.TRANSCRIPT,
-                f"本段 ASR 识别完成：{asr_result.asr_transcript}",
-            )
+            if UI_MODE == "admin":
+                emit(
+                    MessageKind.TRANSCRIPT,
+                    f"本段 ASR 识别完成：{asr_result.asr_transcript}",
+                )
 
             # 结束命令不写入 ASR 文件，
             # 也不发送给后台。
