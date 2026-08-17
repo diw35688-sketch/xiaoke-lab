@@ -20,6 +20,40 @@ BASE_DIR = Path(__file__).resolve().parent
 SETTINGS_FILE = BASE_DIR / "settings.json"
 
 # 常见服务商预设，方便用户一键填好地址和模型名
+USTC_MODEL_CATALOG = [
+    {"id": "mineru", "label": "MinerU 文档解析", "category": "文档解析", "context": "-"},
+    {"id": "unlimited-ocr", "label": "Unlimited OCR", "category": "文档解析", "context": "32,000"},
+    {"id": "qwen-chat", "label": "Qwen Chat", "category": "高效通用层", "context": "262,000"},
+    {"id": "qwen-reasoner", "label": "Qwen Reasoner", "category": "高效通用层", "context": "262,000"},
+    {"id": "qwen3.8-chat", "label": "Qwen3.8 Chat", "category": "能力增强层", "context": "262,144"},
+    {"id": "qwen3.8-reasoner", "label": "Qwen3.8 Reasoner", "category": "能力增强层", "context": "262,144"},
+    {"id": "qwen3-embedding", "label": "Qwen3 Embedding", "category": "向量", "context": "40,000"},
+    {"id": "qwen3-reranker", "label": "Qwen3 Reranker", "category": "排序", "context": "40,000"},
+    {"id": "smart/default", "label": "Smart Default", "category": "高效通用层", "context": "262,000"},
+    {"id": "smart/reasoning", "label": "Smart Reasoning", "category": "高效通用层", "context": "262,000"},
+    {"id": "deepseek-chat", "label": "DeepSeek Chat", "category": "DeepSeek", "context": "-"},
+    {"id": "deepseek-reasoner", "label": "DeepSeek Reasoner", "category": "DeepSeek", "context": "-"},
+    {"id": "deepseek-v4-pro", "label": "DeepSeek V4 Pro", "category": "DeepSeek", "context": "-"},
+    {"id": "deepseek-v4-flash", "label": "DeepSeek V4 Flash", "category": "DeepSeek", "context": "-"},
+    {"id": "deepseek-v4-flash-ascend", "label": "DeepSeek V4 Flash Ascend", "category": "DeepSeek", "context": "-"},
+    {"id": "glm-chat", "label": "GLM Chat", "category": "GLM", "context": "-"},
+    {"id": "glm-reasoner", "label": "GLM Reasoner", "category": "GLM", "context": "-"},
+    {"id": "claude-opus-4-8", "label": "Claude Opus 4.8", "category": "Claude", "context": "-"},
+    {"id": "claude-sonnet-4-6", "label": "Claude Sonnet 4.6", "category": "Claude", "context": "-"},
+    {"id": "k3", "label": "K3", "category": "其他", "context": "-"},
+]
+
+
+def catalog_for_models(models: list[str]) -> list[dict]:
+    """把模型 id 列表映射为带分类和上下文的目录。"""
+
+    by_id = {item["id"]: item for item in USTC_MODEL_CATALOG}
+    return [
+        by_id.get(model, {"id": model, "label": model, "category": "其他", "context": "-"})
+        for model in models
+    ]
+
+
 PRESETS = [
     {"id": "ustc", "label": "中科大校内 LLM",
      "base_url": "https://api.llm.ustc.edu.cn/v1", "model": "deepseek-v4-pro",
