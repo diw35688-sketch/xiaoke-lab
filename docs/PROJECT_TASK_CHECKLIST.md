@@ -71,7 +71,7 @@ TODO → DESIGN → CODED → AUTO_OK → REAL_OK
 
 ## 2. 当前测试基线
 
-- 当前全量自动测试：`715 tests OK`（Python 3.11.9，2026-08-16；`CLARIFICATION-COMPOUND-CONFIRM-ANSWER-01` 完成 AUTO_OK，新增 7 项复合确认+回答测试）
+- 当前全量自动测试：`724 tests OK`（Python 3.11.9，2026-08-16；`PRESENT-NOACTION-FEEDBACK-01` 完成 AUTO_OK，新增 9 项 no_action 反馈测试）
 - 环境验证：核心依赖和 `src.main` 导入成功；首次沙箱内失败已确认是执行权限误判，不是 `.venv` 损坏
 - 最近 PRESENT 真实验收会话：`20260815_212615`（补充复验 `20260815_213926`）
 - 最近 PRESENT 双会话复验：`20260816_143151` → `20260816_143201`（同进程再次唤醒成功，零第三方泄漏）
@@ -89,7 +89,9 @@ cd C:\Users\dahli\Desktop\asr_demo
 
 ## 3. 当前唯一下一项
 
-**`PRESENT-NOACTION-FEEDBACK-01`：no_action 不再沉默。**
+**`UX-MODE-01`：user/admin 输出分层。**
+
+`PRESENT-NOACTION-FEEDBACK-01` 已完成 AUTO_OK：控制类 no_action 现在会投递一条 `NO_ACTION_FEEDBACK` 语义消息，用户文案按原因分别引导（编号不存在/缺答案/无当前目标/弃权/兜底）。 新增测试覆盖执行器原因透传、投影去重和文案映射；全量 724 项通过。
 
 `CLARIFICATION-COMPOUND-CONFIRM-ANSWER-01` 已完成 AUTO_OK：CONFIRM 动作现在可携带/提取实体字段，并在同一原子操作中先填字段再清确认标志；PRESENT 回执按最终 `remaining_fields` 显示“问题已解决”或“仍需补充”。新增测试覆盖完全解决、仍缺字段、纯确认、LLM/规则提取四类合同；全量 715 项通过。
 
@@ -164,7 +166,7 @@ PRESENT 之外的 Query/Safety/RAG 真实接入、ASR 路演稳定性和 LLM 格
 | 17 | `P1` | `SYNC-UI-CLAIMS-01` 用户文案与实际行为一致性核查（评委 2026-08-14 发现） | **硬谎话 2 处已拆（随 RESTORE-NONBLOCK-01）** | ①main.py:320"无需等待"→非阻塞后为真；②main.py:111"旧流程继续"→"ASR 原文已保存"。**误导 2 处**仍待 PRESENT 文案统一改：③"立即继续监听"（非阻塞后为真）；④"提交 M 段实验口述"（内部术语）。DEBUG 泄漏仍登记 UX-01/UX-11 | 误导 2 处随 PRESENT 文案统一改 |
 | 18 | `P1` | `ANSWER-FALLBACK-ADJACENCY-01` 无编号兜底加"紧邻"约束（用户 2026-08-14 晚指出） | **AUTO_OK** | `decide_unnumbered_answer` 加第 5 条规则：问题来源段+1==当前段才允许自动接；新增 `current_segment_id` 参数 + 测试（隔段不承认） | 单测覆盖边界路径，无需专门真实复验 |
 | 19 | `P1` | `PRESENT-FIX-LEAK-01` 开发输出泄漏收尾（B-4 真实验收发现） | `REAL_OK` | 141745发现完整第三方噪声；142352清到仅剩版本行；定位并精确禁用FunASR 1.4.1版本检查入口。会话142945确认启动/整轮零FunASR/ModelScope/路径/进度/RTF/耗时/token泄漏，READY含Ctrl+C、WAITING含再次唤醒指引 | 专项63/63、全量576/576通过；第二次实际唤醒留到最终双会话UX验收，不阻塞泄漏任务 |
-| 20 | `P1` | `PRESENT-NOACTION-FEEDBACK-01` 投影层 no_action 容错反馈（B-4 真实验收发现） | `TODO` | 投影层对 no_action（问题编号不存在/弃权/无目标回答）产出容错提示，不再沉默；双会话143201再次复现：“制业枪”后只有ASR，无处理结果 | 用户说话后系统必有回应，维6 ✗→✓ |
+| 20 | `P1` | `PRESENT-NOACTION-FEEDBACK-01` 投影层 no_action 容错反馈（B-4 真实验收发现） | `AUTO_OK` | 新增 `NO_ACTION_FEEDBACK` 语义意图，控制类 no_action 不再沉默；文案按 reason 映射为“没有找到编号/请说明回答内容/当前没有可操作问题/没把握安全执行”等。执行器 NO_ACTION 透传 planner reason。新增 9 项测试；全量 724 项通过 | 待真实会话验证“制业枪”等 no_action 场景有可见回应；通过后升 REAL_OK |
 | 33 | `P0` | `CLARIFICATION-COMPOUND-CONFIRM-ANSWER-01` 同句确认+实体回答不能丢字段 | `AUTO_OK` | CONFIRM 执行器支持 supplied_entity_fields 或实体提取器，确认与填字段原子完成；PRESENT 确认回执携带 remaining_fields/resolved 并如实显示。新增 7 项测试：完全解决、仍缺字段、纯确认、提取器填充；全量 715 项通过 | 待真实会话验证“是的，体积为50毫升”确认记录不再残留 amount_value/amount_unit；通过后升 REAL_OK |
 | 21 | `P1` | `LLM-FOLLOWUP-STRICT-01` 缺字段追问复核（B-4 二次真实验收修正） | `TODO` | 二次真实验收（会话 213926）证实"将溶液加热"仍稳定追问 {temperature,duration}——**撤回"模型漂移"结论**；之前"加热到60摄氏度APP"不追问 duration，是口述场景不同（温度已明确 + APP 尾音干扰），非漂移。待干净复验：不带尾音的"加热到60摄氏度"缺时长是否应追问 | 确认"加热到60摄氏度"缺时长是否应追问（产品预期 vs LLM 行为） |
 | 22 | `P0` | `ASR-DEMO-NOISE-01` 路演前 ASR 噪音/误识别必修（用户 2026-08-16 明确"路演必须解决"） | `TODO` | 两次真实验收暴露的误识别：①"加热到60摄氏度"→"加热到60摄氏度APP"（尾音）；②"结束实验记录"→"要车翻圈啦"（language=auto 误判粤语 yue）；③"将溶液加热"→"标溶液加热"（首字误听）。**解决方向**：a) language 参数 auto→固定 zh（治粤语误判）；b) 热词/后处理（`ASR-CMD-02-POSTPROCESS-01` 已 REAL_OK，等组长定演示领域后接入）；c) 截音（AUDIO-PREROLL 尾音截断）；d) 噪声样例入语料（`ASR-NOISE-SAMPLES-01`） | **路演环境下核心口述/结束命令识别稳定、不乱识别**（路演硬门槛，不达不演） |
@@ -195,7 +197,7 @@ PRESENT 之外的 Query/Safety/RAG 真实接入、ASR 路演稳定性和 LLM 格
 | 新顺序 | 任务 | 当前状态 |
 |---:|---|---|
 | 1 | `CLARIFICATION-COMPOUND-CONFIRM-ANSWER-01` P0 复合确认+回答不能丢字段 | `AUTO_OK` |
-| 2 | `PRESENT-NOACTION-FEEDBACK-01` NOACTION 容错反馈 | `TODO` |
+| 2 | `PRESENT-NOACTION-FEEDBACK-01` NOACTION 容错反馈 | `AUTO_OK` |
 | 3 | `UX-MODE-01` user/admin 输出分层 | `部分完成，任务状态待校准` |
 | 4 | `SYNC-UI-CLAIMS-01` 文案与真实状态一致性 | `部分完成` |
 | 5 | `PRESENT-RECORD-PREVIEW-01` 规范记录预览 | `TODO` |
@@ -215,7 +217,7 @@ PRESENT 之外的 Query/Safety/RAG 真实接入、ASR 路演稳定性和 LLM 格
 | 3 | `PRESENT-PUMP-FLUSH-01` pump 完成交付合同 | `AUTO_OK` | unfinished 计数覆盖 pending/deferred/in-flight；flush 显式区分超时与交付失败；专项 24/24、全量 584/584 通过 |
 | 4 | `PRESENT-LEGACY-MESSAGE-CLEANUP-01` 删除旧消息双轨 | `AUTO_OK` | 旧模块、旧对象、专属 channel/status/speech policy 和 10 项旧测试已删除；现役枚举归位 Intent；专项86/86、全量574/574通过 |
 | 5 | `PRESENT-FIX-LEAK-01` 开发输出泄漏收尾 | `REAL_OK` | 会话142945确认全程零泄漏；双会话143151→143201进一步确认同进程再次唤醒、两个新会话编号、WAITING/EXITED与程序级Pump生命周期均正确；专项63/63、全量576/576通过 |
-| 6 | `PRESENT-NOACTION-FEEDBACK-01` no_action 容错反馈 | `TODO` | 编号不存在、无目标回答、无法暂缓/弃权等场景不再沉默 |
+| 6 | `PRESENT-NOACTION-FEEDBACK-01` no_action 容错反馈 | `AUTO_OK` | 控制类 no_action 统一投递 NO_ACTION_FEEDBACK，用户不再看到沉默；真实 UX 随最终验收 |
 | 7 | `PRESENT-EXTENSION-SEAMS-01` 扩展接缝 | `TODO` | QUERY/DENY/WARNING/导出结果统一 projection→Intent；定义 WARNING 抢占规则 |
 | 8 | `UX-MODE-01` user/admin 输出分层 | `部分完成，任务状态待校准` | 程序级反馈分层、按会话日志、user/admin 真实对照验收 |
 | 9 | `SYNC-UI-CLAIMS-01` 文案与行为一致 | `部分完成` | 删除“提交 M 段”等内部术语，统一核查用户承诺与真实行为 |

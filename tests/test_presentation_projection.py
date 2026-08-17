@@ -265,6 +265,56 @@ class ObservationProjectionTests(unittest.TestCase):
         self.assertEqual(messages[0].args["remaining_fields"], ("duration",))
         self.assertFalse(messages[0].args["resolved"])
 
+    def test_no_action_projects_feedback_in_control_context(self):
+        observation = _observation(
+            clarification_action="no_action",
+            executed=False,
+            execution_reason="指定的问题编号不存在。",
+        )
+
+        messages = messages_for_observation(
+            observation, experiment_step_number=0
+        )
+
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(messages[0].kind, MessageKind.NO_ACTION_FEEDBACK)
+        self.assertEqual(
+            messages[0].args["reason"], "指定的问题编号不存在。"
+        )
+        self.assertEqual(
+            messages[0].screen_target, ScreenTarget.DIALOGUE
+        )
+
+    def test_no_action_does_not_duplicate_degraded_record_ack(self):
+        observation = _observation(
+            acceptance_kind="degraded_evidence_note",
+            clarification_action="no_action",
+            executed=False,
+            execution_reason="降级NOTE只保留证据，不自动创建待确认问题。",
+        )
+
+        messages = messages_for_observation(
+            observation, experiment_step_number=0
+        )
+
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(messages[0].kind, MessageKind.RECORD_ACK)
+
+    def test_no_action_does_not_duplicate_experiment_record_ack(self):
+        observation = _observation(
+            acceptance_kind="structured_experiment",
+            clarification_action="no_action",
+            executed=False,
+            execution_reason="实验分析不需要追问。",
+        )
+
+        messages = messages_for_observation(
+            observation, experiment_step_number=2
+        )
+
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(messages[0].kind, MessageKind.RECORD_ACK)
+
     def test_defer_projects_deferred(self):
         observation = _observation(
             clarification_action="defer",

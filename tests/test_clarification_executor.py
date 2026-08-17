@@ -73,6 +73,12 @@ class NoActionTests(unittest.TestCase):
         result = self.executor.execute(action)
         self.assertFalse(result.state_changed)
 
+    def test_no_action_preserves_planner_reason_for_feedback(self):
+        action = _action(reason="指定的问题编号不存在。")
+        result = self.executor.execute(action)
+        self.assertFalse(result.state_changed)
+        self.assertEqual(result.reason, "指定的问题编号不存在。")
+
 
 class ReviewTests(unittest.TestCase):
     def setUp(self):
