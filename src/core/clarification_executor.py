@@ -128,10 +128,10 @@ class ClarificationExecutor:
         if action.action_type == ClarificationActionType.ANSWER:
             return self._execute_answer(action)
 
-        if action.action_type in {
-            ClarificationActionType.CONFIRM,
-            ClarificationActionType.REJECT_SUGGESTION,
-        }:
+        if action.action_type == ClarificationActionType.CONFIRM:
+            return self._execute_confirm(action)
+
+        if action.action_type == ClarificationActionType.REJECT_SUGGESTION:
             return self._execute_targeted(action, "confirm")
 
         raise ValueError(f"未知动作类型：{action.action_type}")
@@ -193,6 +193,122 @@ class ClarificationExecutor:
             ),
             affected_clarification_id=updated.clarification_id,
             affected_display_number=updated.display_number,
+        )
+
+    def _execute_confirm(
+        self,
+        action: ClarificationAction,
+    ) -> ClarificationExecutionResult:
+        try:
+            target = self._coordinator._find_clarification(
+                action.target_clarification_id,
+            )
+            if target is None:
+                return self._result(
+                    action,
+                    state_changed=False,
+                    reason=f"未找到目标问题：{action.target_clarification_id}",
+                )
+            if target.revision != action.expected_revision:
+                return self._result(
+                    action,
+                    state_changed=False,
+                    reason=(
+                        f"待确认项版本已变更（期望 {action.expected_revision}，"
+                        f"当前 {target.revision}），拒绝过期确认。"
+                    ),
+                )
+            if not target.is_active:
+                return self._result(
+                    action,
+                    state_changed=False,
+                    reason="只能确认 ACTIVE 状态的待确认项。",
+                )
+            if not target.requires_confirmation:
+                return self._result(
+                    action,
+                    state_changed=False,
+                    reason="待确认项不需要确认。",
+                )
+        except ValueError as error:
+            return self._result(
+                action,
+                state_changed=False,
+                reason=str(error),
+            )
+
+        supplied_fields: set[str] = set()
+        if action.supplied_entity_fields:
+            supplied_fields = set(action.supplied_entity_fields)
+        elif self._entity_extractor is not None and action.answer_text:
+            supplied_fields = self._entity_extractor.extract(
+                action.answer_text
+            )
+
+        updated = target
+        if supplied_fields:
+            try:
+                updated = self._coordinator.answer_clarification(
+                    clarification_id=action.target_clarification_id,
+                    expected_revision=action.expected_revision,
+                    segment_id=action.segment_id,
+                    supplied_fields=supplied_fields,
+                )
+            except ValueError as error:
+                return self._result(
+                    action,
+                    state_changed=False,
+                    reason=str(error),
+                )
+
+        try:
+            updated = self._coordinator.confirm_clarification(
+                clarification_id=action.target_clarification_id,
+                expected_revision=updated.revision,
+                segment_id=action.segment_id,
+            )
+        except ValueError as error:
+            return self._result(
+                action,
+                state_changed=False,
+                reason=str(error),
+            )
+
+        if not updated.is_unresolved:
+            resolved_note = " 问题已解决。"
+            resolved = True
+            remaining_fields: tuple[str, ...] = ()
+        elif updated.missing_fields:
+            resolved_note = (
+                f" 仍需补充：{'、'.join(updated.missing_fields)}。"
+            )
+            resolved = False
+            remaining_fields = tuple(updated.missing_fields)
+        else:
+            resolved_note = ""
+            resolved = False
+            remaining_fields = ()
+
+        if supplied_fields:
+            detail = (
+                f"已确认问题 {updated.display_number} 并补充字段"
+                f" {sorted(supplied_fields)}。"
+                f"{resolved_note}"
+            )
+        else:
+            detail = (
+                f"已确认问题 {updated.display_number}。"
+                f"{resolved_note}"
+            )
+        return self._result(
+            action,
+            state_changed=True,
+            reason=detail,
+            affected_clarification_id=updated.clarification_id,
+            affected_display_number=updated.display_number,
+            answer_text_received=bool(supplied_fields),
+            remaining_fields=remaining_fields,
+            resolved=resolved,
         )
 
     def _execute_answer(

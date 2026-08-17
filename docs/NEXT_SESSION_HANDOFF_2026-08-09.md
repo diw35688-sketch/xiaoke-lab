@@ -318,9 +318,12 @@ git diff --check
 9. `UX-FIX-TONE-01`：事件提示音；
 10. `PRESENT-FINAL-UX-VERIFY-01`：最终双模式真实 UX 验收。
 
-**当前唯一下一项**：`CLARIFICATION-COMPOUND-CONFIRM-ANSWER-01`。先修数据正确性，确保
-同一句中的确认和实体回答都被执行、字段不丢，再处理 NOACTION 和后续呈现体验；未经用户重新
-确认不得跳项。
+`CLARIFICATION-COMPOUND-CONFIRM-ANSWER-01` 已完成 AUTO_OK：CONFIRM 执行器现在会把
+“确认”和“实体补充”作为一个原子结果处理，PRESENT 回执按最终 remaining_fields 显示
+“问题已解决”或“仍需补充”。全量 715 项通过，待真实会话复验后升 REAL_OK。
+
+**当前唯一下一项**：`PRESENT-NOACTION-FEEDBACK-01`。让问题编号不存在、无目标回答、
+无法暂缓/弃权等 no_action 场景不再沉默。
 
 ---
 
@@ -491,3 +494,12 @@ docs/                 任务清单、交接和学习记录
 ### 本轮故意未做
 未改 `src/main.py`，未接 TTS / ASR / LLM，未改 `InteractionCommandType`，未做真实设备验收，未提交未推送。
 
+## 14. 2026-08-16 CLARIFICATION-COMPOUND-CONFIRM-ANSWER-01 AUTO_OK
+
+- 修复：`ClarificationAction` 允许 CONFIRM 携带 supplied_entity_fields；
+  `ClarificationExecutor._execute_confirm` 先填字段再清确认标志，形成原子结果；
+  精确路径 AFFIRM 可通过 AnswerEntityExtractor 从“是的，体积为50毫升”提取实体。
+- 表现：`CONFIRMATION_ACK` 的 CONFIRMED 回执新增 remaining_fields/resolved，
+  user 文案支持“已确认并补充问题 N，问题已解决”和“已确认问题 N，仍需补充：...”。
+- 测试：新增 7 项（执行器 4、投影 1、文案 2）；全量 `Ran 715 tests ... OK`。
+- 下一步：`PRESENT-NOACTION-FEEDBACK-01`。
