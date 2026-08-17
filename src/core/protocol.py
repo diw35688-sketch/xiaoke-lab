@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, field, fields
 from enum import Enum
 from types import MappingProxyType
 from typing import Mapping
@@ -128,7 +128,7 @@ class ProtocolStep:
     must_record: tuple[str, ...]
     terms: tuple[str, ...]
     hazard_note: str | None
-    field_prompts: Mapping[str, str] = MappingProxyType({})
+    field_prompts: Mapping[str, str] = field(default_factory=lambda: MappingProxyType({}))
     substeps: tuple[ProtocolSubStep, ...] = ()
 
     def __post_init__(self) -> None:

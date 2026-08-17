@@ -351,6 +351,7 @@ INTENT-02-CLEANUP-FLAGS-01 删除，统一链是唯一默认路径。
 | NAMING-01（待） | `shadow` 命名（observer/observation/显示） | —（纯命名） | 改为正式执行链命名，不改变行为 |
 | VERIFY-01（待） | 孤儿模块 `clarification_command_handler.py`、`targeted_clarification.py` | 已不被 main 调用 | 删除前确认其测试覆盖已由新链测试承接，再删模块+测试 |
 | RESTORE-NONBLOCK-01 | main.py 主循环内联的六步业务流水线（观察→落盘ASR→落盘事件+上下文→无编号兜底→执行→确认记录） | 主线程同步串行处理每段；observe 调 LLM 期间麦克风关闭，说完干等 | `UnifiedSegmentProcessor.process`（六步流水线，无线程纯业务）+ `OrderedTaskQueue`（后台单线程+背压4：submit/collect_ready/finish）；main 主线程只录音→结束判断→提交→显示 |
+| WEB-BRIDGE-01 | `web/llm_bridge.py` 桥接的旧 `ExperimentLLMProcessor`（`analyze_segment`） | 网页端 LLM 只做实体抽取（events + entities），不分辨意图 | `UnifiedUnderstandingProcessor.understand` 一次调用完成 input_kind（experiment/control/uncertain）分辨 + 结构化；web 只消费 experiment 分支的实体卡片，control/uncertain 只带回标签不执行动作（见 5.6） |
 
 ### 5.4 用户可见输出质量对照表（2026-08-14 建立，回应"没感觉新链路改善/功能丢了"）
 
@@ -396,6 +397,34 @@ INTENT-02-CLEANUP-FLAGS-01 删除，统一链是唯一默认路径。
 3. **确认/否定/编号回答——LLM 识别全弃权，合理**。三者 `reversible=False`（不可逆：确认/否定/填入后状态难回退），LLM 判断不可逆操作宁可弃权要求精确或本地语义，保守但站得住，**不该放行**。
 
 **"LLM 兜底"当前真实覆盖范围**：实验口述 ✅ 一直兜底；查看 ✅ 放行；暂缓 ❌ 被误杀；结束 ⚠️ 半通不通；确认/否定/回答 ⛔ 弃权（合理）。修完 DEFER + 结束闭环后，命令侧从"1/6 通"变"3/6 通"。
+
+### 5.6 web 统一链桥迁移对照（WEB-BRIDGE-01，2026-08-15 建档）
+
+> 背景：`web/llm_bridge.py` 原桥接旧链 `ExperimentLLMProcessor`（src 已标"待删除，
+> 不再作为目标架构"，见 §5.1/§5.3 SUBMIT-01），网页端长期依赖一个将删组件。
+> 本轮把桥迁到统一链 `UnifiedUnderstandingProcessor`，并补齐 `recent_context`。
+> 本表登记"旧桥做了什么 → 新桥如何获得该功能"，逐项标用户可见质量状态。
+
+| 网页能力 | 旧桥（迁移前） | 新桥（迁移后） | 质量状态 |
+|---|---|---|---|
+| 口述→实体卡片 | 旧链 `analyze_segment` 抽 events + entities | 统一链 experiment 分支（同一套 `src/llm/schemas.py` 合同，格式不变），`record.py` 合并逻辑零改动 | **等价**（单测 7 项通过 + 真实验收 5 条口述实体抽取准确，见下） |
+| 模型失败降级 | 旧链 NOTE 卡片（"模型处理失败，仅保留未经解释的ASR原文"）+ degraded 标志 | 统一链 NOTE 卡片（"统一理解失败：…"）+ degraded 标志；前端只渲染 degraded 提示语，不渲染 NOTE 文案 | **等价**（降级文案只进 SQLite，不进 UI） |
+| 指代理解（"它""改到周五"） | 旧链不带上下文 | 新桥从 `lab_records` 取最近 5 条口述作 `recent_context` | **增强**（统一链提示词显式支持上下文） |
+| 控制命令识别（"帮我看看待确认"） | 旧链无此能力，命令被当实验口述硬拆卡片 | control 分支识别 + `input_kind` 标签；web 不执行动作，只回标签 | **新增**（真实验收口述 3 确认 `input_kind=control`、零错误卡片） |
+| 记录/命令说不准的短句 | 旧链硬拆 | uncertain 分支 + `input_kind="uncertain"` | **新增**（UI 暂不消费） |
+
+> **真实验收证据（2026-08-16，会话 `20260816_200646`，deepseek-v4-pro @ api.deepseek.com/v1）**：
+> 5 条口述全部无降级、无报错。口述 1「加热到六十摄氏度」→ action=加热/temperature=六十摄氏度；
+> 口述 2「加入五毫升盐酸」→ action/object/amount_value/amount_unit 全对；
+> 口述 3「帮我看看待确认的问题」→ `input_kind=control`、零实体卡片（旧链会硬拆出错误卡片）；
+> 口述 4「离心机八百转运行十分钟」→ 多字段含 duration；口述 5「溶液颜色变蓝」→ observation 事件。
+> 追问话术：口述 1 缺时长未追问——对应项目已登记未定案争议 `LLM-FOLLOWUP-STRICT-01`
+> （温度明确时缺时长是否应追问），非本轮迁移引入退化。
+> **功能验收 REAL_OK；体验验收（UX）待用户走查确认。**
+
+> 判定纪律同 §5.4：功能等价 ≠ 体验等价；"追问话术"与"降级提示语"两项
+> 必须在真实验收中用新旧链输出逐条对比后才能标"等价"。
+
 
 ---
 

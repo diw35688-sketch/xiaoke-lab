@@ -1,6 +1,6 @@
 # asr_demo 项目任务清单
 
-最后更新：2026-08-16（PRESENT 程序级必要反馈 AUTO_OK）
+最后更新：2026-08-17（登记微调/LoRA 与本地推理远期路线，见第 4 节 K 组）
 
 > 本文件是当前任务、优先级和验收状态的唯一来源。架构说明、环境命令和下一会话摘要
 > 分别见 `PROJECT_ARCHITECTURE.md`、`ENVIRONMENT_SETUP.md` 和
@@ -71,7 +71,7 @@ TODO → DESIGN → CODED → AUTO_OK → REAL_OK
 
 ## 2. 当前测试基线
 
-- 当前全量自动测试：`724 tests OK`（Python 3.11.9，2026-08-16；`PRESENT-NOACTION-FEEDBACK-01` 完成 AUTO_OK，新增 9 项 no_action 反馈测试）
+- 当前全量自动测试：`739 tests OK`（Python 3.11.9，2026-08-16；环境缺依赖修复 + web 桥接测试 7 项 + agent 提示词合同测试 5 项）
 - 环境验证：核心依赖和 `src.main` 导入成功；首次沙箱内失败已确认是执行权限误判，不是 `.venv` 损坏
 - 最近 PRESENT 真实验收会话：`20260815_212615`（补充复验 `20260815_213926`）
 - 最近 PRESENT 双会话复验：`20260816_143151` → `20260816_143201`（同进程再次唤醒成功，零第三方泄漏）
@@ -264,6 +264,8 @@ PRESENT 之外的 Query/Safety/RAG 真实接入、ASR 路演稳定性和 LLM 格
 | 30 | `P1` | `UNIFIED-PROMPT-ASR-ERROR-CONFIRM-01` 统一Prompt补疑似ASR错词确认规则 | `REAL_OK` | 实体疑似同音错词/识别错误时 needs_confirmation=true + confirmation_reason + 确认追问 | 统一提示词实验规则新增"实体疑似同音错词或ASR识别错误时设置needs_confirmation"；合同测试断言；全量 433 项通过。真实会话 `20260814_110116` 段 11："使用一夜枪取50微升缓冲液" → 事件 `needs_confirmation=True, reason="疑似ASR识别错误：'一夜枪'可能应为'移液枪'"` + 确认问题"您说的'一夜枪'是指移液枪吗？"；段 12"问题三，是的，是一夜枪。" → confirm 执行 → **确认记录首次真实落盘**（experiment_confirmations.jsonl 第 1 行） |
 | 31 | `P1` | `INTENT-02-ANSWER-UX-01` 回答体验：反馈补缺 + 无编号回答识别 | `REAL_OK` | ①answer 部分完成后明确提示"仍缺字段"；②仅一个待确认问题时无编号事实性短句判为对该问题的回答（多个时不得自动归属） | ①执行器 reason 含"仍需补充"（会话 110116 验证）；②无编号回答纯函数兜底 `src/core/answer_fallback.py`（单问题+短句+提取字段⊆缺失字段；夹带无关字段的实验记录绝不路由成回答）+ 提示词收紧 + 合同测试；467 项通过。真实会话 `20260814_113237` 验证：段 3"时间为10分钟"→ abstention 被兜底接住为 answer，反馈"已将对问题 1 的答复的实体字段 ['duration'] 填入。仍需补充：temperature"；段 4"60摄氏度"→ 补 temperature"问题已解决"；段 2"分中"听岔碎片不误判；无编号回答不产生实验事件（事件仅段 1）；计数"提交 1 段"、上下文 1、无剩余确认项 |
 | 32 | `P1` | `INTENT-02-QUESTION-AUTO-OUTPUT-01` 追问/回答结果自动输出 | `REAL_OK` | create 后自动显示追问文本；answer 后自动显示"已填 X 仍缺 Y"；不依赖用户手动"查看待确认问题" | ①执行器 create reason 含问题文本；②`display_shadow_observation` executed 时显示 reason；真实会话 `20260814_110116`：段 1/5/11 create 后直接显示"已创建待确认问题 N：…"、段 10 answer 完整反馈、段 12 confirm 反馈——均自动输出，无需手动查看 |
+| 33 | `P1` | `WEB-BRIDGE-01` web 统一链桥迁移（llm_bridge 旧链→统一链） | `REAL_OK` | 网页记录识别接入 `UnifiedUnderstandingProcessor`，不再依赖 src 已标待删的旧 `ExperimentLLMProcessor` | `web/llm_bridge.py` 换处理器 + `extract()` 加 `recent_context` + `input_kind` 标签；`web/api/record.py` 补 `_recent_context()`（最近 5 条口述）；新增 `tests/test_web_llm_bridge.py` 7 项（experiment/control/uncertain/降级/上下文过滤透传）；**环境修复**：`.venv` 补 numpy/sounddevice/soundfile/sherpa-onnx（funasr/torch 无需装，测试未直接 import），requirements.txt 补 numpy；迁移对照登记 `PROJECT_ARCHITECTURE.md` §5.3 WEB-BRIDGE-01 + §5.6；全量 715 项通过。**真实验收**（会话 `20260816_200646`，deepseek-v4-pro）：5 条口述无降级、实体抽取准确，口述 3「帮我看看待确认的问题」`input_kind=control`（旧链做不到）；缺时长未追问对应已登记争议 `LLM-FOLLOWUP-STRICT-01`，非迁移退化 | 功能 REAL_OK；体验验收（UX）待用户走查确认 |
+| 34 | `P1` | `WEB-AGENT-FAKE-RECORD-01` 聊天 agent 假记录修复（用户 2026-08-16 在聊天区实测发现） | `REAL_OK` | 聊天 agent 对实验口述口头回复"已记录"却未调 record_observation 工具 → lab_records 无记录（数据丢失隐患） | 根因：`web/agent/core.py` INSTRUCTIONS 未引导模型使用 `record_observation` 工具（工具栏有但提示词没教）。修复：INSTRUCTIONS 新增"实验记录规则"——描述实验操作/数据必须调用 record_observation 并传原文，禁止不调工具就回复"已记录"，仅工具成功才可确认，失败须如实说明。新增 `tests/test_web_agent_prompts.py` 5 项提示词合同测试（防规则被误删 + 工具注册/schema 断言）。**真实验收**（重启 web 后 `/chat` 实测）：修复前 task 6830ffe4"已记录"但 lab_records 无新增；修复后 task 77ce319c"已记录"且 lab_records 新增 id=10「离心机八百转运行十分钟」（extraction_source=rule） | 全量 739 项通过；体验：话术未变但"已记录"变为真话（维 6 改善） |
 
 ### 当前路线为什么这样排
 
@@ -353,6 +355,7 @@ TTS-01 接口和假客户端
 | `P3` | TTS（含全双工）、GPT-SoVITS、Live2D | 会把当前输出时序问题放大，且难以判断故障来源 | 阶段三和阶段四达到验收条件 |
 | `P3` | Word/PDF报告美化 | 当前还没有完整SessionRecord可供可靠导出 | Markdown/JSON第一版真实导出通过 |
 | `P3` | 多工具Agent | 外部写入和高风险动作尚未建立统一确认边界 | 安全等级、白名单和确认流程完成 |
+| `P3` | 模型微调（LoRA）与本地推理（见第 4 节 K 组） | 数据量与质量未评估；当前问题可由提示词 + RAG 覆盖；需数据清洗与 GPU 投入；微调只解决"知道但做不对"，不解决"不知道" | RAG Phase 2（QUERY-ANSWER-01 等）落地且有足够真实确认样本后评估 |
 
 > **注意**：RAG/用户画像和实验风险知识库已从"暂缓"移入正式任务总表第 I 节。
 > 其中类型定义（QUERY-TYPES-01、SAFETY-TYPES-01、KNOWLEDGE-PROTOCOLS-01）为 P1 准备阶段；
@@ -754,6 +757,7 @@ P1 (下一批):
   Phase 1b: UNIFIED-QUERY-01 → DISPATCH-QUERY-01 → BYPASS-QUERY-01 → CONFIG + ENRICHED-CONTEXT合同
 P2 (远期): SAFETY-INTEGRATE → RAG-CONTEXT → RAG-RETRIEVE → QUERY-ANSWER → E2E
 P3 (TTS后): AGENT-01 多工具Agent
+P3 (远期): FINE-TUNE-* 微调（LoRA）与本地推理（在 RAG Phase 2 与 TTS 之后，见第 4 节 K 组）
 ```
 
 ### J. TTS 与后续阶段
@@ -783,6 +787,30 @@ P3 (TTS后): AGENT-01 多工具Agent
 | `SOVITS-02` | `P3` | 超时、缓存、系统 TTS 回退 | `TODO` | 外部服务失败不影响主流程 |
 | `LIVE2D-01` | `P3` | Live2D 表现层接入 | `TODO` | TTS 稳定后；口型/表情依赖 `TTS-01` 的播放生命周期回调，不在表现层另做 TTS 驱动 |
 | `AGENT-01` | `P3` | 白名单计时器/提醒/查询/导出 | `TODO` | TTS 与记录闭环后 |
+
+### K. 微调（LoRA）与本地推理（远期规划）
+
+> **登记背景（2026-08-16，用户提出"项目成熟后如何加入模型微调"）**：定位澄清——三条路线
+> 解决不同问题，是接力不是替代：**提示词工程**（教模型"怎么答"，零成本）→ **RAG**
+> （给模型"喂资料"，管"不知道"，任务库第 I 节已规划）→ **微调/LoRA**（给模型"练肌肉"，
+> 管"知道但做不对"，如输出格式不稳、术语常错）。判断口诀：模型不知道→RAG；知道但做不对
+> →微调；偶尔错→继续提示词工程。
+>
+> **本组是路线登记，不在 PRESENT 收口清单内，不改变当前执行顺序**。最稀缺资源不是 GPU
+> 而是数据：`results/` 三份 JSONL（asr_segments / experiment_events / experiment_confirmations）
+> 与 `evaluation/narration_robustness/narration_plan.json`（28 段带期望标注）是现成 SFT 样本来源
+> ——"ASR 转写 → 期望结构化 JSON"即为标准有监督微调样本。目标场景：统一理解输出格式稳定性
+> （对应任务库 LLM 格式降级类问题，如 3.1A 看板第 23 项）。接入口已由 `LLMClient` Protocol +
+> `create_llm_client` 工厂预留（见 `PROJECT_ARCHITECTURE.md` 4.2 节）。
+
+| ID | 优先级 | 任务 | 状态 | 验收证据/备注 |
+|---|---|---|---|---|
+| `FINE-TUNE-DECISION-01` | `P3` | 微调适用边界与场景确认 | `TODO` | 判定"哪些问题归 RAG、哪些归微调"：输出格式不稳定/术语常错→微调；知识缺失→RAG。用现有鲁棒性旁路报告（ASR-ROBUSTNESS 缺口分布）和 LLM 格式错误记录做证据，不拍脑袋定 |
+| `FINE-TUNE-DATA-AUDIT-01` | `P3` | 现有会话数据量与质量评估 | `TODO` | 统计三份 JSONL 可清洗出多少对"ASR转写→期望结构化JSON"样本；只计用户确认过/最终采纳的记录，降级 NOTE、误识别段剔除或标注；产出数量与占比结论，决定是否值得做微调 |
+| `FINE-TUNE-DATA-CONTRACT-01` | `P3` | 微调数据集清洗合同 | `TODO` | 定义清洗规则与 alpaca 格式输出（instruction 复用 `unified_prompts.py`；input=ASR 转写；output=期望结构化 JSON）；严格 schema + 测试拒绝脏样本；不覆盖、不回写原始 JSONL（沿用"先存原始数据，后推断"原则） |
+| `FINE-TUNE-TRAIN-01` | `P3` | LoRA 训练闭环 | `TODO` | 选开源可下载权重模型（候选 Qwen2.5-7B-Instruct）+ LLaMA-Factory/Unsloth；LoRA 低秩适配器（r/alpha/epoch 默认参数起步），产物是几十 MB adapter 而非整个模型；训练/数据文件不入仓库 |
+| `FINE-TUNE-EVAL-01` | `P3` | 微调前后对照评估 | `TODO` | 复用 `narration_plan.json` 28 段语料跑"微调前 vs 微调后"报告 + 现有合同测试；标准=意图准确率/格式合规率提升且不破坏原有能力（与 `ASR-CMD-02-POSTPROCESS-01` 同一方法论：单变量对照、保留原文、量化回退） |
+| `FINE-TUNE-INTEGRATE-01` | `P3` | vLLM 本地推理接入 | `TODO` | vLLM 起 OpenAI 兼容服务（/v1/chat/completions）；`create_llm_client` 工厂 + `LLMClient` Protocol 增加配置项指向本地地址，下游零改动；失败降级沿用现有 `UnavailableLLMClient` 策略，不得破坏主流程 |
 
 ## 5. TTS 开始条件
 
@@ -950,6 +978,9 @@ Word/PDF 属于表现层增强，可以在系统 TTS 之后完成。
 | 2026-08-16 | PRESENT 子步 B-3b：DEBUG 分流（基础设施 + main 开发语言迁 logging） | 全量 559 项通过（无新增测试） | `llm/client.py`（[LLM请求]/[LLM响应]）、`asr/sensevoice_backend.py`（加载/识别）、`core/state_manager.py`（状态变化）print → logger；`main.py` 的"统一理解链已启用"/"处理失败"/"最终上下文"迁 logging；`main()` 加 `configure_logging`（user 写 `results/debug.log`，admin 输出屏幕）。屏幕不再有 token/路径/状态变化/[LLM请求] 开发语言 | 下一小步 B-3c（主循环用户消息 print → pump，达成单一输出入口） |
 | 2026-08-16 | PRESENT 子步 B-3c：主循环用户消息 → pump（单一输出入口） | 全量 562 项通过（+3 透传测试） | 文案目录加透传 kind（TRANSCRIPT/WAKE_ACK/STAGE_SUMMARY/SESSION_SUMMARY/SYSTEM_ISSUE，args text 透传）；main.py 加 `emit` 闭包，主循环/结束汇总/待确认列表 print → emit；`recognize_one_segment` 提示移到主循环；`display_unresolved_clarifications` 改为投递 CLARIFICATION_REVIEW（去掉"来源第N段"开发语言，修 UX-08）；main() 启动/唤醒/异常/退出 print → logging。**main.py 零 print 残留，达成"单一输出入口 + 旧 print 已删"** | 下一小步 B-4（真实验收 + 九维走查，需授权数据外发） |
 | 2026-08-16 | PRESENT 子步 B-4：真实验收（会话 20260815_212615，用户自启） | 全量 562 项通过（真实验收未加测试） | 用户自启真实会话 6 段口述（缓冲液/加热60度/问题一/查看/离心/结束）。**发现 4 个软问题**（按硬软判据归类，均不阻塞主流程、数据未丢）：①开发输出泄漏——`vad_recorder.py`/`recorder.py`/`wakeword/detector.py` print + FunASR 进度条未迁 logging，屏幕有路径/rtf/音频时长，维1/7 失败；②投影层 no_action 无容错反馈——段3"问题一"因问题1不存在→no_action→屏幕沉默，维6 失败；③**LLM 缺字段追问漂移**——`加热到60摄氏度` duration=null 但 missing_fields=[]，历史 08-11/12 同类"将溶液加热"稳定追问 {temperature,duration}；`git log -S` 证实追问规则（unified_prompts.py 第64-65行）自 08-11 引入后未改，故是 DeepSeek 模型服务端行为漂移，暴露"缺字段追问 100% 靠 LLM、无确定性兜底"；④ASR 误识别——"加热到60摄氏度APP"尾音、"结束实验记录"被 language=auto 误判粤语(yue)"要车翻圈啦"。**通过项**：编号分离（实验步骤1/2/3）、结束汇总用户语言、回执及时（维4/5/9 通过）、DEBUG 落 debug.log | 先修①②（PRESENT 收尾），③加确定性兜底，④走 ASR 线 |
+| 2026-08-16 | WEB-BRIDGE-01：web 统一链桥迁移（REAL_OK） | 全量 715 项通过（+7 web 桥接测试；此前 15 errors 系 `.venv` 缺依赖，非代码问题） | **环境修复**：`.venv` 缺 numpy/sounddevice/soundfile/sherpa-onnx 致 15 errors，逐包补齐（清华镜像），requirements.txt 补 numpy 显式声明；funasr/torch 无需装（测试未直接 import）。**迁移**：`web/llm_bridge.py` 换 `UnifiedUnderstandingProcessor`、`extract()` 加 `recent_context` 与 `input_kind`；`web/api/record.py` 补 `_recent_context()`。**真实验收**（会话 `20260816_200646`，deepseek-v4-pro @ api.deepseek.com/v1）：5 条口述（加热60度/加5毫升盐酸/帮我看看待确认的问题/离心机800转10分钟/溶液变蓝）全部无降级、实体抽取准确，口述 3 识别为 `input_kind=control` 零错误卡片（旧链做不到）；缺时长未追问对应当前未定案争议 `LLM-FOLLOWUP-STRICT-01`。前端零改动（消费的 entities/degraded/evaluation 字段格式不变）。迁移对照：`PROJECT_ARCHITECTURE.md` §5.3 WEB-BRIDGE-01 + §5.6 | 功能 REAL_OK；体验验收（UX 九维走查）待用户确认；下一步按用户路线决策：web 纯规则业务下沉（planner/tools 两步确认等）或先收团队标准 §2/§3 例外条款 |
+| 2026-08-16 | WEB-AGENT-FAKE-RECORD-01：聊天 agent 假记录修复（REAL_OK） | 全量 739 项通过（+5 提示词合同测试） | 用户实测发现：聊天区输入「离心机八百转运行十分钟」，agent 回复"已记录"但 lab_records 无记录（task 6830ffe4，数据丢失隐患）。根因：`agent/core.py` INSTRUCTIONS 未引导 record_observation 工具。修复：提示词强制"描述实验操作必须调工具、工具成功才可确认已记录、失败须如实说明"。真实验收（重启 web 后 `/chat` 实测）：task 77ce319c 回复"已记录"且 lab_records 新增 id=10（rule 抽取），话术未变但行为变真；对话历史 4 条历史假记录（加热/离心机/溶液/查看）未落盘的事实已留存，用户可重输补录 | 聊天区实验记录已真实落盘；提醒用户历史 4 条假记录需重输；下一步同 WEB-BRIDGE-01 待办 |
+| 2026-08-17 | 登记微调（LoRA）与本地推理远期路线：新增第 4 节 K 组 6 项任务（边界确认/数据审计/清洗合同/训练/评估/接入）+ 3.3 暂缓表与优先级总览各补一笔；任务 ID 与桌面真实项目 2026-08-16 既有登记对齐 | 未改代码；沿用全量 739 项基线 | 文档登记，无用户输出变化 | 当前唯一下一项不变：`CLARIFICATION-COMPOUND-CONFIRM-ANSWER-01` |
 
 ## 7. 每轮结束时必须更新
 
@@ -1040,3 +1071,81 @@ matched_term 以后存知识库匹配到的标准术语（如 ASR 的"一液枪"
 - 设计边界：取消检查放在每个音频块进入sink之前；单写者+多读者前提下不加锁；有意不实现真实播放接入所需的过时输出丢弃队列。
 - 验收边界：本轮不修改`src/main.py`、`InteractionCommandType`、`AssistantState`接线，不引入sounddevice输出流或任何真实TTS依赖，不接模型、不碰声卡；因此状态为`AUTO_OK`，不是`REAL_OK`。
 - 下一步：`PROTOCOL-INTEGRATION-01`仍是项目主线；TTS方向下一步再评估真实后端和播放设备接入，必须先补半双工状态、输出协调和真实设备验收方案。
+## 2026-08-17 本轮维护记录：手机演示页 /m（扫码即用第一版落地）
+- 任务：为比赛"扫码即用"演示提供手机专用页 `/m`（大录音按钮 + 转写/追问展示），复用现有 `/asr/transcribe` + `/record` 接口，不依赖桌面版 shell/composer 布局。
+- 新增：`web/frontend/mobile.html`、`web/frontend/mobile.js`（PCM 采集 → 16kHz WAV → 上传 → 结构化 → speechSynthesis 播报）、`web/app.py` 的 `GET /m` 路由、`tests/test_web_mobile_page.py`（4 项：路由注册/页面结构/接口约定/不依赖桌面脚本）。
+- 测试：专项 4 项通过；全量 `Ran 743 tests ... OK`（基线 739 + 4）。
+- 部署实况：本机 HTTPS 局域网服务可运行（自签证书 SAN=10.101.192.18）；SenseVoice 模型在 ModelScope 缓存中，warmup 后零下载。
+- 登记新问题（部署线，均待修）：
+  - `WEB-DEMO-IP-DETECT-01`：`phone_access.lan_ip()` 用 UDP connect 选出口网卡，会被代理虚拟网卡（Mihomo 198.18.0.1）抢先，导致二维码/证书 SAN 指向不可达地址；需改为优先真实网卡（过滤保留段 198.18.0.0/15 与虚拟网卡）。
+  - `WEB-DEMO-TUNNEL-BIN-01`：`start_phone_tunnel.py` 的 `find_tunnel` 不检查项目 `bin/cloudflared.exe`（`start_best.py` 有检查）；且本机连不上 Cloudflare 边缘（代理干扰），隧道模式暂不可用，现场需预案。
+- 体验：手机真机走查由用户进行中（UX_CONFIRMED 待用户确认，不得代填）。
+- 下一步：真机验收 `/m` 语音闭环 → 修 `lan_ip` 选网卡 → 现场网络预案（有网/无网两套）。
+## 2026-08-17 本轮维护记录：火山引擎 TTS 供应商（第 6 个）
+- 任务：接入火山引擎豆包语音合成（openspeech.bytedance.com HTTP 非流式接口），给演示一个确定能出声、音质好于系统语音的 TTS 选项。
+- 新增：`web/tts_providers.py` 加 `volcano` 供应商（`tts_api_key` 填 `appid:access_token` 冒号分隔）+ `_volcano()` 合成函数（`Bearer;token;appid` 鉴权、base64 音频解析、业务码校验）+ `tests/test_web_tts_providers.py`（7 项：注册信息/请求构造/鉴权头/密钥格式错误/业务错误码/缺音频）。
+- 测试：专项 7 项 + 手机页 6 项通过；全量 `Ran 750 tests ... OK`（743 + 7）。
+- 网络判断纠正：本机外网实际可用（python 实测 pypi/github/deepseek/baidu/modelscope 通，仅 huggingface 超时）；此前用 curl.exe 测得的"全 000"是该程序在此执行环境被沙箱拦截的假象，不是电脑没网。cloudflared 隧道不可用原因待复查（可能同样受沙箱/网络策略影响）。
+- 待用户操作：在设置面板填 appid:access_token 并测试合成（真实验收，UX 由用户裁决）。
+## 2026-08-17 本轮维护记录：ASR 固定中文（ASR_LANGUAGE=zh，防粤语误判）
+- 任务：`ASR-DEMO-NOISE-01` 第一条——`language=auto` 曾把"结束实验记录"误判粤语成"要车翻圈啦"，生产链路默认固定 `zh`，不调用云端 ASR。
+- 改动：`src/config.py` 新增 `ASR_LANGUAGE`（默认 zh，环境变量可覆盖）；`src/asr/sensevoice_backend.py` `recognize` 默认值改 `ASR_LANGUAGE`；`src/asr/backend.py` Protocol 默认同步；`.env.example` 加 `ASR_LANGUAGE=zh`。评测工具（compare_asr_languages、build_command_corpus_baseline）保留显式 auto 作对比，不受影响。
+- 测试：新增 2 项（config 默认 zh、recognize 默认 zh 且传入引擎）；全量 `Ran 752 tests ... OK`（750 + 2）。
+- 部署：服务已重启、ASR 已重新预热（warmup 200 loaded）。
+- 待验：真实口述复验"结束实验记录"等结束命令不再误判粤语（REAL_OK 待真实验收）。
+## 2026-08-17 本轮维护记录：修复设置面板"语音合成"区块不显示（前端三脚本打架）
+- 现象：电脑桌面版点左侧"模型与语音"，设置面板只有"模型设置"、没有"语音合成"（用户报障）。
+- 根因（写两遍打架）：`settings.js` 创建弹窗 `#settings-modal`；`views.js` 的设置视图把面板 `box` 搬进画布内嵌显示，搬完才通知 TTS；`tts_settings.js` 仍在 `#settings-modal .settings-box` 找 box → 已被搬走 → 找不到就静默 return → "语音合成"永不注入。且 box 被搬进画布后切走视图会被清空，二次进入设置面板空白。
+- 修复（3 个前端文件，纯 JS）：`tts_settings.js` attach 改为全局查 `.settings-box`；`views.js` 设置视图不再搬 box，改为弹窗形式打开（box 永驻弹窗）；`shell.js` 切换视图时自动关闭设置弹窗。
+- 验证：node --check 三个文件语法 OK；全量 `Ran 752 tests ... OK`（JS 无单测基建，靠语法检查+人工验收）；静态文件改动无需重启服务，浏览器强刷即可。
+- 待验：用户电脑 Ctrl+Shift+R 强刷 → 点"模型与语音" → 弹窗应含"语音合成"区块（火山 appid:token 配置入口）。
+## 2026-08-17 本轮维护记录：火山 TTS 鉴权头修正（3 段 → 2 段）+ 资源未开通定位
+- 现象：火山测试返回 401 code 3001 "invalid amount of Authorization header parts: 3"。
+- 诊断（实证）：逐种试鉴权头格式，`Bearer;{token}`（2 段）鉴权通过（不再报 parts 错误）；3 段/4 段均被拒；`Bearer {token}`（空格分隔）报 invalid auth token（分隔符必须分号）。
+- 修复：`web/tts_providers.py` `_volcano` 鉴权头 `Bearer;{token};{appid}` → `Bearer;{token}`（appid 本就在请求体）；测试断言同步。
+- 剩余阻塞（账号侧，非代码）：鉴权通过后返回 403 `[resource_id=volc.tts.default] requested resource not granted`——应用未开通"语音合成"资源。待用户在火山控制台开通"语音技术/语音合成"服务后重测。
+- 测试：专项通过；全量 `Ran 752 tests ... OK`；服务已重启。
+## 2026-08-17 本轮维护记录：火山 TTS cluster 配置化（对照官方 demo 补齐）
+- 依据：官方 tts_http_demo.py 明确 cluster 是"平台申请的"（FAQ Q1 可查），非写死值；硬编码 volcano_tts 在 cluster 不匹配时返回 403 `volc.tts.default not granted`。
+- 修复：`web/tts_providers.py` cluster 改从 `settings.tts_model` 读取（默认 volcano_tts，设置面板"合成模型"框可改）；补齐官方 demo 的 `volume_ratio/pitch_ratio/text_type` 字段；PROVIDERS volcano 项加 `default_model=volcano_tts`。
+- 测试：新增 cluster 取自 tts_model 断言；专项通过；全量 `Ran 753 tests ... OK`（+1）；服务已重启。
+- 待用户：控制台查 cluster（FAQ Q1）→ 填"合成模型"框 → 确认"语音合成"已开通 → 重测 /tts/test。
+## 2026-08-17 本轮维护记录：火山 TTS 错误透传 + 凭据诊断（grant not found）
+- 工程改进：`web/tts_providers.py` 火山 HTTP 非 200 时透传响应体（code/message），不再只显示"401 Unauthorized"；测试 +1；全量 `Ran 754 tests ... OK`；服务已重启。
+- 凭据诊断结论：当前 appid=60123933355 + 31 位非字母数字 token，火山返回 `code 3001 load grant: requested grant not found in SaaS storage`——该凭据无正式授权记录（体验中心/试用凭据不能调正式 API）。用户需在语音技术控制台创建正式应用，取 appid/token/cluster 三件套。
+## 2026-08-17 本轮维护记录：火山 TTS 正式打通（真实凭据 + settings_store 缓存/字段 bug）
+- 凭据：用户提供正式应用凭据（appid 6012393335 + 32 位 token）后，直调火山返回 `code 3000` 合成成功（66KB mp3）。
+- 发现的工程 bug（`web/settings_store.py`）：① `current()` 有进程内缓存，直改 settings.json 服务端不感知；② 从文件重建配置时只读部分字段，漏 tts_provider/tts_api_key/tts_model/tts_voice/tts_base_url/tts_speed——文件重建丢 TTS 配置。修复：`current()` 补全全部 TTS 字段。
+- 测试：新增 `tests/test_settings_store.py`（文件重建读全 TTS 字段）；专项通过；全量 `Ran 755 tests ... OK`（+1）；服务已重启。
+- 验收：服务端 `/tts/test` 返回 `ok: True`，合成 66KB、1.3 秒——火山 TTS 演示链路可用（设置面板测试按钮同路径）。
+## 2026-08-17 本轮维护记录：火山 TTS 仅女声 + 头像开机动画误导修复
+- 女声：试听确认 BV001_streaming 为女声、BV002_streaming 实为男声；PROVIDERS 火山音色精简为仅 BV001（设置面板只剩一个女声选项）；`tts_voice` 固定 BV001。
+- 头像误导：`web/frontend/avatar.js` 开机自动播"正在聆听"动画（实未开麦克风），用户误以为自动识别；已删除该动画，头像默认"准备就绪"，仅主动进入通话/识别时才变 listening。
+- 验证：node --check + 编码体检通过；全量 `Ran 755 tests ... OK`；静态文件改动浏览器强刷生效（无需重启）。
+## 2026-08-17 本轮维护记录：通话模式"正在准备语音引擎"误提示修复
+- 现象：每次点"通话"都闪"正在准备语音引擎…"，用户误以为模型每次点击都要重新加载。
+- 根因：`phone_call.js` startCall 无条件显示准备提示并调 /asr/warmup（幂等秒回）——即使模型已加载也闪提示。
+- 修复：先查 /asr/status，仅模型未加载时才提示"首次使用正在加载语音模型，约需 1 分钟…"并预热；已加载直接进通话。node --check + 编码体检通过；静态文件强刷生效。
+## 2026-08-17 本轮维护记录：通话中"开口头像不切回聆听"修复
+- 现象：回答播放完后头像归位"准备就绪"（local_tts 正常行为），但用户接着说第二句时，handleFrame 检测到声音却未把头像切回"正在聆听"，头像停留在"准备就绪"。
+- 修复：`phone_call.js` handleFrame 开口瞬间（speechFrames 由空变非空）补 `setAvatar('listening')`；与 barge-in 打断同点。node --check 通过；静态文件强刷生效。
+## 2026-08-17 本轮维护记录：通话中头像"聆听不持续"修复
+- 现象：回答播完后头像归位"准备就绪"，等待下一句时不再显示"正在聆听"。
+- 根因：`local_tts.js` 播放完/stopSpeech 无条件 `avatar('idle')`；`phone_call.js` 识别失败也 `setAvatar('idle')`——通话模式进行中不该归位。
+- 修复：`local_tts.js` 新增 `isCallActive()`（查 #sh-call.active）+ `settleAvatar()`，通话激活时回"正在聆听"、否则"准备就绪"；`phone_call.js` 识别失败改回"正在聆听"（继续监听等待重试）。node --check 通过；静态文件强刷生效。
+## 2026-08-17 本轮维护记录：头像加语音播报开关（TTS 一键开/关）
+- 需求：小科头像处加"触发/关闭 TTS"按钮，演示现场一键静音/恢复，无需进设置面板。
+- 实现：`avatar.js` 头像左上角加 🔊/🔇 圆钮（点击切 `window.ttsMuted`，localStorage 持久化，stopPropagation 防误触通话）；`local_tts.js` addToQueue 与 `speak.js` speak 开头检查 `ttsMuted` 直接跳过播报。node --check 三个文件通过；静态文件强刷生效。
+## 2026-08-17 本轮维护记录：桌面版对话回答朗读断链修复 + 默认开启
+- 现象：打字对话时回答不朗读（用户"没听到回答朗读"）。
+- 根因：`streaming_chat_v2.js` 朗读判断只看被隐藏的 `#auto-speak` 复选框（默认未勾选），设置面板的 `tts_enabled` 未接入朗读判断——开关断链。
+- 修复：`streaming_chat_v2.js` 新增 `shouldSpeak() = autoSpeak.checked || window.ttsEnabled`，页面加载读 `/settings` 初始化 `window.ttsEnabled`；`tts_settings.js`/`settings.js` 保存后同步 `window.ttsEnabled`；`settings.json` `tts_enabled` 默认置 true。
+- 验证：node --check 三文件通过；后端 `/settings` 确认 tts_enabled=True、provider=volcano；服务已重启。
+## 2026-08-17 本轮维护记录：火山音色列表补全（23 个中文女声/童声，自由选择）
+- 需求：用户要"多搞一些音色自由选择"；官方列表中文女声众多（免费 21 款内为主）。
+- 修复：`web/tts_providers.py` volcano 音色从 1 个补全到 23 个（通用女声/BV001·2.0、灿灿/BV700·2.0、炀炀、甜美小源、亲切/知性/活泼女声、梓梓、清新文艺、温柔淑女、甜宠少御、古风少御、新闻/促销/鸡汤女声、解说小美、直播一姐、知性姐姐、小萝莉、天才童声）；修正 BV002 为男声（此前误标）。
+- 验证：/tts/providers 返回 23 个；全量 `Ran 755 tests ... OK`；服务已重启。用户可在设置面板自由切换试听。
+## 2026-08-17 本轮维护记录：通话模式噪音误触加固（能量 VAD 四项防御）
+- 现象：环境噪音导致 ASR 误触发严重（用户报障）。
+- 修复（`phone_call.js` 纯前端）：① 阈值下限 0.005→0.008、上限 0.022→0.03；② 滞后回滞（hysteresis）——未开始语音需 >1.2×阈值才触发、已进入语音按 0.85×保持，抗噪音突刺与句中断音；③ 静音约 3 秒自动重新校准噪音基线（环境变化自适应），校准期间不再 return（防重校准漏话）；④ MIN_SPEECH_SEC 0.45→0.6 秒，短噪音不送识别。
+- 验证：node --check 通过；静态文件强刷生效。

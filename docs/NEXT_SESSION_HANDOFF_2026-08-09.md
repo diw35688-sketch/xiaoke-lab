@@ -1,13 +1,41 @@
 # asr_demo 当前工作区交接说明
 
-最后整理：2026-08-15
+最后整理：2026-08-16
 
 > 本文件是下一会话的短入口，不保存完整历史。任务状态以
 > `PROJECT_TASK_CHECKLIST.md` 为准，架构原因见 `PROJECT_ARCHITECTURE.md`，
 > 文档关系见 `docs/README.md`。
 
+## 0. 工作区位置决策（2026-08-16 用户拍板：留在 C 盘）
+
+- **正式工作区 = `C:\Users\dahli\Documents\107`**（本会话沙箱；最新代码 + .git + 未提交改动都在这里）。
+- 曾计划迁移到 `D:\me\ai107`（4 个 .bat 写死该路径），但 D 盘根目录 ACL 为"仅管理员可写"（`Everyone:(RX)`），
+  普通账户无法写；授权 dahli 后本会话受限 token 仍拒写，最终用户决定**放弃迁移、留在 C 盘**。
+- `D:\me\ai107` 已有一份 robocopy 副本（无 .venv，61MB，ACL 已授权 dahli 完全控制），**保留不动**；
+  若将来要迁，按"管理员建目录/复制 + icacls 授权 + 新会话工作区指向 D 盘"三步走，勿再重复踩权限坑。
+- 遗留小项：`start.bat`/`build_exe.bat`/`package.bat`/`upload.bat` 原写死 `cd /d D:\me\ai107`，
+  **已于 2026-08-16 改为 `cd /d C:\Users\dahli\Documents\107`**（留在 C 盘，双击即可启动）。
+
 ## 1. 当前结论
 
+- **`WEB-BRIDGE-01`（web 统一链桥迁移）= REAL_OK（2026-08-16）**：`web/llm_bridge.py`
+  从旧链 `ExperimentLLMProcessor` 迁到统一链 `UnifiedUnderstandingProcessor`，
+  `extract()` 加 `recent_context` + `input_kind`；`web/api/record.py` 补
+  `_recent_context()`（最近 5 条口述）。前端零改动（输出合同未变）。新增
+  `tests/test_web_llm_bridge.py` 7 项；**全量 715 tests OK**。真实验收会话
+  `20260816_200646`（deepseek-v4-pro）：5 条口述无降级、实体准确，口述 3
+  「帮我看看待确认的问题」`input_kind=control`（旧链做不到）。迁移对照登记
+  `PROJECT_ARCHITECTURE.md` §5.3 WEB-BRIDGE-01 + §5.6。**环境修复**：`.venv`
+  补 numpy/sounddevice/soundfile/sherpa-onnx（此前 15 errors 全系缺依赖），
+  requirements.txt 补 numpy；funasr/torch 无需装。功能 REAL_OK，UX 待用户走查。
+  **顺序锁死**：web 已迁完，src 侧 VERIFY-01 删旧链现在才可安全执行。
+- **`WEB-AGENT-FAKE-RECORD-01`（聊天 agent 假记录）= REAL_OK（2026-08-16）**：用户实测发现
+  聊天区输入实验口述，agent 口头"已记录"但 lab_records 无记录。根因 = `agent/core.py`
+  INSTRUCTIONS 未引导 `record_observation` 工具。修复 = 提示词强制"必须调工具、成功才能
+  确认已记录"；新增 `tests/test_web_agent_prompts.py` 5 项合同测试；真实验收 task
+  77ce319c 回复"已记录"且 lab_records 新增 id=10。**全量 739 tests OK**。注意：
+  **页面有两条输入路**——实验记录区（/record，统一链强制落盘）与聊天区（/chat，agent 自由发挥）；
+  聊天区历史 4 条假记录（加热/离心机/溶液/查看）未落盘，用户可重输补录。
 - 正式解释器：Python 3.11.9，项目 `.venv` 可用。2026-08-15 曾因受限执行权限
   无法启动而被误判为环境损坏；正常权限复核全量 497 项通过，环境无问题。
 - **PRESENT 子步 A 全部完成（A-1/A-2a/A-2b/A-3/A-4）= AUTO_OK**：A-1 不可变 `PresentationIntent`；A-2a 记录回执文案目录；A-2b 追问/回答/确认/暂缓文案 + 字段名中文化（temperature→温度）；A-3 `TerminalRenderer`（封装 ui_mode + review 多行文案）；A-4 投影层（业务事实→Intent，补 answer 结构化字段）。专项 57/57、正式全量 544/544 通过。未接 main，用户输出零变化，均跳过 UX 走查。
@@ -520,3 +548,30 @@ docs/                 任务清单、交接和学习记录
   未知原因→“我听到了，但暂时无法处理这句话”。
 - 测试：新增 9 项；全量 `Ran 724 tests ... OK`。
 - 下一步：`UX-MODE-01`。
+### 2026-08-17 补充：手机演示页 /m 已上线（扫码即用第一版）
+- 新增 `/m` 手机页（`web/frontend/mobile.html` + `mobile.js` + `app.py` 路由 + `tests/test_web_mobile_page.py` 4 项）；全量 `Ran 743 tests ... OK`。
+- 本机 HTTPS 局域网服务已跑通：`web` 目录下 `..\.venv\Scripts\python.exe -m uvicorn app:app --host 0.0.0.0 --port 8000 --ssl-keyfile certs/key.pem --ssl-certfile certs/cert.pem`（证书 SAN=10.101.192.18，手机需与电脑同一 WiFi，浏览器对自签证书点"继续访问"）。
+- 部署坑（待修）：`phone_access.lan_ip()` 选中代理虚拟网卡（198.18.0.1）；`start_phone_tunnel.py` 不查项目 `bin/cloudflared.exe`；本机连不上 Cloudflare 边缘（代理干扰）。详见清单维护日志 `WEB-DEMO-IP-DETECT-01` / `WEB-DEMO-TUNNEL-BIN-01`。
+- 真机体验验收：用户手机实测中（待 UX_CONFIRMED，agent 不得代填）。
+
+### 2026-08-17 补充：火山引擎 TTS 供应商已接入
+- `web/tts_providers.py` 新增 `volcano`（豆包语音 HTTP 非流式接口）；密钥格式 `appid:access_token` 填设置面板"语音服务密钥"；音色 BV001/BV002/BV700/BV701。
+- 全量 750 tests OK；服务已重启生效（`/tts/providers` 可见 volcano）。
+- 待用户：控制台拿 appid/token → 设置面板选"火山引擎豆包语音" → 测试合成 → 真实验收。
+- 网络事实修正：本机外网可用（python 实测），此前 curl 全 000 为执行环境拦截假象；cloudflared 隧道不可用待复查。
+
+### 2026-08-17 补充：ASR 默认固定中文（ASR_LANGUAGE=zh）
+- 生产链路默认 `zh`（config 集中），治"结束实验记录"→"要车翻圈啦"粤语误判；评测工具显式 auto 保留。
+- 全量 752 tests OK；服务已重启并重新预热 ASR。
+- 待验：真实口述复验结束命令不误判粤语；用户火山 TTS 配置（appid:token）与测试。
+
+### 2026-08-17 补充：设置面板"语音合成"区块不显示的 bug 已修
+- 根因：views.js 搬走设置面板 box，tts_settings.js 按原位置查找失败静默放弃。
+- 修复：tts_settings.js 全局查 .settings-box；views.js 设置视图改弹窗（不搬 box）；shell.js 切走视图关弹窗。
+- 验证：node --check 3 文件 OK；全量 752 tests OK；静态文件改动浏览器强刷生效（无需重启服务）。
+- 待用户：电脑 Ctrl+Shift+R 强刷 → 左侧"模型与语音" → 弹窗底部应出现"语音合成"区块 → 填火山 appid:token 测试。
+
+### 2026-08-17 补充：火山 TTS 鉴权已修，剩余账号侧开通
+- 代码已修：鉴权头改 `Bearer;{token}`（2 段，实证正确）；全量 752 tests OK；服务已重启。
+- 阻塞：火山返回 403 `volc.tts.default requested resource not granted`——应用未开通"语音合成"资源。用户需在火山控制台开通"语音技术→语音合成"后重测（/tts/test）。
+

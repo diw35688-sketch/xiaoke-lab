@@ -1,4 +1,4 @@
-﻿// 应用外壳：三列布局，参考 deepseek-harness 的 AppFrame。
+// 应用外壳：三列布局，参考 deepseek-harness 的 AppFrame。
 //   左  侧栏导航
 //   中  工作画布：工具调用卡片、思维链、步骤卡片
 //   右  对话框
@@ -89,6 +89,11 @@
   var current = 'run';
   function show(view) {
     current = view;
+    // 切走设置视图时关闭设置弹窗，避免遮罩挡着其他页面
+    if (view !== 'settings') {
+      var settingsModal = document.getElementById('settings-modal');
+      if (settingsModal) settingsModal.classList.remove('show');
+    }
     Array.prototype.forEach.call(document.querySelectorAll('.sh-item'), function (n) {
       n.classList.toggle('active', n.dataset.view === view);
     });

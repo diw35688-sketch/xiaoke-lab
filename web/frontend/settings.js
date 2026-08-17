@@ -151,9 +151,12 @@
     el('settings-save').onclick = function () {
       var button = el('settings-save');
       button.disabled = true;
-      fetch('/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body()) })
+      var formPayload = body();
+      fetch('/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formPayload) })
         .then(function (r) { return r.json(); })
         .then(function (d) {
+          // 同步前端朗读开关（对话回答朗读读取它）
+          window.ttsEnabled = !!formPayload.tts_enabled;
           el('settings-key').value = '';
           setStatus(d.ready, d.missing);
           result(d.ready, d.ready ? d.message : (d.message + '，但仍缺：' + (d.missing || []).join('；')));
