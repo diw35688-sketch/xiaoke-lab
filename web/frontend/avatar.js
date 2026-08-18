@@ -6,7 +6,8 @@
     thinking: '/static/assets/assistant_thinking.png',
     speaking: '/static/assets/assistant_speaking.png',
     happy: '/static/assets/assistant_happy.png',
-    interrupted: '/static/assets/assistant_portrait_transparent.png'
+    interrupted: '/static/assets/assistant_portrait_transparent.png',
+    mouth_open: '/static/assets/assistant_mouth_open.png'
   };
   const positionKey = 'lab-agent-avatar-position'; let settleTimer = null; let speakTimer = null; let speakFrame = false;
 
@@ -44,10 +45,10 @@
     clearSpeakTimer();
     const image = widget.querySelector('.portrait img');
     speakFrame = false;
-    image.src = portraits.speaking;
+    image.src = portraits.mouth_open;
     speakTimer = setInterval(function () {
       speakFrame = !speakFrame;
-      image.src = speakFrame ? portraits.idle : portraits.speaking;
+      image.src = speakFrame ? portraits.idle : portraits.mouth_open;
     }, 160);
   }
   function setState(nextState) {
