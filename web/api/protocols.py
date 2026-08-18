@@ -108,6 +108,15 @@ def upload_protocols(payload: UploadPayload):
     return {"added": len(added), "protocols": added}
 
 
+@router.get("/{protocol_id}")
+def read_protocol(protocol_id: str):
+    """方案详情：完整步骤、准备材料、安全提示。"""
+    try:
+        return domain.protocol_detail(protocol_id)
+    except Exception as error:
+        raise HTTPException(status_code=404, detail=str(error))
+
+
 @router.get("/session")
 def read_session():
     """当前会话：已选方案、当前步骤、安全提示。"""
@@ -157,9 +166,17 @@ def reagents():
     for reagent in store.all_reagents():
         items.append({
             "name": reagent.name_zh,
+            "name_en": reagent.name_en,
             "cas": reagent.cas,
+            "formula": reagent.molecular_formula,
+            "weight": reagent.molecular_weight,
+            "signal_word": reagent.signal_word,
             "critical": reagent.is_critical,
             "codes": list(reagent.critical_codes),
+            "statements": [s.text for s in reagent.hazard_statements],
+            "critical_statements": [s.text for s in reagent.critical_statements()],
+            "source_url": reagent.source_url,
+            "review_status": reagent.review_status,
         })
     return {"note": store.authority_note, "count": len(items), "reagents": items}
 

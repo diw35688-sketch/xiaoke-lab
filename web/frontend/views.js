@@ -121,13 +121,67 @@
 
       Array.prototype.forEach.call(host.querySelectorAll('.p-card'), function (card) {
         card.onclick = function () {
-          api('/protocols/session', 'POST', { protocol_id: card.dataset.id || null }).then(function () {
-            refreshStatus();
-            window.shellShow('protocols');
-            if (window.labStepsReload) window.labStepsReload();
-          });
+          if (!card.dataset.id) {
+            api('/protocols/session', 'POST', { protocol_id: null }).then(function () {
+              refreshStatus();
+              window.shellShow('run');
+            });
+            return;
+          }
+          showProtocolDetail(host, card.dataset.id);
         };
       });
+
+      function showProtocolDetail(host, protocolId) {
+        api('/protocols/' + encodeURIComponent(protocolId)).then(function (d) {
+          var steps = (d.steps || []).map(function (s) {
+            var values = Object.keys(s.protocol_values || {}).map(function (k) {
+              return '<span style="background:#e0e7ff;color:#3730a3;border-radius:5px;padding:2px 7px;margin:2px 4px 2px 0;display:inline-block;font-size:11px">'
+                + esc(k) + '=' + esc(s.protocol_values[k]) + '</span>';
+            }).join('');
+            var must = (s.must_record || []).join('、') || '无';
+            var safety = (s.safety || []).map(function (x) {
+              return '<div style="margin-top:6px;color:#b91c1c;font-size:12px">⚠ ' + esc(x.name) + '：' + esc((x.statements || []).join('；')) + '</div>';
+            }).join('');
+            return '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:13px 15px;margin-bottom:10px">'
+              + '<div style="font-weight:600;color:#0f172a;margin-bottom:6px">第 ' + s.number + ' 步 · ' + esc(s.title) + '</div>'
+              + '<div style="color:#334155;font-size:13px;line-height:1.7">' + esc(s.instruction) + '</div>'
+              + (values ? '<div style="margin-top:8px">方案已定：' + values + '</div>' : '')
+              + '<div style="margin-top:8px;color:#64748b;font-size:12px">现场必测：' + esc(must) + '</div>'
+              + (s.hazard_note ? '<div style="margin-top:8px;color:#b45309;font-size:12px">方案提示：' + esc(s.hazard_note) + '</div>' : '')
+              + safety
+              + '</div>';
+          }).join('');
+          var preps = (d.prep_requirements || []).map(function (p) {
+            return '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:9px 12px;margin-bottom:8px">'
+              + '<b>' + esc(p.name_zh) + '</b> · ' + esc(p.target_concentration || '工作液')
+              + '<div style="color:#475569;font-size:12px;margin-top:3px">' + esc(p.purpose) + '</div></div>';
+          }).join('');
+          host.innerHTML = '<div style="max-width:820px">'
+            + '<button class="sh-btn" id="protocol-back">← 返回方案列表</button>'
+            + '<div style="margin:14px 0 4px;font-size:18px;font-weight:700;color:#0f172a">' + esc(d.protocol.title) + '</div>'
+            + '<div style="color:#64748b;font-size:12px;margin-bottom:14px">' + esc(d.protocol.source) + ' · 共 ' + d.protocol.total_steps + ' 步 · v' + esc(d.protocol.version) + '</div>'
+            + '<div style="margin-bottom:14px"><button class="sh-btn primary" id="protocol-select-detail">选择此方案开始实验</button>'
+            + '<button class="sh-btn" id="protocol-edit-detail" style="margin-left:8px">编辑当前步骤</button></div>'
+            + (preps ? '<div style="font-size:13px;font-weight:700;color:#0f172a;margin:0 0 8px">实验前准备</div>' + preps : '')
+            + '<div style="font-size:13px;font-weight:700;color:#0f172a;margin:10px 0 8px">实验步骤</div>'
+            + steps + '</div>';
+          host.querySelector('#protocol-back').onclick = function () { window.shellShow('protocols'); };
+          host.querySelector('#protocol-select-detail').onclick = function () {
+            api('/protocols/session', 'POST', { protocol_id: protocolId }).then(function () {
+              refreshStatus();
+              window.shellShow('run');
+              if (window.runReload) window.runReload();
+            });
+          };
+          host.querySelector('#protocol-edit-detail').onclick = function () {
+            window.shellShow('run');
+            setTimeout(function () { if (window.openProtocolEditor) window.openProtocolEditor(); }, 300);
+          };
+        }).catch(function (err) {
+          host.innerHTML = '<div style="color:#b91c1c;font-size:13px">加载方案详情失败：' + esc(err.message || err) + '</div>';
+        });
+      }
         var aiTextBtn = host.querySelector('#ai-protocol-text-btn');
         if (aiTextBtn) aiTextBtn.onclick = function () {
           var text = host.querySelector('#protocol-text').value.trim();
@@ -190,20 +244,42 @@
   // ---------- 试剂安全库页 ----------
   window.shellRegisterView('reagents', function (host) {
     api('/protocols/reagents').then(function (d) {
-      var rows = (d.reagents || []).map(function (r) {
-        return '<tr style="border-bottom:1px solid #f1f5f9">'
-          + '<td style="padding:9px 10px;font-weight:500;color:#0f172a">' + esc(r.name) + '</td>'
-          + '<td style="padding:9px 10px;color:#64748b;font-size:12px">' + esc(r.cas || '—') + '</td>'
-          + '<td style="padding:9px 10px">' + (r.critical
+      var cards = (d.reagents || []).map(function (r) {
+        return '<div class="reagent-card" data-name="' + esc(r.name) + '" style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px 14px;margin-bottom:10px;cursor:pointer">'
+          + '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>' + esc(r.name) + '</b>'
+          + (r.critical
               ? '<span style="background:#fee2e2;color:#b91c1c;border-radius:5px;padding:2px 8px;font-size:11px">高危 ' + (r.codes || []).join('/') + '</span>'
-              : '<span style="color:#94a3b8;font-size:12px">无高危项</span>') + '</td></tr>';
+              : '<span style="color:#94a3b8;font-size:12px">无高危项</span>') + '</div>'
+          + '<div style="color:#64748b;font-size:12px;margin-top:5px">CAS ' + esc(r.cas || '—') + ' · ' + esc(r.formula || '') + '</div></div>';
       }).join('');
       host.innerHTML = '<div style="max-width:860px">'
         + '<div style="color:#64748b;font-size:12px;line-height:1.7;margin-bottom:14px">共 ' + d.count + ' 种试剂。' + esc(d.note) + '</div>'
-        + '<table style="width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;font-size:13px">'
-        + '<thead><tr style="background:#f8fafc;color:#475569;font-size:12px">'
-        + '<th style="text-align:left;padding:10px">试剂</th><th style="text-align:left;padding:10px">CAS</th>'
-        + '<th style="text-align:left;padding:10px">危险性</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+        + cards + '</div>';
+
+      function showReagentDetail(item) {
+        var statements = (item.statements || []).map(function (s) {
+          return '<div style="padding:5px 0;border-bottom:1px solid #f1f5f9;color:#334155;font-size:13px">' + esc(s) + '</div>';
+        }).join('') || '<div style="color:#94a3b8;font-size:12px">无 GHS 危险性说明记录</div>';
+        var critical = (item.critical_statements || []).map(function (s) {
+          return '<div style="padding:4px 0;color:#b91c1c;font-size:12px">⚠ ' + esc(s) + '</div>';
+        }).join('') || '<div style="color:#94a3b8;font-size:12px">无高危项</div>';
+        host.innerHTML = '<div style="max-width:760px">'
+          + '<button class="sh-btn" id="reagent-back">← 返回试剂列表</button>'
+          + '<div style="margin:14px 0 4px;font-size:18px;font-weight:700;color:#0f172a">' + esc(item.name) + '</div>'
+          + '<div style="color:#64748b;font-size:12px;margin-bottom:14px">' + esc(item.name_en || '') + ' · CAS ' + esc(item.cas || '—') + ' · ' + esc(item.formula || '') + ' · ' + esc(item.signal_word || '') + '</div>'
+          + '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:13px 15px;margin-bottom:12px"><div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:6px">GHS 危险性说明</div>' + statements + '</div>'
+          + '<div style="background:#fff;border:1px solid #fee2e2;border-radius:12px;padding:13px 15px;margin-bottom:12px"><div style="font-size:13px;font-weight:700;color:#b91c1c;margin-bottom:6px">现场重点提醒</div>' + critical + '</div>'
+          + '<div style="font-size:12px;color:#94a3b8">复核状态：' + esc(item.review_status || 'UNREVIEWED') + (item.source_url ? ' · <a href="' + esc(item.source_url) + '" target="_blank">PubChem 来源</a>' : '') + '</div>'
+          + '</div>';
+        host.querySelector('#reagent-back').onclick = function () { window.shellShow('reagents'); };
+      }
+
+      Array.prototype.forEach.call(host.querySelectorAll('.reagent-card'), function (card) {
+        card.onclick = function () {
+          var item = (d.reagents || []).filter(function (r) { return r.name === card.dataset.name; })[0];
+          if (item) showReagentDetail(item);
+        };
+      });
     });
   });
 

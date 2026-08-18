@@ -205,6 +205,42 @@ def entity_field_names() -> list:
     return [f.name for f in dc_fields(ExperimentEntities)]
 
 
+def protocol_detail(protocol_id: str) -> dict:
+    """一份方案的完整详情：步骤、准备材料、危险提示。"""
+
+    protocol = protocols().get_by_id(protocol_id)
+    if protocol is None:
+        raise ValueError(f"找不到方案 {protocol_id}")
+    return {
+        "protocol": {
+            "id": protocol.protocol_id,
+            "title": protocol.title,
+            "source": protocol.source,
+            "version": protocol.version,
+            "total_steps": len(protocol.steps),
+        },
+        "steps": [
+            {
+                "number": s.step_number,
+                "title": s.title,
+                "instruction": s.instruction,
+                "protocol_values": dict(s.protocol_values),
+                "must_record": list(s.must_record),
+                "terms": list(s.terms),
+                "hazard_note": s.hazard_note,
+                "field_prompts": dict(s.field_prompts),
+                "substeps": [
+                    {"order": x.order, "text": x.text, "note": x.note}
+                    for x in s.substeps
+                ],
+                "safety": safety_for(s),
+            }
+            for s in protocol.steps
+        ],
+        "prep_requirements": protocol_prep_requirements(protocol_id)["items"],
+    }
+
+
 def add_protocol(raw_protocol: dict) -> dict:
     """把一份新的实验方案写入方案库；先严格校验，再整份重写。"""
     import json
