@@ -138,6 +138,37 @@ def generate_protocol_draft(description: str) -> dict:
         raise ValueError(f"AI 返回的不是合法 JSON：{error}") from error
 
 
+def generate_protocol_edit_draft(protocol_json: dict, instruction: str) -> dict:
+    """根据当前方案上下文和用户修改要求，生成修订后的完整方案 JSON。"""
+
+    client = WebSettingsLLMClient()
+    system_prompt = (
+        "你是实验方案修订助手。用户会给你一份现有实验方案和修改要求。"
+        "请返回一份完整修订后的实验方案 JSON，不要 Markdown，不要解释。"
+        "要求：protocol_id 保持不变；只修改用户要求的部分，其他步骤尽量保留；"
+        "如果用户要新增步骤，在合适位置插入并重新编号。"
+        "JSON 结构必须与现有方案完全一致："
+        '{"protocol_id":"英文短横线id","title":"方案标题","source":"AI修订草稿","version":"1.0","schema_version":1,'
+        '"steps":[{"step_number":1,"title":"步骤标题","instruction":"步骤说明","protocol_values":{"字段名":"值"},'
+        '"must_record":["字段名"],"terms":["术语"],"hazard_note":"安全提示或null",'
+        '"field_prompts":{"字段名":"追问话术"}}]}'
+        "字段名只能使用：action, object, amount_value, amount_unit, concentration, "
+        "temperature, duration, condition, observation, instrument。"
+    )
+    user_prompt = (
+        "当前方案 JSON：\n" + json.dumps(protocol_json, ensure_ascii=False, indent=2)
+        + "\n\n用户修改要求：\n" + instruction
+    )
+    result = client.generate_json(
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+    )
+    try:
+        return clean_text(json.loads(result.content))
+    except json.JSONDecodeError as error:
+        raise ValueError(f"AI 返回的不是合法 JSON：{error}") from error
+
+
 def generate_reagent_prep_draft(description: str) -> dict:
     """用 LLM 生成一条试剂配置草稿（不落盘，确认后才保存）。"""
 

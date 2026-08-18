@@ -52,6 +52,49 @@ def list_protocols():
         })
     return {"protocols": items}
 
+@router.post("/ai-edit")
+def ai_edit(payload: AiEditPayload):
+    """结合当前方案上下文和用户文字，生成修订后的完整方案草稿。"""
+    try:
+        detail = domain.protocol_detail(payload.protocol_id)
+        raw_protocol = {
+            "protocol_id": detail["protocol"]["id"],
+            "title": detail["protocol"]["title"],
+            "source": detail["protocol"]["source"],
+            "version": detail["protocol"]["version"],
+            "schema_version": 1,
+            "steps": [
+                {
+                    "step_number": s["number"],
+                    "title": s["title"],
+                    "instruction": s["instruction"],
+                    "protocol_values": s["protocol_values"],
+                    "must_record": s["must_record"],
+                    "terms": s["terms"],
+                    "hazard_note": s["hazard_note"],
+                    "field_prompts": s["field_prompts"],
+                    "substeps": s["substeps"],
+                }
+                for s in detail["steps"]
+            ],
+        }
+        draft = llm_bridge.generate_protocol_edit_draft(
+            raw_protocol, payload.instruction
+        )
+        return {"draft": draft}
+    except Exception as error:
+        raise HTTPException(status_code=502, detail=str(error))
+
+
+@router.post("/save-ai-edit")
+def save_ai_edit(payload: SaveAiEditPayload):
+    """保存 AI 修订后的完整方案，自动升版本。"""
+    try:
+        return domain.update_protocol_from_draft(payload.protocol)
+    except Exception as error:
+        raise HTTPException(status_code=400, detail=str(error))
+
+
 @router.post("/ai-draft")
 def ai_draft(payload: AiDraftPayload):
     """用 AI 生成实验方案草稿（不落盘）。"""
@@ -192,6 +235,15 @@ class AddStepPayload(BaseModel):
 class DeleteStepPayload(BaseModel):
     protocol_id: str
     step_number: int
+
+
+class AiEditPayload(BaseModel):
+    protocol_id: str
+    instruction: str
+
+
+class SaveAiEditPayload(BaseModel):
+    protocol: dict
 
 
 class StepEditPayload(BaseModel):

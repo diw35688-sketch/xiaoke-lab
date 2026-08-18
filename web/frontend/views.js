@@ -168,8 +168,55 @@
             + '<div style="margin-bottom:14px"><button class="sh-btn primary" id="protocol-select-detail">选择此方案开始实验</button>'
             + '<button class="sh-btn" id="protocol-edit-detail" style="margin-left:8px">编辑当前步骤</button></div>'
             + (preps ? '<div style="font-size:13px;font-weight:700;color:#0f172a;margin:0 0 8px">实验前准备</div>' + preps : '')
+            + '<div style="margin-top:18px;border-top:1px dashed #cbd5e1;padding-top:14px">'
+            + '<div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:8px">AI 辅助修改方案</div>'
+            + '<textarea id="ai-edit-text" rows="3" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;margin-bottom:8px" placeholder="输入修改要求，例如：在第2步后面增加一步“记录pH校准”，并把第3步改成用分光光度计"></textarea>'
+            + '<div style="margin-bottom:8px"><input type="file" id="ai-edit-file" accept=".pdf,.png,.jpg,.jpeg" style="font-size:12px">'
+            + '<span style="color:#94a3b8;font-size:12px;margin-left:8px">也可上传 PDF/图片，系统先 OCR 识别，再按识别结果修改</span></div>'
+            + '<button class="sh-btn primary" id="ai-edit-btn">AI 修改方案</button>'
+            + '<span id="ai-edit-msg" style="color:#64748b;font-size:12px;margin-left:10px"></span>'
+            + '<div id="ai-edit-draft"></div></div>'
             + '<div style="font-size:13px;font-weight:700;color:#0f172a;margin:10px 0 8px">实验步骤</div>'
             + steps + '</div>';
+          var aiEditBtn = host.querySelector('#ai-edit-btn');
+          if (aiEditBtn) aiEditBtn.onclick = function () {
+            var instruction = host.querySelector('#ai-edit-text').value.trim();
+            var msg = host.querySelector('#ai-edit-msg');
+            var box = host.querySelector('#ai-edit-draft');
+            if (!instruction) { msg.textContent = '请先输入修改要求'; return; }
+            msg.textContent = 'AI 正在结合当前方案修改…';
+            box.innerHTML = '';
+            api('/protocols/ai-edit', 'POST', { protocol_id: protocolId, instruction: instruction }).then(function (res) {
+              if (res && res.detail) { msg.textContent = '修改失败：' + res.detail; return; }
+              var draft = res.draft;
+              msg.textContent = '已生成修订草稿，请确认后保存';
+              box.innerHTML = '<pre style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px;white-space:pre-wrap;font-size:12px;margin-top:10px">'
+                + esc(JSON.stringify(draft, null, 2)) + '</pre>'
+                + '<div style="margin-top:10px"><button class="sh-btn primary" id="ai-edit-save">确认保存修订</button></div>';
+              host.querySelector('#ai-edit-save').onclick = function () {
+                api('/protocols/save-ai-edit', 'POST', { protocol: draft }).then(function (saved) {
+                  if (saved && saved.detail) { msg.textContent = '保存失败：' + saved.detail; return; }
+                  msg.textContent = '已保存，版本已更新';
+                  showProtocolDetail(host, protocolId);
+                });
+              };
+            }).catch(function (e) { msg.textContent = '修改失败：' + e.message; });
+          };
+          var aiEditFile = host.querySelector('#ai-edit-file');
+          if (aiEditFile) aiEditFile.onchange = function () {
+            var file = aiEditFile.files && aiEditFile.files[0];
+            if (!file) return;
+            var msg = host.querySelector('#ai-edit-msg');
+            var form = new FormData();
+            form.append('file', file);
+            msg.textContent = 'OCR 识别中…';
+            fetch('/protocols/upload-file', { method: 'POST', body: form }).then(function (r) { return r.json(); }).then(function (res) {
+              if (res && res.detail) { msg.textContent = '识别失败：' + res.detail; return; }
+              host.querySelector('#ai-edit-text').value = (host.querySelector('#ai-edit-text').value ? host.querySelector('#ai-edit-text').value + '\n' : '') + res.ocr_text;
+              msg.textContent = '已把识别内容填入，可继续补充修改要求后点“AI 修改方案”';
+            }).catch(function (e) { msg.textContent = '识别失败：' + e.message; });
+          };
+
           Array.prototype.forEach.call(host.querySelectorAll('.step-add'), function (btn) {
             btn.onclick = function () {
               var after = parseInt(btn.dataset.after, 10);

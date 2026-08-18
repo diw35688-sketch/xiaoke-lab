@@ -579,6 +579,50 @@ def add_protocol_step(payload: dict) -> dict:
     return step_view(session())
 
 
+def update_protocol_from_draft(raw_protocol: dict) -> dict:
+    """用 AI 修订后的完整方案替换同 ID 的现有方案，自动升版本。"""
+
+    from src.storage.protocol_store import ProtocolStore, ProtocolStoreError
+
+    protocol_id = raw_protocol.get("protocol_id", "")
+    # 先校验，不通过绝不落盘
+    try:
+        ProtocolStore._parse_protocol(raw_protocol, index=1)
+    except ProtocolStoreError as error:
+        raise ValueError(f"修订后的方案不符合契约：{error}")
+
+    raw = json.loads(PROTOCOL_FILE.read_text(encoding="utf-8"))
+    target = None
+    for item in raw["protocols"]:
+        if item["protocol_id"] == protocol_id:
+            target = item
+            break
+    if target is None:
+        raise ValueError(f"找不到方案 {protocol_id}")
+    raw_protocol["version"] = _bump_version(raw_protocol.get("version", "1.0"))
+    for index, item in enumerate(raw["protocols"]):
+        if item["protocol_id"] == protocol_id:
+            raw["protocols"][index] = raw_protocol
+            break
+    PROTOCOL_FILE.write_text(
+        json.dumps(raw, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+    global _protocol_store, _session
+    with _lock:
+        _protocol_store = None
+        if _session is not None and _session.selection.protocol is not None:
+            if _session.selection.protocol.protocol_id == protocol_id:
+                current = _session.step_number
+                _session = ProtocolSessionState.start(
+                    select_protocol(protocols(), protocol_id)
+                )
+                if current:
+                    _session = _session.jump_to(current)
+    _sync_prep_requirements_for_protocol(raw_protocol)
+    return protocol_detail(protocol_id)
+
+
 def delete_protocol_step(protocol_id: str, step_number: int) -> dict:
     """删除方案中的一个大步骤并重新编号，严格校验后落盘。"""
 
