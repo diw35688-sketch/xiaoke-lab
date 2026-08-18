@@ -22,6 +22,14 @@ def _auth_headers(settings) -> dict:
     }
 
 
+def _mineru_key(settings) -> str:
+    return settings.mineru_api_key or settings.key_for("ustc") or settings.api_key
+
+
+def _ocr_key(settings) -> str:
+    return settings.ocr_api_key or settings.key_for("ustc") or settings.api_key
+
+
 def pdf_to_images(pdf_bytes: bytes) -> list[bytes]:
     """把 PDF 每页渲染成 PNG 字节。"""
 
@@ -43,10 +51,10 @@ def pdf_to_images(pdf_bytes: bytes) -> list[bytes]:
 def ocr_image(settings, image_bytes: bytes, mime: str = "image/png") -> str:
     """调用 OCR 模型识别一张图片。"""
 
-    url = settings.base_url.rstrip("/") + "/chat/completions"
+    url = settings.ocr_base_url.rstrip("/") + "/chat/completions"
     data_url = f"data:{mime};base64," + base64.b64encode(image_bytes).decode()
     payload = {
-        "model": OCR_MODEL,
+        "model": settings.ocr_model or OCR_MODEL,
         "messages": [
             {
                 "role": "user",
@@ -60,7 +68,10 @@ def ocr_image(settings, image_bytes: bytes, mime: str = "image/png") -> str:
     }
     response = httpx.post(
         url,
-        headers=_auth_headers(settings),
+        headers={
+            "Authorization": "Bearer " + _ocr_key(settings),
+            "Content-Type": "application/json",
+        },
         json=payload,
         timeout=httpx.Timeout(120, connect=10),
         trust_env=False,
@@ -86,12 +97,10 @@ def _mineru_file_parse_url(settings) -> str:
 def parse_pdf_with_mineru(settings, pdf_bytes: bytes) -> str:
     """调用科大 MinerU 文件解析服务，返回 Markdown。"""
 
-    if "ustc" not in settings.base_url:
-        raise ValueError("MinerU 文件解析只在科大接口上可用。")
-    url = _mineru_file_parse_url(settings)
+    url = settings.mineru_file_parse_url or _mineru_file_parse_url(settings)
     response = httpx.post(
         url,
-        headers={"Authorization": "Bearer " + settings.api_key},
+        headers={"Authorization": "Bearer " + _mineru_key(settings)},
         data={"return_md": "true", "response_format_zip": "false"},
         files={"files": ("protocol.pdf", pdf_bytes, "application/pdf")},
         timeout=httpx.Timeout(180, connect=10),
