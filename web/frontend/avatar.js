@@ -7,7 +7,9 @@
     speaking: '/static/assets/assistant_speaking.png',
     happy: '/static/assets/assistant_happy.png',
     interrupted: '/static/assets/assistant_portrait_transparent.png',
-    mouth_open: '/static/assets/assistant_mouth_open.png'
+    mouth_open: '/static/assets/assistant_mouth_open.png',
+    eye_left: '/static/assets/assistant_eye_left.png',
+    eye_right: '/static/assets/assistant_eye_right.png'
   };
   const positionKey = 'lab-agent-avatar-position'; let settleTimer = null; let speakTimer = null; let speakFrame = false;
 
@@ -55,6 +57,7 @@
     if (!labels[nextState]) nextState = 'idle'; const widget = document.querySelector('#assistant-avatar'); if (!widget) return;
     const dragging = widget.classList.contains('is-dragging'); widget.className = `is-${nextState}${dragging ? ' is-dragging' : ''}`; widget.querySelector('.avatar-label').textContent = labels[nextState];
     clearTimeout(settleTimer);
+    widget.dataset.state = nextState;
     if (nextState === 'speaking') { startSpeakFrames(widget); }
     else { clearSpeakTimer(); const image = widget.querySelector('.portrait img'); if (image.getAttribute('src') !== portraits[nextState]) image.src = portraits[nextState]; }
   }
@@ -64,10 +67,16 @@
       const widget = document.querySelector('#assistant-avatar');
       if (!widget) return;
       const portrait = widget.querySelector('.portrait');
-      if (!portrait) return;
+      const image = widget.querySelector('.portrait img');
+      if (!portrait || !image) return;
       const dx = (e.clientX / window.innerWidth - 0.5) * 2;
       const dy = (e.clientY / window.innerHeight - 0.5) * 2;
       portrait.style.transform = 'translate(' + (dx * 5).toFixed(1) + 'px,' + (dy * 3).toFixed(1) + 'px)';
+      const state = widget.dataset.state || 'idle';
+      if (state === 'speaking') return;
+      if (dx < -0.15) image.src = portraits.eye_left;
+      else if (dx > 0.15) image.src = portraits.eye_right;
+      else if (image.getAttribute('src') !== portraits[state]) image.src = portraits[state];
     });
   }
   document.addEventListener('DOMContentLoaded', () => { create(); enableEyeFollow(); setTimeout(() => { setState('listening'); settleTimer = setTimeout(() => setState('idle'), 1200); }, 180); });
