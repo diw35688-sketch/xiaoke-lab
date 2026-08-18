@@ -126,7 +126,7 @@
   window.composerRefresh = refresh;
 
   function init() {
-    var host = document.getElementById('sh-chat');
+    var host = document.getElementById('sh-chat-main') || document.getElementById('sh-chat');
     if (!host) { setTimeout(init, 300); return; }
 
     var style = document.createElement('style');

@@ -101,7 +101,7 @@
     bar.innerHTML = '<button id="asr-btn">开始录音</button>'
       + '<span id="asr-state">本地语音识别（SenseVoice）</span>'
       + '<span id="asr-text"></span>';
-    (document.getElementById('sh-chat') || document.body).appendChild(bar);
+    (document.getElementById('sh-chat-main') || document.getElementById('sh-chat') || document.body).appendChild(bar);
 
     fetch('/asr/status').then(function (r) { return r.json(); }).then(function (d) {
       if (!d.loaded) say('本地识别未加载，首次使用需等待模型加载');
