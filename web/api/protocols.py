@@ -108,14 +108,6 @@ def upload_protocols(payload: UploadPayload):
     return {"added": len(added), "protocols": added}
 
 
-@router.get("/{protocol_id}")
-def read_protocol(protocol_id: str):
-    """方案详情：完整步骤、准备材料、安全提示。"""
-    try:
-        return domain.protocol_detail(protocol_id)
-    except Exception as error:
-        raise HTTPException(status_code=404, detail=str(error))
-
 
 @router.get("/session")
 def read_session():
@@ -259,3 +251,11 @@ def edit_step(payload: StepEditPayload):
 def entity_fields():
     """可用于 protocol_values / must_record 的实体字段白名单。"""
     return {"fields": domain.entity_field_names()}
+
+@router.get("/{protocol_id}")
+def read_protocol(protocol_id: str):
+    """方案详情：完整步骤、准备材料、安全提示。"""
+    try:
+        return domain.protocol_detail(protocol_id)
+    except Exception as error:
+        raise HTTPException(status_code=404, detail=str(error))
