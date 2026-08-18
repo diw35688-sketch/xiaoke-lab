@@ -11,6 +11,8 @@ import json
 
 import httpx
 
+from text_clean import clean_text
+
 # 科大统一 API 上经过实测可用的 OCR 模型。
 OCR_MODEL = "unlimited-ocr"
 
@@ -182,4 +184,4 @@ def extract_protocol_drafts(settings, ocr_text: str) -> list[dict]:
         raise RuntimeError("LLM 没有返回合法 JSON：" + str(error))
     if not isinstance(protocols, list) or not protocols:
         raise RuntimeError("没有识别到实验方案。")
-    return protocols
+    return clean_text(protocols)

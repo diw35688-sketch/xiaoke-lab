@@ -9,6 +9,8 @@
 from __future__ import annotations
 
 import json
+
+from text_clean import clean_text
 import time
 
 import domain  # noqa: F401  确保仓库根目录已在 sys.path
@@ -131,7 +133,7 @@ def generate_protocol_draft(description: str) -> dict:
         user_prompt=description,
     )
     try:
-        return json.loads(result.content)
+        return clean_text(json.loads(result.content))
     except json.JSONDecodeError as error:
         raise ValueError(f"AI 返回的不是合法 JSON：{error}") from error
 
@@ -155,6 +157,6 @@ def generate_reagent_prep_draft(description: str) -> dict:
         user_prompt=description,
     )
     try:
-        return json.loads(result.content)
+        return clean_text(json.loads(result.content))
     except json.JSONDecodeError as error:
         raise ValueError(f"AI 返回的不是合法 JSON：{error}") from error
