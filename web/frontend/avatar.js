@@ -7,9 +7,18 @@
     speaking: '/static/assets/assistant_speaking.png',
     happy: '/static/assets/assistant_happy.png',
     interrupted: '/static/assets/assistant_portrait_transparent.png',
-    mouth_open: '/static/assets/assistant_mouth_open.png',
-    eye_left: '/static/assets/assistant_eye_left.png',
-    eye_right: '/static/assets/assistant_eye_right.png'
+    mouth_open: '/static/assets/assistant_mouth_open.png'
+  };
+  const eyeFrames = {
+    look_upper_left: '/static/assets/eye_frames/look_upper_left.png',
+    look_up: '/static/assets/eye_frames/look_up.png',
+    look_upper_right: '/static/assets/eye_frames/look_upper_right.png',
+    look_left: '/static/assets/eye_frames/look_left.png',
+    look_center: '/static/assets/eye_frames/look_center.png',
+    look_right: '/static/assets/eye_frames/look_right.png',
+    look_lower_left: '/static/assets/eye_frames/look_lower_left.png',
+    look_down: '/static/assets/eye_frames/look_down.png',
+    look_lower_right: '/static/assets/eye_frames/look_lower_right.png'
   };
   const positionKey = 'lab-agent-avatar-position'; let settleTimer = null; let speakTimer = null; let speakFrame = false;
 
@@ -74,9 +83,19 @@
       portrait.style.transform = 'translate(' + (dx * 5).toFixed(1) + 'px,' + (dy * 3).toFixed(1) + 'px)';
       const state = widget.dataset.state || 'idle';
       if (state === 'speaking') return;
-      if (dx < -0.15) image.src = portraits.eye_left;
-      else if (dx > 0.15) image.src = portraits.eye_right;
-      else if (image.getAttribute('src') !== portraits[state]) image.src = portraits[state];
+      const dirX = dx < -0.15 ? 'left' : dx > 0.15 ? 'right' : 'center';
+      const dirY = dy < -0.15 ? 'up' : dy > 0.15 ? 'down' : 'center';
+      const key = dirX === 'center' && dirY === 'center' ? 'look_center'
+        : dirX === 'left' && dirY === 'up' ? 'look_upper_left'
+        : dirX === 'right' && dirY === 'up' ? 'look_upper_right'
+        : dirX === 'left' && dirY === 'down' ? 'look_lower_left'
+        : dirX === 'right' && dirY === 'down' ? 'look_lower_right'
+        : dirY === 'up' ? 'look_up'
+        : dirY === 'down' ? 'look_down'
+        : dirX === 'left' ? 'look_left'
+        : dirX === 'right' ? 'look_right'
+        : 'look_center';
+      if (image.getAttribute('src') !== eyeFrames[key]) image.src = eyeFrames[key];
     });
   }
   document.addEventListener('DOMContentLoaded', () => { create(); enableEyeFollow(); setTimeout(() => { setState('listening'); settleTimer = setTimeout(() => setState('idle'), 1200); }, 180); });
