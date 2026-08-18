@@ -7,21 +7,34 @@
   }
 
   function renderPrep(p) {
-    var steps = (p.steps || []).map(function (s, i) {
-      return '<div style="margin:4px 0 0 18px;color:#475569;font-size:13px">' + (i + 1) + '. ' + esc(s) + '</div>';
-    }).join('');
-    var safety = (p.safety || []).map(function (s) {
-      return '<div class="lab-hazard" style="margin-top:6px">⚠ ' + esc(s.name) + '：' + esc((s.statements || []).join('；')) + '</div>';
-    }).join('');
     var badge = p.review_status === 'REVIEWED' ? '<span style="color:#16a34a">已复核</span>' : '<span style="color:#d97706">未复核</span>';
-    return '<div style="background:var(--n-00,#fff);border:1px solid var(--bd-1,#e2e8f0);border-radius:12px;padding:12px 14px;margin-bottom:10px">'
+    return '<div class="prep-card" data-id="' + esc(p.reagent_prep_id) + '" style="background:var(--n-00,#fff);border:1px solid var(--bd-1,#e2e8f0);border-radius:12px;padding:12px 14px;margin-bottom:10px;cursor:pointer">'
       + '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>' + esc(p.name_zh) + '</b><span style="font-size:12px">' + badge + '</span></div>'
       + '<div style="color:#64748b;font-size:13px;margin-top:4px">' + esc(p.purpose) + '</div>'
-      + '<div style="color:#334155;font-size:13px;margin-top:6px">目标：' + esc(p.target_concentration || '未指定') + '；体积：' + esc(p.target_volume || '按需') + '；溶剂：' + esc(p.solvent || '未指定') + '</div>'
-      + steps
-      + safety
-      + (p.source_url ? '<div style="margin-top:6px;font-size:12px"><a href="' + esc(p.source_url) + '" target="_blank">来源</a> · ' + esc(p.source) + '</div>' : '<div style="margin-top:6px;font-size:12px;color:#94a3b8">来源：' + esc(p.source) + '</div>')
+      + '<div style="color:#334155;font-size:13px;margin-top:6px">目标：' + esc(p.target_concentration || '未指定') + ' · 体积：' + esc(p.target_volume || '按需') + ' · 溶剂：' + esc(p.solvent || '未指定') + '</div>'
       + '</div>';
+  }
+
+  function showPrepDetail(host, prep) {
+    var steps = (prep.steps || []).map(function (s, i) {
+      return '<div style="margin:5px 0 0 18px;color:#475569;font-size:13px">' + (i + 1) + '. ' + esc(s) + '</div>';
+    }).join('');
+    var safety = (prep.safety || []).map(function (s) {
+      return '<div style="margin-top:6px;color:#b91c1c;font-size:12px">⚠ ' + esc(s.name) + '：' + esc((s.statements || []).join('；')) + '</div>';
+    }).join('');
+    var badge = prep.review_status === 'REVIEWED' ? '<span style="color:#16a34a">已复核</span>' : '<span style="color:#d97706">未复核</span>';
+    host.innerHTML = '<div style="max-width:820px">'
+      + '<button class="sh-btn" id="prep-back">← 返回配置列表</button>'
+      + '<div style="margin:14px 0 4px;font-size:18px;font-weight:700;color:#0f172a">' + esc(prep.name_zh) + '</div>'
+      + '<div style="color:#64748b;font-size:12px;margin-bottom:14px">' + esc(prep.purpose) + ' · ' + badge + '</div>'
+      + '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;margin-bottom:12px">'
+      + '<div style="color:#334155;font-size:13px;line-height:1.8">目标：' + esc(prep.target_concentration || '未指定') + '<br>体积：' + esc(prep.target_volume || '按需') + '<br>溶剂：' + esc(prep.solvent || '未指定') + '<br>保存：' + esc(prep.storage_condition || '未指定') + '<br>有效期：' + esc(prep.expiry || '未指定') + '</div></div>'
+      + '<div style="font-size:13px;font-weight:700;color:#0f172a;margin:10px 0 8px">配制步骤</div>'
+      + '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px 15px">' + steps + '</div>'
+      + (safety ? '<div style="font-size:13px;font-weight:700;color:#0f172a;margin:12px 0 8px">安全提示</div><div style="background:#fff;border:1px solid #fee2e2;border-radius:12px;padding:12px 15px">' + safety + '</div>' : '')
+      + '<div style="margin-top:12px;font-size:12px;color:#94a3b8">来源：' + esc(prep.source || '未注明') + (prep.source_url ? ' · <a href="' + esc(prep.source_url) + '" target="_blank">查看来源</a>' : '') + '</div>'
+      + '</div>';
+    host.querySelector('#prep-back').onclick = function () { window.shellShow('reagent_prep'); };
   }
 
   window.shellRegisterView('reagent_prep', function (host) {
@@ -39,6 +52,12 @@
     function load() {
       fetch('/reagent-prep').then(function (r) { return r.json(); }).then(function (d) {
         host.querySelector('#prep-list').innerHTML = (d.items || []).map(renderPrep).join('') || '<div style="color:#94a3b8">暂无配置。</div>';
+        Array.prototype.forEach.call(host.querySelectorAll('.prep-card'), function (card) {
+          card.onclick = function () {
+            var item = (d.items || []).filter(function (x) { return x.reagent_prep_id === card.dataset.id; })[0];
+            if (item) showPrepDetail(host, item);
+          };
+        });
       });
     }
 
