@@ -15,9 +15,24 @@
   stopButton.title = '停止生成'; stopButton.textContent = '■'; stopButton.disabled = true;
   send.after(stopButton);
 
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function mdToHtml(text) {
+    var html = escapeHtml(text);
+    html = html.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+    html = html.replace(/(^|\n)(#{1,3})\s*/g, '$1');
+    html = html.replace(/\n/g, '<br>');
+    return html;
+  }
+
   function add(text, role) {
     const row = document.createElement('div'), bubble = document.createElement('div');
-    row.className = `message ${role}`; bubble.className = 'bubble'; bubble.textContent = text;
+    row.className = `message ${role}`; bubble.className = 'bubble';
+    if (role === 'assistant') bubble.innerHTML = mdToHtml(text); else bubble.textContent = text;
     row.appendChild(bubble); chat.appendChild(row); chat.scrollTop = chat.scrollHeight; return bubble;
   }
   window.addChatMessage = add;
@@ -202,7 +217,7 @@
               thinkBuffer += parts.slice(1).join('');
               window.chatPushThink(thinkBuffer, true);
               window.runPushThink?.(thinkBuffer, true);
-              reply.textContent = answer;
+              reply.innerHTML = mdToHtml(answer);
               chat.scrollTop = chat.scrollHeight;
               continue;
             }
@@ -216,7 +231,7 @@
                   window.labToolCard?.(view);
                 } catch (e) { answer += parts[i]; }
               }
-              reply.textContent = answer;
+              reply.innerHTML = mdToHtml(answer);
               chat.scrollTop = chat.scrollHeight;
               continue;
             }
@@ -254,7 +269,7 @@
           }
         }
       }
-      if (!answer) reply.textContent = '模型没有返回文字内容。';
+      if (!answer) reply.innerHTML = '模型没有返回文字内容。';
     } catch (error) {
       if (error.name === 'AbortError' || ownId !== requestId) return;
       reply.textContent = `出错了：${error.message}`;
