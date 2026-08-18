@@ -144,13 +144,17 @@
               return '<div style="margin-top:6px;color:#b91c1c;font-size:12px">⚠ ' + esc(x.name) + '：' + esc((x.statements || []).join('；')) + '</div>';
             }).join('');
             return '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:13px 15px;margin-bottom:10px">'
-              + '<div style="font-weight:600;color:#0f172a;margin-bottom:6px">第 ' + s.number + ' 步 · ' + esc(s.title) + '</div>'
+              + '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:6px">'
+              + '<div style="font-weight:600;color:#0f172a">第 ' + s.number + ' 步 · ' + esc(s.title) + '</div>'
+              + '<div style="white-space:nowrap"><button class="sh-btn step-edit" data-step="' + s.number + '" style="margin-left:4px;padding:3px 8px;font-size:12px">编辑</button>'
+              + '<button class="sh-btn step-del" data-step="' + s.number + '" style="margin-left:4px;padding:3px 8px;font-size:12px;color:#b91c1c">删除</button></div></div>'
               + '<div style="color:#334155;font-size:13px;line-height:1.7">' + esc(s.instruction) + '</div>'
               + (values ? '<div style="margin-top:8px">方案已定：' + values + '</div>' : '')
               + '<div style="margin-top:8px;color:#64748b;font-size:12px">现场必测：' + esc(must) + '</div>'
               + (s.hazard_note ? '<div style="margin-top:8px;color:#b45309;font-size:12px">方案提示：' + esc(s.hazard_note) + '</div>' : '')
               + safety
-              + '</div>';
+              + '</div>'
+              + '<div style="text-align:center;margin-bottom:10px"><button class="sh-btn step-add" data-after="' + s.number + '" style="border:1px dashed #cbd5e1;background:transparent;padding:4px 12px;font-size:12px">+ 在此后添加步骤</button></div>';
           }).join('');
           var preps = (d.prep_requirements || []).map(function (p) {
             return '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:9px 12px;margin-bottom:8px">'
@@ -166,6 +170,39 @@
             + (preps ? '<div style="font-size:13px;font-weight:700;color:#0f172a;margin:0 0 8px">实验前准备</div>' + preps : '')
             + '<div style="font-size:13px;font-weight:700;color:#0f172a;margin:10px 0 8px">实验步骤</div>'
             + steps + '</div>';
+          Array.prototype.forEach.call(host.querySelectorAll('.step-add'), function (btn) {
+            btn.onclick = function () {
+              var after = parseInt(btn.dataset.after, 10);
+              var title = prompt('新步骤标题（插在第 ' + after + ' 步之后）');
+              if (!title) return;
+              api('/protocols/step', 'POST', { protocol_id: protocolId, after_step_number: after, title: title, instruction: '请补充步骤说明', must_record: [], terms: [] }).then(function (res) {
+                if (res && res.detail) { alert('添加失败：' + res.detail); return; }
+                showProtocolDetail(host, protocolId);
+              });
+            };
+          });
+          Array.prototype.forEach.call(host.querySelectorAll('.step-edit'), function (btn) {
+            btn.onclick = function () {
+              var stepNumber = parseInt(btn.dataset.step, 10);
+              api('/protocols/session', 'POST', { protocol_id: protocolId }).then(function () {
+                return api('/protocols/session/move', 'POST', { action: 'jump', step_number: stepNumber });
+              }).then(function () {
+                refreshStatus();
+                window.shellShow('run');
+                setTimeout(function () { if (window.openProtocolEditor) window.openProtocolEditor(); }, 300);
+              });
+            };
+          });
+          Array.prototype.forEach.call(host.querySelectorAll('.step-del'), function (btn) {
+            btn.onclick = function () {
+              var stepNumber = parseInt(btn.dataset.step, 10);
+              if (!confirm('确定删除第 ' + stepNumber + ' 步？此操作会立即落盘。')) return;
+              api('/protocols/step', 'DELETE', { protocol_id: protocolId, step_number: stepNumber }).then(function (res) {
+                if (res && res.detail) { alert('删除失败：' + res.detail); return; }
+                showProtocolDetail(host, protocolId);
+              });
+            };
+          });
           host.querySelector('#protocol-back').onclick = function () { window.shellShow('protocols'); };
           host.querySelector('#protocol-select-detail').onclick = function () {
             api('/protocols/session', 'POST', { protocol_id: protocolId }).then(function () {

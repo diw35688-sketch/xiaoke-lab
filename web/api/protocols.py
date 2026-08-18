@@ -186,6 +186,7 @@ class AnalyzeReagentsPayload(BaseModel):
 
 class AddStepPayload(BaseModel):
     protocol_id: str
+    after_step_number: int | None = None
     title: str
     instruction: str = ""
     hazard_note: str | None = None
@@ -194,6 +195,11 @@ class AddStepPayload(BaseModel):
     terms: list | None = None
     field_prompts: dict | None = None
     substeps: list | None = None
+
+
+class DeleteStepPayload(BaseModel):
+    protocol_id: str
+    step_number: int
 
 
 class StepEditPayload(BaseModel):
@@ -223,6 +229,17 @@ def add_step(payload: AddStepPayload):
         return domain.add_protocol_step(payload.model_dump(exclude_none=True))
     except Exception as error:
         raise HTTPException(status_code=400, detail=f"{type(error).__name__}: {error}")
+
+
+@router.delete("/step")
+def delete_step(payload: DeleteStepPayload):
+    """删除方案中的一个步骤并重新编号。"""
+    try:
+        return domain.delete_protocol_step(
+            payload.protocol_id, payload.step_number
+        )
+    except Exception as error:
+        raise HTTPException(status_code=400, detail=str(error))
 
 
 @router.put("/step")

@@ -205,6 +205,14 @@ def entity_field_names() -> list:
     return [f.name for f in dc_fields(ExperimentEntities)]
 
 
+def _bump_version(version: str) -> str:
+    try:
+        major, minor = str(version).split(".")
+        return f"{major}.{int(minor) + 1}"
+    except Exception:
+        return str(version) + ".1"
+
+
 def protocol_detail(protocol_id: str) -> dict:
     """一份方案的完整详情：步骤、准备材料、危险提示。"""
 
@@ -338,6 +346,7 @@ def update_step(payload: dict) -> dict:
         if step["step_number"] == step_number:
             target_protocol["steps"][index] = updated
             break
+    target_protocol["version"] = _bump_version(target_protocol.get("version", "1.0"))
     PROTOCOL_FILE.write_text(
         json.dumps(raw, ensure_ascii=False, indent=2), encoding="utf-8"
     )
@@ -494,11 +503,12 @@ def _sync_prep_requirements_for_protocol(raw_protocol: dict) -> None:
 
 
 def add_protocol_step(payload: dict) -> dict:
-    """在方案末尾追加一个大步骤，严格校验后落盘。"""
+    """在方案中追加/插入一个大步骤，严格校验后落盘。"""
 
     from src.core.protocol import ProtocolStep, ProtocolSubStep
 
     protocol_id = payload["protocol_id"]
+    after = payload.get("after_step_number")
     raw = json.loads(PROTOCOL_FILE.read_text(encoding="utf-8"))
     target_protocol = None
     for item in raw["protocols"]:
@@ -508,9 +518,8 @@ def add_protocol_step(payload: dict) -> dict:
     if target_protocol is None:
         raise ValueError(f"找不到方案 {protocol_id}")
 
-    next_number = len(target_protocol["steps"]) + 1
     step_data = {
-        "step_number": next_number,
+        "step_number": 0,
         "title": payload.get("title", ""),
         "instruction": payload.get("instruction", ""),
         "protocol_values": payload.get("protocol_values") or {},
@@ -526,7 +535,7 @@ def add_protocol_step(payload: dict) -> dict:
     }
 
     ProtocolStep(
-        step_number=step_data["step_number"],
+        step_number=1,
         title=step_data["title"],
         instruction=step_data["instruction"],
         protocol_values=step_data["protocol_values"],
@@ -540,7 +549,56 @@ def add_protocol_step(payload: dict) -> dict:
         ),
     )
 
-    target_protocol["steps"].append(step_data)
+    steps = target_protocol["steps"]
+    if after is None:
+        insert_at = len(steps)
+    else:
+        after = int(after)
+        insert_at = after
+        if insert_at < 0 or insert_at > len(steps):
+            raise ValueError("after_step_number 超出范围。")
+    steps.insert(insert_at, step_data)
+    for index, step in enumerate(steps, start=1):
+        step["step_number"] = index
+    target_protocol["version"] = _bump_version(target_protocol.get("version", "1.0"))
+    PROTOCOL_FILE.write_text(
+        json.dumps(raw, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+    global _protocol_store, _session
+    with _lock:
+        _protocol_store = None
+        if _session is not None and _session.selection.protocol is not None:
+            if _session.selection.protocol.protocol_id == protocol_id:
+                current = _session.step_number
+                _session = ProtocolSessionState.start(
+                    select_protocol(protocols(), protocol_id)
+                )
+                if current:
+                    _session = _session.jump_to(current)
+    return step_view(session())
+
+
+def delete_protocol_step(protocol_id: str, step_number: int) -> dict:
+    """删除方案中的一个大步骤并重新编号，严格校验后落盘。"""
+
+    raw = json.loads(PROTOCOL_FILE.read_text(encoding="utf-8"))
+    target_protocol = None
+    for item in raw["protocols"]:
+        if item["protocol_id"] == protocol_id:
+            target_protocol = item
+            break
+    if target_protocol is None:
+        raise ValueError(f"找不到方案 {protocol_id}")
+    if len(target_protocol["steps"]) <= 1:
+        raise ValueError("方案至少保留一个步骤。")
+    step_number = int(step_number)
+    if step_number < 1 or step_number > len(target_protocol["steps"]):
+        raise ValueError("步骤号超出范围。")
+    del target_protocol["steps"][step_number - 1]
+    for index, step in enumerate(target_protocol["steps"], start=1):
+        step["step_number"] = index
+    target_protocol["version"] = _bump_version(target_protocol.get("version", "1.0"))
     PROTOCOL_FILE.write_text(
         json.dumps(raw, ensure_ascii=False, indent=2), encoding="utf-8"
     )
