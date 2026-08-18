@@ -34,6 +34,15 @@ class SaveDraftPayload(BaseModel):
     protocol: dict
 
 
+class AiEditPayload(BaseModel):
+    protocol_id: str
+    instruction: str
+
+
+class SaveAiEditPayload(BaseModel):
+    protocol: dict
+
+
 class UploadPayload(BaseModel):
     protocols: list
 
@@ -235,15 +244,6 @@ class AddStepPayload(BaseModel):
 class DeleteStepPayload(BaseModel):
     protocol_id: str
     step_number: int
-
-
-class AiEditPayload(BaseModel):
-    protocol_id: str
-    instruction: str
-
-
-class SaveAiEditPayload(BaseModel):
-    protocol: dict
 
 
 class StepEditPayload(BaseModel):
