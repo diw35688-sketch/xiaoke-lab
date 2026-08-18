@@ -374,19 +374,23 @@
   // ---------- 设置页：分类侧边栏 + 内容区 ----------
   window.shellRegisterView('settings', function (host) {
     var categories = [
-      { id: 'workspace', label: '管理工作台偏好' },
-      { id: 'account', label: '账户' },
-      { id: 'appearance', label: '外观' },
-      { id: 'model', label: '模型' },
-      { id: 'experiment', label: '实验' },
-      { id: 'skills', label: '技能' },
-      { id: 'search', label: '搜索引擎' },
-      { id: 'papers', label: '论文管理' },
-      { id: 'im', label: 'IM管理' },
-      { id: 'proxy', label: '代理' },
+      { id: 'model', label: '模型与语音' },
+      { id: 'experiment', label: '实验与数据' },
+      { id: 'conversation', label: '会话' },
+      { id: 'appearance', label: '外观与形象' },
+      { id: 'proxy', label: '代理与网络' },
       { id: 'system', label: '系统环境' },
       { id: 'about', label: '关于' }
     ];
+    var categoryDescriptions = {
+      'model': '文字模型、文档解析 MinerU/OCR、语音合成',
+      'experiment': '方案库、试剂配置库、危化品库、实验记录',
+      'conversation': '会话标题、历史保留、自动创建',
+      'appearance': '形象帧、口型动画、眼神跟随、主题',
+      'proxy': '访问外网与科大接口的代理配置',
+      'system': '数据目录、日志目录、模型缓存目录',
+      'about': '版本、仓库、团队开发标准'
+    };
     host.innerHTML = '<div style="display:flex;max-width:1180px;min-height:calc(100vh - 80px);gap:18px;margin:0 auto">'
       + '<div style="width:190px;flex:0 0 190px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:10px;height:max-content">'
       + categories.map(function (c) {
@@ -421,7 +425,8 @@
       }
       pane.innerHTML = '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:28px 30px;max-width:760px">'
         + '<div style="font-size:17px;font-weight:700;color:#0f172a;margin-bottom:10px">' + esc(categories.filter(function (c) { return c.id === id; })[0].label) + '</div>'
-        + '<div style="color:#94a3b8;font-size:13px;line-height:1.8">该设置项将在后续版本提供。</div></div>';
+        + '<div style="color:#64748b;font-size:13px;line-height:1.8">' + esc(categoryDescriptions[id] || '') + '</div>'
+        + '<div style="margin-top:14px;padding:12px 14px;background:#f8fafc;border:1px dashed #e2e8f0;border-radius:10px;color:#94a3b8;font-size:12px">该分类的设置项会根据项目需要逐步加入。</div></div>';
     }
     Array.prototype.forEach.call(host.querySelectorAll('.settings-nav'), function (nav) {
       nav.onclick = function () { showPane(nav.dataset.pane); };
