@@ -55,14 +55,22 @@
         + cards
         + '<div style="margin-top:18px;border-top:1px dashed #cbd5e1;padding-top:14px">'
         + '<div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:8px">新增方案</div>'
-        + '<textarea id="protocol-text" rows="3" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--bd-2);border-radius:8px;font-size:13px;margin-bottom:8px" placeholder="粘贴实验步骤文字，例如：配制 100mL 0.1M pH7.4 磷酸盐缓冲液，先称量磷酸盐，再溶解、调 pH、定容、混匀"></textarea>'
-        + '<button class="sh-btn primary" id="ai-protocol-text-btn">AI 分析文字成方案</button>'
+        + '<button class="sh-btn primary" id="protocol-chat-create">在右侧对话中创建方案</button>'
         + '<input type="file" id="protocol-file" accept=".json,.pdf,.png,.jpg,.jpeg" style="margin-left:10px;font-size:12px">'
         + '<span id="protocol-file-msg" style="color:#64748b;font-size:12px;margin-left:10px"></span>'
         + '<span style="color:#94a3b8;font-size:12px;margin-left:10px">文件自动识别：JSON 直接入库；PDF/图片走 OCR 识别成方案</span></div>'
         + '<div id="ai-draft-box"></div>'
         + '<div id="ocr-draft-box"></div>'
         + '</div>';
+      var chatCreate = host.querySelector('#protocol-chat-create');
+      if (chatCreate) chatCreate.onclick = function () {
+        var message = document.getElementById('message');
+        if (message) {
+          message.value = '请根据我的描述创建一份新的实验方案：';
+          message.focus();
+          message.setSelectionRange(message.value.length, message.value.length);
+        }
+      };
       var fileInput = host.querySelector('#protocol-file');
       if (fileInput) fileInput.onchange = function () {
         var file = fileInput.files && fileInput.files[0];
@@ -168,53 +176,20 @@
             + '<div style="margin-bottom:14px"><button class="sh-btn primary" id="protocol-select-detail">选择此方案开始实验</button>'
             + '<button class="sh-btn" id="protocol-edit-detail" style="margin-left:8px">编辑当前步骤</button></div>'
             + (preps ? '<div style="font-size:13px;font-weight:700;color:#0f172a;margin:0 0 8px">实验前准备</div>' + preps : '')
-            + '<div style="margin-top:18px;border-top:1px dashed #cbd5e1;padding-top:14px">'
-            + '<div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:8px">AI 辅助修改方案</div>'
-            + '<textarea id="ai-edit-text" rows="3" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;margin-bottom:8px" placeholder="输入修改要求，例如：在第2步后面增加一步“记录pH校准”，并把第3步改成用分光光度计"></textarea>'
-            + '<div style="margin-bottom:8px"><input type="file" id="ai-edit-file" accept=".pdf,.png,.jpg,.jpeg" style="font-size:12px">'
-            + '<span style="color:#94a3b8;font-size:12px;margin-left:8px">也可上传 PDF/图片，系统先 OCR 识别，再按识别结果修改</span></div>'
-            + '<button class="sh-btn primary" id="ai-edit-btn">AI 修改方案</button>'
-            + '<span id="ai-edit-msg" style="color:#64748b;font-size:12px;margin-left:10px"></span>'
-            + '<div id="ai-edit-draft"></div></div>'
+            + '<div style="margin-top:18px;border-top:1px dashed #cbd5e1;padding-top:14px;background:#f8fafc;border-radius:12px;padding:12px 14px">'
+            + '<div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:5px">使用右侧 AI 助手修改</div>'
+            + '<div style="font-size:12px;color:#64748b;line-height:1.7">同一个聊天框可以查看、添加、修改、删除方案步骤，也能控制页面。方案上下文会通过工具读取，不再维护第二个 AI 输入框。</div>'
+            + '<button class="sh-btn primary" id="protocol-chat-edit" style="margin-top:8px">在对话中修改这个方案</button></div>'
             + '<div style="font-size:13px;font-weight:700;color:#0f172a;margin:10px 0 8px">实验步骤</div>'
             + steps + '</div>';
-          var aiEditBtn = host.querySelector('#ai-edit-btn');
-          if (aiEditBtn) aiEditBtn.onclick = function () {
-            var instruction = host.querySelector('#ai-edit-text').value.trim();
-            var msg = host.querySelector('#ai-edit-msg');
-            var box = host.querySelector('#ai-edit-draft');
-            if (!instruction) { msg.textContent = '请先输入修改要求'; return; }
-            msg.textContent = 'AI 正在结合当前方案修改…';
-            box.innerHTML = '';
-            api('/protocols/ai-edit', 'POST', { protocol_id: protocolId, instruction: instruction }).then(function (res) {
-              if (res && res.detail) { msg.textContent = '修改失败：' + res.detail; return; }
-              var draft = res.draft;
-              msg.textContent = '已生成修订草稿，请确认后保存';
-              box.innerHTML = '<pre style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px;white-space:pre-wrap;font-size:12px;margin-top:10px">'
-                + esc(JSON.stringify(draft, null, 2)) + '</pre>'
-                + '<div style="margin-top:10px"><button class="sh-btn primary" id="ai-edit-save">确认保存修订</button></div>';
-              host.querySelector('#ai-edit-save').onclick = function () {
-                api('/protocols/save-ai-edit', 'POST', { protocol: draft }).then(function (saved) {
-                  if (saved && saved.detail) { msg.textContent = '保存失败：' + saved.detail; return; }
-                  msg.textContent = '已保存，版本已更新';
-                  showProtocolDetail(host, protocolId);
-                });
-              };
-            }).catch(function (e) { msg.textContent = '修改失败：' + e.message; });
-          };
-          var aiEditFile = host.querySelector('#ai-edit-file');
-          if (aiEditFile) aiEditFile.onchange = function () {
-            var file = aiEditFile.files && aiEditFile.files[0];
-            if (!file) return;
-            var msg = host.querySelector('#ai-edit-msg');
-            var form = new FormData();
-            form.append('file', file);
-            msg.textContent = 'OCR 识别中…';
-            fetch('/protocols/upload-file', { method: 'POST', body: form }).then(function (r) { return r.json(); }).then(function (res) {
-              if (res && res.detail) { msg.textContent = '识别失败：' + res.detail; return; }
-              host.querySelector('#ai-edit-text').value = (host.querySelector('#ai-edit-text').value ? host.querySelector('#ai-edit-text').value + '\n' : '') + res.ocr_text;
-              msg.textContent = '已把识别内容填入，可继续补充修改要求后点“AI 修改方案”';
-            }).catch(function (e) { msg.textContent = '识别失败：' + e.message; });
+          var chatEdit = host.querySelector('#protocol-chat-edit');
+          if (chatEdit) chatEdit.onclick = function () {
+            var message = document.getElementById('message');
+            if (message) {
+              message.value = '请查看方案 ' + protocolId + '，根据我的要求修改它：';
+              message.focus();
+              message.setSelectionRange(message.value.length, message.value.length);
+            }
           };
 
           Array.prototype.forEach.call(host.querySelectorAll('.step-add'), function (btn) {
@@ -396,22 +371,62 @@
     });
   });
 
-  // ---------- 设置页：复用已有面板，改为内嵌 ----------
+  // ---------- 设置页：分类侧边栏 + 内容区 ----------
   window.shellRegisterView('settings', function (host) {
-    host.innerHTML = '<div style="max-width:620px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:20px 22px" id="settings-inline"></div>';
-    var modal = document.getElementById('settings-modal');
-    if (modal) {
-      var box = modal.querySelector('.settings-box');
-      if (box) {
-        box.style.boxShadow = 'none';
-        box.style.maxHeight = 'none';
-        box.style.width = '100%';
-        var head = box.querySelector('.settings-head');
-        if (head) head.style.display = 'none';
-        document.getElementById('settings-inline').appendChild(box);
+    var categories = [
+      { id: 'workspace', label: '管理工作台偏好' },
+      { id: 'account', label: '账户' },
+      { id: 'appearance', label: '外观' },
+      { id: 'model', label: '模型' },
+      { id: 'experiment', label: '实验' },
+      { id: 'skills', label: '技能' },
+      { id: 'search', label: '搜索引擎' },
+      { id: 'papers', label: '论文管理' },
+      { id: 'im', label: 'IM管理' },
+      { id: 'proxy', label: '代理' },
+      { id: 'system', label: '系统环境' },
+      { id: 'about', label: '关于' }
+    ];
+    host.innerHTML = '<div style="display:flex;max-width:1180px;min-height:calc(100vh - 80px);gap:18px;margin:0 auto">'
+      + '<div style="width:190px;flex:0 0 190px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:10px;height:max-content">'
+      + categories.map(function (c) {
+          return '<div class="settings-nav" data-pane="' + c.id + '" style="padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13px;color:#334155;margin-bottom:2px">' + esc(c.label) + '</div>';
+        }).join('')
+      + '</div>'
+      + '<div style="flex:1;min-width:0" id="settings-pane"></div></div>';
+
+    var pane = host.querySelector('#settings-pane');
+    function showPane(id) {
+      Array.prototype.forEach.call(host.querySelectorAll('.settings-nav'), function (nav) {
+        nav.style.background = nav.dataset.pane === id ? '#eff6ff' : '';
+        nav.style.color = nav.dataset.pane === id ? '#1d4ed8' : '#334155';
+        nav.style.fontWeight = nav.dataset.pane === id ? '600' : '400';
+      });
+      if (id === 'model') {
+        pane.innerHTML = '<div id="settings-inline"></div>';
+        var modal = document.getElementById('settings-modal');
+        if (modal) {
+          var box = modal.querySelector('.settings-box');
+          if (box) {
+            box.style.boxShadow = 'none';
+            box.style.maxHeight = 'none';
+            box.style.width = '100%';
+            var head = box.querySelector('.settings-head');
+            if (head) head.style.display = 'none';
+            pane.querySelector('#settings-inline').appendChild(box);
+          }
+        }
+        if (window.__ttsAttach) window.__ttsAttach();
+        return;
       }
+      pane.innerHTML = '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:28px 30px;max-width:760px">'
+        + '<div style="font-size:17px;font-weight:700;color:#0f172a;margin-bottom:10px">' + esc(categories.filter(function (c) { return c.id === id; })[0].label) + '</div>'
+        + '<div style="color:#94a3b8;font-size:13px;line-height:1.8">该设置项将在后续版本提供。</div></div>';
     }
-    if (window.__ttsAttach) window.__ttsAttach();
+    Array.prototype.forEach.call(host.querySelectorAll('.settings-nav'), function (nav) {
+      nav.onclick = function () { showPane(nav.dataset.pane); };
+    });
+    showPane('model');
   });
 
   document.addEventListener('shell-ready', function () {
