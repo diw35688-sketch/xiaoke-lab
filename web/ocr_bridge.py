@@ -74,12 +74,50 @@ def ocr_image(settings, image_bytes: bytes, mime: str = "image/png") -> str:
     return content or ""
 
 
-def ocr_pdf(settings, pdf_bytes: bytes) -> str:
-    """PDF → 逐页 OCR → 合并 Markdown 文本。"""
+def _mineru_file_parse_url(settings) -> str:
+    """从 OpenAI 兼容 base_url 推导科大 MinerU 服务地址。"""
 
-    pages = pdf_to_images(pdf_bytes)
-    parts = [ocr_image(settings, page) for page in pages]
+    origin = settings.base_url.rstrip("/")
+    if origin.endswith("/v1"):
+        origin = origin[:-3]
+    return origin + "/mineru/file_parse"
+
+
+def parse_pdf_with_mineru(settings, pdf_bytes: bytes) -> str:
+    """调用科大 MinerU 文件解析服务，返回 Markdown。"""
+
+    if "ustc" not in settings.base_url:
+        raise ValueError("MinerU 文件解析只在科大接口上可用。")
+    url = _mineru_file_parse_url(settings)
+    response = httpx.post(
+        url,
+        headers={"Authorization": "Bearer " + settings.api_key},
+        data={"return_md": "true", "response_format_zip": "false"},
+        files={"files": ("protocol.pdf", pdf_bytes, "application/pdf")},
+        timeout=httpx.Timeout(180, connect=10),
+        trust_env=False,
+    )
+    response.raise_for_status()
+    data = response.json()
+    results = data.get("results", {})
+    parts: list[str] = []
+    for item in results.values():
+        if isinstance(item, dict) and item.get("md_content"):
+            parts.append(item["md_content"])
+    if not parts:
+        raise ValueError("MinerU 没有返回解析内容：" + str(data)[:300])
     return "\n\n".join(parts)
+
+
+def ocr_pdf(settings, pdf_bytes: bytes) -> str:
+    """PDF → 优先 MinerU 文件解析；失败时回退逐页 OCR。"""
+
+    try:
+        return parse_pdf_with_mineru(settings, pdf_bytes)
+    except Exception:
+        pages = pdf_to_images(pdf_bytes)
+        parts = [ocr_image(settings, page) for page in pages]
+        return "\n\n".join(parts)
 
 
 def extract_protocol_drafts(settings, ocr_text: str) -> list[dict]:
