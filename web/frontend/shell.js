@@ -91,6 +91,7 @@
     '  <div id="sh-conversation-panel">',
     '    <div class="sh-panel-title">会话管理</div>',
     '    <button class="sh-btn" id="sh-new-session" type="button">＋ 新会话</button>',
+    '    <button class="sh-btn" id="sh-clean-empty" type="button" style="margin:0 9px 6px;color:#b91c1c">清理空会话</button>',
     '    <div id="sh-conversation-list"></div>',
     '  </div>',
     '  <div id="sh-chat-main">',

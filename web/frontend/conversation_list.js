@@ -30,6 +30,19 @@
   }
   window.appNewConversation = createConversation;
 
+  function cleanEmptyConversations() {
+    return fetch('/chat/conversations').then(function (r) { return r.json(); }).then(function (d) {
+      var active = currentId();
+      var empties = (d.items || []).filter(function (item) {
+        return !item.message_count && item.id !== active;
+      });
+      return Promise.all(empties.map(function (item) {
+        return fetch('/chat/conversations/' + encodeURIComponent(item.id), { method: 'DELETE' });
+      })).then(function () { return load(); });
+    });
+  }
+  window.cleanEmptyConversations = cleanEmptyConversations;
+
   function renameConversation(id, currentTitle) {
     var title = prompt('会话名称', currentTitle || '');
     if (!title || title.trim() === currentTitle) return;
