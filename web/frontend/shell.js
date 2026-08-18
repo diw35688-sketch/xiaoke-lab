@@ -77,7 +77,7 @@
     '    <div class="sh-item" data-view="reagents"><span class="sh-ico">⚗</span><span class="sh-label">试剂安全库</span></div>',
     '    <div class="sh-item" data-view="records"><span class="sh-ico">▤</span><span class="sh-label">本次记录</span></div>',
     '    <div class="sh-sec">配置</div>',
-    '    <div class="sh-item" data-view="settings"><span class="sh-ico">⚙</span><span class="sh-label">模型与语音</span></div>',
+    '    <div class="sh-item" data-view="settings"><span class="sh-ico">⚙</span><span class="sh-label">设置</span></div>',
     '  </div>',
     '  <div id="sh-foot"><button class="sh-btn" id="sh-collapse" style="width:100%">收起侧栏</button></div>',
     '</div>',
@@ -113,7 +113,7 @@
       n.classList.toggle('active', n.dataset.view === view);
     });
     var titles = { run: '实验进行中', protocols: '实验方案', reagent_prep: '试剂配置库', reagents: '试剂安全库',
-                   records: '本次记录', settings: '模型与语音' };
+                   records: '本次记录', settings: '设置' };
     el('sh-title').textContent = titles[view] || view;
     var canvas = el('sh-canvas');
     canvas.classList.remove('empty');
