@@ -29,6 +29,11 @@ class SettingsPayload(BaseModel):
     tts_model: str | None = None
     tts_voice: str | None = None
     tts_speed: float | None = None
+    mineru_file_parse_url: str | None = None
+    mineru_api_key: str | None = None
+    ocr_base_url: str | None = None
+    ocr_api_key: str | None = None
+    ocr_model: str | None = None
 
 
 @router.get("")

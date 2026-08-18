@@ -89,11 +89,20 @@ class ModelSettings:
     tts_speed: float = 1.0
     api_keys: dict = field(default_factory=dict)
     provider_profiles: dict = field(default_factory=dict)
+    mineru_file_parse_url: str = "https://api.llm.ustc.edu.cn/mineru/file_parse"
+    mineru_api_key: str = ""
+    ocr_base_url: str = "https://api.llm.ustc.edu.cn/v1"
+    ocr_api_key: str = ""
+    ocr_model: str = "unlimited-ocr"
 
     def masked(self) -> dict:
         """给前端看的版本：密钥掩码，永不回传明文。"""
         data = asdict(self)
         data["provider_profiles"] = dict(self.provider_profiles)
+        data["mineru_api_key_set"] = bool(self.mineru_api_key)
+        data["mineru_api_key"] = _mask_key(self.mineru_api_key) if self.mineru_api_key else ""
+        data["ocr_api_key_set"] = bool(self.ocr_api_key)
+        data["ocr_api_key"] = _mask_key(self.ocr_api_key) if self.ocr_api_key else ""
         data["provider_keys"] = {
             provider_id: _mask_key(key)
             for provider_id, key in self.api_keys.items()
@@ -181,6 +190,11 @@ def current() -> ModelSettings:
                     tts_url=raw.get("tts_url", "http://127.0.0.1:8001/tts"),
                     api_keys=raw.get("api_keys", {}) or {},
                     provider_profiles=raw.get("provider_profiles", {}) or {},
+                    mineru_file_parse_url=raw.get("mineru_file_parse_url", "https://api.llm.ustc.edu.cn/mineru/file_parse"),
+                    mineru_api_key=raw.get("mineru_api_key", ""),
+                    ocr_base_url=raw.get("ocr_base_url", "https://api.llm.ustc.edu.cn/v1"),
+                    ocr_api_key=raw.get("ocr_api_key", ""),
+                    ocr_model=raw.get("ocr_model", "unlimited-ocr"),
                 )
             except (json.JSONDecodeError, OSError):
                 _cache = _from_env()
@@ -195,7 +209,8 @@ def update(**changes) -> ModelSettings:
     with _lock:
         settings = current()
         for name in ("base_url", "model_name", "tts_url",
-                     "tts_provider", "tts_base_url", "tts_model", "tts_voice"):
+                     "tts_provider", "tts_base_url", "tts_model", "tts_voice",
+                     "mineru_file_parse_url", "ocr_base_url", "ocr_model"):
             if name in changes and changes[name] is not None:
                 setattr(settings, name, str(changes[name]).strip())
         if "tts_enabled" in changes and changes["tts_enabled"] is not None:
@@ -223,6 +238,12 @@ def update(**changes) -> ModelSettings:
         new_tts_key = changes.get("tts_api_key")
         if new_tts_key:
             settings.tts_api_key = str(new_tts_key).strip()
+        new_mineru_key = changes.get("mineru_api_key")
+        if new_mineru_key:
+            settings.mineru_api_key = str(new_mineru_key).strip()
+        new_ocr_key = changes.get("ocr_api_key")
+        if new_ocr_key:
+            settings.ocr_api_key = str(new_ocr_key).strip()
         SETTINGS_FILE.write_text(
             json.dumps(asdict(settings), ensure_ascii=False, indent=2),
             encoding="utf-8",

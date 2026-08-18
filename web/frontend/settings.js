@@ -22,6 +22,17 @@
     '    <label class="settings-field"><span>API 密钥</span>',
     '      <input id="settings-key" type="password" autocomplete="off" />',
     '      <em>密钥只保存在本机服务器，页面上始终以掩码显示。</em></label>',
+    '    <div style="font-size:13px;font-weight:700;color:#0f172a;margin:18px 0 10px">文档解析（MinerU / OCR）</div>',
+    '    <label class="settings-field"><span>MinerU 文件解析地址</span>',
+    '      <input id="settings-mineru-url" type="text" placeholder="https://api.llm.ustc.edu.cn/mineru/file_parse" /></label>',
+    '    <label class="settings-field"><span>MinerU 密钥</span>',
+    '      <input id="settings-mineru-key" type="password" autocomplete="off" placeholder="留空则使用科大 LLM 密钥" /></label>',
+    '    <label class="settings-field"><span>图片 OCR 地址</span>',
+    '      <input id="settings-ocr-url" type="text" placeholder="https://api.llm.ustc.edu.cn/v1" /></label>',
+    '    <label class="settings-field"><span>图片 OCR 模型</span>',
+    '      <input id="settings-ocr-model" type="text" placeholder="unlimited-ocr" /></label>',
+    '    <label class="settings-field"><span>图片 OCR 密钥</span>',
+    '      <input id="settings-ocr-key" type="password" autocomplete="off" placeholder="留空则使用科大 LLM 密钥" /></label>',
     '    <div style="font-size:13px;font-weight:700;color:#0f172a;margin:18px 0 10px">语音模型</div>',
     '    <label class="settings-field settings-inline">',
     '      <input id="settings-tts" type="checkbox" />',
@@ -109,6 +120,15 @@
       el('settings-key').placeholder = data.settings.api_key_set
         ? ('已保存 ' + data.settings.api_key + '，留空表示不修改')
         : '请填写 API 密钥';
+      el('settings-mineru-url').value = data.settings.mineru_file_parse_url || '';
+      el('settings-mineru-key').placeholder = data.settings.mineru_api_key_set
+        ? ('已保存 ' + data.settings.mineru_api_key + '，留空表示不修改')
+        : '留空则使用科大 LLM 密钥';
+      el('settings-ocr-url').value = data.settings.ocr_base_url || '';
+      el('settings-ocr-model').value = data.settings.ocr_model || 'unlimited-ocr';
+      el('settings-ocr-key').placeholder = data.settings.ocr_api_key_set
+        ? ('已保存 ' + data.settings.ocr_api_key + '，留空表示不修改')
+        : '留空则使用科大 LLM 密钥';
       var hit = presets.filter(function (p) { return p.base_url === data.settings.base_url; })[0];
       if (!hit && data.settings.model_name) {
         hit = presets.filter(function (p) { return p.model === data.settings.model_name; })[0];
@@ -135,10 +155,17 @@
       model_name: el('settings-model').value.trim(),
       tts_enabled: el('settings-tts').checked,
       provider_id: selectedProviderId,
-      provider_label: selectedProvider.label || selectedProviderId
+      provider_label: selectedProvider.label || selectedProviderId,
+      mineru_file_parse_url: el('settings-mineru-url').value.trim(),
+      ocr_base_url: el('settings-ocr-url').value.trim(),
+      ocr_model: el('settings-ocr-model').value.trim()
     };
     var key = el('settings-key').value.trim();
     if (key) payload.api_key = key;
+    var mineruKey = el('settings-mineru-key').value.trim();
+    if (mineruKey) payload.mineru_api_key = mineruKey;
+    var ocrKey = el('settings-ocr-key').value.trim();
+    if (ocrKey) payload.ocr_api_key = ocrKey;
     return payload;
   }
 
