@@ -188,8 +188,7 @@
                 return api('/protocols/session/move', 'POST', { action: 'jump', step_number: stepNumber });
               }).then(function () {
                 refreshStatus();
-                window.shellShow('run');
-                setTimeout(function () { if (window.openProtocolEditor) window.openProtocolEditor(); }, 300);
+                setTimeout(function () { if (window.openProtocolEditor) window.openProtocolEditor(); }, 200);
               });
             };
           });
