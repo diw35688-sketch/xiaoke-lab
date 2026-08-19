@@ -34,13 +34,23 @@
   }
   window.shellRefreshStatus = refreshStatus;
 
-  // ---------- 分子量计算页 ----------
+  // ---------- 计算器页：分子量 / 溶液配制 / 稀释 ----------
   window.shellRegisterView('calculator', function (host) {
     var examples = ['CuSO4·5H2O', '(NH4)2SO4', 'Ca(OH)2', 'KAl(SO4)2·12H2O', 'FeSO4·7H2O', 'Na2CO3·10H2O', 'C6H12O6', '五水硫酸铜'];
-    host.innerHTML = '<div style="max-width:760px;margin:0 auto">'
-      + '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:24px 26px">'
+    var tabs = [
+      { id: 'mw', label: '分子量' },
+      { id: 'prep', label: '溶液配制' },
+      { id: 'dilute', label: '稀释计算' }
+    ];
+    host.innerHTML = '<div style="max-width:820px;margin:0 auto">'
+      + '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:20px 22px">'
+      + '<div style="display:flex;gap:6px;border-bottom:1px solid #e2e8f0;margin-bottom:18px">'
+      + tabs.map(function (t) { return '<button class="calc-tab" data-tab="' + t.id + '" style="border:0;background:transparent;padding:8px 14px;font-size:14px;color:#64748b;cursor:pointer;border-bottom:2px solid transparent">' + t.label + '</button>'; }).join('')
+      + '</div>'
+      // 分子量
+      + '<div class="calc-pane" data-pane="mw">'
       + '<div style="font-size:16px;font-weight:700;color:#0f172a;margin-bottom:4px">分子量 / 摩尔质量计算</div>'
-      + '<div style="color:#64748b;font-size:13px;margin-bottom:16px">输入试剂中文名、英文名或化学式，支持括号、复盐、结晶水合物，例如 CuSO4·5H2O。</div>'
+      + '<div style="color:#64748b;font-size:13px;margin-bottom:16px">输入试剂中文名、英文名或化学式，支持括号、复盐、结晶水合物。</div>'
       + '<div style="display:flex;gap:10px"><input id="calc-input" style="flex:1;min-width:0;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:15px;font-family:inherit" placeholder="例如：CuSO4·5H2O、五水硫酸铜、KAl(SO4)2·12H2O">'
       + '<button id="calc-run" class="sh-btn primary" style="padding:10px 18px">计算</button></div>'
       + '<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px">' + examples.map(function (e) {
@@ -48,15 +58,42 @@
         }).join('') + '</div>'
       + '<div id="calc-result" style="margin-top:16px"></div>'
       + '</div>'
+      // 溶液配制
+      + '<div class="calc-pane" data-pane="prep" style="display:none">'
+      + '<div style="font-size:16px;font-weight:700;color:#0f172a;margin-bottom:4px">溶液配制计算</div>'
+      + '<div style="color:#64748b;font-size:13px;margin-bottom:16px">按 质量(g) = 浓度(mol/L) × 体积(L) × 分子量(g/mol) 计算称样量，支持纯度修正。</div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">'
+      + '<div><label style="font-size:12px;color:#475569">试剂 / 化学式</label><input id="prep-reagent" style="width:100%;margin-top:4px;box-sizing:border-box;padding:9px 11px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px" placeholder="例如：NaOH、Tris、CuSO4·5H2O"></div>'
+      + '<div><label style="font-size:12px;color:#475569">目标浓度 (mol/L)</label><input id="prep-molarity" type="number" step="any" style="width:100%;margin-top:4px;box-sizing:border-box;padding:9px 11px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px" placeholder="例如：0.1"></div>'
+      + '<div><label style="font-size:12px;color:#475569">目标体积</label><div style="display:flex;gap:6px;margin-top:4px"><input id="prep-volume" type="number" step="any" style="flex:1;min-width:0;padding:9px 11px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px" placeholder="500"><select id="prep-volume-unit" style="padding:9px 8px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px"><option value="mL">mL</option><option value="L">L</option></select></div></div>'
+      + '<div><label style="font-size:12px;color:#475569">纯度 (%)</label><input id="prep-purity" type="number" step="any" value="100" style="width:100%;margin-top:4px;box-sizing:border-box;padding:9px 11px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px"></div>'
+      + '</div>'
+      + '<button id="prep-run" class="sh-btn primary" style="padding:9px 18px">计算称样量</button>'
+      + '<div id="prep-result" style="margin-top:14px"></div>'
+      + '</div>'
+      // 稀释计算
+      + '<div class="calc-pane" data-pane="dilute" style="display:none">'
+      + '<div style="font-size:16px;font-weight:700;color:#0f172a;margin-bottom:4px">稀释计算</div>'
+      + '<div style="color:#64748b;font-size:13px;margin-bottom:16px">按 C1V1 = C2V2 计算需要取多少母液。</div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">'
+      + '<div><label style="font-size:12px;color:#475569">母液浓度</label><input id="dil-stock" type="number" step="any" style="width:100%;margin-top:4px;box-sizing:border-box;padding:9px 11px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px" placeholder="例如：1"></div>'
+      + '<div><label style="font-size:12px;color:#475569">目标浓度</label><input id="dil-target" type="number" step="any" style="width:100%;margin-top:4px;box-sizing:border-box;padding:9px 11px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px" placeholder="例如：0.1"></div>'
+      + '<div><label style="font-size:12px;color:#475569">目标体积</label><div style="display:flex;gap:6px;margin-top:4px"><input id="dil-volume" type="number" step="any" style="flex:1;min-width:0;padding:9px 11px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px" placeholder="500"><select id="dil-volume-unit" style="padding:9px 8px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px"><option value="mL">mL</option><option value="L">L</option></select></div></div>'
+      + '</div>'
+      + '<button id="dil-run" class="sh-btn primary" style="padding:9px 18px">计算取液量</button>'
+      + '<div id="dil-result" style="margin-top:14px"></div>'
+      + '</div>'
+      + '</div>'
       + '<div style="color:#94a3b8;font-size:12px;margin-top:14px;line-height:1.8">计算引擎：molmass（开源 BSD-3）优先，内置解析器兜底；试剂名先查试剂安全库（PubChem）。</div>'
       + '</div>';
 
-    function renderResult(d) {
+    function renderError(box, d, fallback) {
+      box.innerHTML = '<div style="background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:10px;padding:12px 14px;font-size:13px">' + esc((d && d.detail) || fallback || '计算失败') + '</div>';
+    }
+
+    function renderMw(d) {
       var box = host.querySelector('#calc-result');
-      if (!d || d.detail) {
-        box.innerHTML = '<div style="background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:10px;padding:12px 14px;font-size:13px">' + esc((d && d.detail) || '计算失败') + '</div>';
-        return;
-      }
+      if (!d || d.detail) { renderError(box, d); return; }
       var nameLine = d.name ? '<div style="font-size:13px;color:#64748b;margin-bottom:2px">' + esc(d.name) + '</div>' : '';
       box.innerHTML = '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:16px 18px">'
         + nameLine
@@ -66,26 +103,96 @@
         + '</div>';
     }
 
-    function run(value) {
+    function runMw(value) {
       var v = String(value || '').trim();
       if (!v) return;
-      host.querySelector('#calc-result').innerHTML = '<div style="color:#94a3b8;font-size:13px">计算中…</div>';
-      api('/calculator/molecular-weight', 'POST', { reagent: v }).then(renderResult).catch(function (err) {
-        host.querySelector('#calc-result').innerHTML = '<div style="background:#fef2f2;color:#b91c1c;border-radius:10px;padding:12px;font-size:13px">请求失败：' + esc(err.message || err) + '</div>';
+      var box = host.querySelector('#calc-result');
+      box.innerHTML = '<div style="color:#94a3b8;font-size:13px">计算中…</div>';
+      api('/calculator/molecular-weight', 'POST', { reagent: v }).then(renderMw).catch(function (err) {
+        renderError(box, { detail: err.message || err }, '请求失败');
       });
     }
 
-    host.querySelector('#calc-run').onclick = function () { run(host.querySelector('#calc-input').value); };
+    function renderPrep(d) {
+      var box = host.querySelector('#prep-result');
+      if (!d || d.detail) { renderError(box, d); return; }
+      box.innerHTML = '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:16px 18px">'
+        + '<div style="font-size:13px;color:#64748b">' + esc(d.name || d.formula) + ' · 分子量 ' + Number(d.molecular_weight).toFixed(3) + ' g/mol</div>'
+        + '<div style="font-size:15px;font-weight:700;color:#0f172a;margin:8px 0 4px">' + Number(d.molarity) + ' mol/L × ' + Number(d.volume) + ' ' + esc(d.volume_unit) + '</div>'
+        + '<div style="font-size:26px;font-weight:800;color:#166534">' + Number(d.mass_g).toFixed(4) + ' g</div>'
+        + '<div style="font-size:13px;color:#64748b;margin-top:4px">（' + Number(d.mass_mg).toFixed(2) + ' mg）' + (d.purity !== 100 ? ' · 已按纯度 ' + Number(d.purity) + '% 修正' : '') + '</div>'
+        + '<div style="font-size:13px;color:#334155;margin-top:10px">' + esc(d.instruction) + '</div>'
+        + '</div>';
+    }
+
+    function runPrep() {
+      var box = host.querySelector('#prep-result');
+      box.innerHTML = '<div style="color:#94a3b8;font-size:13px">计算中…</div>';
+      var payload = {
+        reagent: host.querySelector('#prep-reagent').value,
+        molarity: parseFloat(host.querySelector('#prep-molarity').value),
+        volume: parseFloat(host.querySelector('#prep-volume').value),
+        volume_unit: host.querySelector('#prep-volume-unit').value,
+        purity: parseFloat(host.querySelector('#prep-purity').value || 100)
+      };
+      api('/calculator/solution-prep', 'POST', payload).then(renderPrep).catch(function (err) {
+        renderError(box, { detail: err.message || err }, '请求失败');
+      });
+    }
+
+    function renderDil(d) {
+      var box = host.querySelector('#dil-result');
+      if (!d || d.detail) { renderError(box, d); return; }
+      box.innerHTML = '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:16px 18px">'
+        + '<div style="font-size:15px;font-weight:700;color:#0f172a">取母液 <span style="font-size:26px;color:#166534">' + Number(d.stock_volume).toFixed(4) + '</span> ' + esc(d.volume_unit) + '</div>'
+        + '<div style="font-size:13px;color:#64748b;margin-top:6px">再加溶剂定容至 ' + Number(d.final_volume) + ' ' + esc(d.volume_unit) + '</div>'
+        + '<div style="font-size:13px;color:#334155;margin-top:10px">' + esc(d.instruction) + '</div>'
+        + '</div>';
+    }
+
+    function runDil() {
+      var box = host.querySelector('#dil-result');
+      box.innerHTML = '<div style="color:#94a3b8;font-size:13px">计算中…</div>';
+      var payload = {
+        stock_concentration: parseFloat(host.querySelector('#dil-stock').value),
+        final_concentration: parseFloat(host.querySelector('#dil-target').value),
+        final_volume: parseFloat(host.querySelector('#dil-volume').value),
+        volume_unit: host.querySelector('#dil-volume-unit').value
+      };
+      api('/calculator/dilution', 'POST', payload).then(renderDil).catch(function (err) {
+        renderError(box, { detail: err.message || err }, '请求失败');
+      });
+    }
+
+    function activateTab(id) {
+      Array.prototype.forEach.call(host.querySelectorAll('.calc-tab'), function (tab) {
+        var active = tab.dataset.tab === id;
+        tab.style.color = active ? '#1d4ed8' : '#64748b';
+        tab.style.borderBottomColor = active ? '#2563eb' : 'transparent';
+        tab.style.fontWeight = active ? '600' : '400';
+      });
+      Array.prototype.forEach.call(host.querySelectorAll('.calc-pane'), function (pane) {
+        pane.style.display = pane.dataset.pane === id ? '' : 'none';
+      });
+    }
+
+    host.querySelector('#calc-run').onclick = function () { runMw(host.querySelector('#calc-input').value); };
     host.querySelector('#calc-input').addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') { e.preventDefault(); run(this.value); }
+      if (e.key === 'Enter') { e.preventDefault(); runMw(this.value); }
     });
     Array.prototype.forEach.call(host.querySelectorAll('.calc-example'), function (btn) {
       btn.onclick = function () {
         var value = btn.dataset.value;
         host.querySelector('#calc-input').value = value;
-        run(value);
+        runMw(value);
       };
     });
+    host.querySelector('#prep-run').onclick = runPrep;
+    host.querySelector('#dil-run').onclick = runDil;
+    Array.prototype.forEach.call(host.querySelectorAll('.calc-tab'), function (tab) {
+      tab.onclick = function () { activateTab(tab.dataset.tab); };
+    });
+    activateTab('mw');
   });
 
   // ---------- 实验方案页 ----------

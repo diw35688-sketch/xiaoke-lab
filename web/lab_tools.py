@@ -818,3 +818,105 @@ def _calculate_molecular_weight(reagent):
         "unit": "g/mol",
         "source": "按化学式解析计算",
     }
+
+
+# ---------------- 溶液配制与稀释计算 ----------------
+
+@tool(
+    "calculate_solution_prep",
+    "计算配制一定摩尔浓度溶液所需的称样量。用户说“配 0.1 mol/L 的 NaOH 500 mL”"
+    "“配 1 M Tris 100 mL”这类需求时调用。会先算分子量，再按 质量=浓度×体积×分子量 计算。",
+    {
+        "type": "object",
+        "properties": {
+            "reagent": {"type": "string", "description": "试剂中文名/英文名/化学式，如 氢氧化钠、NaCl、Tris"},
+            "molarity": {"type": "number", "description": "目标浓度，单位 mol/L，如 0.1"},
+            "volume": {"type": "number", "description": "目标体积数值"},
+            "volume_unit": {"type": "string", "enum": ["L", "mL"], "description": "体积单位，默认 L"},
+            "purity": {"type": "number", "description": "试剂纯度百分比，默认 100，如 98 表示 98%"},
+        },
+        "required": ["reagent", "molarity", "volume"],
+        "additionalProperties": False,
+    },
+    kind="read", title="溶液配制：{molarity} mol/L {reagent} {volume}{volume_unit}",
+    present=lambda a, r: [
+        f"{r['name'] or r['formula']} 分子量 {r['molecular_weight']} g/mol",
+        f"需称取 {r['mass_g']} g（{r['mass_mg']} mg）",
+        r["instruction"],
+    ],
+)
+def _calculate_solution_prep(reagent, molarity, volume, volume_unit="L", purity=100.0):
+    mw_result = _calculate_molecular_weight(reagent)
+    if not mw_result.get("molecular_weight"):
+        raise ValueError("无法确定分子量，请提供正确的试剂名或化学式")
+    molarity = float(molarity)
+    if molarity <= 0:
+        raise ValueError("浓度必须大于 0")
+    volume = float(volume)
+    if volume <= 0:
+        raise ValueError("体积必须大于 0")
+    raw_unit = str(volume_unit or "L").strip().lower()
+    if raw_unit in ("ml", "毫升"):
+        volume_l = volume / 1000.0
+        unit_display = "mL"
+    else:
+        volume_l = volume
+        unit_display = "L"
+    purity = float(purity if purity is not None else 100)
+    if purity <= 0 or purity > 100:
+        raise ValueError("纯度应在 0-100 之间")
+    mw = float(mw_result["molecular_weight"])
+    mass_g = mw * molarity * volume_l / (purity / 100.0)
+    return {
+        "name": mw_result.get("name"),
+        "formula": mw_result.get("formula"),
+        "molecular_weight": mw,
+        "molarity": molarity,
+        "volume": volume,
+        "volume_unit": unit_display,
+        "purity": purity,
+        "mass_g": round(mass_g, 4),
+        "mass_mg": round(mass_g * 1000, 2),
+        "instruction": f"称取约 {round(mass_g, 4)} g（{round(mass_g * 1000, 2)} mg），溶解后定容至 {volume} {unit_display}。",
+    }
+
+
+@tool(
+    "calculate_dilution",
+    "计算稀释需要的母液体积。用户说“把 1 M 母液稀释成 0.1 M 共 500 mL”时调用，"
+    "使用 C1V1=C2V2。",
+    {
+        "type": "object",
+        "properties": {
+            "stock_concentration": {"type": "number", "description": "母液浓度，单位 mol/L 或 ×，如 1"},
+            "final_concentration": {"type": "number", "description": "目标浓度，单位与母液一致，如 0.1"},
+            "final_volume": {"type": "number", "description": "目标体积数值"},
+            "volume_unit": {"type": "string", "enum": ["L", "mL"], "description": "体积单位，默认 mL"},
+        },
+        "required": ["stock_concentration", "final_concentration", "final_volume"],
+        "additionalProperties": False,
+    },
+    kind="read", title="稀释计算：{final_concentration} 从 {stock_concentration} 配 {final_volume}{volume_unit}",
+    present=lambda a, r: [
+        f"取母液 {r['stock_volume']} {r['volume_unit']}",
+        f"再加溶剂定容至 {r['final_volume']} {r['volume_unit']}",
+    ],
+)
+def _calculate_dilution(stock_concentration, final_concentration, final_volume, volume_unit="mL"):
+    c1 = float(stock_concentration)
+    c2 = float(final_concentration)
+    v2 = float(final_volume)
+    if c1 <= 0 or c2 <= 0 or v2 <= 0:
+        raise ValueError("浓度和体积必须大于 0")
+    if c2 > c1:
+        raise ValueError("目标浓度不能高于母液浓度")
+    v1 = c2 * v2 / c1
+    raw_unit = str(volume_unit or "mL").strip().lower()
+    unit_display = "mL" if raw_unit in ("ml", "毫升") else "L"
+    return {
+        "stock_volume": round(v1, 4),
+        "volume_unit": unit_display,
+        "final_volume": v2,
+        "formula": "C1V1=C2V2",
+        "instruction": f"取母液 {round(v1, 4)} {unit_display}，再加溶剂定容至 {v2} {unit_display}。",
+    }
