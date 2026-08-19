@@ -14,9 +14,11 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import domain
+import llm_bridge
 from src.core.rule_entity_extraction import extract_entities
 from datetime import datetime, timedelta
 import threading
@@ -87,6 +89,9 @@ def present_result(name: str, arguments: dict, outcome: dict) -> dict:
         except Exception:
             lines = []
     view.update(status="done", lines=lines or [])
+    result = outcome.get("result")
+    if isinstance(result, dict) and isinstance(result.get("ui_action"), dict):
+        view["ui_action"] = result["ui_action"]
     return view
 
 
@@ -121,6 +126,26 @@ def names() -> list:
 
 
 # ---------------- 实验方案 ----------------
+
+@tool(
+    "create_protocol_from_text",
+    "根据用户的自然语言描述创建一份新的实验方案。只有用户明确要求创建方案时调用。",
+    {
+        "type": "object",
+        "properties": {"description": {"type": "string"}},
+        "required": ["description"],
+        "additionalProperties": False,
+    },
+    kind="execute",
+    title="AI 创建实验方案",
+    present=lambda a, r: [f"已创建方案：{r['title']}", f"共 {len(r['steps'])} 步"],
+)
+def _create_protocol_from_text(description):
+    draft = llm_bridge.generate_protocol_draft(description)
+    saved = domain.add_protocol(draft)
+    saved["ui_action"] = {"type": "navigate", "view": "protocols"}
+    return saved
+
 
 @tool(
     "list_protocols",
@@ -158,7 +183,29 @@ def _list_protocols():
                            f"共 {r['protocol']['total_steps']} 步，当前第 {r['step']['number']} 步：{r['step']['title']}"]),
 )
 def _select_protocol(protocol_id=None):
-    return domain.step_view(domain.start_session(protocol_id or None))
+    result = domain.step_view(domain.start_session(protocol_id or None))
+    result["ui_action"] = {"type": "navigate", "view": "run"}
+    return result
+
+
+@tool(
+    "create_reagent_prep_from_text",
+    "根据用户的自然语言描述创建一条试剂配置。只有用户明确要求创建配方时调用。",
+    {
+        "type": "object",
+        "properties": {"description": {"type": "string"}},
+        "required": ["description"],
+        "additionalProperties": False,
+    },
+    kind="execute",
+    title="AI 创建试剂配置",
+    present=lambda a, r: [f"已创建：{r['name_zh']}", f"共 {len(r['steps'])} 个配制步骤"],
+)
+def _create_reagent_prep_from_text(description):
+    draft = llm_bridge.generate_reagent_prep_draft(description)
+    saved = domain.add_reagent_prep(draft)
+    saved["ui_action"] = {"type": "navigate", "view": "reagent_prep"}
+    return saved
 
 
 @tool(
@@ -246,7 +293,134 @@ def _get_current_step():
                           [f"已到第 {r['step']['number']}/{r['protocol']['total_steps']} 步：{r['step']['title']}"]),
 )
 def _move_step(action, step_number=None):
-    return domain.step_view(domain.move(action, step_number))
+    result = domain.step_view(domain.move(action, step_number))
+    result["ui_action"] = {"type": "navigate", "view": "run"}
+    return result
+
+
+@tool(
+    "navigate_view",
+    "打开软件中的指定页面。用户说查看方案、查看安全库、打开设置或返回实验进行中时调用。",
+    {
+        "type": "object",
+        "properties": {
+            "view": {
+                "type": "string",
+                "enum": ["run", "protocols", "reagent_prep", "reagents", "records", "settings"],
+            }
+        },
+        "required": ["view"],
+        "additionalProperties": False,
+    },
+    kind="read",
+    title="打开页面 {view}",
+    present=lambda a, r: ["已打开目标页面"],
+)
+def _navigate_view(view):
+    return {"ui_action": {"type": "navigate", "view": view}}
+
+
+@tool(
+    "get_protocol_detail",
+    "查看一份实验方案的完整步骤、准备材料和安全提示。",
+    {
+        "type": "object",
+        "properties": {"protocol_id": {"type": "string"}},
+        "required": ["protocol_id"],
+        "additionalProperties": False,
+    },
+    kind="read",
+    title="查看方案 {protocol_id}",
+    present=lambda a, r: [f"方案：{r['protocol']['title']}", f"共 {len(r['steps'])} 步"],
+)
+def _get_protocol_detail(protocol_id):
+    result = domain.protocol_detail(protocol_id)
+    result["ui_action"] = {"type": "navigate", "view": "protocols"}
+    return result
+
+
+@tool(
+    "add_protocol_step",
+    "在指定实验方案的某一步之后添加新步骤。",
+    {
+        "type": "object",
+        "properties": {
+            "protocol_id": {"type": "string"},
+            "after_step_number": {"type": ["integer", "null"]},
+            "title": {"type": "string"},
+            "instruction": {"type": "string"},
+        },
+        "required": ["protocol_id", "after_step_number", "title", "instruction"],
+        "additionalProperties": False,
+    },
+    kind="execute",
+    title="添加方案步骤 {title}",
+    present=lambda a, r: ["步骤已添加，方案版本已更新"],
+)
+def _add_protocol_step(protocol_id, after_step_number, title, instruction):
+    result = domain.add_protocol_step({
+        "protocol_id": protocol_id,
+        "after_step_number": after_step_number,
+        "title": title,
+        "instruction": instruction,
+        "must_record": [],
+        "terms": [],
+    })
+    result["ui_action"] = {"type": "navigate", "view": "protocols"}
+    return result
+
+
+@tool(
+    "update_protocol_step",
+    "修改指定实验方案中某一步的标题、说明或安全提示。只传需要修改的字段。",
+    {
+        "type": "object",
+        "properties": {
+            "protocol_id": {"type": "string"},
+            "step_number": {"type": "integer"},
+            "title": {"type": ["string", "null"]},
+            "instruction": {"type": ["string", "null"]},
+            "hazard_note": {"type": ["string", "null"]},
+        },
+        "required": ["protocol_id", "step_number", "title", "instruction", "hazard_note"],
+        "additionalProperties": False,
+    },
+    kind="execute",
+    title="修改方案步骤 {step_number}",
+    present=lambda a, r: ["步骤已修改，方案版本已更新"],
+)
+def _update_protocol_step(protocol_id, step_number, title=None, instruction=None, hazard_note=None):
+    result = domain.update_step({
+        "protocol_id": protocol_id,
+        "step_number": step_number,
+        "title": title,
+        "instruction": instruction,
+        "hazard_note": hazard_note,
+    })
+    result["ui_action"] = {"type": "navigate", "view": "protocols"}
+    return result
+
+
+@tool(
+    "delete_protocol_step",
+    "删除指定实验方案中的某一步。只有用户明确要求删除时调用。",
+    {
+        "type": "object",
+        "properties": {
+            "protocol_id": {"type": "string"},
+            "step_number": {"type": "integer"},
+        },
+        "required": ["protocol_id", "step_number"],
+        "additionalProperties": False,
+    },
+    kind="execute",
+    title="删除方案步骤 {step_number}",
+    present=lambda a, r: ["步骤已删除，后续步骤已重新编号"],
+)
+def _delete_protocol_step(protocol_id, step_number):
+    result = domain.delete_protocol_step(protocol_id, step_number)
+    result["ui_action"] = {"type": "navigate", "view": "protocols"}
+    return result
 
 
 # ---------------- 实验记录 ----------------
@@ -449,4 +623,102 @@ def _check_reagent_safety(reagent):
         "critical_codes": list(found.critical_codes),
         "statements": [s.text for s in found.hazard_statements],
         "disclaimer": store.authority_note,
+    }
+
+
+# ---------------- 分子量计算 ----------------
+
+# 常用元素原子量（实验室常见范围，足够覆盖现有危化品/试剂库）
+_ATOMIC_MASS = {
+    "H": 1.008, "He": 4.003, "Li": 6.94, "Be": 9.012, "B": 10.81,
+    "C": 12.011, "N": 14.007, "O": 15.999, "F": 18.998, "Ne": 20.180,
+    "Na": 22.990, "Mg": 24.305, "Al": 26.982, "Si": 28.085, "P": 30.974,
+    "S": 32.06, "Cl": 35.45, "Ar": 39.948, "K": 39.098, "Ca": 40.078,
+    "Sc": 44.956, "Ti": 47.867, "V": 50.942, "Cr": 51.996, "Mn": 54.938,
+    "Fe": 55.845, "Co": 58.933, "Ni": 58.693, "Cu": 63.546, "Zn": 65.38,
+    "Ga": 69.723, "Ge": 72.630, "As": 74.922, "Se": 78.971, "Br": 79.904,
+    "Kr": 83.798, "Rb": 85.468, "Sr": 87.62, "Y": 88.906, "Zr": 91.224,
+    "Nb": 92.906, "Mo": 95.95, "Ru": 101.07, "Rh": 102.91, "Pd": 106.42,
+    "Ag": 107.87, "Cd": 112.41, "In": 114.82, "Sn": 118.71, "Sb": 121.76,
+    "Te": 127.60, "I": 126.90, "Xe": 131.29, "Cs": 132.91, "Ba": 137.33,
+    "La": 138.91, "Ce": 140.12, "Pr": 140.91, "Nd": 144.24, "Sm": 150.36,
+    "Eu": 151.96, "Gd": 157.25, "Tb": 158.93, "Dy": 162.50, "Ho": 164.93,
+    "Er": 167.26, "Tm": 168.93, "Yb": 173.05, "Lu": 174.97, "Hf": 178.49,
+    "Ta": 180.95, "W": 183.84, "Re": 186.21, "Os": 190.23, "Ir": 192.22,
+    "Pt": 195.08, "Au": 196.97, "Hg": 200.59, "Tl": 204.38, "Pb": 207.2,
+    "Bi": 208.98, "Th": 232.04, "U": 238.03,
+}
+
+
+def _parse_formula(formula: str):
+    """解析简单化学式，例如 H2O、NaCl、C6H12O6、CuSO4。"""
+    formula = str(formula or "").strip().replace(" ", "")
+    if not formula:
+        raise ValueError("化学式不能为空")
+    tokens = re.findall(r"([A-Z][a-z]?)(\d*)", formula)
+    if not tokens or "".join(t[0] + t[1] for t in tokens) != formula:
+        raise ValueError(f"无法解析化学式：{formula}")
+    mass = 0.0
+    parts = []
+    for element, count in tokens:
+        if element not in _ATOMIC_MASS:
+            raise ValueError(f"暂不支持元素：{element}")
+        n = int(count) if count else 1
+        mass += _ATOMIC_MASS[element] * n
+        parts.append(f"{element}{count or ''}")
+    return round(mass, 3), "".join(parts)
+
+
+@tool(
+    "calculate_molecular_weight",
+    "计算分子量或摩尔质量。用户问某试剂的分子量、摩尔质量、Mw、相对分子质量，"
+    "或者给出化学式（如 H2O、NaCl、C6H12O6）要计算时调用。"
+    "会先查试剂安全库，查不到就按化学式解析计算。",
+    {
+        "type": "object",
+        "properties": {
+            "reagent": {"type": "string", "description": "试剂中文名/英文名/化学式，如 氢氧化钠、NaCl、C6H12O6"}
+        },
+        "required": ["reagent"],
+        "additionalProperties": False,
+    },
+    kind="read", title="分子量计算：{reagent}",
+    present=lambda a, r: [
+        (f"{r['name']}：{r['molecular_weight']}" if r.get("name") else f"{r['formula']}：{r['molecular_weight']}")
+        + (" g/mol" if r.get("molecular_weight") else "")
+    ],
+)
+def _calculate_molecular_weight(reagent):
+    reagent = str(reagent or "").strip()
+    if not reagent:
+        raise ValueError("请输入试剂名称或化学式")
+    store = domain.hazmat()
+    found = store.find(reagent) or (store.find_in_text(reagent) or [None])[0]
+    if found is not None and found.molecular_weight:
+        return {
+            "found": True,
+            "name": found.name_zh,
+            "formula": found.molecular_formula,
+            "molecular_weight": float(found.molecular_weight),
+            "unit": "g/mol",
+            "source": "试剂安全库（PubChem）",
+        }
+    if found is not None and found.molecular_formula:
+        weight, formula = _parse_formula(found.molecular_formula)
+        return {
+            "found": True,
+            "name": found.name_zh,
+            "formula": formula,
+            "molecular_weight": weight,
+            "unit": "g/mol",
+            "source": "按化学式从试剂安全库计算",
+        }
+    weight, formula = _parse_formula(reagent)
+    return {
+        "found": True,
+        "name": None,
+        "formula": formula,
+        "molecular_weight": weight,
+        "unit": "g/mol",
+        "source": "按化学式解析计算",
     }
