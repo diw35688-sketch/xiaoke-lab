@@ -57,3 +57,24 @@ def test_lookup_chinese_hydrate_name():
     assert result["found"] is True
     assert result["name"] == "五水硫酸铜"
     assert abs(result["molecular_weight"] - 249.69) < 0.01
+
+
+def test_parenthesized_formula_ammonium_sulfate():
+    result = handler()("(NH4)2SO4")
+    assert result["found"] is True
+    assert result["formula"] == "(NH4)2SO4"
+    assert abs(result["molecular_weight"] - 132.14) < 0.05
+
+
+def test_parenthesized_hydroxide():
+    result = handler()("Ca(OH)2")
+    assert result["found"] is True
+    assert result["formula"] == "Ca(OH)2"
+    assert abs(result["molecular_weight"] - 74.09) < 0.05
+
+
+def test_alum_double_salt_hydrate():
+    result = handler()("KAl(SO4)2·12H2O")
+    assert result["found"] is True
+    assert result["formula"] == "KAl(SO4)2·12H2O"
+    assert abs(result["molecular_weight"] - 474.37) < 0.05
