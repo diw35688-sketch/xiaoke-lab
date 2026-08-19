@@ -58,9 +58,9 @@ def home():
         '<script src="/static/shell.js?v=20260818"></script>'
         '<script src="/static/conversation_list.js?v=20260818"></script>'
         '<script src="/static/run_canvas.js"></script>'
-        '<script src="/static/views.js?v=20260819"></script>'
+        '<script src="/static/views.js?v=20260820"></script>'
         '<script src="/static/protocol_editor.js"></script>'
-        '<script src="/static/reagent_prep.js?v=20260819"></script>'
+        '<script src="/static/reagent_prep.js?v=20260820"></script>'
         '<script src="/static/composer.js?v=20260816"></script>'
           '<script src="/static/phone_call.js"></script>'
     )

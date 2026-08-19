@@ -102,13 +102,7 @@
       if (purpose) parts.push('用途：' + purpose);
       if (!parts.length) { host.querySelector('#pf-msg').textContent = '请至少填写一项'; return; }
       var text = '请根据以下要求创建一条试剂配置：' + parts.join('，') + '。';
-      var message = document.getElementById('message');
-      if (message) {
-        message.value = text;
-        message.focus();
-      }
-      var sendBtn = document.getElementById('send-btn');
-      if (sendBtn) sendBtn.click();
+      if (typeof window.composerSend === 'function') window.composerSend(text);
       host.querySelector('#prep-form-box').style.display = 'none';
     };
 
