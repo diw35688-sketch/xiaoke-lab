@@ -6,6 +6,7 @@ import network_mode
 import phone_access
 
 from api.asr import router as asr_router
+from api.calculator import router as calculator_router
 from api.chat import router as chat_router
 from api.experiments import router as experiments_router
 from api.memories import router as memories_router
@@ -54,7 +55,8 @@ def home():
         '<script src="/static/streaming_chat_v2.js"></script>'
         '<script src="/static/template_planner.js"></script>'
         '<script src="/static/task_panel.js"></script>'
-        '<script src="/static/shell.js?v=20260816"></script>'
+        '<script src="/static/shell.js?v=20260818"></script>'
+        '<script src="/static/conversation_list.js?v=20260818"></script>'
         '<script src="/static/run_canvas.js"></script>'
         '<script src="/static/views.js"></script>'
         '<script src="/static/protocol_editor.js"></script>'
@@ -125,6 +127,7 @@ def phone_access_page(request: Request):
 
 
 app.include_router(chat_router)
+app.include_router(calculator_router)
 app.include_router(experiments_router)
 app.include_router(memories_router)
 app.include_router(network_router)
