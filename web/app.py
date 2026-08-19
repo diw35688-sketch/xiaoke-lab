@@ -64,7 +64,10 @@ def home():
         '<script src="/static/composer.js?v=20260816"></script>'
           '<script src="/static/phone_call.js"></script>'
     )
-    return HTMLResponse(page.replace("</body>", scripts + "</body>"))
+    return HTMLResponse(
+        page.replace("</body>", scripts + "</body>"),
+        headers={"Cache-Control": "no-cache"},
+    )
 
 
 @app.get("/health")
