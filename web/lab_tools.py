@@ -650,27 +650,63 @@ _ATOMIC_MASS = {
 }
 
 
-def _parse_single_formula(formula: str):
-    """解析单个简单化学式，例如 H2O、NaCl、C6H12O6、CuSO4。"""
-    formula = str(formula or "").strip().replace(" ", "")
-    if not formula:
-        raise ValueError("化学式不能为空")
-    tokens = re.findall(r"([A-Z][a-z]?)(\d*)", formula)
-    if not tokens or "".join(t[0] + t[1] for t in tokens) != formula:
-        raise ValueError(f"无法解析化学式：{formula}")
-    mass = 0.0
-    parts = []
-    for element, count in tokens:
-        if element not in _ATOMIC_MASS:
-            raise ValueError(f"暂不支持元素：{element}")
-        n = int(count) if count else 1
-        mass += _ATOMIC_MASS[element] * n
-        parts.append(f"{element}{count or ''}")
-    return round(mass, 3), "".join(parts)
+def _parse_formula_unit(text: str):
+    """递归解析一个化学式单元，支持括号和下标的任意组合。
+
+    例如 H2O、NaCl、C6H12O6、CuSO4、(NH4)2SO4、Ca(OH)2、Al2(SO4)3。
+    返回 (质量, 规范化显示, 结束下标)。
+    """
+    def parse(idx):
+        mass = 0.0
+        parts = []
+        while idx < len(text):
+            ch = text[idx]
+            if ch == ")":
+                return mass, "".join(parts), idx + 1
+            if ch == "(":
+                inner_mass, inner_disp, idx = parse(idx + 1)
+                count = 0
+                while idx < len(text) and text[idx].isdigit():
+                    count = count * 10 + int(text[idx])
+                    idx += 1
+                n = count or 1
+                mass += inner_mass * n
+                parts.append(f"({inner_disp})" + (str(count) if count else ""))
+                continue
+            if ch.isupper():
+                j = idx + 1
+                if j < len(text) and text[j].islower():
+                    j += 1
+                element = text[idx:j]
+                if element not in _ATOMIC_MASS:
+                    raise ValueError(f"暂不支持元素：{element}")
+                idx = j
+                count = 0
+                while idx < len(text) and text[idx].isdigit():
+                    count = count * 10 + int(text[idx])
+                    idx += 1
+                n = count or 1
+                mass += _ATOMIC_MASS[element] * n
+                parts.append(f"{element}" + (str(count) if count else ""))
+                continue
+            raise ValueError(f"无法解析化学式：{text}")
+        return mass, "".join(parts), idx
+
+    mass, disp, idx = parse(0)
+    if idx != len(text):
+        raise ValueError(f"无法解析化学式：{text}")
+    return mass, disp
 
 
 def _parse_formula(formula: str):
-    """解析化学式，支持结晶水合物，例如 CuSO4·5H2O、Na2CO3·10H2O、FeSO4.7H2O。"""
+    """解析化学式，支持括号、下标和结晶水合物。
+
+    支持：
+    - 简单式：H2O、NaCl、C6H12O6、CuSO4
+    - 括号：Ca(OH)2、(NH4)2SO4、Al2(SO4)3、KAl(SO4)2
+    - 结晶水合物：CuSO4·5H2O、CuSO4.5H2O、Na2CO3·10H2O、FeSO4·7H2O
+    - 复盐：KAl(SO4)2·12H2O
+    """
     formula = str(formula or "").strip().replace(" ", "")
     if not formula:
         raise ValueError("化学式不能为空")
@@ -681,21 +717,22 @@ def _parse_formula(formula: str):
                .replace("＊", ".")
                .replace("*", "."))
     if "." in formula:
-        parts = [p for p in formula.split(".") if p]
-        if len(parts) == 2:
-            base_mass, base_formula = _parse_single_formula(parts[0])
-            second = parts[1]
-            match = re.match(r"^(\d+)([A-Za-z].*)$", second)
+        units = [u for u in formula.split(".") if u]
+        total = 0.0
+        displays = []
+        for unit in units:
+            coeff = 1
+            body = unit
+            match = re.match(r"^(\d+)(.*)$", unit)
             if match:
-                hydrate_count = int(match.group(1))
-                hydrate_formula = match.group(2)
-                hydrate_mass, hydrate_text = _parse_single_formula(hydrate_formula)
-                mass = base_mass + hydrate_count * hydrate_mass
-                display = f"{base_formula}·{hydrate_count}{hydrate_text}"
-                return round(mass, 3), display
-            hydrate_mass, hydrate_text = _parse_single_formula(second)
-            return round(base_mass + hydrate_mass, 3), f"{base_formula}·{hydrate_text}"
-    return _parse_single_formula(formula)
+                coeff = int(match.group(1))
+                body = match.group(2)
+            mass, disp = _parse_formula_unit(body)
+            total += coeff * mass
+            displays.append((str(coeff) if coeff != 1 else "") + disp)
+        return round(total, 3), "·".join(displays)
+    mass, disp = _parse_formula_unit(formula)
+    return round(mass, 3), disp
 
 
 @tool(
