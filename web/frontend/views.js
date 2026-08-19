@@ -34,6 +34,60 @@
   }
   window.shellRefreshStatus = refreshStatus;
 
+  // ---------- 分子量计算页 ----------
+  window.shellRegisterView('calculator', function (host) {
+    var examples = ['CuSO4·5H2O', '(NH4)2SO4', 'Ca(OH)2', 'KAl(SO4)2·12H2O', 'FeSO4·7H2O', 'Na2CO3·10H2O', 'C6H12O6', '五水硫酸铜'];
+    host.innerHTML = '<div style="max-width:760px;margin:0 auto">'
+      + '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:24px 26px">'
+      + '<div style="font-size:16px;font-weight:700;color:#0f172a;margin-bottom:4px">分子量 / 摩尔质量计算</div>'
+      + '<div style="color:#64748b;font-size:13px;margin-bottom:16px">输入试剂中文名、英文名或化学式，支持括号、复盐、结晶水合物，例如 CuSO4·5H2O。</div>'
+      + '<div style="display:flex;gap:10px"><input id="calc-input" style="flex:1;min-width:0;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:15px;font-family:inherit" placeholder="例如：CuSO4·5H2O、五水硫酸铜、KAl(SO4)2·12H2O">'
+      + '<button id="calc-run" class="sh-btn primary" style="padding:10px 18px">计算</button></div>'
+      + '<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px">' + examples.map(function (e) {
+          return '<button class="calc-example" data-value="' + esc(e) + '" style="border:1px solid #e2e8f0;background:#f8fafc;border-radius:999px;padding:4px 10px;font-size:12px;color:#334155;cursor:pointer">' + esc(e) + '</button>';
+        }).join('') + '</div>'
+      + '<div id="calc-result" style="margin-top:16px"></div>'
+      + '</div>'
+      + '<div style="color:#94a3b8;font-size:12px;margin-top:14px;line-height:1.8">计算引擎：molmass（开源 BSD-3）优先，内置解析器兜底；试剂名先查试剂安全库（PubChem）。</div>'
+      + '</div>';
+
+    function renderResult(d) {
+      var box = host.querySelector('#calc-result');
+      if (!d || d.detail) {
+        box.innerHTML = '<div style="background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:10px;padding:12px 14px;font-size:13px">' + esc((d && d.detail) || '计算失败') + '</div>';
+        return;
+      }
+      var nameLine = d.name ? '<div style="font-size:13px;color:#64748b;margin-bottom:2px">' + esc(d.name) + '</div>' : '';
+      box.innerHTML = '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:16px 18px">'
+        + nameLine
+        + '<div style="font-size:20px;font-weight:800;color:#166534">' + esc(d.formula || '-') + '</div>'
+        + '<div style="font-size:26px;font-weight:800;color:#0f172a;margin-top:8px">' + Number(d.molecular_weight).toFixed(3) + ' <span style="font-size:14px;color:#64748b;font-weight:400">g/mol</span></div>'
+        + '<div style="font-size:12px;color:#64748b;margin-top:8px">来源：' + esc(d.source || '化学式解析') + '</div>'
+        + '</div>';
+    }
+
+    function run(value) {
+      var v = String(value || '').trim();
+      if (!v) return;
+      host.querySelector('#calc-result').innerHTML = '<div style="color:#94a3b8;font-size:13px">计算中…</div>';
+      api('/calculator/molecular-weight', 'POST', { reagent: v }).then(renderResult).catch(function (err) {
+        host.querySelector('#calc-result').innerHTML = '<div style="background:#fef2f2;color:#b91c1c;border-radius:10px;padding:12px;font-size:13px">请求失败：' + esc(err.message || err) + '</div>';
+      });
+    }
+
+    host.querySelector('#calc-run').onclick = function () { run(host.querySelector('#calc-input').value); };
+    host.querySelector('#calc-input').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); run(this.value); }
+    });
+    Array.prototype.forEach.call(host.querySelectorAll('.calc-example'), function (btn) {
+      btn.onclick = function () {
+        var value = btn.dataset.value;
+        host.querySelector('#calc-input').value = value;
+        run(value);
+      };
+    });
+  });
+
   // ---------- 实验方案页 ----------
   window.shellRegisterView('protocols', function (host) {
     api('/protocols').then(function (d) {
