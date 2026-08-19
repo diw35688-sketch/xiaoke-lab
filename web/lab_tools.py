@@ -698,7 +698,7 @@ def _parse_formula_unit(text: str):
     return mass, disp
 
 
-def _parse_formula(formula: str):
+def _parse_formula_custom(formula: str):
     """解析化学式，支持括号、下标和结晶水合物。
 
     支持：
@@ -733,6 +733,36 @@ def _parse_formula(formula: str):
         return round(total, 3), "·".join(displays)
     mass, disp = _parse_formula_unit(formula)
     return round(mass, 3), disp
+
+
+# 优先使用开源化学式库 molmass（BSD-3），缺失时回退到内置解析器。
+try:
+    from molmass import Formula as _MolFormula
+except Exception:  # pragma: no cover - 依赖未安装时走内置解析器
+    _MolFormula = None
+
+
+def _parse_formula(formula: str):
+    """解析化学式并计算分子量；优先用 molmass，失败回退内置解析器。"""
+    if _MolFormula is not None:
+        try:
+            normalized = (str(formula or "").strip().replace(" ", "")
+                          .replace("·", ".")
+                          .replace("⋅", ".")
+                          .replace("∙", ".")
+                          .replace("×", ".")
+                          .replace("＊", ".")
+                          .replace("*", "."))
+            mass = float(_MolFormula(normalized).mass)
+            display = normalized
+            try:
+                _, display = _parse_formula_custom(formula)
+            except Exception:
+                pass
+            return round(mass, 3), display
+        except Exception:
+            pass
+    return _parse_formula_custom(formula)
 
 
 @tool(

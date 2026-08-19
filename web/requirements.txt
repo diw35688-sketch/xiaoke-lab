@@ -5,3 +5,4 @@ python-dotenv>=1.0,<2.0
 httpx>=0.28,<1.0
 cryptography>=42.0
 qrcode>=7.4
+molmass>=2024,<2027
