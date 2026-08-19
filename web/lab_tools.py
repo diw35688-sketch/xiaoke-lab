@@ -650,8 +650,8 @@ _ATOMIC_MASS = {
 }
 
 
-def _parse_formula(formula: str):
-    """解析简单化学式，例如 H2O、NaCl、C6H12O6、CuSO4。"""
+def _parse_single_formula(formula: str):
+    """解析单个简单化学式，例如 H2O、NaCl、C6H12O6、CuSO4。"""
     formula = str(formula or "").strip().replace(" ", "")
     if not formula:
         raise ValueError("化学式不能为空")
@@ -667,6 +667,35 @@ def _parse_formula(formula: str):
         mass += _ATOMIC_MASS[element] * n
         parts.append(f"{element}{count or ''}")
     return round(mass, 3), "".join(parts)
+
+
+def _parse_formula(formula: str):
+    """解析化学式，支持结晶水合物，例如 CuSO4·5H2O、Na2CO3·10H2O、FeSO4.7H2O。"""
+    formula = str(formula or "").strip().replace(" ", "")
+    if not formula:
+        raise ValueError("化学式不能为空")
+    formula = (formula.replace("·", ".")
+               .replace("⋅", ".")
+               .replace("∙", ".")
+               .replace("×", ".")
+               .replace("＊", ".")
+               .replace("*", "."))
+    if "." in formula:
+        parts = [p for p in formula.split(".") if p]
+        if len(parts) == 2:
+            base_mass, base_formula = _parse_single_formula(parts[0])
+            second = parts[1]
+            match = re.match(r"^(\d+)([A-Za-z].*)$", second)
+            if match:
+                hydrate_count = int(match.group(1))
+                hydrate_formula = match.group(2)
+                hydrate_mass, hydrate_text = _parse_single_formula(hydrate_formula)
+                mass = base_mass + hydrate_count * hydrate_mass
+                display = f"{base_formula}·{hydrate_count}{hydrate_text}"
+                return round(mass, 3), display
+            hydrate_mass, hydrate_text = _parse_single_formula(second)
+            return round(base_mass + hydrate_mass, 3), f"{base_formula}·{hydrate_text}"
+    return _parse_single_formula(formula)
 
 
 @tool(
