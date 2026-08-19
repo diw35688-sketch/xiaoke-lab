@@ -391,6 +391,12 @@
               refreshStatus();
               window.shellShow('run');
               if (window.runReload) window.runReload();
+              var message = document.getElementById('message');
+              if (message) {
+                message.value = '我现在开始执行方案「' + d.protocol.title + '」（共 ' + d.protocol.total_steps + ' 步），请简要说明第一步怎么做、需要哪些试剂和仪器。';
+                var sendBtn = document.getElementById('send-btn');
+                if (sendBtn) sendBtn.click();
+              }
             });
           };
           host.querySelector('#protocol-edit-detail').onclick = function () {
