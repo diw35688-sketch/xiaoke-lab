@@ -43,10 +43,25 @@
       + '<button class="sh-btn" id="prep-upload" style="margin-left:8px">上传 JSON</button>'
       + '<span id="prep-upload-msg" style="margin-left:8px;font-size:12px;color:#64748b"></span></h3>'
       + '<div style="color:#64748b;font-size:12px;margin:8px 0 6px">JSON 格式：{"reagent_preps":[{...}]}，字段见契约说明。上传会严格校验，不通过不落盘。</div>'
-      + '<div style="margin:8px 0 12px"><textarea id="prep-text" rows="2" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--bd-2);border-radius:8px;font-size:13px" placeholder="粘贴文字，例如：配制 1L 50× TAE 电泳缓冲液，用 Tris、冰醋酸和 EDTA，室温保存"></textarea>'
-      + '<button class="sh-btn primary" id="prep-ai">AI 分析成 JSON</button>'
-      + '<span id="prep-ai-msg" style="margin-left:8px;font-size:12px;color:#64748b"></span></div>'
-      + '<div id="prep-draft"></div>'
+      + '<div style="margin:8px 0 12px"><button class="sh-btn primary" id="prep-chat-create">在右侧对话中创建试剂配置</button>'
+      + '<span style="margin-left:8px;font-size:12px;color:#64748b">告诉 AI 浓度、体积、溶剂、保存条件即可</span></div>'
+      + '<div id="prep-form-box" style="display:none;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px 18px;margin-bottom:14px">'
+      + '<div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:10px">填写试剂配置信息</div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+      + '<div><label style="font-size:12px;color:#475569">试剂名称</label><input id="pf-name" style="width:100%;margin-top:4px;box-sizing:border-box;padding:9px 11px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px" placeholder="例如：PBS 缓冲液"></div>'
+      + '<div><label style="font-size:12px;color:#475569">目标浓度</label><input id="pf-conc" style="width:100%;margin-top:4px;box-sizing:border-box;padding:9px 11px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px" placeholder="例如：0.1 mol/L"></div>'
+      + '<div><label style="font-size:12px;color:#475569">体积</label><input id="pf-vol" style="width:100%;margin-top:4px;box-sizing:border-box;padding:9px 11px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px" placeholder="例如：500 mL"></div>'
+      + '<div><label style="font-size:12px;color:#475569">溶剂</label><input id="pf-solvent" style="width:100%;margin-top:4px;box-sizing:border-box;padding:9px 11px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px" placeholder="例如：超纯水 / DMSO"></div>'
+      + '<div><label style="font-size:12px;color:#475569">保存条件</label><input id="pf-storage" style="width:100%;margin-top:4px;box-sizing:border-box;padding:9px 11px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px" placeholder="例如：4℃ 避光"></div>'
+      + '<div><label style="font-size:12px;color:#475569">有效期</label><input id="pf-expiry" style="width:100%;margin-top:4px;box-sizing:border-box;padding:9px 11px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px" placeholder="例如：1 个月"></div>'
+      + '<div style="grid-column:1 / -1"><label style="font-size:12px;color:#475569">用途</label><input id="pf-purpose" style="width:100%;margin-top:4px;box-sizing:border-box;padding:9px 11px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px" placeholder="例如：细胞洗涤、Western blot 转膜缓冲液"></div>'
+      + '</div>'
+      + '<div style="margin-top:12px;display:flex;gap:8px;align-items:center">'
+      + '<button class="sh-btn primary" id="pf-send">生成并发送</button>'
+      + '<button class="sh-btn" id="pf-cancel">取消</button>'
+      + '<span id="pf-msg" style="font-size:12px;color:#64748b"></span>'
+      + '</div>'
+      + '</div>'
       + '<div id="prep-list" style="margin-top:12px">加载中…</div>';
 
     function load() {
@@ -61,40 +76,44 @@
       });
     }
 
-    host.querySelector('#prep-ai').onclick = function () {
-      var box = host.querySelector('#prep-draft');
-      var msg = host.querySelector('#prep-ai-msg');
-      var text = host.querySelector('#prep-text').value.trim();
-      if (!text) { msg.textContent = '请先粘贴文字'; return; }
-      msg.textContent = 'AI 正在分析…';
-      box.innerHTML = '';
-      fetch('/reagent-prep/ai-draft', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: text })
-      }).then(function (r) {
-        return r.json().then(function (d) { return { ok: r.ok, d: d }; });
-      }).then(function (res) {
-        if (!res.ok) { msg.textContent = res.d.detail || 'AI 分析失败'; return; }
-        msg.textContent = '草稿已生成，请确认后保存';
-        box.innerHTML = '<pre style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px;white-space:pre-wrap;font-size:12px">'
-          + esc(JSON.stringify(res.d, null, 2)) + '</pre>'
-          + '<div style="margin-top:10px"><button class="sh-btn primary" id="prep-save-draft">确认保存</button></div>';
-        host.querySelector('#prep-save-draft').onclick = function () {
-          fetch('/reagent-prep/save-draft', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ reagent_prep: res.d })
-          }).then(function (r2) {
-            return r2.json().then(function (d2) { return { ok: r2.ok, d2: d2 }; });
-          }).then(function (res2) {
-            if (!res2.ok) { msg.textContent = res2.d2.detail || '保存失败'; return; }
-            msg.textContent = '已保存';
-            box.innerHTML = '';
-            load();
-          });
-        };
-      }).catch(function (e) { msg.textContent = 'AI 分析失败：' + e.message; });
+    host.querySelector('#prep-chat-create').onclick = function () {
+      var box = host.querySelector('#prep-form-box');
+      box.style.display = '';
+      box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      var nameInput = host.querySelector('#pf-name');
+      if (nameInput) nameInput.focus();
+    };
+
+    host.querySelector('#pf-send').onclick = function () {
+      var parts = [];
+      var name = (host.querySelector('#pf-name').value || '').trim();
+      var conc = (host.querySelector('#pf-conc').value || '').trim();
+      var vol = (host.querySelector('#pf-vol').value || '').trim();
+      var solvent = (host.querySelector('#pf-solvent').value || '').trim();
+      var storage = (host.querySelector('#pf-storage').value || '').trim();
+      var expiry = (host.querySelector('#pf-expiry').value || '').trim();
+      var purpose = (host.querySelector('#pf-purpose').value || '').trim();
+      if (name) parts.push('试剂：' + name);
+      if (conc) parts.push('浓度：' + conc);
+      if (vol) parts.push('体积：' + vol);
+      if (solvent) parts.push('溶剂：' + solvent);
+      if (storage) parts.push('保存条件：' + storage);
+      if (expiry) parts.push('有效期：' + expiry);
+      if (purpose) parts.push('用途：' + purpose);
+      if (!parts.length) { host.querySelector('#pf-msg').textContent = '请至少填写一项'; return; }
+      var text = '请根据以下要求创建一条试剂配置：' + parts.join('，') + '。';
+      var message = document.getElementById('message');
+      if (message) {
+        message.value = text;
+        message.focus();
+      }
+      var sendBtn = document.getElementById('send-btn');
+      if (sendBtn) sendBtn.click();
+      host.querySelector('#prep-form-box').style.display = 'none';
+    };
+
+    host.querySelector('#pf-cancel').onclick = function () {
+      host.querySelector('#prep-form-box').style.display = 'none';
     };
 
     host.querySelector('#prep-upload').onclick = function () {
