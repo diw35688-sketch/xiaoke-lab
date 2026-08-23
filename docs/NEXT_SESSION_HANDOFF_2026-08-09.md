@@ -1,6 +1,6 @@
 # asr_demo 当前工作区交接说明
 
-最后整理：2026-08-16
+最后整理：2026-08-20
 
 > 本文件是下一会话的短入口，不保存完整历史。任务状态以
 > `PROJECT_TASK_CHECKLIST.md` 为准，架构原因见 `PROJECT_ARCHITECTURE.md`，
@@ -18,6 +18,33 @@
 
 ## 1. 当前结论
 
+- **`VOICE-WEB-MIGRATION-01`（语音接入 Web 迁移）= REAL_OK，Phase B（B1-B4）完成并真实验收通过（2026-08-18/19）**：
+  用户指定按 `docs/VOICE_WEB_MIGRATION_PLAN.md` 推进（该文件是唯一简明落点）。
+  **产品形态（用户 2026-08-18 定）：最终产品 = web（桌面）+ 手机（/m），以 web 优先**——
+  验收/体验/后续 Phase 均以 web 为主路径，手机页为同构辅助。
+  B1 设计（容忍部分观察分支）→ B2 三模块（partial 字段 13 项 / 降级生产者 12 项 / WebRenderer 10 项）
+  → B3 `/record` 影子 messages（6 项）→ B4 前端切渲染 messages + 迁移对照 §5.3 WEB-RENDER-01/02 + §5.4。
+  **真实验收通过（REAL_OK）**：语音记录闭环（灰色圈圈→录音→/record→面板回执"已记录"）
+  + 选方案缺字段→"小科追问"+ TTS 朗读纯问题。验收修复：WEB-RENDER-02 桌面语音死代码、
+  话术撒谎硬问题（拆 RECORDED_NO_STEP/DEGRADED）、lab_panel.js 未注入、语音入口治理
+  （cp-mic 语音记录 / vad 语音对话 / 通话独立）、文案"小科追问"+TTS 不念前缀。
+  基线：**全量 800 tests OK**。**关键定位纠正（用户）**：统一理解链核心是处理命令（control 分支），
+  B 降级生产者只有记录+方案追问，**命令处理待 Phase D**（见第 2 节）。
+  UX 走查证据已收集（反应慢/称呼重复/前端乱/undefined 段口述等），体验最终裁决权在用户。
+- **`VOICE-WEB-MIGRATION-01` Phase C1/C2a（语音收敛）完成 = AUTO_OK（2026-08-20，功能待 C3 真机 REAL_OK）**：
+  C1 三张嘴收敛为单一 `window.speak`（`speak.js` 改薄适配层、`mobile.html` 加载 local_tts.js、
+  `mobile.js` 委托 window.speak、`local_tts.js` 补浏览器兜底 + status 空安全）——解决风险 B（打断停错对象）。
+  C2a 词在后端：copy 层 `copy_for_intent(voice=True)` + `WebRenderer.voice_text`，前端不再剥"小科："前缀。
+  基线：**全量 804 tests OK**（800→804，+4 项 voice 测试）。C2b（对话链路念 /chat agent 回答）暂缓到 Phase D；
+  C3 真机 barge-in 验证待用户设备（外放测自激、耳机测漏检）。
+- **`CLARIFICATION-COMPOUND-CONFIRM-ANSWER-01`（P0 复合确认+实体）= REAL_OK（2026-08-20，会话 20260820_122234）**：
+  "是的，是X"确认+实体丢字段的根因修复。集合方案（回答类命令/动作集合放行实体，`unified_understanding.py`
+  `_ENTITY_CARRYING_COMMAND_TYPES` + `clarification_acceptance.py` `_ENTITY_CARRYING_ACTION_TYPES`）
+  + B 混合方案（确定性判"确认/否定"、LLM 抽实体）：`interaction_command.py` AFFIRM_PREFIXES 恢复
+  ("是的","没错","确认")、DENY_PREFIXES ("不是","不对","错误")、`confirm_clarification` 加可选
+  `supplied_fields`（先填再确认）、执行器从 answer_text 抽实体。真实验收："是的，50微升" → 已确认问题 2，
+  填入实体 ['amount_unit','amount_value']，问题已解决。基线：**全量 808 tests OK**（804→808，+4 项 P0 测试）。
+  遗留：ASR"是的"→"日的"误识别（ASR-CMD-02 线）；LLM 弃权时 no_action 沉默（PRESENT-NOACTION-FEEDBACK-01）。
 - **`WEB-BRIDGE-01`（web 统一链桥迁移）= REAL_OK（2026-08-16）**：`web/llm_bridge.py`
   从旧链 `ExperimentLLMProcessor` 迁到统一链 `UnifiedUnderstandingProcessor`，
   `extract()` 加 `recent_context` + `input_kind`；`web/api/record.py` 补
@@ -57,6 +84,17 @@
 - 工作区存在用户累计未提交修改；不得覆盖、回退或混入无关变更。
 
 ## 2. 当前唯一下一项
+
+> **2026-08-20：Phase B REAL_OK（800）+ Phase C1/C2a（804）+ P0 复合确认 REAL_OK（808）+ 入口治理完成。**
+> **当前唯一下一项（方向待用户定）**：
+> - **C3 真机 barge-in 验证（需用户设备，agent 无法代做）**：外放测自激（听到自己 TTS 就打断自己）、
+>   耳机测漏检（说"停/打断"能否停住正在念的话）；同时验 C1/C2a——追问念纯问题（无"小科"）、打断能停住。
+> - **Phase D（用户强调的核心缺口）**：统一理解链核心是**处理命令**（control 分支：查看待确认/暂缓/确认/
+>   否定/编号回答/结束），B 降级生产者没有命令处理，需接 `UnifiedObserver`（含 LLM）+ 服务端托管会话
+>   （reply_coordinator）才能迁入 web。**注意**：迁入时保留 chat agent 的"执行工具"（list/check/propose/
+>   confirm/calculate/time/memory/move_step），只把 `record_observation` 里的规则抽取收敛进统一链。
+> 详见 `docs/VOICE_WEB_MIGRATION_PLAN.md` 路线图。
+> 全量 808 项通过；入口治理已收（保留「语音记录」+「通话」，删「语音对话」+「头像点击通话」）。
 
 **明天开工清单（2026-08-14 夜定）**：按"硬问题清零即进 PRESENT"的闸门，先做硬问题：
 
@@ -574,4 +612,113 @@ docs/                 任务清单、交接和学习记录
 ### 2026-08-17 补充：火山 TTS 鉴权已修，剩余账号侧开通
 - 代码已修：鉴权头改 `Bearer;{token}`（2 段，实证正确）；全量 752 tests OK；服务已重启。
 - 阻塞：火山返回 403 `volc.tts.default requested resource not granted`——应用未开通"语音合成"资源。用户需在火山控制台开通"语音技术→语音合成"后重测（/tts/test）。
+
+### 2026-08-18 补充：web 版关闭模型思考模式（提速，与终端版对齐）
+- 改动：`web/agent/core.py` 第 83/112 行（agent 非流式+流式）、`web/llm_bridge.py` 第 57 行（统一理解链）三处 `chat.completions.create` 各加 `extra_body={"thinking": {"type": "disabled"}}`；终端版 `src/llm/client.py` 本就显式 disabled，未动。
+- 测试：全量 `Ran 796 tests ... OK`（PYEXIT=0），测试基线 796。
+- 待验：重启 web 服务后用户实测——不再出现 `[[LABTHINK]]` 折叠块、回复明显变快（REAL_OK 待用户；UX_CONFIRMED 待用户裁决）。
+- 风险备注：设置面板切「中科大校内 LLM」（api.llm.ustc.edu.cn）时该代理不保证支持 thinking 字段，届时需评估。
+
+### 2026-08-20 补充：Phase C1/C2a 三张嘴收敛 + 词在后端（voice_text）
+- C1：三张嘴（`local_tts.js`/`speak.js`/`mobile.js` 各自 fetch `/tts` 发声）收敛为单一 `window.speak`——`speak.js` 改薄适配层（`labSpeak`→`window.speak`）、`mobile.html` 加载 `local_tts.js`、`mobile.js` 委托 `window.speak`、`local_tts.js` 补浏览器兜底 + status 空安全。解决风险 B（打断 `stopSpeech` 停错对象、barge-in 失灵）。
+- C2a：后端 copy 层 `copy_for_intent(..., voice=True)`（CLARIFICATION 返回纯问题，去"小科："前缀+来源标注）+ `WebRenderer.render()` 多产出 `voice_text`；前端 `speak.js`/`mobile.js` 改读 `voice_text`，删 `.replace(/^小科：/,'')`——"剥前缀"从前端搬回后端（词在后端）。
+- 测试：新增 4 项 voice 测试，全量 800 → 804 tests OK。登记 `PROJECT_ARCHITECTURE.md` §5.3 VOICE-MOUTH-01 + VOICE-TEXT-01。
+- 待验（C3 真机，需用户设备）：外放/耳机分别测 barge-in 漏检/自激；追问念纯问题、打断停得住。REAL_OK/UX_CONFIRMED 待用户实测。
+
+### 2026-08-23 补充：VOICE-C5-C5 新追问替代旧追问
+
+- 已完成 35 项清单第 9 项：`supersede_deferred()` 按非空 `supersession_key` 将旧延后请求标为 `DROP/SUPERSEDED`，只保留新请求；无关请求 FIFO 顺序不变。
+- 失败原子边界：缺 key、非 DEFERRED 决定、重复 intent_id 均在修改队列前拒绝。
+- 验证：播放层专项 `76/76`；项目原 `.venv` 全量 `896/896` 通过。
+- 当前唯一下一项：第 10 项 `VOICE-C5-C6-SESSION-CANCEL`；只做会话结束清队列与 `DROP/SESSION_ENDED` 证据，不提前做抢占或 TTS 失败边界。
+
+### 2026-08-23 补充：VOICE-C5-C6 会话结束永久取消
+
+- `DeferredPlaybackQueue.close()` 原子关闭并清空；关闭后所有迟到 defer 请求被拒绝，重复关闭幂等，旧会话不能恢复。
+- `cancel_deferred_for_session()` 为关闭时全部剩余项返回 `DROP/SESSION_ENDED`，不执行真实播放。
+- 验证按风险选择：播放层及全部相邻模块 `82/82`；本轮未跑全量，最近全量基线为上一项 `896/896`。
+- 当前唯一下一项：第 11 项 `VOICE-C5-C7-PREEMPTION`。
+
+### 2026-08-23 补充：播放执行架构已纳入计划
+
+- 唯一清单由 35 项扩展为 39 项，在抢占前新增运行状态协调器、播放上下文工厂、播放调度器、TTS 适配器事件合同四项。
+- 设计边界：VoiceStateCoordinator 独占可变运行状态写入；PlaybackContextFactory 只产不可变快照；PlaybackScheduler 独占 Gate/Queue/TTS 编排；TTSAdapter 只执行 `play/stop` 并回报事件。
+- 短停顿不等于断句：`user_speaking=False, segment_capturing=True` 时仍禁止播放；PREEMPT 必须等待 `STOPPED` 后用新快照复判。
+- 本轮为文档设计变更，无业务代码和代码回归；文档内 39 项顺序已一致。
+- 当前唯一下一项：第 11 项 `VOICE-C5-C7-RUNTIME-STATE-COORDINATOR`。
+
+### 2026-08-23 补充：VOICE-C5-C7 运行状态协调器
+
+- `src/core/voice_runtime_state.py` 新增不可变 `VoiceRuntimeState`、严格事件合同和唯一状态写入者 `VoiceStateCoordinator`。
+- 短停顿状态固定为 `user_speaking=False, segment_capturing=True`；恢复讲话不新建片段，只有固化事件结束采集。ASR 与 TTS 生命周期事实分别维护。
+- Coordinator 在锁内归约，非法顺序失败且保留原状态；不接 Microphone/VAD/ASR/TTS，不创建 PlaybackContext，也不做播放决定。
+- 验证：专项 `13/13`，新模块及相邻播放层组合回归 `69/69`；本轮按风险未跑全量，最近可信全量 `896/896`。
+- 内部合同无输出面变化，未做真实设备和 UX 验收。
+- 当前唯一下一项：第 12 项 `VOICE-C5-C8-PLAYBACK-CONTEXT-FACTORY`。
+
+### 2026-08-23 补充：VOICE-C5-C8 播放上下文工厂
+
+- `src/core/playback_context_factory.py` 新增 `PlaybackContextFactory`，从 Coordinator 读取一次状态，配合注入时钟和显式会话阶段生成不可变 `PlaybackContext`。
+- 保守映射：`voice_input_busy = segment_capturing or asr_processing`，所以句中短停顿仍是输入忙；只有片段结束且 ASR 结束才释放普通播放窗口。
+- 工厂不修改运行状态、不调用 Gate/Queue/TTS；已创建快照不会随 Coordinator 后续状态变化。
+- 验证：专项 `10/10`，工厂、运行状态及相邻播放层组合回归 `79/79`；本轮按风险未跑全量，最近可信全量 `896/896`。
+- 纯内部适配，无真实设备或 UX 验收。
+- 当前唯一下一项：第 13 项 `VOICE-C5-C9-PLAYBACK-SCHEDULER`。
+
+### 2026-08-23 补充：VOICE-C5-C9 播放调度器
+
+- `src/core/playback_scheduler.py` 新增唯一编排入口：一次建快照、一次 Gate 判断，然后 READY→play、DEFERRED→queue、DROP→证据、PREEMPT→`PREEMPT_REQUIRED`。
+- PREEMPT 暂不 stop/play，因为尚未建立 STOPPED 事件和复判闭环；这是安全等待状态，不是假执行成功。
+- Scheduler 使用最小 `PlaybackExecutionPort`，Fake TTS 失败时异常传播，不返回成功结果；完整失败隔离留给后续任务。
+- 验证：专项 `8/8`，Scheduler 及相邻播放模块组合回归 `87/87`；本轮按风险未跑全量，最近可信全量 `896/896`。
+- 纯内部编排，无真实设备或 UX 验收。
+- 当前唯一下一项：第 14 项 `VOICE-C5-C10-TTS-ADAPTER-EVENTS`。
+
+### 2026-08-23 补充：VOICE-C5-C10 TTSAdapter 执行事件合同
+
+- `src/core/tts_adapter.py` 新增可追踪四事件合同、低层 Driver 协议和 `TTSAdapter`；事件均绑定当前 `intent_id` 和优先级。
+- play/stop 是命令，不直接改运行事实：STARTED 后才置播放中，STOPPED/FINISHED/FAILED 后才清除；stop 发出后到 STOPPED 到达前仍保持 busy。
+- 终止事件必须有对应 STARTED，重复 play、未开始 stop 和歧义 error 字段均被拒绝；Adapter 可直接作为 Scheduler play 端口。
+- 验证：专项 `9/9`，Adapter 及全部相邻播放模块组合回归 `96/96`；本轮按风险未跑全量，最近可信全量 `896/896`。
+- Fake Driver 无真实声音或 UX 验收。
+- 当前唯一下一项：第 15 项 `VOICE-C5-C11-PREEMPTION`。
+
+### 2026-08-23 补充：VOICE-C5-C11 CRITICAL 限定抢占
+
+- Scheduler 现在观察 TTS STARTED 身份；Gate 返回 PREEMPT 后保存新请求和旧 intent，调用 stop，并返回 `PREEMPT_STOP_REQUESTED`。
+- 只有匹配旧 intent 的 STOPPED 才触发新快照和 Gate 复判；错误 STOPPED 不唤醒。复判时使用当前时间与当前会话阶段，过期/会话结束均 DROP。
+- 普通请求和同级 CRITICAL 不 stop；未观察到 STARTED 身份时拒绝盲抢占。
+- 验证：直接相关测试 `22/22`，全部播放层组合回归 `102/102`；本轮按风险未跑全量，最近可信全量 `896/896`。
+- Fake 软件闭环不证明真实播放器停止时延，无 UX/REAL_OK。
+- 当前唯一下一项：第 16 项 `VOICE-C5-C12-TTS-FAILURE-BOUNDARY`。
+
+### 2026-08-23 补充：VOICE-C5-C12 TTS 失败隔离与播放架构收口
+
+- `src/core/tts_failure_boundary.py` 新增三阶段失败证据与有限策略：只有未被 Driver 接受的 START_COMMAND 默认重试 1 次；ACTIVE_PLAYBACK / EVENT_DELIVERY 永不自动重播。
+- Scheduler 最终启动失败返回 `PLAYBACK_FAILED` 和原请求；不伪造已交付。Adapter 隔离 event sink 异常，保留 Coordinator 已更新的真实状态。
+- 验证：直接相关 `23/23`、全部播放层 `108/108`；第 1–16 项阶段收口运行项目原 `.venv` 全量 `954/954` 通过。既有弃用和损坏 JSON 样例警告不影响通过。
+- Fake 失败边界不证明真实 TTS 供应商恢复能力，无 UX/REAL_OK。
+- 当前唯一下一项：第 17 项 `VOICE-C5-D1-SHARED-RECORD-SERVICE`。
+
+### 2026-08-23 补充：VOICE-C5-D1 共享记录应用服务
+
+- `web/record_service.py` 新增入口无关的 `SharedRecordService`：统一抽取、规则兜底、评估、保存、共享成功结果和 PresentationIntent 投影；无 FastAPI、Renderer、设备或播放依赖。
+- 保存成功后才构造成功结果和意图；保存失败抛 `RecordPersistenceError` 且不投影。输出 `SharedRecordResult` 不可变、不含 Web messages。
+- 验证：专项 `7/7`，结果/投影/Renderer/现有路由相邻回归 `65/65`；本轮未切入口、未跑全量，最近可信全量 `954/954`。
+- 过渡风险：旧 `/record` 仍保留原编排，与新服务暂时重复；下一项必须迁移并删除旧路，不能长期双轨。
+- 当前唯一下一项：第 18 项 `VOICE-C5-D2-RECORD-USE-SERVICE`。
+
+### 2026-08-23 补充：VOICE-C5-D2 `/record` 迁移共享服务
+
+- `/record` 已切到 `SharedRecordService`；旧内联抽取/兜底/评估/保存后适配/投影路径删除。路由只做 HTTP 校验、依赖绑定、存储错误映射和 WebRenderer 适配。
+- JSON 原字段与 messages 合同保留；messages 继续只在保存后附加到响应、不入库；保存失败仍 HTTP 500 且不生成成功消息。
+- 迁移对照登记 `PROJECT_ARCHITECTURE.md` §5.3 `RECORD-SERVICE-01`，自动合同等价，真实浏览器 UX 待确认。
+- 验证：直接 `16/16`、相邻 `71/71`、项目原 `.venv` 全量 `961/961`。既有警告不影响通过。
+- 当前唯一下一项：第 19 项 `VOICE-C5-D3-TOOL-USE-SERVICE`。
+
+### 2026-08-23 补充：播放输入忙字段统一命名
+
+- 播放合同字段由 `asr_listening` 无兼容双名迁移为 `voice_input_busy`；原因码同步为 `VOICE_INPUT_BUSY`，重新判断触发器同步为 `VOICE_INPUT_BECAME_IDLE`。
+- 语义保持不变：`voice_input_busy = segment_capturing or asr_processing`。运行时仍分别保存片段采集和 ASR 处理事实，只有播放快照将两者合并为“当前不可插话”。
+- 本次只改命名，不改变 Gate 顺序、队列行为或播放策略。
 

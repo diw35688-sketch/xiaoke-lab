@@ -5,7 +5,7 @@
 (() => {
   const $ = id => document.getElementById(id);
   const form = $('form'), input = $('message'), send = $('send'), mic = $('mic'), chat = $('chat'),
-        autoSpeak = $('auto-speak'), conversationKey = 'lab-agent-conversation-id';
+        conversationKey = 'lab-agent-conversation-id';
   const avatar = state => window.dispatchAvatarState?.(state);
   let activeController = null, activeReply = null, requestId = 0;
   let activeThinkRow = null, toolRows = {};
@@ -16,8 +16,6 @@
   fetch('/settings').then(r => r.json()).then(d => {
     window.ttsEnabled = !!(d.settings && d.settings.tts_enabled);
   }).catch(() => {});
-  function shouldSpeak() { return autoSpeak.checked || window.ttsEnabled === true; }
-
   const stopButton = document.createElement('button');
   stopButton.type = 'button'; stopButton.className = 'mic'; stopButton.id = 'stop-response';
   stopButton.title = '停止生成'; stopButton.textContent = '■'; stopButton.disabled = true;
@@ -143,13 +141,6 @@
   loadHistory();
 
 
-  function takeCompletedSentences(buffer, flush = false) {
-    const sentences = []; let match;
-    while ((match = buffer.match(/^([\s\S]*?[。！？!?；;：:,，\n])/))) { sentences.push(match[1]); buffer = buffer.slice(match[1].length); }
-    if (flush && buffer.trim()) { sentences.push(buffer); buffer = ''; }
-    return { buffer, sentences };
-  }
-
   function stopCurrentResponse(showNotice = true) {
     if (!activeController) return;
     activeController.abort(); activeController = null;
@@ -180,7 +171,7 @@
     stopButton.disabled = false;
     avatar('thinking');
 
-    let answer = '', speechBuffer = '';
+    let answer = '';
     try {
       const response = await fetch('/chat/stream', {
         method: 'POST',
@@ -202,7 +193,13 @@
           if (!dataLine) continue;
           const data = JSON.parse(dataLine.slice(6));
 
-          if (data.type === 'delta' && data.text) {
+          if (data.type === 'screen_delta' && data.text) {
+            answer += data.text;
+            reply.textContent = answer;
+            chat.scrollTop = chat.scrollHeight;
+          } else if (data.type === 'voice_delivery') {
+            window.consumeVoiceDelivery?.(data);
+          } else if (data.type === 'delta' && data.text) {
             const text = data.text;
             if (text.indexOf('[[LABTHINK]]') >= 0) {
               const parts = text.split('[[LABTHINK]]');
@@ -231,15 +228,9 @@
             answer += text;
             reply.textContent = answer;
             chat.scrollTop = chat.scrollHeight;
-            if (shouldSpeak()) {
-              const extracted = takeCompletedSentences(speechBuffer + text);
-              speechBuffer = extracted.buffer;
-              extracted.sentences.forEach(sentence => window.enqueueSpeech?.(sentence));
-            }
           } else if (data.type === 'task_queued') {
             answer = data.answer; reply.textContent = answer;
             if (data.conversation_id) localStorage.setItem(conversationKey, data.conversation_id);
-            if (shouldSpeak()) window.enqueueSpeech?.(answer);
             avatar('listening');
             window.refreshTaskPanel?.();
           } else if (data.type === 'done') {
@@ -250,12 +241,7 @@
               avatarThought('···');
             }
             if (data.conversation_id) localStorage.setItem(conversationKey, data.conversation_id);
-            if (shouldSpeak()) {
-              const extracted = takeCompletedSentences(speechBuffer, true);
-              extracted.sentences.forEach(sentence => window.enqueueSpeech?.(sentence));
-            } else {
-              avatar('happy'); setTimeout(() => avatar('idle'), 1000);
-            }
+            avatar('happy'); setTimeout(() => avatar('idle'), 1000);
             if (typeof loadExperiments === 'function') loadExperiments();
           } else if (data.type === 'error') {
             throw new Error(data.detail || '流式回复失败');

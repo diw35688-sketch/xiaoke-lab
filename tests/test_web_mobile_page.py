@@ -47,17 +47,23 @@ class WebMobilePageTests(unittest.TestCase):
     def test_mobile_html_has_record_button(self):
         html = (FRONTEND_DIR / "mobile.html").read_text(encoding="utf-8")
         self.assertIn('id="m-record-btn"', html)
-        self.assertIn('src="/static/mobile.js"', html)
+        self.assertIn("/static/mobile.js", html)
         self.assertIn('name="viewport"', html)
 
     def test_mobile_js_uses_existing_api_contracts(self):
         js = (FRONTEND_DIR / "mobile.js").read_text(encoding="utf-8")
         self.assertIn("/asr/transcribe", js)
-        self.assertIn('"/record"', js)
+        self.assertIn('"/record/stream"', js)
+        self.assertIn("response.body.getReader()", js)
         self.assertIn("getUserMedia", js)
-        # 结构化结果按现有 /record 响应字段消费
-        self.assertIn("follow_up_question", js)
-        self.assertIn("deviations", js)
+        # B4：mobile.js 消费 /record 的 messages 合同（kind/screen_target/text），
+        # 前端只按 kind/screen_target 上样式、显示/朗读 text，不自行判断。
+        self.assertIn("messages", js)
+        self.assertIn("screen_target", js)
+        self.assertIn('"clarification"', js)
+        # 旧薄字典平行投影字段已退役（前端不再读 evaluation 自行判断/拼话）
+        self.assertNotIn("follow_up_question", js)
+        self.assertNotIn("deviations", js)
 
     def test_mobile_page_does_not_depend_on_desktop_scripts(self):
         html = (FRONTEND_DIR / "mobile.html").read_text(encoding="utf-8")

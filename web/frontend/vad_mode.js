@@ -149,11 +149,11 @@
     }
     active = false;
     if (btn) {
-      btn.textContent = "🎤 自动";
+      btn.textContent = "🎤 语音对话";
       btn.classList.remove("active");
     }
     setButtonsLocked(false);
-    say("自动语音已关闭");
+    say("语音对话已关闭");
   }
 
   function enable() {
@@ -181,15 +181,15 @@
         active = true;
         if (btn) {
           btn.disabled = false;
-          btn.textContent = "关闭自动";
+          btn.textContent = "关闭对话";
           btn.classList.add("active");
         }
         setButtonsLocked(true);
-        say("自动语音：开口即录，安静后自动识别");
+        say("语音对话：开口即录，安静后自动识别");
       })
       .catch(function (err) {
-        if (btn) { btn.disabled = false; btn.textContent = "🎤 自动"; }
-        say("自动语音不可用：" + (err && err.message ? err.message : String(err)) + "。请使用手动录音");
+        if (btn) { btn.disabled = false; btn.textContent = "🎤 语音对话"; }
+        say("语音对话不可用：" + (err && err.message ? err.message : String(err)) + "。请使用手动录音");
       });
   }
 
@@ -206,8 +206,8 @@
       btn.id = "vad-mode-btn";
       btn.type = "button";
       btn.className = "cp-chip";
-      btn.textContent = "🎤 自动";
-      btn.title = "自动语音：开口即录，安静后自动识别（免按键）";
+      btn.textContent = "🎤 语音对话";
+      btn.title = "语音对话：开口即录，安静后自动识别（免按键）";
       btn.addEventListener("click", function () {
         if (active) disable();
         else enable();
@@ -222,7 +222,7 @@
       state.id = "vad-state";
       state.style.cssText =
         "display:block;padding:4px 16px 2px;font-size:var(--fs-xs,#12px);color:var(--n-500,#64748b);line-height:1.6";
-      state.textContent = "🎤 自动语音：开口即录，安静自动识别";
+      state.textContent = "🎤 语音对话：开口即录，安静自动识别";
       var wrap = document.getElementById("cp-wrap");
       if (wrap) wrap.appendChild(state);
       return;
@@ -236,7 +236,7 @@
       "border-top:1px solid #e2e8f0;background:#f8fafc;font-size:13px;font-family:inherit";
     btn = document.createElement("button");
     btn.id = "vad-mode-btn";
-    btn.textContent = "🎤 自动";
+    btn.textContent = "🎤 语音对话";
     btn.style.cssText =
       "border:1px solid #cfdaff;border-radius:999px;padding:6px 14px;font-size:13px;" +
       "cursor:pointer;background:#eef3ff;color:#3158c8;font-family:inherit";
@@ -247,7 +247,7 @@
     var state = document.createElement("span");
     state.id = "vad-state";
     state.style.cssText = "color:#64748b;font-size:12px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
-    state.textContent = "🎤 自动语音：开口即录，安静自动识别（首次需下载 WASM 运行时）";
+    state.textContent = "🎤 语音对话：开口即录，安静自动识别（首次需下载 WASM 运行时）";
     bar.appendChild(btn);
     bar.appendChild(state);
     var asrBar = el("asr-bar");

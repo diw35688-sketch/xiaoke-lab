@@ -352,6 +352,19 @@ INTENT-02-CLEANUP-FLAGS-01 删除，统一链是唯一默认路径。
 | VERIFY-01（待） | 孤儿模块 `clarification_command_handler.py`、`targeted_clarification.py` | 已不被 main 调用 | 删除前确认其测试覆盖已由新链测试承接，再删模块+测试 |
 | RESTORE-NONBLOCK-01 | main.py 主循环内联的六步业务流水线（观察→落盘ASR→落盘事件+上下文→无编号兜底→执行→确认记录） | 主线程同步串行处理每段；observe 调 LLM 期间麦克风关闭，说完干等 | `UnifiedSegmentProcessor.process`（六步流水线，无线程纯业务）+ `OrderedTaskQueue`（后台单线程+背压4：submit/collect_ready/finish）；main 主线程只录音→结束判断→提交→显示 |
 | WEB-BRIDGE-01 | `web/llm_bridge.py` 桥接的旧 `ExperimentLLMProcessor`（`analyze_segment`） | 网页端 LLM 只做实体抽取（events + entities），不分辨意图 | `UnifiedUnderstandingProcessor.understand` 一次调用完成 input_kind（experiment/control/uncertain）分辨 + 结构化；web 只消费 experiment 分支的实体卡片，control/uncertain 只带回标签不执行动作（见 5.6） |
+| WEB-RENDER-01（B4，2026-08-18） | 前端 `voice_asr.js`/`mobile.js`/`lab_panel.js(labRender)` 读 `evaluation.follow_up_required/follow_up_question/deviations` 自行判断"要不要问"并**拼话播报**（薄字典平行投影） | `/record` 返回 `messages`（B3），前端只按 `kind`/`screen_target` 上样式、显示/朗读 `messages` 的 `text`（话术来自后端 copy 层）；"要不要问"的判断权收归后端（降级生产者+投影层） | **保留点（明确标注）**：`views.js` 历史视图仍读 evaluation（messages 不入库，历史无 messages；属存储数据展示非实时判断）；`labEvaluate` 面板走 `/protocols/evaluate`（非 /record 语音链），不在本迁移范围。质量状态见 5.4 表"web 侧"行 |
+| WEB-RENDER-02（2026-08-18 真实验收后补） | 桌面语音链 `voice_asr.js` 识别后 `if (input && form) { requestSubmit() }` 填聊天框送 `/chat`——**B4 改的 /record 直连分支因 `return` 在前从未执行（死代码）**，界面追问/回执话术实为 agent 生成（"好的，请问…"） | 删除聊天框分支，桌面语音口述一律直连 `/record`：判断在后端（降级生产者+投影层）、话术走 messages text（copy 层"小科：…"）、前端只画只念 | **等价提升**：桌面与 `/m` 手机页统一走 messages 渲染；文字聊天（composer→/chat）保留 agent 链不动。真实验收证据：改前语音说"称量磷酸盐"返回 agent 话术；改后返回 copy 层话术 |
+| RECORD-SERVICE-01（D2，2026-08-23） | `web/api/record.py` 内联的最近上下文、LLM 抽取、规则兜底、确定性评估、保存、共享结果适配和 PresentationIntent 投影 | `/record` 自己完成整条记录业务链，再用 WebRenderer 添加响应 messages；手机与桌面虽调用同一 HTTP 路径，但业务能力无法被其他入口直接复用 | `SharedRecordService.record()` 接管完整业务顺序；`/record` 只做 HTTP 校验、依赖绑定、`RecordPersistenceError`→HTTP 500 和 WebRenderer 响应适配 | **等价（自动合同）/ UX 待确认**：旧 JSON 字段、messages 文案、messages 不入库和保存失败无成功回执均有回归证据；未做真实浏览器体验裁决 |
+| RECORD-SERVICE-02（D3，2026-08-23） | `web/lab_tools.py` 的 `record_observation` 独立执行规则抽取、评估、段号分配和保存，与 `/record` 形成第二条记录业务链 | 工具与 HTTP 入口可能因抽取路径和后续规则演进而产生不同记录结果 | 工具构造 `RecordCommand` 并调用同一 `SharedRecordService`，只把共享结果适配回原五字段工具合同；异常仍由工具分发器转成结构化错误 | **等价（自动合同）/ UX 待确认**：工具字段合同和失败边界保持；共享 intents 接入工具呈现留给 D4，未接 PlaybackScheduler |
+| TOOL-PRESENT-01（D4，2026-08-23） | `record_observation` 保存后只把五字段结果交回聊天模型，模型再次生成“已记录”或追问 | 底层记录事实虽已统一，但回执措辞和是否追问仍可能被模型重新决定，绕过 Intent/copy/DeliveryPlan | 工具成功结果同时携带后端 `PresentationDeliveryPlan`；同步/流式 agent 完成同轮工具后直接用 WebRenderer/copy 的确定性文本结束该轮，不再请求模型重写记录回执 | **提升（自动合同）/ UX 待确认**：模型请求次数测试证明记录呈现不经第二次模型；仍经普通 delta 上屏，播放事件与许可接线留给 D5–D10 |
+| CHAT-SCREEN-01（D5，2026-08-23） | `/chat/stream` 把普通正文、思考标记和工具卡片标记全部包装成 `delta`；前端 `delta` 同时上屏并进入 `enqueueSpeech` | 普通聊天文本天然暗含播放权，无法区分“显示内容”和“获准发声内容” | 普通正文经 `agent_chunk_event()` 变为显式 `screen_delta`；实际 v2 前端只上屏该事件。思考/卡片控制标记暂留旧 `delta`，播放路径随后单项删除 | **提升（自动合同）/ UX 待确认**：screen_delta payload 与前端分支均无发声能力；后端 voice_delivery、旧 delta 清理和真实播放尚未完成 |
+| DELTA-TTS-01（D7，2026-08-23） | 活动 `streaming_chat_v2.js` 与遗留 `streaming_chat.js` 的 `delta` 普通文本分支都可直接调用 `enqueueSpeech` | 任何旧/误发 delta 都可能绕过 DeliveryPlan、PlaybackGate 和 Scheduler 获得发声权；遗留文件重新启用会恢复旁路 | 两份前端的 delta 分支只保留控制标记和屏幕更新，删除所有 delta 驱动的发声调用；task_queued/done 保持原样分项治理 | **提升（自动合同）/ UX 待确认**：静态分支测试与 Node 语法检查通过；后端 voice_delivery 尚未接通，真实播放未验收 |
+| VOICE-EVENT-01（D6，2026-08-23） | 工具 DeliveryPlan 的 `voice_items` 停在 agent 内部，SSE 只能发送屏幕文本和遗留控制标记 | 后端无法显式交付稳定语音候选；若直接把文本塞回 delta 又会恢复无权限发声 | agent 以不可变批次输出合并后重新预算的 voice items，`/chat/stream` 独立序列化为 `voice_delivery`，不写聊天正文/历史；事件标注 `CONTENT_ELIGIBLE` 而非运行时授权 | **提升（自动合同）/ UX 待确认**：候选合同与预算有测试；前端尚不消费，Scheduler 尚未产生 READY/PREEMPT，真实播放未验收 |
+| TASK-QUEUED-TTS-01（D8，2026-08-23） | 活动与遗留流式客户端收到 `task_queued` 后既显示排队回执又直接调用 `enqueueSpeech` | 后台排队状态绕过 Intent、DeliveryPlan 和播放门控；打开自动播报就会插话 | 两份客户端的 task_queued 只保留上屏、conversation_id、头像和任务面板刷新，删除直接 TTS；任务完成轮询通知保持独立待治理 | **提升（自动合同）/ UX 待确认**：分支静态测试与 JS 语法检查通过；真实浏览器、完成通知和受控播放未验收 |
+| FRONTEND-VOICE-AUTH-01（D9，2026-08-23） | 前端没有 voice_delivery 消费合同，历史事件分支各自直接调用 TTS | 即使后端发送候选，前端也无法区分内容资格与运行时授权，容易把 CONTENT_ELIGIBLE 直接播放 | 共享 voice_delivery 客户端只允许 READY/PREEMPT 进入唯一 TTS；候选、延后、丢弃、未知和坏 payload 无副作用。两个流式客户端只负责委托 | **提升（自动合同）/ UX 待确认**：Node 行为测试验证调用序列；生产后端尚无 READY/PREEMPT，需 D10 Scheduler 接线后才可真实播放 |
+| VOICE-MOUTH-01（C1，2026-08-20） | `speak.js` 自带 `/tts`+`Audio` 发声的 `labSpeak`、`mobile.js` 局部 `speak`（两张独立"嘴"） | 各自 fetch `/tts` 独立发声；打断时 `window.stopSpeech` 只能停 `local_tts.js` 自己那张，停不到 `speak.js`/`mobile.js` 正在念的音频（barge-in 失灵，风险 B） | 三张嘴收敛为单一 `window.speak`（保留 `local_tts.js`）：`speak.js` 改薄适配层 `labSpeak`→`window.speak`；`mobile.html` 加载 `local_tts.js`、`mobile.js` 追问改调 `window.speak`；`local_tts.js` 补浏览器兜底 + status 空安全。打断现停得住唯一那张嘴 |
+| VOICE-TEXT-01（C2a，2026-08-20） | 前端 `speak.js`/`mobile.js` 朗读时 `.replace(/^小科：/, '')` 自己剥称呼前缀 | 从 `messages[].text` 里剥"小科："再念——"词"的一部分（剥前缀）落在前端 | 后端 copy 层新增 `voice` 通道：`copy_for_intent(..., voice=True)` 对 CLARIFICATION 返回纯问题（无"小科："、无来源标注），`WebRenderer.render` 多产出 `voice_text`；前端直接念 `voice_text` 不再剥前缀（词全在后端） |
+| VOICE-ENTRY-01（2026-08-20） | 桌面页两个冗余"对话"入口：`vad_mode.js` 的「🎤 语音对话」按钮（VAD 免按键连续对话→/chat）、`avatar.js:41` 头像 click 触发 `phoneCallToggle` | 「语音对话」与「通话」职责重叠（都是连续对话→/chat，两套实现）；头像 click 是「通话」第二入口、与 `#sh-call` 重复；且 `phone_call.js` 的 `$('#sh-call')` 因 `$` 封装为 getElementById 不认 `#` 前缀永远取 null（按钮 onclick 从未接上、不变"挂断"，只有头像那条路能用） | 只留两个入口：`cp-mic`「语音记录」（→/record）+ `#sh-call`「通话」（→/chat）。删 `app.py` 加载 `vad_mode.js`（文件保留供 `vad_check.html` 诊断页）；删 `avatar.js:41` 头像 click 通话（头像保留状态展示+🔊播报开关）；修 `phone_call.js` `$` 封装 getElementById→querySelector | **等价/提升**：被删两个入口的"连续对话"能力由「通话」全覆盖（更完整：barge-in+噪音校准）；通话按钮修好后可正常进入/挂断 |
 
 ### 5.4 用户可见输出质量对照表（2026-08-14 建立，回应"没感觉新链路改善/功能丢了"）
 
@@ -369,6 +382,11 @@ INTENT-02-CLEANUP-FLAGS-01 删除，统一链是唯一默认路径。
 | 降级提示 | "原始记录已保存，结构化处理暂时不可用"（POLICY 第6节示例） | 无面向用户提示，只有"[统一链] 目标=degraded_note…" | **丢失** |
 | 查看待确认列表 | "当前没有待确认问题"/列表 | "当前共有1个待确认问题：-问题1（待回答）：…" | 等价 ✓ |
 | 结束汇总 | 会话总结（用户语言） | "共处理8段…提交4段" + "最终上下文包含4条事件" | **降级**（混入开发语言） |
+| 追问播报（web，B4） | 前端读 `evaluation.follow_up_required` 播报 `follow_up_question` | `messages` clarification 的 `text`（"小科：缺时长，请补充"）由 `labSpeakMessages` 朗读 | 等价 ✓（话术来自后端 copy 层，判断在后端） |
+| 偏差播报（web，B4，"注意，X 方案规定为 Y，你说的是 Z"） | 前端拼话播报 `deviations` | `messages` 体系暂无 deviations 消息 → 不再播报 | **丢失**（登记：降级生产者/投影层补 deviations 消息，随 D 阶段或独立任务） |
+| "本步现场记录已完整"（web，B4 无追问反馈） | 无追问时显示"本步现场记录已完整" | `messages` record_ack 降级"原始记录已保存，结构化处理暂时不可用。" | **降级**（措辞从"完整"变"降级"；D 阶段真观察器产 structured_experiment 后恢复"已记录实验步骤 N"等价反馈） |
+| 实体/结构化展示（web，B4） | 前端展示 entities | 保留（前端只画不判） | 等价 ✓ |
+| 历史视图（web，B4，/record/history） | 读 evaluation 展示追问/偏差 | 保留 evaluation 展示（messages 不入库，历史无 messages；属存储数据展示，非实时判断） | 等价 ✓（边界已说明） |
 
 > **判定规则（写入验收纪律）**：迁移对照必须逐项标注质量状态（等价/降级/丢失），
 > "降级/丢失"项在 PRESENT 前视为未完成；agent 的"功能验收通过"不得掩盖"体验质量降级"。
@@ -552,3 +570,18 @@ src/
 ├── storage/                   # JSONL 持久化
 └── evaluation/                # 离线评估工具
 ```
+
+## 2026-08-23 本轮维护记录：VOICE-C5-D10 Web 统一播放授权
+
+- `web/playback_runtime.py` 是 Web 生产者与核心播放域之间的适配层。`/record` 与 chat tool 只提交 `VoiceDeliveryItem`，由共享 `WebPlaybackService → PlaybackRequest → PlaybackScheduler → PlaybackGate` 产生授权。
+- `BrowserPlaybackExecutionPort` 是核心 `PlaybackExecutionPort` 的浏览器实现边界：服务器不播放音频；Scheduler 成功 hand-off 后，适配层才把结果序列化成 `voice_delivery authorization=READY`，由前端唯一 `consumeVoiceDelivery()` 进入 `window.enqueueSpeech`。
+- 普通 chat 没有 `VoiceDeliveryItem`，因此只上屏，不进入 Scheduler；这不是绕过，而是没有语音候选就没有播放请求。
+- `/record` HTTP JSON 新增 `voice_delivery_events` 影子字段并保留旧 `messages` 与记录字段；`messages.voice_text` 暂保留兼容数据，但桌面与手机客户端不再据此发声。
+- 当前运行时协调器尚未接浏览器 VAD/TTS 事实，默认只验证空闲 READY；PREEMPT 在 STOPPED 反馈接通前安全降为 DEFERRED。会话隔离、实时状态回传与真机时序不属于本项。
+
+## 2026-08-23 本轮维护记录：VOICE-C5-E1 职责冻结
+
+- 新增 `tests/test_c5_architecture_freeze.py`，把 C5 架构约定从文档提升为持续执行的测试：内容资格层不能导入播放状态/TTS，Gate 不能拥有 Queue/执行行为，Web producer 不能直接调用 TTS，迁移范围内前端只有授权客户端能执行播放。
+- `streaming_chat_v2.js` 与遗留 `streaming_chat.js` 已删除无写入者的 `speechBuffer` 及 done 收尾发声代码；普通 chat、delta、screen_delta、task_queued、done 均不再包含 `enqueueSpeech`。
+- `task_panel.js` 的后台任务完成通知是当前冻结测试显式记录的范围外例外，后续若统一通知语音，应单独建任务接入 Scheduler，不能暗中扩大 C5 结论。
+- C5 组合回归 `190/190`；项目级全量受 NumPy/Pydantic ABI 环境阻塞，执行到 898 项时有 17 个导入错误，因此架构状态为 `AUTO_OK` 而非真实设备或全项目通过。

@@ -7,7 +7,7 @@
 //
 // 与 voice_asr.js 的单次录音不同：这里只点一次开始，之后完全自动。
 (() => {
-  const $ = id => document.getElementById(id);
+  const $ = sel => document.querySelector(sel);
   const HINT_SELECTOR = '#cp-hint';
 
   let active = false;
@@ -31,8 +31,8 @@
   let silenceLen = 0;
 
   const PRE_SEC = 0.45;        // 保留开口前 0.45s 的预缓冲，避免句首被截断
-  const SILENCE_SEC = 0.9;     // 停顿 0.9s 视为一句话结束
-  const MIN_SPEECH_SEC = 0.6;  // 太短的噪声（<0.6s）不送 ASR，抗噪音误触
+  const SILENCE_SEC = 1.5;     // 停顿 1.5s 视为一句话结束（原 0.9 会把句中思考停顿误判成句末，加长留思考余量）
+  const MIN_SPEECH_SEC = 1.2;  // 太短的噪声（<1.2s）不送 ASR，抗噪音误触（0.6→0.8→1.2 调高）
   const MAX_SPEECH_SEC = 15;   // 单段上限，超长自动切断
   const SAMPLE_RATE = 16000;   // SenseVoice 固定 16kHz
 
@@ -146,7 +146,7 @@
       calibFrames += 1; calibSum += rms(frame);
       if (calibFrames >= 18) {
         const noise = calibSum / calibFrames;
-        threshold = Math.max(0.008, Math.min(0.03, noise * 3.5 + 0.003));
+        threshold = Math.max(0.02, Math.min(0.06, noise * 6 + 0.01)); // 噪音误触二次调高：下限 0.02、系数 6、上限 0.06
         calibrated = true;
         hint('正在听你说话…');
       } else {
@@ -157,7 +157,7 @@
     const frameRms = rms(frame);
     // 滞后回滞（hysteresis）：未开始语音时需明显高于阈值才触发（抗噪音突刺），
     // 已进入语音后以较低阈值保持（防止句中断音）。
-    const loud = frameRms > (speechFrames.length > 0 ? threshold * 0.85 : threshold * 1.2);
+    const loud = frameRms > (speechFrames.length > 0 ? threshold * 0.85 : threshold * 1.8);
 
     if (!loud) {
       pushPre(frame);
