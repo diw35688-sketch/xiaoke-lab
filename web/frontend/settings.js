@@ -16,9 +16,6 @@
     '    <label class="settings-field"><span>API 密钥</span>',
     '      <input id="settings-key" type="password" autocomplete="off" />',
     '      <em>密钥只保存在本机服务器，页面上始终以掩码显示。</em></label>',
-    '    <label class="settings-field settings-inline">',
-    '      <input id="settings-tts" type="checkbox" />',
-    '      <span>启用语音播报（需本机 TTS 服务在 8001 端口运行）</span></label>',
     '    <div class="settings-actions">',
     '      <button id="settings-test" class="ghost">测试连接</button>',
     '      <button id="settings-save" class="primary">保存并生效</button></div>',
@@ -80,7 +77,6 @@
       }).join('');
       el('settings-base-url').value = data.settings.base_url || '';
       el('settings-model').value = data.settings.model_name || '';
-      el('settings-tts').checked = !!data.settings.tts_enabled;
       el('settings-key').placeholder = data.settings.api_key_set
         ? ('已保存 ' + data.settings.api_key + '，留空表示不修改')
         : '请填写 API 密钥';
@@ -93,8 +89,7 @@
   function body() {
     var payload = {
       base_url: el('settings-base-url').value.trim(),
-      model_name: el('settings-model').value.trim(),
-      tts_enabled: el('settings-tts').checked
+      model_name: el('settings-model').value.trim()
     };
     var key = el('settings-key').value.trim();
     if (key) payload.api_key = key;
@@ -155,8 +150,6 @@
       fetch('/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formPayload) })
         .then(function (r) { return r.json(); })
         .then(function (d) {
-          // 同步前端朗读开关（对话回答朗读读取它）
-          window.ttsEnabled = !!formPayload.tts_enabled;
           el('settings-key').value = '';
           setStatus(d.ready, d.missing);
           result(d.ready, d.ready ? d.message : (d.message + '，但仍缺：' + (d.missing || []).join('；')));

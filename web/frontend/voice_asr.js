@@ -15,6 +15,11 @@
 
   function el(id) { return document.getElementById(id); }
   function say(text) { el('asr-state').textContent = text; }
+  function publishRecordingState(active) {
+    document.dispatchEvent(new CustomEvent('lab:recording-state', {
+      detail: { recording: active }
+    }));
+  }
 
   // 把 Float32 PCM 重采样到 16kHz 并编码为 WAV，服务端可直接读取。
   function encodeWav(samples, inputRate) {
@@ -63,12 +68,14 @@
         source.connect(node);
         node.connect(ctx.destination);
         recording = true;
+        publishRecordingState(true);
         say('正在录音，说完点“停止并识别”');
       });
   }
 
   function stop() {
     recording = false;
+    publishRecordingState(false);
     var rate = ctx ? ctx.sampleRate : 48000;
     var total = chunks.reduce(function (sum, c) { return sum + c.length; }, 0);
     var merged = new Float32Array(total);
@@ -89,6 +96,34 @@
     form.append('audio', blob, 'segment.wav');
     return fetch('/asr/transcribe', { method: 'POST', body: form })
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); });
+  }
+
+  async function streamRecord(text, onEvent) {
+    var response = await fetch('/record/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transcript: text })
+    });
+    if (!response.ok) {
+      var failure = await response.json().catch(function () { return {}; });
+      throw new Error(failure.detail || '记录请求失败');
+    }
+    if (!response.body) throw new Error('浏览器不支持流式响应');
+    var reader = response.body.getReader();
+    var decoder = new TextDecoder();
+    var buffer = '';
+    while (true) {
+      var chunk = await reader.read();
+      buffer += decoder.decode(chunk.value || new Uint8Array(), { stream: !chunk.done });
+      var boundary;
+      while ((boundary = buffer.indexOf('\n')) >= 0) {
+        var line = buffer.slice(0, boundary).trim();
+        buffer = buffer.slice(boundary + 1);
+        if (line) onEvent(JSON.parse(line));
+      }
+      if (chunk.done) break;
+    }
+    if (buffer.trim()) onEvent(JSON.parse(buffer));
   }
 
   function init() {
@@ -135,34 +170,32 @@
         }
         var text = res.data.transcript || '';
         el('asr-text').textContent = text;
-        say('已转写');
-        // 语音接入对话：把识别结果送进聊天框并直接发送，
-        // 由模型决定调用哪个实验室工具（记录/查安全/推进步骤）。
-        var input = document.querySelector('#message');
-        var form = document.querySelector('#form');
-        if (input && form) {
-          input.value = text;
-          if (typeof form.requestSubmit === 'function') form.requestSubmit();
-          else form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
-          setTimeout(function () { if (window.labStepsReload) window.labStepsReload(); }, 2500);
+        if (!text) {
+          say('没听清，请再说一次');
           return;
         }
-        say('正在结构化…');
-        // 完整链路：LLM 抽实体 → 程序按方案做确定性判断 → 播报追问
-        fetch('/record', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ transcript: text })
-        }).then(function (r) { return r.json(); }).then(function (d) {
-          if (window.labRender) window.labRender(d);
-          var ev = d.evaluation || {};
-          if (ev.follow_up_required && window.labSpeak) window.labSpeak(ev.follow_up_question);
-          else if ((ev.deviations || []).length && window.labSpeak) {
-            var x = ev.deviations[0];
-            window.labSpeak('注意，' + x.field + '方案规定为' + x.protocol_value + '，你说的是' + x.actual_value + '，请确认');
+        say('正在连接理解服务…');
+        // 完整链路（B4+用户拍板 2026-08-18）：语音口述一律直连 /record，
+        // 不再送聊天框绕 agent——记录类口述走统一输出层（messages 渲染 + copy 话术），
+        // 追问/回执由后端判断、前端只按 kind/screen_target 上样式、显示/朗读 text。
+        streamRecord(text, function (event) {
+          if (event.type === 'record_status') {
+            say(event.text || '正在处理…');
+            return;
           }
-          var degraded = d.extraction && d.extraction.degraded;
-          say(degraded ? '已记录（模型未配置或调用失败，按原文保存）' : '已结构化并判断');
+          if (event.type === 'record_error') {
+            say('记录失败：' + (event.detail || '未知错误'));
+            return;
+          }
+          if (event.type !== 'record_result') return;
+          var d = event.data || {};
+          if (window.labRender) window.labRender(d);
+          // C5-D10：messages 只负责显示；只有 Scheduler 授权事件可以发声。
+          (d.voice_delivery_events || []).forEach(function (delivery) {
+            window.consumeVoiceDelivery?.(delivery);
+          });
+          say('已记录');
+          if (window.labStepsReload) setTimeout(window.labStepsReload, 800);
         }).catch(function (err) { say('处理失败：' + err.message); });
       }).catch(function (err) {
         button.disabled = false;

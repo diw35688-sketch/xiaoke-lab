@@ -118,6 +118,24 @@ class WebLlmBridgeTests(unittest.TestCase):
         self.assertEqual(result["events"], [])
         self.assertIsNone(result["assistant_reply"])
 
+    def test_experiment_branch_preserves_semantic_follow_up_contract(self):
+        branch = json.loads(json.dumps(EXPERIMENT_BRANCH, ensure_ascii=False))
+        analysis = branch["analysis"]
+        analysis["events"][0]["raw_text"] = "加热到六十摄氏度"
+        analysis["events"][0]["normalized_text"] = "加热到六十摄氏度"
+        analysis["events"][0]["missing_fields"] = ["duration"]
+        analysis["should_ask_follow_up"] = True
+        analysis["follow_up_question"] = "加热了多长时间？"
+        _install(content=_response("experiment", branch))
+
+        result = llm_bridge.extract(
+            "加热到六十摄氏度", session_id="session-1", segment_id=8
+        )
+
+        self.assertEqual(result["events"][0]["missing_fields"], ["duration"])
+        self.assertTrue(result["should_ask_follow_up"])
+        self.assertEqual(result["follow_up_question"], "加热了多长时间？")
+
     def test_uncertain_branch_returns_label_without_cards(self):
         _install(content=_response("uncertain", {"reason": "语义不足。"}))
         result = llm_bridge.extract(

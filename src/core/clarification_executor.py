@@ -135,6 +135,8 @@ class ClarificationExecutor:
             return self._execute_confirm(action)
 
         if action.action_type == ClarificationActionType.REJECT_SUGGESTION:
+            if action.supplied_entity_fields or self._entity_extractor is not None:
+                return self._execute_confirm_with_entities(action)
             return self._execute_targeted(action, "confirm")
 
         raise ValueError(f"未知动作类型：{action.action_type}")
@@ -421,6 +423,65 @@ class ClarificationExecutor:
             reason=(
                 f"已将对问题 {updated.display_number} 的答复的实体字段"
                 f" {sorted(supplied_fields)} 填入。"
+                f"{resolved_note}"
+            ),
+            affected_clarification_id=updated.clarification_id,
+            affected_display_number=updated.display_number,
+            remaining_fields=remaining_fields,
+            resolved=resolved,
+        )
+
+    def _execute_confirm_with_entities(
+        self,
+        action: ClarificationAction,
+    ) -> ClarificationExecutionResult:
+        """确认/否定 + 填字段：先抽实体，再原子地填缺失字段并清除确认标志。"""
+
+        supplied_fields: set[str] = set()
+        if action.supplied_entity_fields:
+            supplied_fields = set(action.supplied_entity_fields)
+        elif self._entity_extractor is not None:
+            supplied_fields = self._entity_extractor.extract(action.answer_text)
+
+        if not supplied_fields:
+            # 没有可填实体时退化为纯确认（只清标志、不填字段）。
+            return self._execute_targeted(action, "confirm")
+
+        try:
+            updated = self._coordinator.confirm_clarification(
+                clarification_id=action.target_clarification_id,
+                expected_revision=action.expected_revision,
+                segment_id=action.segment_id,
+                supplied_fields=supplied_fields,
+            )
+        except ValueError as error:
+            return self._result(
+                action,
+                state_changed=False,
+                reason=str(error),
+            )
+
+        if not updated.is_unresolved:
+            resolved_note = " 问题已解决。"
+            resolved = True
+            remaining_fields: tuple[str, ...] = ()
+        elif updated.missing_fields:
+            resolved_note = (
+                f" 仍需补充：{'、'.join(updated.missing_fields)}。"
+            )
+            resolved = False
+            remaining_fields = tuple(updated.missing_fields)
+        else:
+            resolved_note = " 仍需确认。"
+            resolved = False
+            remaining_fields = ()
+        return self._result(
+            action,
+            state_changed=True,
+            answer_text_received=True,
+            reason=(
+                f"已确认问题 {updated.display_number}，"
+                f"并填入实体字段 {sorted(supplied_fields)}。"
                 f"{resolved_note}"
             ),
             affected_clarification_id=updated.clarification_id,

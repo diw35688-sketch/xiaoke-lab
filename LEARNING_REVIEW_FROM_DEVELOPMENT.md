@@ -3863,3 +3863,393 @@ web 会直接断供。本轮把桥迁到统一链，并补齐 `recent_context` �
 - 专业术语：错误信息驱动的诊断（error-message-driven debugging）；HTTP 401 vs 403 语义（未认证 vs 已认证但无权限）。
 - 项目实际体现：`Bearer;token;appid`（3段）→ 401 格式错；`Bearer;token`（2段）→ 通过鉴权但 403 资源未开通。401→403 的转变证明代码修对了，剩的是控制台操作。
 
+## 2026-08-18（B1 敲钉子）："部分观察"比"伪造富字段"诚实——降级生产者的契约边界
+
+> 背景：`docs/VOICE_WEB_MIGRATION_PLAN.md` Phase B 开始。B1 是纯设计（不写码）：
+> 决定 web 降级生产者填 `UnifiedObservation` 的哪几个字段、投影层怎么接。
+> 结论：选"容忍部分观察的分支"，否掉"拼富字段（含 pending_action）"。
+
+### 知识 1：契约禁止"托管有状态会话"时，伪造编号状态就是撒谎
+- 白话：web 现在没有"问题编号"这种会话级状态。如果降级生产者硬要拼出 CLI 那种带编号的富对象（pending_action），就得自己维护"下一个编号是多少"——这正是迁移契约明令禁止的"托管有状态会话"。更糟的是"记录成功"那条路：CLI 说"已记录实验步骤 N"的 N 来自 main 里的会话计数器，web 没有计数器，只能编一个假编号。反面例子：如果硬拼，用户看到"已记录实验步骤 3"，但数据库里根本没有步骤概念，话是假的。
+- 专业术语：有状态会话（stateful session）vs 无状态降级生产者；语义映射的诚实性（semantic fidelity）。
+- 项目实际体现：B1 决策否掉"拼富字段"，改为 `UnifiedObservation` 加 `partial: bool=False` + `partial_question: str|None=None`，追问文本直接透传——web 的即时追问不伪装成"编号问题"。
+
+### 知识 2：用显式标记区分"完整观察"和"部分观察"，而不是放宽全局校验
+- 白话：如果为了放行降级生产者，把 `UnifiedObservation` 的整体校验放松（OBSERVED 不再强制 destination/clarification_action），CLI 完整路径的 bug 也会从同一个口子溜过去。正确做法是加一个 `partial` 开关：只有 partial=True 的构造才放宽校验——"只给降级门开个小口，正门还是锁着的"。反面例子：不加标记直接删校验 → CLI 观察缺字段也不报错，测试全绿但语义已悄悄破坏。
+- 专业术语：显式模式标记（explicit mode flag）；校验收窄 vs 全局放宽（narrowing vs relaxing validation）；fail-fast 的边界。
+- 项目实际体现：`src/core/unified_observer.py` 的 `__post_init__` 已按 partial 分支分叉（B2-1 实现，2026-08-18）；CLI 构造不传 partial（默认 False）行为零变化，现有 768 项测试已锁定。
+
+### 知识 3：为什么"输出层一行不动"是 drop-in 抽换的承诺
+- 白话：真观察器（Phase D）就绪后要能"拔掉降级生产者、插上真观察器"，前端和投影代码一行不改。如果降级生产者产出的是另一套结构（比如现在 web 直接给前端 evaluation 字典），将来抽换就要同时动两层，风险翻倍。
+- 专业术语：drop-in replacement（原位替换）；接缝（seam）；依赖倒置（dependency inversion）。
+- 项目实际体现：降级生产者与真观察器产出**同一类型** `UnifiedObservation`，投影函数签名 `messages_for_observation(observation)` 不变；partial 分支只在降级时触发（B2-1 已落地），真观察器填完整字段走现有路径；web 现状的 `evaluation` 薄字典投影（`domain.evaluate`→`evaluate_segment`）就是反面教材——它就是"另立投影"，B 阶段要退役它。
+
+### 知识 4：投影产"意图"、渲染产"话"——三层呈现链的边界（用户 2026-08-18 纠正）
+- 白话：系统想对用户说话，中间必须过两道闸：先把判断结果变成"想表达什么、多重要、显示在哪个区"（意图，不含中文），再由渲染器把意图变成真正的句子。把这两步合成一步的后果：换一种说话方式（用户版/管理员版/网页版）就要重写判断逻辑。反面例子：我最初讲解时把投影层说成"翻译成对用户说的话"，把两层压成一层——错在让"判断"偷看了"话术"。
+- 专业术语：三层呈现链 = 业务事实 → 语义意图（semantic intent）→ 最终文字（copy/文案目录）；Renderer 协议（`render(intent) -> str`）；关注点分离（separation of concerns）。
+- 项目实际体现：`presentation_projection.py` docstring 明写"不产中文——中文由文案目录按 kind + args 生成"；`presentation_intent.py` 明写"不包含最终展示文案"；`presentation_copy.py` 明写"把语义意图翻译成指定模式的最终文字"；`presentation_pump.py` 的 `Renderer` 协议 `render(intent) -> str` 是 CLI `TerminalRenderer` 与未来 Web/TTS 渲染器的共同契约。B2 的 `WebRenderer` 就是实现该协议（意图→结构化 JSON）；前端只按 `screen_target`/`kind` 上样式，不产话、不判意图（契约 4/5）。
+
+## 2026-08-18（B2-1）：部分观察字段落地——"只增不改"与"校验分叉"的代码形态
+
+> 背景：B1 设计落地第一步。给 `UnifiedObservation` 加 `partial`/`partial_question` 字段、
+> `__post_init__` 分叉、投影层加 partial 分支；新增 `tests/test_observation_partial.py` 13 项。
+> 本条目即本轮知识的唯一存档（2026-08-18 用户定：不另建卡片文件）。
+
+### 知识 1：给"冻结数据类"加新字段，老代码一行不用改
+- 白话：在冻结类后面加两行带默认值的新字段（`partial: bool = False`），老代码不传它们 → 自动用默认值 → 老行为不变。frozen 只禁止"改已有值"，不禁止"加新格子"。反面例子：新字段不写默认值 → 所有现有构造点报"缺参数"，必须改老代码，违反零改动。
+- 专业术语：向后兼容（backward compatibility）；只增不改（additive change）；默认参数（default argument）。
+- 项目实际体现：`src/core/unified_observer.py` 字段末尾新增 `partial: bool = False` + `partial_question: str | None = None`；全量 768 项通过（755+13）。
+
+### 知识 2：校验"分叉"——同一个检查员，两个通道两套规则
+- 白话：`__post_init__` 进门先看"通行证"：partial=True 走降级通道（不强制 destination/clarification_action，但必须成功观察、不能带错误、追问文本非空白）；没持证走原通道（老校验原样）。还有一条反向检查：追问文本仅 partial 允许——防止完整路径悄悄夹带。
+- 专业术语：校验分叉（validation branching）；fail-fast；显式模式标记（explicit mode flag）。
+- 项目实际体现：`unified_observer.py` `__post_init__` 的 `if self.partial:` 分支 + 末尾 `if self.partial_question is not None: raise`；投影层 `messages_for_observation` 在 FAILED 检查后加 `if observation.partial:` 分支，复用现成 `_clarification`/`_record_ack`（零新增辅助函数）。
+
+### 知识 3：回归测试 = 用证据锁住"老行为没变"
+- 白话：新功能测试和"回归"用例写在一起——回归用例明确断言"partial=False 时老校验不放宽、CLI 投影输出不变"。以后谁改坏了，测试立刻红。
+- 专业术语：回归测试（regression test）；测试即合同（test as contract）。
+- 项目实际体现：`tests/test_observation_partial.py` 13 项（8 构造 + 5 投影），含 3 个回归用例（`test_full_observation_still_requires_destination` / `test_question_only_allowed_when_partial` / `test_full_structured_experiment_still_projects_recorded`）；专项 37 项通过、全量 768 项通过。
+
+## 2026-08-18（B2-2）：降级生产者——纯函数、容错降级与判定同源
+
+> 背景：B2-1 备好"部分观察"容器后，B2-2 实现第一个生产者：把 web 现有
+> `evaluation`（薄字典评估产物）翻译成部分 `UnifiedObservation`。
+> 本条目即本轮知识的唯一存档（2026-08-18 用户定：不另建卡片文件）。
+
+### 知识 1：纯函数生产者——"同样输入，同样输出，不碰任何外部东西"
+- 白话：降级生产者是纯函数：给一份 evaluation 字典，返回一个部分观察对象；给一万次同样的输入，一万次同样的结果；不碰数据库、不调大模型、不改传入数据、不记任何账。反面例子：函数内部记计数器 → 两个请求同时进来串号，测试因依赖历史无法重复。
+- 专业术语：纯函数（pure function）；无副作用（side-effect free）；确定性（deterministic）。
+- 项目实际体现：`web/degraded_producer.py` 的 `produce_partial_observation()` 只造对象不碰外部资源；降级生产者契约"确定性、不调 LLM、不改输入、不托管有状态会话"就是纯函数的另一种说法；正因为纯，Phase D 才能 drop-in 抽换、输出层一行不动。
+
+### 知识 2：容错降级——"永远返回合法结果，而不是抛异常"
+- 白话：evaluation 不是字典（None/字符串）时，降级生产者不抛异常，而是返回"失败观察"（status=failed），下游照常投影出"本段处理失败，原始记录已保存"。调用方永远拿到合法的 UnifiedObservation，永远不用写 try/except。
+- 专业术语：容错降级（fail-safe / graceful degradation）；防御性编程（defensive programming）；fail-fast 与 fail-safe 的分层（创建点严、转换点稳）。
+- 项目实际体现：`web/degraded_producer.py` 的 try/except 统一兜底为 FAILED 观察（error_type 记录）；专项测试 `test_none_evaluation_produces_failed_observation` / `test_non_dict_evaluation_produces_failed_observation`；这与 `UnifiedObservation.__post_init__` 的 fail-fast 不矛盾——创建点严格、转换点容错。
+
+### 知识 3：判定同源原则——"要不要追问"只认一个来源
+- 白话：evaluation 里有两个信息：follow_up_required（标志）和 follow_up_question（文本）。降级生产者判定"是不是追问观察"只认文本是否非空，不认标志——因为投影层消费的就是文本（有文本→追问消息，无文本→记录回执），判定必须与消费方同源，否则"标志为真、文本为空"的矛盾状态会让投影层无法处理。
+- 专业术语：单一事实来源（single source of truth）；判定与消费同源（decision-consumer consistency）；数据如实抄录 vs 参与判定。
+- 项目实际体现：`web/degraded_producer.py` 用 `question = (evaluation.get("follow_up_question") or "").strip(); is_followup = bool(question)` 判定，`follow_up_required` 字段照抄进观察但只作记录；专项测试 `test_required_flag_true_but_empty_question_counts_as_record` 锁死该行为。
+
+## 2026-08-18（B2-3）：WebRenderer——同一份意图，不同呈现形态（B2 收官）
+
+> 背景：B2 最后一块。投影层产出意图后，web 需要一个渲染器把意图变成
+> 前端可消费的结构化 JSON（kind/screen_target/priority/text）。
+> 改动：`web/web_renderer.py`（新模块，`WebRenderer` 类）、`tests/test_web_renderer.py`（新，10 项）。
+> 本条目即本轮知识的唯一存档（2026-08-18 用户定：不另建卡片文件）。
+
+### 知识 1：适配器模式——CLI 渲染成终端文字，web 渲染成 JSON，投影层不动
+- 白话：同一份"意图"（想表达什么、多重要、显示在哪），CLI 用 `TerminalRenderer` 渲染成终端字符串，web 用 `WebRenderer` 渲染成 JSON 字典——两个渲染器各管各的呈现形态，投影层永远不用为渠道改一行。这就是"适配器"：同一个插头，配不同的转换头接不同的设备。
+- 专业术语：适配器模式（adapter pattern）；呈现层多态（presentation polymorphism）；接口与实现分离。
+- 项目实际体现：`web/web_renderer.py` 的 `WebRenderer.render(intent) -> dict` 与 CLI `TerminalRenderer` 角色相同、产出不同；`presentation_pump.py` 的 Renderer 协议（`render -> str`）是 CLI 的，WebRenderer 不实现它（web 没有 stdout pump），但"意图 → 呈现物"的职责一致；B3 接 `/record` 时投影层零改动。
+
+### 知识 2：最小暴露——前端只拿"画"需要的字段，不透传意图参数
+- 白话：JSON 只给前端六样：intent_id（追踪）、kind（消息类型）、screen_target（区域）、priority（排序）、source_segment_id（来源口述）、text（最终话）。**不透传 args**（意图参数，比如追问文本、步骤号）——因为前端一旦拿到参数原文，就会忍不住自己判断、自己拼话，这就违反"前端只画不判"的契约。给得越少，越不容易越权。
+- 专业术语：最小暴露（minimum exposure）；接口隔离原则（interface segregation principle）；契约边界（contract boundary）。
+- 项目实际体现：`web/web_renderer.py` 的 render 只挑六个字段输出；专项测试 `test_clarification_intent_renders_expected_fields` 断言字段集合；反面：如果透传 args，前端看到 `{"question": "缺时长，请补充"}` 就会自己拼"小科：..."，和后端 copy 层各说各话。
+
+### 知识 3：文案单一来源——"话"永远由后端 copy 层生成
+- 白话：text 不是前端拼的，也不是渲染器现编的，而是调用 copy 层 `copy_for_intent(intent, ui_mode)` 生成的——同一句意图，user 模式出"原始记录已保存…"，admin 模式出"原始记录已保存…（来源口述 5）"。前端只负责显示和朗读，改话术只改 copy 层一处。
+- 专业术语：单一事实来源（single source of truth）；文案目录（copy catalog）；ui_mode 参数化。
+- 项目实际体现：`WebRenderer.render` 里 `"text": copy_for_intent(intent, ui_mode=self._ui_mode)`；专项测试 `test_admin_mode_appends_source` 断言 admin 文案带来源；这正是迁移契约 5"嘴在前端、词在后端"的工程化——B 阶段结束，web 的输出从"前端读薄字典拼话"收敛为"后端统一出词"。
+
+## 2026-08-18（B3）：/record 影子 messages——新输出先"旁观"，不抢方向盘
+
+> 背景：B2 三块模块单测就绪后，B3 第一次把它们接进真实接口 `/record`：
+> 影子式新增 `messages` 字段（降级生产者→投影→WebRenderer 全链内联），
+> **保留原始 evaluation**，前端暂不消费，肉眼核对。
+> 改动：`web/api/record.py`（+影子接线）、`tests/test_web_record_messages.py`（新，6 项）。
+> 本条目即本轮知识的唯一存档（2026-08-18 用户定：不另建卡片文件）。
+
+### 知识 1：影子模式——新能力先"旁观"，验证后再切换
+- 白话：新输出（messages）先在接口里"挂一个观察位"：旧输出（evaluation）照旧、前端照旧看旧输出，新输出在旁边产出但没人消费。核对无误后才让前端切过去；出问题就撤掉影子，旧路径原样还在。就像换新方向盘之前，先在后座放一个"备胎方向盘"，让教练（肉眼）先看看它转得对不对。
+- 专业术语：影子模式（shadow mode / shadow deployment）；canary 发布思想；可回退（revertible）。
+- 项目实际体现：`web/api/record.py` 里 `saved["messages"] = messages` 只是往返回里多挂一个字段，`evaluation` 及其余字段零改动；前端 4 个 JS 仍消费 evaluation；测试 `test_record_preserves_original_fields` 断言原始字段原样。这正是迁移计划"先单测→影子→切换"在接口层的落地——B3 是影子，B4 才是切换。
+
+### 知识 2：派生数据不冗余存储——messages 不入库
+- 白话：messages 是从 evaluation 算出来的（evaluation → 部分观察 → 意图 → JSON），是"派生数据"。库里已经有 evaluation 了，messages 随时能重算，所以不落库——否则同一份信息存两份，evaluation 逻辑一改，库里旧的 messages 就和新的 evaluation 对不上（漂移）。
+- 专业术语：派生数据（derived data）vs 原始数据（source data）；冗余存储（redundant storage）；数据漂移（data drift）。
+- 项目实际体现：`save_record` 是九列白名单落库（`lab_record_store.py` 第 132-146 行），messages 不在其中——`record.py` 只在 `saved` 返回副本上补挂；测试 `test_messages_not_persisted_into_database_item` 断言落库 item 不含 messages。原始数据（transcript/evaluation）优先保存、派生数据随用随算，与项目"模型推断不覆盖原始事实"同一精神。
+
+### 知识 3：接口返回与落库是两条路——"影子字段"挂在哪由消费者决定
+- 白话：一条记录有两个去向：落库（持久化，供历史查询/报告）和接口返回（给前端本次交互）。messages 是为"前端本次交互"服务的（显示/朗读），不是为"历史存档"服务的，所以只挂接口返回、不进库。哪个消费者需要，就挂在哪条路上。
+- 专业术语：读写路径分离（read/write path separation）；接口合同（API contract）；消费者驱动设计（consumer-driven design）。
+- 项目实际体现：`record()` 里 `saved = save_record(item)` 后 `saved["messages"] = messages` 再 return——落库九列不变，接口返回多一字段；畸形 evaluation（None）也不崩接口（降级为失败消息，测试 `test_none_evaluation_produces_failed_message`），因为降级生产者永不抛异常（B2-2 知识 2 的延续）。
+
+## 2026-08-18：web 版关闭模型思考模式（extra_body 与 thinking 参数）
+
+> 背景：小科有终端/web 两条 LLM 调用链。终端版（`src/llm/client.py`）用 urllib 手拼请求体并显式
+> `"thinking": {"type": "disabled"}`；web 版（openai SDK）三处调用都没传 thinking，模型默认开思考，
+> 回复前先等推理、界面出 `[[LABTHINK]]` 折叠块。本轮在 web 三处调用加 `extra_body={"thinking": {"type": "disabled"}}` 对齐终端版。
+> 本条目即本轮知识的唯一存档（2026-08-18 用户定：不另建卡片文件）。
+
+### 知识 1：OpenAI SDK 的 extra_body——非标准请求参数怎么传
+- 白话：openai 这个 Python 库只认识它自己定义的参数（model、messages、temperature 等）。DeepSeek 的 `thinking` 是它家的私有参数，SDK 不认，直接当关键字传会报"意外的参数"错误。SDK 留了一个"后门"叫 `extra_body`：你把不认识的字段放进这个字典，它会把字典原样塞进发给服务器的 JSON 请求体里。就像点菜时菜单上没有的菜，你跟服务员说"帮我跟后厨说一声"——extra_body 就是那句传话。
+- 最小知识块：先解释两个前置概念。① **请求体（request body）**：调用 API 时发给服务器的 JSON 文本，里面是 model/messages 等字段；② **参数白名单**：SDK 类库为了帮你校验和补默认值，只接受它文档里列出的参数，没列的一律拒绝。`thinking` 不在白名单里，所以必须绕过后门。
+- 专业术语：`extra_body`（OpenAI Python SDK 的非标准参数透传口）；参数白名单（allowlist）；请求序列化（request serialization）。
+- 真实代码/运行输出：本轮真实改动——`web/llm_bridge.py` 第 57 行调用加 `extra_body={"thinking": {"type": "disabled"}}`；请求体里最终出现 `"thinking": {"type": "disabled"}`，与终端版 `src/llm/client.py` 第 282-284 行手拼的 `"thinking": {"type": "disabled"}` 完全一致。全量测试 `Ran 796 tests ... OK`（PYEXIT=0）。
+- 反面例子：不知道 extra_body，直接用 `create(..., thinking={"type": "disabled"})` 会立刻抛 `TypeError: chat.completions.create() got an unexpected keyword argument 'thinking'`；或者干脆不传 thinking，模型按默认开思考，每次回复多等几十秒、多烧几千 token。
+- 确认点：这里有没有不清楚的？比如"白名单"具体拦在哪一层、extra_body 是不是只能传 thinking 这类字段，有问题随时问。
+
+### 知识 2：DeepSeek 思考模式开关——thinking 参数与三档推理强度
+- 白话：DeepSeek 的模型有两种工作方式：开思考（先偷偷算一遍再给答案）和关思考（直接给答案）。开思考时 API 流里多出一段 `reasoning_content`（思维链），就是 web 界面那个 `[[LABTHINK]]` 折叠块；关思考就完全没有这段，快、省 token，但复杂任务质量会降。
+- 最小知识块：先解释前置概念。① **思维链（chain of thought）**：模型在给出最终答案前生成的中间推理文字；② **流式响应（streaming）**：服务器把回答分成一小块一小块发回来，前端边收边显示；思考内容就是在流里以 `reasoning_content` 字段单独出现的。
+- 专业术语：thinking 开关（`thinking: {"type": "enabled"|"disabled"}`）；推理强度（reasoning effort，本项目适配器里为 off/high/max 三档）；思维链（chain of thought, CoT）。
+- 真实代码/运行输出：本轮真实改动——`web/agent/core.py` 第 112 行流式调用加 `extra_body={"thinking": {"type": "disabled"}}` 后，第 120-122 行读取 `delta.reasoning_content` 的分支自然不再触发，`[[LABTHINK]]` 折叠块消失；终端版同款参数已在生产链路长期运行。
+- 反面例子：不做这个改动，web 版每个问题都先烧一大段推理 token 再回答，演示现场"小科卡住想半天"；更糟的是如果把 thinking 参数拼错（比如拼成 `thinking: "off"` 而不是 `{"type": "disabled"}`），DeepSeek 官方接口会直接 400 报错，整条对话链断掉。
+- 确认点：这里有没有不清楚的？比如"关思考后复杂任务质量下降"具体影响在哪，要不要实测对比，随时说。
+
+### 知识 3：两条链路同一份协议——找"差异在哪一行"再动手
+- 白话：同一件事（调 DeepSeek）在项目里有两份实现：终端版自己拼 JSON，web 版用 SDK。功能没对齐时，先别急着改，先找出"旧的那份在哪一行做了 X、新的那份缺了哪一行"，照着补齐，而不是重写一遍。
+- 最小知识块：先解释前置概念。① **双实现（dual implementation）**：终端和 web 各自维护一份调用代码，属历史演进；② **diff 式排查**：逐行对比两份实现，定位行为差异的行号。
+- 专业术语：职责对齐（parity）；行为差异定位（delta debugging）；单一协议多实现（one protocol, multiple adapters）。
+- 真实代码/运行输出：本轮排查路径——终端版 `src/llm/client.py` 第 282 行有 `"thinking"`，web 版 `web/agent/core.py` 第 83/112 行、`web/llm_bridge.py` 第 57 行没有 → 差异就是"缺 thinking 参数"这 3 处；补上后两边请求体一致。
+- 反面例子：不先定位差异就动手，可能把 web 版整套调用重写成终端版风格（大改、回归风险高）；或者改错了位置（比如只改流式、漏改非流式），出现"打字对话快了、语音对话还是慢"的半截效果。
+- 确认点：这里有没有不清楚的？比如为什么不是把 web 版也改成手拼 JSON（统一实现），这个取舍可以展开聊。
+
+## 2026-08-18（B4）：前端切渲染 messages——"只画不判"落地与迁移对照的诚实标注（Phase B 收官）
+
+> 背景：B3 让 `/record` 返回 messages（影子），B4 让前端真正消费它：4 个前端文件
+> 从"读 evaluation 自行判断拼话"切换为"按 messages 的 kind/screen_target 上样式、
+> 显示/朗读 text"；写 `PROJECT_ARCHITECTURE.md` 5.3/5.4 迁移对照表（标等价/降级/丢失）。
+> 本条目即本轮知识的唯一存档（2026-08-18 用户定：不另建卡片文件）。
+
+### 知识 1：接口合同测试——前端依赖的字段被测试锁死，合同变了测试立刻红
+- 白话：前端消费 `/record` 返回的哪些字段，被一个测试（`test_web_mobile_page.py` 的合同测试）白纸黑字断言了：它读 mobile.js，断言里面用到了 `messages`/`screen_target`，并且**不再出现** `follow_up_question`/`deviations`。这轮我把 mobile.js 切到新合同后，旧断言立刻失败——不是 bug，是合同变了，测试在提醒"旧契约已断裂、请更新断言"。这就是"测试即合同"：测试不只是验证，还是前后端之间的契约书。
+- 最小知识块：① **接口合同（API contract）**：前后端约定的数据形状（字段名/类型）；② **合同测试（contract test）**：把约定写成断言，任一侧偏离立刻红。
+- 专业术语：接口合同（API contract）；合同测试（contract test）；测试即合同（test as contract）。
+- 真实代码/运行输出：本轮真实改动——`tests/test_web_mobile_page.py` 从 `assertIn("follow_up_question", js)` 改为 `assertIn("messages", js)` + `assertNotIn("follow_up_question", js)`；全量 `Ran 796 tests ... OK`。
+- 反面例子：没有合同测试，前端偷偷改成读 `messages`、后端还以为它读 `evaluation`——两边各改各的，上线才发现追问不播了、历史页崩了，而测试全绿（因为没有测试覆盖"前端依赖什么字段"）。
+- 确认点：为什么"断言前端 JS 文件里出现/不出现某字段"能防前后端断裂？（提示：JS 文件本身就是前端依赖的静态证据。）
+
+### 知识 2：前端"只画不判"的落地——渲染只认呈现位，不认内容
+- 白话：B4 之前，前端拿到 `/record` 返回要"自己拿主意"：读 `follow_up_required` 判断"要不要问"，读 `deviations` 自己拼一句"注意，X 方案规定为 Y…"——这就是迁移计划要消灭的"前端正则二次判断"。B4 之后，前端只做两件事：**认 kind/screen_target 这两个呈现位**（clarification → 追问样式；current_question → 该朗读），**显示/朗读 text**（话是后端 copy 层写好的）。"要不要问、问什么"全在后端（降级生产者+投影层）。
+- 最小知识块：① **呈现位（presentation slot）**：kind（消息类型）、screen_target（显示区域）、priority（顺序）——前端用来"上样式/摆放"的钥匙；② **内容 vs 呈现分离**：判断内容（后端）、呈现内容（前端）。
+- 专业术语：呈现与判断分离（presentation/judgment separation）；契约 4"前端只画不判"；呈现位（presentation slot）。
+- 真实代码/运行输出：本轮真实改动——`speak.js` 新增 `labSpeakMessages`：`msgs.filter(m => m.screen_target === 'current_question' || m.kind === 'clarification')` 后朗读第一条 text——**只认呈现位，不读任何业务字段**；`mobile.js` 同样 `isAsk = m.kind === "clarification" || m.screen_target === "current_question"`。
+- 反面例子：前端又去读 `m.args`（B2-3 已不透传）或从 text 里正则找"追问"二字 → 话术一改正则失灵，判断逻辑重新长回前端——迁移白做。
+- 确认点：为什么"只看 kind/screen_target"就能做到"不判断"？（提示：判断在哪儿做的，前端就不知道"为什么"是追问，只知道"它是"追问。）
+
+### 知识 3：迁移对照表的诚实标注——"代码删了，能力丢了"必须被看见
+- 白话：B4 把前端旧判断逻辑退役了，但退役不等于零损失：旧前端有"偏差播报"（"注意，X 方案规定为 Y…"），messages 体系里没有对应消息 → 这个能力**真丢了**；旧前端无追问时显示"本步现场记录已完整"，现在显示降级的"原始记录已保存，结构化处理暂时不可用" → **降级**了。这些不是 bug 也不是羞耻，是迁移成本——但必须写进 `PROJECT_ARCHITECTURE.md` 5.4 表逐项标注（等价/降级/丢失），否则"代码删了能力没了"会无声无息。
+- 最小知识块：① **职责迁移对照表**：旧路做了什么 → 新路如何获得；② **质量状态标注**：动作迁移了 ≠ 体验等价，逐项标等价/降级/丢失。
+- 专业术语：迁移对照（migration mapping）；质量状态标注（quality annotation）；可见的丢失（visible loss）。
+- 真实代码/运行输出：本轮真实产出——`PROJECT_ARCHITECTURE.md` §5.3 增 `WEB-RENDER-01` 行；§5.4 增 web 侧 5 行：追问播报**等价**、偏差播报**丢失**（登记：降级生产者/投影层补 deviations 消息，随 D 阶段）、"本步现场记录已完整"**降级**（D 阶段 structured_experiment 恢复"已记录实验步骤 N"）、实体展示**等价**、历史视图**等价**（messages 不入库的边界说明）。
+- 反面例子：退役旧代码时不写对照表 → 三个月后没人记得"偏差播报"存在过，用户问"以前会提醒我浓度不对，现在怎么不提醒了"，agent 翻代码找不到（代码已删），只能当新需求重新做——"丢失"没有在迁移时被登记，就成了无声的债。
+- 确认点：为什么"丢失"要登记而不是默默接受？（提示：登记的丢失是可计划的修复，不登记的丢失是永远找不到的债。）
+
+## 2026-08-18（桌面语音链直连 /record）：改了代码但路径没走到——真实验收暴露死代码
+
+> 背景：B4 改完前端后真实验收，用户语音说"称量磷酸盐"，界面回的是聊天 agent 的话术
+> （"好的，请问称量了多少克磷酸盐？"），不是 B4 改造的 messages 话术——暴露 `voice_asr.js`
+> 桌面语音默认走"聊天框→/chat"分支，B4 改的"/record 直连"分支从未执行。用户拍板
+> 桌面语音也直连 /record，删除聊天框分支。全量 796 项通过。
+> 本条目即本轮知识的唯一存档（2026-08-18 用户定：不另建卡片文件）。
+
+### 知识 1：改了代码但路径没走到——死代码只有真实验收能暴露
+- 白话：B4 时我改了"直连分支"内部的渲染（labRender/labSpeakMessages），但桌面语音默认走"聊天框分支"——我改的分支根本不会执行，成了死代码。单测全绿、JS 语法全对、全量 796 通过，但用户真实录音时看到的是 agent 话术，不是改造效果。**只有真实走一遍界面（录音→识别→呈现）才发现"改的代码没被走到"**——这是单测和静态检查永远覆盖不到的盲区。
+- 最小知识块：① **死代码（dead code）**：写进文件但永远不会执行的分支；② **路径覆盖（path coverage）**：测试只覆盖到执行的路径，未执行的分支测不到；③ 真实验收的价值：验证"用户真实走的路径"而不是"测试走的路径"。
+- 专业术语：死代码（dead code）；路径覆盖盲区；真实验收 vs 静态验证。
+- 真实代码/运行输出：`voice_asr.js` 改前 `if (input && form) { ...requestSubmit(); return; }` 分支优先，`fetch('/record')` 直连在 `return` 之后永远到不了；用户实测输出"好的，请问称量了多少克磷酸盐？"（agent 话术）为证据；改后删除聊天框分支，语音一律 `fetch('/record')`。
+- 反面例子：不真实验收就宣布"B4 完成" → 用户实测发现追问话术还是 agent 的，B4 的渲染是死代码，等于白做——验收前"代码完成"只是"代码写完"，不是"路径走通"。
+- 确认点：为什么"测试全绿"不能证明"用户走的路径生效"？（提示：测试执行的是哪条路径？）
+
+### 知识 2：同一件事两种话术源——"单一语义权威"就是消灭这个混乱
+- 白话：同一个追问（"称量了多少克？"），改前语音口述经 agent 得到"好的，请问…我好帮你记录"（agent 自己的话），直连 /record 得到"小科：实际称了多少克磷酸盐？"（copy 层话术）。同一件事两种嘴、两种风格，用户感知混乱，改话术要改两处。迁移契约的"单一语义权威"（判断只在一处、话术只在一处）就是消灭这种分裂。
+- 最小知识块：① **话术源（copy source）**：最终文字由谁生成；② 双话术源的后果：口径不一致、改一处漏一处。
+- 专业术语：单一语义权威（single semantic authority）；话术源统一；呈现一致性（presentation consistency）。
+- 真实代码/运行输出：改前语音链 `requestSubmit()` → `/chat` agent（`web/agent/core.py` + `web/lab_tools.py` 341 行工具话术"已记录：…"）；改后语音链直连 `/record` → messages text（copy 层"小科：…"）；`/m` 手机页一直是直连。
+- 反面例子：保留两条链各说各话 → 用户一会听到"好的，请问…"（agent）一会"小科：…"（copy），以为系统有两个助手；改一句追问话术要同时改 agent 提示词和 copy 层。
+- 确认点：为什么"话术只在一处生成"比"两处都能说"好？（提示：改一处 vs 改两处、口径会不会打架。）
+
+## 2026-08-18/19（Phase B 收尾）：真实验收修复的两条硬道理 + 统一理解链的定位纠正
+
+> 背景：Phase B 真实验收通过（REAL_OK），语音记录链路闭环。验收期间连续暴露并修复
+> 话术撒谎硬问题、lab_panel 未注入、语音入口混乱、文案重复等。本条目记录两条知识 +
+> 一条关键定位纠正（用户点拨）。
+> 本条目即本轮知识的唯一存档（2026-08-18 用户定：不另建卡片文件）。
+
+### 知识 1：话术与事实必须一致——"结构化成功"却报"不可用"是硬问题
+- 白话：系统明明抽到了实体（"加入/缓冲液/65毫升"），回执却说"结构化处理暂时不可用"——话术在撒谎，用户会误判"我的数据没被结构化"。按项目纪律，这种"文案与行为不一致、误导用户判断"是**硬问题**（不是措辞不当的软问题）。
+- 最小知识块：① **话术撒谎（lying copy）**：输出与实际状态矛盾；② 修复不是改一句话，而是**让状态能区分**——给 `RecordAckResult` 加 `RECORDED_NO_STEP`（"已记录"），降级生产者按"有没有抽到实体"填 `acceptance_kind`（有→`partial_recorded`，无→`degraded_evidence_note`），投影层据此出对应话术。
+- 专业术语：语义诚实（semantic fidelity）；状态→话术映射；硬问题 vs 软问题（用户会误判操作/状态 = 硬）。
+- 真实代码/运行输出：`src/core/presentation_copy.py` 增 `RecordAckResult.RECORDED_NO_STEP` + `_copy_record_ack` 分支"已记录"；`web/degraded_producer.py` 增 `entities` 参数、`acceptance_kind` 三档；`tests/test_web_record_messages.py` 增两条（规则抽取成功→"已记录" / 抽不到→"不可用"）。全量 800 项通过。
+- 反面例子：只改文案不改状态映射 → 要么"抽到实体也报不可用"（撒谎），要么"真降级也报已记录"（另一种撒谎）；单测测不到"状态与话术对齐"，必须真实验收看实际输出。
+- 确认点：为什么"话术撒谎"比"措辞不当"严重？（提示：用户是否因此误判自己的数据状态。）
+
+### 知识 2：统一理解链的核心是"处理命令"，不是"记录+追问"（用户 2026-08-18 点拨纠正）
+- 白话：统一理解链（`UnifiedUnderstandingResult`）一次分辨三路：`experiment`（实验口述，结构化+追问）、`control`（控制命令：查看待确认/暂缓/确认/否定/编号回答/结束）、`uncertain`（弃权）。**命令处理（control）才是它的核心价值**——分辨"你这句话是要做实验，还是要查看/暂缓/结束"，然后路由。我之前把统一理解链窄化成"记录+追问"，是丢了主线。
+- 最小知识块：① **意图分辨（intent classification）**：一句话属于哪类意图；② **命令处理（control branch）**：查看/暂缓/确认/结束等控制动作的路由与执行；③ 降级生产者（B 阶段）只有 `evaluate_segment` 薄字典——只做"实验记录+按方案追问"，**没有命令处理**；命令处理要 Phase D 接 `UnifiedObserver`（含 LLM）才能迁入 web。
+- 专业术语：统一理解链（unified understanding chain）；control 分支（command handling）；意图分辨（input_kind: experiment/control/uncertain）。
+- 真实代码/运行输出：`src/core/unified_understanding.py` 的 `UnifiedInputKind`（EXPERIMENT/CONTROL/UNCERTAIN）、`ControlUnderstanding`（intent + supplied_entities）、`parse_unified_understanding` 的 control 分支解析；CLI 侧 `unified_acceptance_bypass.py` 把 control 路由到 `ClarificationActionPlanner`（查看/暂缓/回答/确认）。web 现状：口述"帮我看看待确认的问题"只会抽实体或弃权，**不执行查看命令**——这是 Phase D 要补的最大缺口。
+- 反面例子：把统一理解链当成"记录+追问"的增强 → 只迁记录，漏掉命令处理 → web 永远不能"查看待确认/暂缓/结束"，而这是 CLI 已验证的核心能力，等于迁移只搬了半条链。
+- 确认点：为什么"命令处理"是统一理解链的核心价值而不是附加项？（提示：实验口述抽实体是常规能力，分辨"查看/暂缓/结束"才是让语音助手"能对话"的关键。）
+
+### 知识 3：前端多入口混乱——治乱不是"合并"，是"职责标注 + 退役"
+- 白话：桌面页有 4 个语音入口（老灰色圈圈/自动语音/蓝色记录/电话），职责混杂（灰色圈圈被写死成触发电话、蓝色记录按钮被隐藏）。治乱不是把所有入口并成一个，而是：**每个入口说清自己是干什么的**（灰色圈圈=语音记录、自动语音=语音对话、通话=电话模式）+ **退役没人要的**（老浏览器原生语音）。根因是"新老两套 UI 混装 + 脚本注入不全"（lab_panel.js 没被注入）。
+- 最小知识块：① **职责标注（labeling by responsibility）**；② 退役（retire）vs 合并（merge）——乱在"职责不清"时先标注，不要急着合并；③ cache-busting（版本号 ?v=）防浏览器缓存旧 JS。
+- 专业术语：入口职责分离；cache-busting；脚本注入完整性（orphan script）。
+- 真实代码/运行输出：`composer.js` cp-mic 删 `if (window.phoneCallToggle)` 电话分支改触发 asr-btn（语音记录）；`vad_mode.js` "自动语音"→"语音对话"；`app.py` 注入缺失的 `lab_panel.js`；多个 script 加 `?v=20260818/20`。用户实测"灰色圈圈变红→录音→面板回执"链路闭环。
+- 反面例子：只合并入口不动职责 → 用户还是分不清"点哪个是记录、哪个是对话"；不加版本号 → 用户刷新拿旧 JS，改了跟没改一样（本次踩过的坑）。
+- 确认点：为什么"治乱"要先标注职责、再退役，而不是一步到位合并？（提示：合并前得先知道每个入口本来在干什么。）
+
+## 2026-08-20（Phase C1/C2a）：三张嘴收敛 + 词在后端（voice_text）
+
+> 背景：Phase C 语音收敛。C1 把三张独立的"嘴"（`local_tts.js` / `speak.js` / `mobile.js` 各自 fetch `/tts` 发声）
+> 收敛为单一 `window.speak`，解决风险 B（打断停不到第二张嘴）；C2a 给后端 copy 层加 `voice` 通道 + `voice_text` 字段，
+> 把"剥小科：前缀"从前端搬回后端（词在后端）。本条目即本轮知识的唯一存档。
+
+### 知识 1：适配器/委托——收敛"多张嘴"不是删，是"别自己发声、转发给源头"
+- 白话：三张嘴里最危险的是 `speak.js` 那张——它自己造了个"小喇叭"（自己 fetch `/tts` + `new Audio()` 播放），别人喊"停"（`window.stopSpeech`）时它听不到，因为停的只是 `local_tts.js` 自己那张。治理不是删掉它（删了 `voice_asr.js` 调 `labSpeakMessages` 的地方就断了），而是让它"别自己发声了，改成转发给 `window.speak`"。这样喊停的人还喊同一个名字（`labSpeak` 还在），但停得住了。
+- 最小知识块：① **适配器（Adapter）**：保留对外的名字和形状，内部换成另一个实现；② **委托（Delegation）**：自己不干活，转给唯一权威干；③ 收敛的前提是先"数清楚几方在抢同一个名字"（grep 定义了几次、被谁调用）。
+- 专业术语：适配器模式（Adapter Pattern）；委托（Delegation）；单一发声源（single speech source）。
+- 真实代码/运行输出：`web/frontend/speak.js` 整段重写为 13 行薄适配层——`window.labSpeak = text => window.speak ? window.speak(text) : false`、`labSpeakStop` 转发 `window.stopSpeech`；`mobile.js` 删局部 `speak`，追问改调 `window.speak`；`local_tts.js` 补浏览器兜底 + status 空安全。全量 804 项通过。
+- 反面例子：直接删 `speak.js` → `voice_asr.js` 的 `labSpeakMessages` 调用断了（No function）；留着 `speak.js` 自己发声 → 打断还是停不到它（barge-in 失灵）。两种都错，唯独"委托"两全。
+- 确认点：为什么"保留 `labSpeak` 名字、内部转发"比"删掉它、让调用方改用 `window.speak`"更好？（提示：调用方要改几处？）
+
+### 知识 2：渠道分离——同一语义，屏幕和嘴用两份文案
+- 白话：同一个追问，屏幕要写"小科：缺时长，请补充"（带个称呼，让人知道是谁在问），但念出来不能念"小科"两个字（TTS 会把"小科"也读出来，很怪）。所以要备两份话：一份给屏幕看（`text`），一份给嘴念（`voice_text`，去掉称呼前缀和来源标注）。
+- 最小知识块：① **渠道分离（channel separation）**：同一语义按呈现渠道（屏幕 vs 语音）用不同文案；② **词在后端**：文案的生成规则（含剥前缀）全在 copy 层，前端只"画 `text`、念 `voice_text`"，不自己改词。
+- 专业术语：渠道分离（channel separation）；多模态呈现文案（multi-modal presentation copy）；语音渠道文案（voice_text）。
+- 真实代码/运行输出：`src/core/presentation_copy.py` 的 `copy_for_intent(..., voice=True)`，`_copy_clarification` 在 voice=True 时 `return question`（无"小科："前缀、无来源标注）；`web/web_renderer.py` 的 `render()` 同时产出 `text` 和 `voice_text`；`speak.js`/`mobile.js` 改读 `voice_text`，删掉 `.replace(/^小科：/,'')`。新增 4 项 voice 测试，全量 804 项通过。
+- 反面例子：前端自己 `.replace(/^小科：/,'')` 剥前缀 → "词"的一部分落在前端；后端把前缀改成"助手："，前端就得跟着改，等于前端又"懂"了 copy 层规则，违背"前端只画不判"。
+- 确认点：为什么"剥前缀"这种小事也要放到后端，而不是让前端顺手剥一下？（提示：前缀规则归谁管？改前缀要动几处？）
+
+## 2026-08-20（P0 复合确认+实体）：集合方案 + 确定性/LLM 混合（REAL_OK）
+
+> 背景：P0 `CLARIFICATION-COMPOUND-CONFIRM-ANSWER-01`（"是的，是X"确认+实体丢字段）真实验收通过（会话 20260820_122234）。
+> 一路迭代：集合方案 → 撤前缀纯靠 LLM → 真机撞墙（LLM 两次判 abstention）→ B 混合方案（确定性判确认 + LLM 抽实体）。本条目即本轮知识唯一存档。
+
+### 知识 1：集合方案——"带数据"是"回答类"的固有属性，不逐动词打补丁
+- 白话：同一个"回答类"动词（affirm/deny/targeted_answer）都能带实体数据。别给每个动词单独写"能不能带数据"的判断，而是用一个集合定义"哪些能带"，一次表达。
+- 最小知识块：① 意图（动词）和数据（实体）是两层；② 用 `frozenset` 定义"能带数据的动词集合"，校验时查集合成员——加新动词 = 往集合加一行，不改校验逻辑。
+- 专业术语：正交设计（orthogonality）；集合驱动校验（set-driven validation）。
+- 真实代码：`unified_understanding.py` 的 `_ENTITY_CARRYING_COMMAND_TYPES = frozenset({TARGETED_ANSWER, AFFIRM, DENY})`；`clarification_acceptance.py` 的 `_ENTITY_CARRYING_ACTION_TYPES = frozenset({ANSWER, CONFIRM, REJECT_SUGGESTION})`。
+- 反面例子：逐动词写 `if command_type == AFFIRM: ... elif == DENY: ...`，每加一个动词改一遍校验——就是"加一次改一次"。
+- 确认点：为什么"能带数据"该用集合定义，而不是散在几个 if 里？
+
+### 知识 2：能确定性的别交给 LLM——确定性判"动作"、LLM 抽"实体"
+- 白话：这次先撤掉确定性前缀、把"是的，是X"整个交给 LLM 判，结果 LLM 两次都判"弃权"（沉默），实体还是丢。教训：LLM 分类不可靠（prompt 是软约束），能确定性判定的（"是不是确认"）别交给 LLM。
+- 最小知识块：① 软约束（prompt 求 LLM）vs 硬约束（确定性规则/代码）；② 混合方案：把"确定性的部分"和"需要语义的部分"拆开——"是不是确认"是确定性（"是的"前缀），"实体是什么"是语义（LLM 提取器）。
+- 专业术语：混合架构（hybrid）；软约束 vs 硬约束。
+- 真实代码：`interaction_command.py` 的 `AFFIRM_PREFIXES = ("是的","没错","确认")`（确定性判确认，刻意避开"对/是"这类歧义前缀）；`clarification_executor.py` 的 `_execute_confirm_with_entities` 用 LLM 提取器从 `answer_text` 抽实体。
+- 真实运行输出：会话 20260820_122234 "是的，50微升" → debug.log 第 619 行 "已确认问题 2，并填入实体字段 ['amount_unit','amount_value']。问题已解决。"（改前两次都判 abstention 沉默）。
+- 反面例子：撤前缀纯靠 LLM → LLM 把"是的，50微升"判 uncertain（弃权），问题一直"待回答"，实体一直丢。
+- 确认点：为什么"是不是确认"能确定性判定，而"实体是什么"必须 LLM？
+
+### 知识 3：语音受控是根本目的，不是"统一/确定"本身（用户校准）
+- 白话：做统一链的目的不是追求"统一和确定"，而是让"语音输出受控、不打扰实验者"。统一/确定只是达成"语音受控"的手段。
+- 最小知识块：语音 ≠ 屏幕文字，语音必须短且受控；实验者手忙眼忙、看的是试剂瓶不是屏幕，屏幕不是语音的兜底。
+- 专业术语：语音输出控制（voice output control）。
+- 真实代码/决策：`lab_tools.py` 的 `present` 是"工具结果格式化器"（确定性代码），但最终语音仍是 LLM 自由生成——这是下一步要在"呈现层"收的口（统一话术来源）。
+- 反面例子：把"降级到屏幕"当语音兜底 → 实验者没法看屏幕；把话术"模板化"成几个固定句 → 灵活性全丢，"小科"变机器。
+- 确认点：语音"短 + 受控 + 又灵活"，靠控"形式"（长度/内容/优先级）不控"措辞"——这个边界清楚吗？
+
+## 2026-08-23（VOICE-C5-C5）：替代键与先校验后修改
+
+- 白话：新追问像新版通知，旧版即使还在排队也不能晚点再念；给同一类通知贴相同 `supersession_key`，新版本到来时把所有旧版本作废，只留下新版。
+- 最小知识块：① `intent_id` 标识一条具体消息；② `supersession_key` 标识“谁可以替代谁”的上下文；③ 所有输入先验证成功，再修改队列，避免旧项已删而新项加入失败。
+- 专业术语：替代键（supersession key）、失效处理（invalidation）、先决条件校验（precondition validation）、原子性边界（atomicity boundary）。
+- 项目实际体现：`src/core/playback_supersession.py` 的 `supersede_deferred()` 先验证 replacement/decision/key/重复 intent，再扫描；同 key 旧项生成 `DROP/SUPERSEDED`，无关项保持 FIFO，新项追加队尾。专项 `76/76`、全量 `896/896`。
+- 反面例子：边扫描边验证，新请求缺 key 或 intent 重复时才报错，会出现旧追问已经消失、新追问也没入队的数据丢失。
+- 确认点：`intent_id` 回答“这是哪一条消息”，`supersession_key` 回答“哪些旧消息会被这条替代”，两者职责是否清楚？
+
+## 2026-08-23（VOICE-C5-C6）：清空不等于关闭
+
+- 白话：把店里的排队号码清空，不代表店已经关门；如果门还开着，迟到顾客仍能重新取号。会话结束必须既清空队列，又永久关门。
+- 最小知识块：① drain 只取出当前项目；② close 同时改变生命周期；③ closed 状态必须和清空动作在同一把锁内完成，避免中间插入新请求。
+- 专业术语：资源生命周期（resource lifecycle）、原子关闭（atomic close）、幂等取消（idempotent cancellation）。
+- 项目实际体现：`DeferredPlaybackQueue.close()` 原子设置 `_closed=True` 并清空；`defer()` 对 closed 队列报错；`cancel_deferred_for_session()` 产出 `DROP/SESSION_ENDED`。播放层回归 `82/82`。
+- 反面例子：只循环 `take_next()` 清空，清空后迟到的 ASR/TTS 回调仍可 `defer()`，旧会话语音会在新会话中突然出现。
+- 确认点：为什么会话结束不仅需要“队列为空”，还必须保存“以后也不接受新项目”的 closed 状态？
+
+## 2026-08-23（播放执行架构）：事实、决定、执行必须分层
+
+- 白话：VAD 只报告“人现在是否在说、这一段是否还没结束”，不能顺手决定“现在可以播”；同样，Gate 只判定，不能自己调用 TTS。否则短停顿很容易被误当成播放空档。
+- 最小知识块：① VoiceStateCoordinator 保存运行事实；② PlaybackContextFactory 把事实冻结成一次判断使用的快照；③ PlaybackGate 只返回决定；④ PlaybackScheduler 执行决定并协调队列与 TTS。
+- 专业术语：单一写入者（single writer）、不可变快照（immutable snapshot）、策略与执行分离（policy/execution separation）、事件回流（event feedback）。
+- 项目实际体现：39 项计划在抢占前插入四项架构任务，并明确 `user_speaking / segment_capturing / asr_processing / tts_playing` 四个不同事实；TTS 的 `STARTED / FINISHED / STOPPED / FAILED` 回流给 Coordinator。
+- 反面例子：VAD 一检测到静音就直接启动 TTS，会在用户句中思考停顿时插话；Scheduler 发出 stop 后立刻播放新内容，会与尚未真正停止的旧音频重叠。
+- 确认点：为什么 `user_speaking=False` 仍不能单独证明“现在可以播放”？（提示：同一个音频段可能仍在捕获。）
+
+## 2026-08-23（VOICE-C5-C7）：用事件归约保护运行状态
+
+- 白话：Coordinator 像一本只有值班员能改的登记簿。设备不能直接涂改“正在说话”等格子，只能交一张“开始讲话”“短暂停顿”“片段固化”的事件单；值班员检查事件顺序正确后，才生成新一页状态。
+- 最小知识块：① 状态是某一刻的事实；② 事件是刚刚发生的事情；③ 归约是用“旧状态 + 事件”计算新状态；④ 先计算成功再替换，可让非法事件失败时保留旧状态。
+- 专业术语：事件驱动状态机（event-driven state machine）、归约器（reducer）、单一写入者（single writer）、不可变值对象（immutable value object）、原子状态转换（atomic state transition）。
+- 项目实际体现：`VoiceStateCoordinator.consume()` 持锁调用 `_reduce()`，成功后才赋给 `_state`；专项输出 `Ran 13 tests ... OK`，组合回归 `Ran 69 tests ... OK`。`USER_SPEECH_PAUSED` 只清除讲话事实，仍保留片段采集事实。
+- 反面例子：如果 VAD 直接分别写两个布尔值，先把 `user_speaking` 设为假、稍后才更新片段状态，播放线程可能在两次写入中间看到半成品并插话；任意 setter 还可能制造“用户正在讲话但没有采集片段”的不可能状态。
+- 确认点：为什么调用方提交“发生了什么事件”，比允许它直接设置四个布尔值更安全？
+
+## 2026-08-23（VOICE-C5-C8）：用不可变快照隔离判断时刻
+
+- 白话：PlaybackContext 像给运行状态拍照片。Gate 判断一条语音时只看这张照片；即使用户下一毫秒又开始讲话，旧判断的输入证据也不会在计算中途被偷偷改掉。
+- 最小知识块：① 运行状态会持续变化；② 快照只表达一个观察时刻；③ 工厂负责把细粒度状态翻译成旧合同；④ 注入时钟让测试能固定“照片拍摄时间”。
+- 专业术语：不可变快照（immutable snapshot）、适配器映射（adapter mapping）、依赖注入（dependency injection）、一致性读取（consistent read）。
+- 项目实际体现：`PlaybackContextFactory.create()` 只调用一次 `coordinator.snapshot()` 和一次注入时钟；`asr_listening` 使用 `segment_capturing or asr_processing`。专项输出 `Ran 10 tests ... OK`，组合回归 `Ran 79 tests ... OK`。
+- 反面例子：如果 Gate 判断过程中分别实时读取 `user_speaking`、`asr_processing` 和 `tts_playing`，这些值可能来自三个不同时刻；如果只映射 `asr_processing`，用户句中短停顿会被错误当成空闲窗口。
+- 确认点：为什么旧快照不应该随着 Coordinator 后续状态变化而自动变化？
+
+## 2026-08-23（VOICE-C5-C9）：决定与副作用的一一映射
+
+- 白话：Scheduler 像铁路调度台。Gate 只给出“发车、候车、取消、需要先清轨”四种指令；调度台必须让每张票只走一条轨道，不能既候车又发车，也不能把“需要清轨”误当成“已经清完轨”。
+- 最小知识块：① 决定是规则结果；② 副作用是播放或入队等真实动作；③ 编排器把两者一一对应；④ 执行动作失败时不能先返回成功证据。
+- 专业术语：应用服务/编排器（application service/orchestrator）、端口（port）、副作用路由（side-effect routing）、结果证据（result evidence）。
+- 项目实际体现：`PlaybackScheduler.schedule()` 只调用一次 Factory 和 Gate；READY 才调用 `execution_port.play()`，DEFERRED 才调用 `queue.defer()`。专项输出 `Ran 8 tests ... OK`，组合回归 `Ran 87 tests ... OK`。
+- 反面例子：如果 PREEMPT 分支直接 `stop(); play()`，stop 可能只是发出请求而旧音频尚未真正停止，新音频立刻开始就会重叠；所以当前只返回 `PREEMPT_REQUIRED`，等待 STOPPED 后复判。
+- 确认点：为什么 `PREEMPT_REQUIRED` 不能被当成“抢占已经完成”？
+
+## 2026-08-23（VOICE-C5-C10）：命令发出不等于事实发生
+
+- 白话：按下电梯关门按钮只是发出命令，门传感器报告“已关闭”才是事实。TTS 也一样：调用 play 不代表已经出声，调用 stop 不代表声音已经停止。
+- 最小知识块：① command 表达“请求设备做什么”；② event 表达“设备确认发生了什么”；③ Coordinator 只根据 event 更新事实；④ `intent_id` 把异步事件追踪回具体请求。
+- 专业术语：命令—事件分离（command-event separation）、异步确认（asynchronous acknowledgement）、关联标识（correlation identifier）、生命周期事件（lifecycle event）。
+- 项目实际体现：`TTSAdapter.play()` 只把请求交给 Driver；Driver 回报 STARTED 后才发送 `VoiceRuntimeEventType.TTS_STARTED`。专项输出 `Ran 9 tests ... OK`，组合回归 `Ran 96 tests ... OK`。
+- 反面例子：如果 `stop()` 返回就立即把 `tts_playing=False`，Scheduler 会认为声道空闲并播放新语音，但浏览器旧音频可能还在实际发声，造成重叠。
+- 确认点：为什么 stop 方法已经返回，系统仍要等 STOPPED 事件才能认为播放真正结束？
+
+## 2026-08-23（VOICE-C5-C11）：抢占是异步事务，不是连续两行调用
+
+- 白话：抢占像换轨：不能发出“旧车停车”命令后立刻让新车进入，必须等旧车确认停稳，再检查新车的通行证是否仍有效。等待期间请求可能已经过期，会话也可能结束。
+- 最小知识块：① 保存待办请求；② 用旧播放 `intent_id` 关联停止确认；③ STOPPED 后重新读取时间和会话状态；④ 再走一次 Gate，而不是沿用旧 PREEMPT 决定。
+- 专业术语：异步事务（asynchronous transaction）、关联匹配（correlation matching）、检查—等待—再检查（check-wait-recheck）、陈旧决定（stale decision）。
+- 项目实际体现：Scheduler 的 `_PendingPreemption` 保存 request 和 `preempted_intent_id`；`handle_tts_event()` 只接受匹配 STOPPED，再调用 Factory/Gate。直接相关输出 `Ran 22 tests ... OK`，组合回归 `Ran 102 tests ... OK`。
+- 反面例子：沿用 stop 前的 PREEMPT 决定直接播放，会忽略等待期间 TTL 到期或会话结束；接受任意 STOPPED，则别的迟到事件可能错误唤醒新请求。
+- 确认点：为什么 STOPPED 到达后不能直接播放，而必须重新经过 PlaybackGate？
+
+## 2026-08-23（VOICE-C5-C12）：重试取决于失败发生在“开始前还是开始后”
+
+- 白话：快递还没出仓失败，可以再安排一次；如果包裹已经送到一半却失联，盲目再发一份可能让用户收到两份。TTS 也是一样，只有确定尚未开始出声的失败才适合自动重试。
+- 最小知识块：① START_COMMAND 失败表示 Driver 未接受播放；② ACTIVE_PLAYBACK 失败表示可能已经念出一部分；③ EVENT_DELIVERY 失败只表示报告消费者出错，不表示音频失败；④ 每类失败必须有独立重试规则和证据。
+- 专业术语：失败分类（failure taxonomy）、有限重试（bounded retry）、至少一次风险（at-least-once risk）、失败隔离（failure isolation）。
+- 项目实际体现：`TTSFailureBoundary.execute_start()` 默认总尝试最多 2 次；非 START_COMMAND 记录禁止 `will_retry=True`。直接相关输出 `Ran 23 tests ... OK`，播放层 `Ran 108 tests ... OK`，全量 `Ran 954 tests ... OK`。
+- 反面例子：FAILED 到达后无条件重播，用户可能先听到“请立即停止加热”，随后又完整听一次，造成打扰甚至误判系统产生了两条安全告警；event sink 失败后重播更错误，因为音频本身可能已经正常播放。
+- 确认点：为什么播放中 FAILED 比启动命令失败更不适合自动重试？
+
+## 2026-08-23（VOICE-C5-D1）：共享的是业务顺序，不是页面格式
+
+- 白话：桌面和手机像两个不同窗口，后厨的“接单、做菜、确认出餐”必须共用，但装盘样式可以不同。共享记录服务统一的是理解、保存和意图生成；Web JSON 仍由入口适配器负责。
+- 最小知识块：① 应用服务编排用例顺序；② 命令对象表达入口无关输入；③ 业务结果和 PresentationIntent 不包含 HTTP；④ 保存是成功声明的提交点，保存前不能生成“已记录”或追问。
+- 专业术语：应用服务（application service）、入口适配器（inbound adapter）、提交点（commit point）、关注点分离（separation of concerns）。
+- 项目实际体现：`SharedRecordService.record()` 在 `_save_record(item)` 成功后才调用 request ID 工厂和投影；输出 `SharedRecordResult` 不含 `messages`。专项 `Ran 7 tests ... OK`，相邻回归 `Ran 65 tests ... OK`。
+- 反面例子：如果共享服务直接调用 WebRenderer，未来终端入口也被迫接收 JSON 字段；如果保存前先生成追问，磁盘失败时用户会看到“请补充时长”，但原口述其实没有保存。
+- 确认点：为什么桌面和手机应该共享 PresentationIntent，却不一定共享最终 JSON 或 UI 组件？
+
+## 2026-08-23（VOICE-C5-D2）：薄入口不是“代码少”，而是权力少
+
+- 白话：前台接待可以检查表单、把请求交给后厨、把后厨结果装进外卖盒，但不能自己再做一遍菜。`/record` 变薄的关键不是行数减少，而是不再拥有抽取、评估、保存顺序和成功判断权。
+- 最小知识块：① HTTP 入口处理协议；② 应用服务处理用例；③ 依赖绑定把数据库和 domain 函数交给服务；④ 输出适配把 PresentationIntent 渲染成 Web JSON。
+- 专业术语：薄控制器（thin controller）、组合根/依赖绑定（composition root/dependency wiring）、职责迁移（responsibility migration）、合同兼容（contract compatibility）。
+- 项目实际体现：`record()` 现在只调用 `_build_record_service().record(...)`，捕获 `RecordPersistenceError`，再 `WebRenderer.render_many(result.intents)`。直接测试 `16/16`、相邻 `71/71`、全量 `961/961`。
+- 反面例子：只新增 SharedRecordService 却保留路由旧业务代码，会形成两条看似相同但会逐渐漂移的路径；以后修规则兜底只改一处，桌面和工具就出现不同结果。
+- 确认点：为什么判断入口是否“薄”，应该看它还掌握哪些业务决定，而不只是数代码行？
+
+## 2026-08-23：名字必须覆盖字段的全部真实来源
+
+- 白话：一个指示灯同时在“录音还没结束”和“正在转文字”时亮着，就不能把它叫作“正在转文字灯”；叫“语音输入忙”才能覆盖两种亮灯原因。
+- 最小知识块：运行状态保留细粒度事实 `segment_capturing` 与 `asr_processing`；播放快照通过 OR 得到派生事实 `voice_input_busy`，供 Gate 判断是否可以插话。
+- 专业术语：派生状态（derived state）、语义命名（semantic naming）、无兼容双名迁移（clean rename）。
+- 项目实际体现：`PlaybackContextFactory` 使用 `voice_input_busy=state.segment_capturing or state.asr_processing`；原因码和重新判断触发器同步改名。
+- 反面例子：继续叫 `asr_listening` 会让维护者误以为它只在 ASR 工作时为真，进而删掉短停顿期间的保护逻辑。
+- 确认点：为什么运行状态要保留两个字段，而播放快照可以合并成一个 `voice_input_busy`？
+
