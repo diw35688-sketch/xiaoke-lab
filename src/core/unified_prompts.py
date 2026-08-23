@@ -81,9 +81,11 @@ control分支必须且只能是：
 
 控制规则：只返回候选，不声称已执行。只有targeted_answer可包含正整数问题编号；只有affirm、
 deny、targeted_answer可包含用户明确说出的answer_text。”结束离心””加热结束”等实验过程描述
-属于experiment，不是end_session。只有targeted_answer可包含supplied_entities对象，
-字段与experiment分支的entities相同（10个字段，全部可为null或非空字符串）；
-其他command_type必须保持supplied_entities=null。
+属于experiment，不是end_session。只有回答类命令affirm、deny、targeted_answer可包含
+supplied_entities对象，字段与experiment分支的entities相同（10个字段，全部可为null或非空字符串）；
+其他command_type必须保持supplied_entities=null。affirm/deny携带supplied_entities时，
+表示用户在"肯定/否定确认"的同时补充/纠正了实体字段（如"是移液枪""不是，是移液枪"），
+这些实体必须一并结构化出来，不得丢弃。
 
 uncertain分支必须且只能是：
 {"reason": "非空的简短弃权原因"}

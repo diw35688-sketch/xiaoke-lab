@@ -6,6 +6,9 @@ from pydantic import BaseModel, Field
 from agent.core import ModelServiceError, run_agent, stream_agent
 from database.crud import add_message, ensure_conversation, get_messages, get_recent_messages, latest_conversation
 from realtime.routing import acknowledgement, requires_background_task
+from stream_contract import agent_output_event
+from tool_presentation import ToolVoiceDeliveryBatch
+from playback_runtime import web_playback_service
 from tasks.task_manager import task_manager
 
 router = APIRouter(prefix="/chat", tags=["聊天"])
@@ -79,11 +82,17 @@ def chat_stream(request: ChatRequest):
             return
         answer_parts = []
         try:
-            for text in stream_agent(get_recent_messages(conversation_id), conversation_id):
+            for output in stream_agent(get_recent_messages(conversation_id), conversation_id):
+                payload = agent_output_event(output)
+                if isinstance(output, ToolVoiceDeliveryBatch):
+                    for authorized in web_playback_service.authorize(output.items):
+                        yield f"data: {json.dumps(authorized, ensure_ascii=False)}\n\n"
+                    continue
+                text = output
                 clean_text = _clean_stream_text(text)
                 if clean_text:
                     answer_parts.append(clean_text)
-                yield f"data: {json.dumps({'type': 'delta', 'text': text}, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
             answer = "".join(answer_parts) or "模型没有返回文字内容。"
             add_message(conversation_id, "assistant", answer)
             yield f"data: {json.dumps({'type': 'done', 'answer': answer, 'conversation_id': conversation_id}, ensure_ascii=False)}\n\n"

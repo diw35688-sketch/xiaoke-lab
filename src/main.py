@@ -496,6 +496,7 @@ def run_experiment_session(
 def configure_logging() -> None:
     """按 UI_MODE 配置日志：user 写文件，admin 输出屏幕。"""
 
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     if UI_MODE == "user":
         logging.basicConfig(
             level=logging.DEBUG,

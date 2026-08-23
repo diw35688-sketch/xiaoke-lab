@@ -62,6 +62,7 @@ class WebSettingsLLMClient:
                     ],
                     response_format={"type": "json_object"},
                     temperature=0,
+                    extra_body={"thinking": {"type": "disabled"}},
                 )
                 content = response.choices[0].message.content or ""
                 return LLMGenerationResult(
@@ -102,6 +103,7 @@ def _event_view(event) -> dict:
             name: getattr(event.entities, name)
             for name in event.entities.__dataclass_fields__
         },
+        "missing_fields": list(event.missing_fields),
         "needs_confirmation": event.needs_confirmation,
         "confirmation_reason": event.confirmation_reason,
     }
@@ -134,10 +136,14 @@ def extract(
     if result.experiment is not None:
         analysis = result.experiment.analysis
         events = [_event_view(event) for event in analysis.events]
+        should_ask_follow_up = analysis.should_ask_follow_up
+        follow_up_question = analysis.follow_up_question
         assistant_reply = analysis.assistant_reply
     else:
         # control / uncertain：web 不执行动作，只带回标签，不产生实体卡片
         events = []
+        should_ask_follow_up = False
+        follow_up_question = None
         assistant_reply = None
     return {
         "events": events,
@@ -146,6 +152,8 @@ def extract(
         "error": outcome.error,
         "llm_attempts": outcome.llm_attempts,
         "llm_seconds": round(outcome.llm_processing_seconds, 2),
+        "should_ask_follow_up": should_ask_follow_up,
+        "follow_up_question": follow_up_question,
         "assistant_reply": assistant_reply,
     }
 

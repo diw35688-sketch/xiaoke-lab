@@ -7,6 +7,11 @@ from tools.calculator import calculate
 from tools.experiment_tools import check_experiment_conflicts, confirm_pending_experiment, list_current_experiments, propose_experiment
 from tools.memory_tools import confirm_pending_memory, propose_memory
 import lab_tools
+from tool_presentation import (
+    ToolVoiceDeliveryBatch,
+    merge_tool_plans,
+    tool_reply_text,
+)
 
 INSTRUCTIONS = """你是实验室实验规划辅助助手。结合近期对话理解“它”“改到周五”等指代。准确计算必须调用 calculate，查询已有实验时调用 list_experiments。用户问时间/日期时调用 get_current_time，需要计时/定时时调用 start_timer，之后查询剩余时间用 check_timer。
 
@@ -38,6 +43,13 @@ class ModelServiceError(Exception):
 
 
 def run_tool(name, args, conversation_id):
+    result, _ = _run_tool_with_presentation(name, args, conversation_id)
+    return result
+
+
+def _run_tool_with_presentation(name, args, conversation_id):
+    """Execute a tool and retain any backend-owned presentation plan."""
+
     handlers = {
         "calculate": lambda: calculate(args["expression"]),
         "list_experiments": list_current_experiments,
@@ -48,12 +60,12 @@ def run_tool(name, args, conversation_id):
         "confirm_save_memory": lambda: confirm_pending_memory(conversation_id),
     }
     if name in handlers:
-        return handlers[name]()
+        return handlers[name](), None
     if name in lab_tools.names():
         outcome = lab_tools.call(name, args)
         if not outcome["ok"]:
-            return {"error": outcome["error"]}
-        return outcome["result"]
+            return {"error": outcome["error"]}, None
+        return outcome["result"], outcome.get("presentation_plan")
     raise ValueError(f"不支持的工具：{name}")
 
 
@@ -80,18 +92,28 @@ def run_agent(history, conversation_id):
     messages = _messages(history)
     try:
         for _ in range(6):
-            response = client.chat.completions.create(model=settings_store.current().model_name, messages=messages, tools=TOOLS)
+            response = client.chat.completions.create(model=settings_store.current().model_name, messages=messages, tools=TOOLS, extra_body={"thinking": {"type": "disabled"}})
             assistant = response.choices[0].message
             calls = assistant.tool_calls or []
             if not calls:
                 return assistant.content or "模型没有返回文字内容。"
             messages.append(assistant)
+            presentation_plans = []
             for call in calls:
                 try:
-                    result = run_tool(call.function.name, json.loads(call.function.arguments), conversation_id)
+                    result, presentation_plan = _run_tool_with_presentation(
+                        call.function.name,
+                        json.loads(call.function.arguments),
+                        conversation_id,
+                    )
                 except Exception as error:
                     result = {"error": str(error)}
+                    presentation_plan = None
                 messages.append({"role":"tool","tool_call_id":call.id,"content":json.dumps(result, ensure_ascii=False)})
+                if presentation_plan is not None:
+                    presentation_plans.append(presentation_plan)
+            if presentation_plans:
+                return tool_reply_text(merge_tool_plans(presentation_plans))
     except APITimeoutError as error:
         raise ModelServiceError("学校大模型连接超时。请检查校园网或 VPN 后重试。", 504) from error
     except APIConnectionError as error:
@@ -109,7 +131,7 @@ def stream_agent(history, conversation_id):
         for _ in range(6):
             text_parts = []
             calls_by_index = {}
-            stream = client.chat.completions.create(model=settings_store.current().model_name, messages=messages, tools=TOOLS, stream=True)
+            stream = client.chat.completions.create(model=settings_store.current().model_name, messages=messages, tools=TOOLS, stream=True, extra_body={"thinking": {"type": "disabled"}})
             for chunk in stream:
                 if not chunk.choices:
                     continue
@@ -137,6 +159,7 @@ def stream_agent(history, conversation_id):
             if not calls:
                 return
             messages.append({"role":"assistant", "content":"".join(text_parts) or None, "tool_calls":calls})
+            presentation_plans = []
             for call in calls:
                 name = call["function"]["name"]
                 try:
@@ -149,15 +172,26 @@ def stream_agent(history, conversation_id):
                     yield "[[LABCARD]]" + json.dumps(
                         lab_tools.present_call(name, args), ensure_ascii=False)
                 try:
-                    result = run_tool(name, args, conversation_id)
+                    result, presentation_plan = _run_tool_with_presentation(
+                        name, args, conversation_id
+                    )
                     outcome = {"ok": True, "result": result}
                 except Exception as error:
                     result = {"error": str(error)}
                     outcome = {"ok": False, "error": str(error)}
+                    presentation_plan = None
                 if name in lab_tools.names():
                     yield "[[LABCARD]]" + json.dumps(
                         lab_tools.present_result(name, args, outcome), ensure_ascii=False)
                 messages.append({"role":"tool", "tool_call_id":call["id"], "content":json.dumps(result, ensure_ascii=False)})
+                if presentation_plan is not None:
+                    presentation_plans.append(presentation_plan)
+            if presentation_plans:
+                plan = merge_tool_plans(presentation_plans)
+                yield tool_reply_text(plan)
+                if plan.voice_items:
+                    yield ToolVoiceDeliveryBatch(plan.voice_items)
+                return
     except APITimeoutError as error:
         raise ModelServiceError("学校大模型连接超时。请检查校园网或 VPN 后重试。", 504) from error
     except APIConnectionError as error:

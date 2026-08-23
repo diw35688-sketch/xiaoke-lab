@@ -15,7 +15,7 @@
   function restorePosition(widget) { try { const saved = JSON.parse(localStorage.getItem(positionKey)); if (Number.isFinite(saved?.left) && Number.isFinite(saved?.top)) place(widget, saved.left, saved.top); } catch (_) { localStorage.removeItem(positionKey); } }
   function enableDragging(widget) {
     let pointerId = null, startX = 0, startY = 0, originLeft = 0, originTop = 0, moved = false;
-    widget.addEventListener('pointerdown', event => { if (event.button !== 0 && event.pointerType !== 'touch') return; const rect = widget.getBoundingClientRect(); pointerId = event.pointerId; startX = event.clientX; startY = event.clientY; originLeft = rect.left; originTop = rect.top; widget.classList.add('is-dragging'); widget.setPointerCapture?.(pointerId); event.preventDefault(); });
+    widget.addEventListener('pointerdown', event => { if (event.target.closest('button, input, select, textarea, a')) return; if (event.button !== 0 && event.pointerType !== 'touch') return; const rect = widget.getBoundingClientRect(); pointerId = event.pointerId; startX = event.clientX; startY = event.clientY; originLeft = rect.left; originTop = rect.top; widget.classList.add('is-dragging'); widget.setPointerCapture?.(pointerId); event.preventDefault(); });
     widget.addEventListener('pointermove', event => { if (event.pointerId === pointerId) { const dx = event.clientX - startX, dy = event.clientY - startY; if (Math.abs(dx) + Math.abs(dy) > 4) { moved = true; widget.dataset.moved = '1'; } place(widget, originLeft + dx, originTop + dy); } });
     const finish = event => { if (event.pointerId !== pointerId) return; const rect = widget.getBoundingClientRect(); place(widget, rect.left, rect.top, true); widget.classList.remove('is-dragging'); pointerId = null; widget.dataset.moved = moved ? '1' : ''; moved = false; };
     widget.addEventListener('pointerup', finish); widget.addEventListener('pointercancel', finish);
@@ -38,7 +38,6 @@
     const widget = document.createElement('aside'); widget.id = 'assistant-avatar'; widget.className = 'is-idle'; widget.setAttribute('aria-label', '可拖动的实验助手虚拟形象');
     widget.innerHTML = '<div class="portrait"><img src="/static/assets/assistant_portrait_transparent.png" alt="小科实验助手"><span class="avatar-thought">···</span></div><div class="avatar-info"><span class="avatar-name">小科</span><span><i class="avatar-dot"></i><span class="avatar-label">准备就绪</span></span></div><button id="avatar-tts-btn" type="button" title="语音播报开关" aria-label="语音播报开关">🔊</button>';
     document.body.appendChild(widget); Object.values(portraits).forEach(src => { const image = new Image(); image.src = src; }); restorePosition(widget); enableDragging(widget); initTtsToggle();
-      widget.addEventListener('click', () => { if (widget.dataset.moved !== '1' && window.phoneCallToggle) window.phoneCallToggle(); });
   }
   // 头像上的语音播报开关：演示现场一键开启/关闭 TTS，无需进设置面板。
   // 状态存 localStorage（浏览器记住），播报入口（enqueueSpeech/labSpeak）读取 window.ttsMuted。
@@ -57,6 +56,7 @@
       event.stopPropagation(); // 不能触发头像的"通话模式"切换
       window.ttsMuted = !(window.ttsMuted === true);
       try { localStorage.setItem('tts-muted', window.ttsMuted ? '1' : '0'); } catch (_) { /* 忽略 */ }
+      if (window.ttsMuted) window.stopSpeech?.();
       update();
     });
   }

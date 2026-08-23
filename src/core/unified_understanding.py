@@ -82,6 +82,13 @@ class ExperimentUnderstanding:
     analysis: LLMAnalysisResult
 
 
+_ENTITY_CARRYING_COMMAND_TYPES = frozenset({
+    InteractionCommandType.TARGETED_ANSWER,
+    InteractionCommandType.AFFIRM,
+    InteractionCommandType.DENY,
+})
+
+
 @dataclass(frozen=True)
 class ControlUnderstanding:
     intent: IntentCandidate
@@ -90,11 +97,12 @@ class ControlUnderstanding:
     def __post_init__(self) -> None:
         if self.intent.status != IntentCandidateStatus.MATCHED:
             raise ValueError("control分支必须包含matched意图候选。")
-        if self.supplied_entities and self.intent.command_type not in {
-            InteractionCommandType.TARGETED_ANSWER,
-        }:
+        if (
+            self.supplied_entities
+            and self.intent.command_type not in _ENTITY_CARRYING_COMMAND_TYPES
+        ):
             raise ValueError(
-                "只有targeted_answer可携带supplied_entities。"
+                "只有回答类命令（affirm/deny/targeted_answer）可携带supplied_entities。"
             )
 
 

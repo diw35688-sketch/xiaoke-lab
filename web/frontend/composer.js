@@ -47,8 +47,8 @@
     '  <textarea id="cp-text" rows="1" placeholder="给实验助手发消息，或按住麦克风口述"></textarea>',
     '  <div id="cp-row">',
     '    <div class="cp-left">',
-    '      <button class="cp-icon" id="cp-mic" title="语音输入">◉</button>',
-    '      <span class="cp-chip plain" id="cp-hint">本地识别 SenseVoice</span>',
+    '      <button class="cp-icon" id="cp-mic" title="语音记录：说实验操作，自动保存并追问">◉</button>',
+    '      <span class="cp-chip plain" id="cp-hint">语音记录</span>',
     '    </div>',
     '    <div class="cp-right">',
     '      <button class="cp-chip" id="cp-model"><span id="cp-model-name">未配置模型</span><span class="v">⌄</span></button>',
@@ -155,15 +155,19 @@
     });
     el('cp-send').onclick = send;
 
-    // 麦克风：复用已有的录音实现
+    // 麦克风 = 语音记录：复用 asr-bar 的录音实现，直连 /record（不再误触发电话模式）
+    function showRecordingState(active) {
+      el('cp-mic').classList.toggle('rec', active);
+      el('cp-mic').textContent = active ? '■' : '◉';
+      el('cp-hint').textContent = active ? '正在录音，再点一次结束' : '语音记录';
+    }
+    document.addEventListener('lab:recording-state', function (event) {
+      showRecordingState(Boolean(event.detail && event.detail.recording));
+    });
     el('cp-mic').onclick = function () {
-        if (window.phoneCallToggle) { window.phoneCallToggle(); return; }
       var real = document.getElementById('asr-btn');
-      if (!real) return;
+      if (!real || real.disabled) return;
       real.click();
-      var on = el('cp-mic').classList.toggle('rec');
-      el('cp-mic').textContent = on ? '■' : '◉';
-      el('cp-hint').textContent = on ? '正在录音，再点一次结束' : '本地识别 SenseVoice';
     };
 
     // 模型/语音/方案 快捷面板

@@ -73,10 +73,25 @@ def messages_for_observation(
 
     experiment_step_number 仅在 structured_experiment 时使用；
     非实验段（降级/失败/追问/命令）传 None。
+
+    部分观察（partial=True，web 降级生产者产出）走独立分支：
+    有追问文本 → 一条 CLARIFICATION；无追问 → 一条降级 RECORD_ACK。
+    CLI 完整观察（partial=False）不受影响，走下方既有逻辑。
     """
 
     if observation.status == UnifiedObservationStatus.FAILED:
         return (_record_ack(observation, RecordAckResult.FAILED),)
+
+    if observation.partial:
+        if observation.partial_question:
+            return (_clarification(observation, observation.partial_question),)
+        # 无追问时区分：结构化成功（partial_recorded）→ 已记录；真降级 → 不可用
+        result = (
+            RecordAckResult.RECORDED_NO_STEP
+            if observation.acceptance_kind == "partial_recorded"
+            else RecordAckResult.DEGRADED
+        )
+        return (_record_ack(observation, result),)
 
     messages: list[PresentationIntent] = []
     if observation.acceptance_kind == "degraded_evidence_note":
@@ -123,12 +138,28 @@ def messages_for_observation(
         if (
             observation.acceptance_kind is None
             and not observation.end_confirmation_requested
+            and observation.destination != "abstention"
         ):
             messages.append(_no_action_feedback(observation))
 
     if observation.end_confirmation_requested:
         messages.append(
             _clarification(observation, _END_CONFIRMATION_QUESTION)
+        )
+
+    if (
+        observation.destination == "abstention"
+        and observation.clarification_action == "no_action"
+    ):
+        messages.append(
+            PresentationIntent(
+                intent_id=f"{observation.request_id}-no-action-feedback",
+                kind=MessageKind.SYSTEM_ISSUE,
+                args={"text": "没听清，请再说。"},
+                priority=MessagePriority.DIRECT_ACK,
+                screen_target=ScreenTarget.DIALOGUE,
+                source_segment_id=observation.segment_id,
+            )
         )
 
     return tuple(messages)
