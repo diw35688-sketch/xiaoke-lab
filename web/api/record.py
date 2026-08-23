@@ -1,21 +1,27 @@
 # -*- coding: utf-8 -*-
-"""实验记录主链路：口述 → 结构化实体 → 按方案确定性判断 → 追问。
-
-分工严格：
-- LLM 只负责从口述里抽取实体（它擅长的）。
-- 缺什么字段、有没有偏离方案，由程序按方案算（确定性，不可漂移）。
-"""
+"""HTTP adapter for the shared experiment-record application service."""
 
 from __future__ import annotations
 
+import json
 import threading
+import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 import domain
 import llm_bridge
+import web_renderer
+from playback_runtime import web_playback_service
+from src.core.presentation_delivery import build_delivery_plan
+from record_service import (
+    RecordCommand,
+    RecordPersistenceError,
+    SharedRecordService,
+)
 from database.lab_record_store import (
     current_session_id,
     list_records,
@@ -50,13 +56,31 @@ def _next_record_segment(session_id: str) -> int:
         return next_segment_id(session_id)
 
 
-def _recent_context(session_id: str, count: int = 5) -> tuple[str, ...]:
-    """最近几条口述原文，供统一理解链理解指代；旧段在前。"""
-    records = list_records(session_id)
-    return tuple(
-        item["transcript"].strip()
-        for item in records[-count:]
-        if item.get("transcript") and item["transcript"].strip()
+def _current_terms() -> tuple[str, ...]:
+    step = domain.session().current_step()
+    return tuple(step.terms) if step is not None else ()
+
+
+def _save_record_locked(item: dict[str, object]):
+    with _lock:
+        return save_record(item)
+
+
+def _build_record_service() -> SharedRecordService:
+    """Bind Web/database dependencies without putting them in the service."""
+
+    return SharedRecordService(
+        current_session_id=current_session_id,
+        next_segment_id=_next_record_segment,
+        list_records=list_records,
+        extract_entities_llm=llm_bridge.extract,
+        extract_entities_rule=extract_entities,
+        current_terms=_current_terms,
+        evaluate=domain.evaluate,
+        step_view=lambda: domain.step_view(domain.session()),
+        save_record=_save_record_locked,
+        clock=datetime.now,
+        request_id_factory=lambda: f"web-{uuid.uuid4().hex[:12]}",
     )
 
 
@@ -66,67 +90,65 @@ def record(payload: RecordPayload):
     text = (payload.transcript or "").strip()
     if not text:
         raise HTTPException(status_code=400, detail="口述内容为空")
+    try:
+        return _record_response(text, extract=payload.extract)
+    except RecordPersistenceError as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
 
-    session_id = current_session_id()
-    segment_id = _next_record_segment(session_id)
-    entities: dict = {}
-    extraction = None
 
-    extraction_source = "none"
-    if payload.extract:
-        try:
-            extraction = llm_bridge.extract(
-                text,
-                session_id,
-                segment_id,
-                recent_context=_recent_context(session_id),
-            )
-            for event in extraction["events"]:
-                for name, value in event["entities"].items():
-                    if value and not entities.get(name):
-                        entities[name] = value
-            extraction_source = "degraded" if extraction.get("degraded") else "llm"
-        except Exception as error:
-            extraction = {
-                "events": [],
-                "degraded": True,
-                "error": f"{type(error).__name__}: {error}",
-            }
-            extraction_source = "degraded"
+def _record_response(text: str, *, extract: bool) -> dict[str, object]:
+    """Run the shared transaction and build the post-commit HTTP payload."""
 
-    # 模型不可用或没抽到东西时，用规则抽取兜底：
-    # 数量、单位、浓度、温度、时长这些有明确书写形式的事实不需要大模型。
-    if not entities:
-        step = domain.session().current_step()
-        known_terms = tuple(step.terms) if step is not None else ()
-        rule_entities = extract_entities(text, known_terms)
-        rule_fields = {
-            name: value
-            for name, value in vars(rule_entities).items()
-            if value
-        }
-        if rule_fields:
-            entities.update(rule_fields)
-            extraction_source = "rule"
+    result = _build_record_service().record(
+        RecordCommand(transcript=text, extract=extract)
+    )
+    response = dict(result.saved_record)
+    plan = build_delivery_plan(result.intents, ui_mode="user")
+    response["messages"] = web_renderer.WebRenderer().render_plan(plan)
+    response["voice_delivery_events"] = list(
+        web_playback_service.authorize(plan.voice_items)
+    )
+    return response
 
-    evaluation = domain.evaluate(entities)
-    item = {
-        "segment_id": segment_id,
-        "session_id": session_id,
-        "transcript": text,
-        "entities": entities,
-        "extraction": extraction,
-        "extraction_source": extraction_source,
-        "evaluation": evaluation,
-        "step": domain.step_view(domain.session()),
-        "at": datetime.now().isoformat(timespec="seconds"),
-    }
-    with _lock:
-        try:
-            saved = save_record(item)
-        except Exception as error:
-            raise HTTPException(status_code=500, detail=f"实验记录落盘失败：{error}") from error
-        return saved
+
+def _stream_event(payload: dict[str, object]) -> str:
+    return json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n"
+
+
+def _record_events(text: str, *, extract: bool):
+    """Yield immediate progress, then the same committed result as POST /record."""
+
+    yield _stream_event({
+        "type": "record_status",
+        "phase": "understanding",
+        "text": "正在理解实验内容…",
+    })
+    try:
+        response = _record_response(text, extract=extract)
+    except RecordPersistenceError as error:
+        yield _stream_event({"type": "record_error", "detail": str(error)})
+        return
+    except Exception as error:
+        yield _stream_event({
+            "type": "record_error",
+            "detail": f"处理失败：{type(error).__name__}: {error}",
+        })
+        return
+    yield _stream_event({"type": "record_result", "data": response})
+
+
+@router.post("/stream")
+def record_stream(payload: RecordPayload):
+    """Stream progress while preserving the post-commit result boundary."""
+
+    text = (payload.transcript or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="口述内容为空")
+    return StreamingResponse(
+        _record_events(text, extract=payload.extract),
+        media_type="application/x-ndjson",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 

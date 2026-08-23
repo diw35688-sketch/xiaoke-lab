@@ -3,6 +3,9 @@
 (function () {
   "use strict";
 
+  // 手机演示页没有桌面端 auto-speak 控件，默认沿用原有“可播报”体验。
+  window.ttsEnabled = window.ttsMuted !== true;
+
   var btn = document.getElementById("m-record-btn");
   var logEl = document.getElementById("m-log");
   var emptyEl = document.getElementById("m-empty");
@@ -47,32 +50,7 @@
     return row;
   }
 
-  // 播报：优先服务端火山 TTS（女声），失败回退浏览器系统语音。
-  function speak(text) {
-    if (!text) return;
-    if (window.ttsMuted === true) return; // 头像语音开关（全局）
-    fetch("/tts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: text })
-    }).then(function (r) {
-      if (!r.ok) throw new Error("tts unavailable");
-      return r.blob();
-    }).then(function (blob) {
-      var url = URL.createObjectURL(blob);
-      var audio = new Audio(url);
-      audio.play();
-    }).catch(function () {
-      if (!window.speechSynthesis) return;
-      try {
-        window.speechSynthesis.cancel();
-        var utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = "zh-CN";
-        utterance.rate = 1.05;
-        window.speechSynthesis.speak(utterance);
-      } catch (e) { /* 播报失败不影响记录 */ }
-    });
-  }
+  // 播报已收敛到 local_tts.js 的 window.speak（单一发声源，含队列 + 打断 + 浏览器兜底）。
 
   // Float32 → 16kHz 单声道 PCM WAV（与 voice_asr.js 相同的零依赖编码）。
   function encodeWav(samples, inputRate) {
@@ -148,19 +126,36 @@
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); });
   }
 
-  function postRecord(text) {
-    return fetch("/record", {
+  async function postRecord(text, onEvent) {
+    var response = await fetch("/record/stream", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ transcript: text })
-    }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); });
+    });
+    if (!response.ok) {
+      var failure = await response.json().catch(function () { return {}; });
+      throw new Error(failure.detail || "记录请求失败");
+    }
+    if (!response.body) throw new Error("浏览器不支持流式响应");
+    var reader = response.body.getReader();
+    var decoder = new TextDecoder();
+    var buffer = "";
+    while (true) {
+      var chunk = await reader.read();
+      buffer += decoder.decode(chunk.value || new Uint8Array(), { stream: !chunk.done });
+      var boundary;
+      while ((boundary = buffer.indexOf("\n")) >= 0) {
+        var line = buffer.slice(0, boundary).trim();
+        buffer = buffer.slice(boundary + 1);
+        if (line) onEvent(JSON.parse(line));
+      }
+      if (chunk.done) break;
+    }
+    if (buffer.trim()) onEvent(JSON.parse(buffer));
   }
 
   function handleRecordResult(d) {
-    var eval_ = d.evaluation || {};
     var degraded = d.extraction && d.extraction.degraded;
-    var sourceLabel = d.extraction_source === "rule" ? "（规则抽取）"
-      : degraded ? "（模型降级，原文保存）" : "";
 
     var entityText = Object.keys(d.entities || {}).length
       ? Object.keys(d.entities).map(function (k) {
@@ -169,28 +164,20 @@
       : "";
 
     addBubble(d.transcript, "user", "我的口述");
-    if (entityText) addBubble("已结构化：\n" + entityText + sourceLabel, null, "系统");
-    else if (degraded) addBubble("已按原文保存（结构化暂不可用）" + sourceLabel, "warn", "系统");
-    else addBubble("已保存口述。" + sourceLabel, null, "系统");
+    if (entityText) addBubble("已结构化：\n" + entityText, null, "系统");
+    else if (degraded) addBubble("已按原文保存（结构化暂不可用）", "warn", "系统");
+    else addBubble("已保存口述。", null, "系统");
 
-    if (eval_.follow_up_required && eval_.follow_up_question) {
-      addBubble(eval_.follow_up_question, null, "追问");
-      speak(eval_.follow_up_question);
-      return;
-    }
-    var devs = eval_.deviations || [];
-    if (devs.length) {
-      var first = devs[0];
-      var msg = "注意：" + first.field + "方案规定为" + first.protocol_value
-        + "，你说的是" + first.actual_value + "，请确认";
-      addBubble(msg, "warn", "偏差提示");
-      speak(msg);
-      return;
-    }
-    if (eval_.message) {
-      addBubble(eval_.message, null, "系统");
-      speak(eval_.message);
-    }
+    // B4：渲染 messages（前端只按 kind/screen_target 上样式，不判断内容；话术来自后端）
+    var msgs = d.messages || [];
+    msgs.forEach(function (m) {
+      var isAsk = m.kind === "clarification" || m.screen_target === "current_question";
+      addBubble(m.text, isAsk ? null : "warn", isAsk ? "小科追问" : "系统");
+    });
+    // C5-D10：屏幕 messages 本身没有播放权，只消费 Scheduler 授权事件。
+    (d.voice_delivery_events || []).forEach(function (event) {
+      window.consumeVoiceDelivery?.(event);
+    });
   }
 
   function fail(text) {
@@ -242,20 +229,21 @@
         return;
       }
       addBubble(text, null, "识别结果");
-      setStatus("正在结构化…");
-      return postRecord(text);
-    }).then(function (res) {
-      if (!res) return;
+      setStatus("正在连接理解服务…");
+      return postRecord(text, function (event) {
+        if (event.type === "record_status") {
+          setStatus(event.text || "正在处理…");
+          return;
+        }
+        if (event.type === "record_error") throw new Error(event.detail || "记录失败");
+        if (event.type === "record_result") handleRecordResult(event.data || {});
+      });
+    }).then(function () {
       busy = false;
       btn.disabled = false;
       btn.textContent = "🎤";
-      if (!res.ok) {
-        fail("处理失败：" + (res.data.detail || "未知错误"));
-        return;
-      }
       setStatus("已记录");
       setHint("点击开始录音，说完再点一次");
-      handleRecordResult(res.data);
     }).catch(function (err) {
       busy = false;
       btn.disabled = false;

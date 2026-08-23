@@ -353,6 +353,113 @@ class ConfirmTests(unittest.TestCase):
         self.assertFalse(updated.requires_confirmation)
 
 
+class ConfirmWithEntitiesTests(unittest.TestCase):
+    """确认/否定 + 补充实体：CONFIRM/REJECT 带 supplied_entity_fields 时填字段+确认。"""
+
+    def setUp(self):
+        self.coordinator = ReplyCoordinator()
+        self.executor = ClarificationExecutor(self.coordinator)
+        self.coordinator.register_clarification(
+            segment_id=1,
+            raw_text="测试口述。",
+            question="疑似ASR错词？一液枪是移液枪吗？体积多少？",
+            requires_confirmation=True,
+            missing_fields=("amount_value", "amount_unit"),
+        )
+        self.coordinator.pop_next_reply()
+
+    def _target(self):
+        return self.coordinator.current_clarification()
+
+    def test_confirm_with_all_entities_resolves(self):
+        target = self._target()
+        action = _action(
+            action_type=ClarificationActionType.CONFIRM,
+            mutation_permission=ClarificationMutationPermission.PREPARE_UPDATE,
+            requires_evidence_persistence=True,
+            target_clarification_id=target.clarification_id,
+            target_display_number=target.display_number,
+            expected_revision=target.revision,
+            answer_text="是的，是移液枪，体积50毫升",
+            supplied_entity_fields=("amount_value", "amount_unit"),
+        )
+        result = self.executor.execute(action)
+
+        self.assertTrue(result.state_changed)
+        self.assertTrue(result.resolved)
+        updated = self.coordinator._find_clarification(target.clarification_id)
+        self.assertFalse(updated.requires_confirmation)
+        self.assertFalse(updated.is_unresolved)
+        self.assertEqual(updated.missing_fields, ())
+
+    def test_confirm_with_partial_entities_keeps_remaining(self):
+        target = self._target()
+        action = _action(
+            action_type=ClarificationActionType.CONFIRM,
+            mutation_permission=ClarificationMutationPermission.PREPARE_UPDATE,
+            requires_evidence_persistence=True,
+            target_clarification_id=target.clarification_id,
+            target_display_number=target.display_number,
+            expected_revision=target.revision,
+            answer_text="是的，是移液枪",
+            supplied_entity_fields=("amount_value",),
+        )
+        result = self.executor.execute(action)
+
+        self.assertTrue(result.state_changed)
+        self.assertFalse(result.resolved)
+        self.assertEqual(result.remaining_fields, ("amount_unit",))
+        updated = self.coordinator._find_clarification(target.clarification_id)
+        self.assertFalse(updated.requires_confirmation)
+        self.assertEqual(updated.missing_fields, ("amount_unit",))
+
+    def test_reject_with_entities_fills_and_confirms(self):
+        target = self._target()
+        action = _action(
+            action_type=ClarificationActionType.REJECT_SUGGESTION,
+            mutation_permission=ClarificationMutationPermission.PREPARE_UPDATE,
+            requires_evidence_persistence=True,
+            target_clarification_id=target.clarification_id,
+            target_display_number=target.display_number,
+            expected_revision=target.revision,
+            answer_text="不是，是移液枪，体积50毫升",
+            supplied_entity_fields=("amount_value", "amount_unit"),
+        )
+        result = self.executor.execute(action)
+
+        self.assertTrue(result.state_changed)
+        self.assertTrue(result.resolved)
+        updated = self.coordinator._find_clarification(target.clarification_id)
+        self.assertFalse(updated.requires_confirmation)
+        self.assertFalse(updated.is_unresolved)
+
+    def test_confirm_extracts_entities_from_answer_text(self):
+        # 确定性确认"是的，50微升"：无 supplied_entity_fields，靠执行器的
+        # LLM 提取器从 answer_text 抽出实体，再填字段+确认。
+        target = self._target()
+        executor = ClarificationExecutor(
+            self.coordinator,
+            entity_extractor=FakeEntityExtractor({"amount_value", "amount_unit"}),
+        )
+        action = _action(
+            action_type=ClarificationActionType.CONFIRM,
+            mutation_permission=ClarificationMutationPermission.PREPARE_UPDATE,
+            requires_evidence_persistence=True,
+            target_clarification_id=target.clarification_id,
+            target_display_number=target.display_number,
+            expected_revision=target.revision,
+            answer_text="是的50微升",
+        )
+        result = executor.execute(action)
+
+        self.assertTrue(result.state_changed)
+        self.assertTrue(result.resolved)
+        updated = self.coordinator._find_clarification(target.clarification_id)
+        self.assertFalse(updated.requires_confirmation)
+        self.assertFalse(updated.is_unresolved)
+        self.assertEqual(updated.missing_fields, ())
+
+
 class AnswerTests(unittest.TestCase):
     def setUp(self):
         self.coordinator = ReplyCoordinator()
