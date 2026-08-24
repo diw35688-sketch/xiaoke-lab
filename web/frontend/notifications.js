@@ -19,17 +19,29 @@
     const style = document.createElement('style');
     style.id = 'notify-style';
     style.textContent = [
-      '#notify-panel{position:fixed;top:50px;right:18px;z-index:9999;width:380px;max-height:70vh;overflow:auto;background:#fff;border:1px solid #e2e8f0;border-radius:14px;box-shadow:0 16px 44px rgba(15,23,42,.18);display:none}',
-      '#notify-panel.show{display:block}',
-      '#notify-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;border-bottom:1px solid #f1f5f9}',
-      '#notify-head b{font-size:14px;color:#0f172a}',
+      '#notify-panel{position:fixed;top:52px;right:16px;z-index:9999;width:392px;max-height:72vh;background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 20px 52px rgba(15,23,42,.2);display:flex;flex-direction:column;overflow:hidden}',
+      '#notify-panel.show{display:flex}',
+      '#notify-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:13px 15px;border-bottom:1px solid #f1f5f9;background:#f8fbff}',
+      '#notify-head b{font-size:15px;color:#0f172a}',
+      '#notify-count{background:#eff6ff;color:#1d4ed8;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:600}',
+      '#notify-head-actions{display:flex;align-items:center;gap:8px}',
+      '#notify-readall{border:0;background:transparent;color:#2563eb;font-size:12px;cursor:pointer}',
       '#notify-close{border:0;background:transparent;font-size:18px;cursor:pointer;color:#94a3b8}',
-      '#notify-list{padding:8px 10px}',
-      '.notify-item{padding:10px 8px;border-bottom:1px solid #f8fafc;font-size:12px;line-height:1.6}',
-      '.notify-item .n-title{font-weight:600;color:#0f172a}',
-      '.notify-item .n-meta{color:#94a3b8;font-size:11px;margin-top:3px}',
-      '.notify-item .n-body{color:#475569;margin-top:5px;white-space:pre-wrap}',
+      '#notify-list{padding:10px 12px;overflow:auto;flex:1}',
+      '.notify-item{padding:11px 12px;border:1px solid #eef2f7;border-radius:12px;margin-bottom:8px;background:#fff;transition:border-color .15s}',
+      '.notify-item:hover{border-color:#bfdbfe}',
+      '.notify-item.unread{border-color:#dbeafe;background:#f8fbff}',
+      '.notify-item .n-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px}',
+      '.notify-item .n-period{display:inline-flex;padding:1px 7px;border-radius:999px;font-size:10px;font-weight:600}',
+      '.notify-item .n-period.morning{background:#fef3c7;color:#b45309}',
+      '.notify-item .n-period.afternoon{background:#dcfce7;color:#15803d}',
+      '.notify-item .n-period.evening{background:#e0e7ff;color:#4338ca}',
+      '.notify-item .n-time{color:#94a3b8;font-size:11px}',
+      '.notify-item .n-title{font-weight:700;color:#0f172a;font-size:13px;margin-bottom:2px}',
       '.notify-item.unread .n-title{color:#1d4ed8}',
+      '.notify-item .n-body{color:#64748b;font-size:12px;line-height:1.7;margin-top:4px;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}',
+      '.notify-item .n-actions{margin-top:7px;display:flex;justify-content:flex-end}',
+      '.notify-item .n-actions .sh-btn{padding:2px 8px;font-size:11px}',
       '#daily-mask{position:fixed;inset:0;z-index:10000;background:rgba(15,23,42,.45);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center}',
       '#daily-mask.show{display:flex}',
       '#daily-box{background:linear-gradient(180deg,#f8fbff 0%,#ffffff 32%);border-radius:18px;padding:0;width:min(500px,94vw);box-shadow:0 28px 70px rgba(15,23,42,.35);overflow:hidden}',
@@ -56,17 +68,21 @@
       const items = d.items || [];
       const btn = document.getElementById('sh-notify');
       const badge = document.getElementById('sh-notify-badge');
+      const count = document.getElementById('notify-count');
       if (badge) badge.textContent = items.length > 99 ? '99+' : String(items.length);
       if (btn) btn.classList.toggle('has-unread', items.length > 0);
+      if (count) { count.textContent = items.length; count.style.display = items.length ? '' : 'none'; }
       const list = document.getElementById('notify-list');
       if (list) {
+        const periodLabel = { morning: '上午', afternoon: '下午', evening: '晚上' };
         list.innerHTML = items.map(function (n) {
+          const label = periodLabel[n.period] || n.period || '通知';
           return '<div class="notify-item unread">'
+            + '<div class="n-top"><span class="n-period ' + esc(n.period) + '">' + esc(label) + '</span><span class="n-time">' + esc(n.created_at || '') + '</span></div>'
             + '<div class="n-title">' + esc(n.title) + '</div>'
-            + '<div class="n-meta">' + esc(n.created_at) + ' · ' + esc(n.period || '') + '</div>'
             + '<div class="n-body">' + esc(n.body) + '</div>'
-            + '<div style="margin-top:6px"><button class="sh-btn" data-ack="' + n.id + '" style="padding:2px 8px;font-size:11px">标记已读</button></div></div>';
-        }).join('') || '<div style="color:#94a3b8;font-size:12px;padding:10px 4px">暂无未读通知</div>';
+            + '<div class="n-actions"><button class="sh-btn" data-ack="' + n.id + '">标记已读</button></div></div>';
+        }).join('') || '<div style="color:#94a3b8;font-size:12px;padding:26px 4px;text-align:center">暂无未读通知</div>';
         Array.prototype.forEach.call(list.querySelectorAll('[data-ack]'), function (btn) {
           btn.onclick = function () {
             fetch('/notifications/' + btn.getAttribute('data-ack') + '/ack', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
@@ -147,7 +163,7 @@
     const notifyBtn = document.getElementById('sh-notify');
     const panel = document.createElement('div');
     panel.id = 'notify-panel';
-    panel.innerHTML = '<div id="notify-head"><b>消息通知</b><button id="notify-close">×</button></div><div id="notify-list"></div>';
+    panel.innerHTML = '<div id="notify-head"><b>消息通知 <span id="notify-count" style="display:none">0</span></b><div id="notify-head-actions"><button id="notify-readall">全部已读</button><button id="notify-close">×</button></div></div><div id="notify-list"></div>';
     document.body.appendChild(panel);
     const mask = document.createElement('div');
     mask.id = 'daily-mask';
@@ -156,6 +172,16 @@
 
     notifyBtn.onclick = function () {
       openPanel();
+    };
+    document.getElementById('notify-readall').onclick = function () {
+      fetch('/notifications?unread=1').then(function (r) { return r.json(); }).then(function (d) {
+        const ids = (d.items || []).map(function (n) { return n.id; });
+        const chain = Promise.resolve();
+        ids.forEach(function (id) {
+          chain.then(function () { return fetch('/notifications/' + id + '/ack', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); });
+        });
+        chain.then(function () { loadNotifications(); });
+      });
     };
     document.getElementById('notify-close').onclick = function () { panel.classList.remove('show'); };
     document.addEventListener('click', function (e) {
