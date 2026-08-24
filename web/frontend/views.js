@@ -585,6 +585,39 @@
         if (window.__ttsAttach) window.__ttsAttach();
         return;
       }
+      if (id === 'appearance') {
+        var avatarOn = localStorage.getItem('lab-avatar-enabled') !== '0';
+        var avatarSize = parseInt(localStorage.getItem('lab-avatar-size'), 10) || 225;
+        pane.innerHTML = '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:28px 30px;max-width:760px">'
+          + '<div style="font-size:17px;font-weight:700;color:#0f172a;margin-bottom:10px">外观与形象</div>'
+          + '<div style="color:#64748b;font-size:13px;line-height:1.8;margin-bottom:18px">小科形象显示开关与大小。设置会保存在当前浏览器。</div>'
+          + '<div style="display:flex;flex-direction:column;gap:18px">'
+          + '<div style="display:flex;align-items:center;justify-content:space-between;border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px">'
+          + '<div><div style="font-weight:600;color:#0f172a">显示小科形象</div><div style="color:#64748b;font-size:12px;margin-top:3px">关闭后实验进行中也不会显示</div></div>'
+          + '<input type="checkbox" id="avatar-enabled" ' + (avatarOn ? 'checked' : '') + ' style="width:20px;height:20px;accent-color:#2563eb"></div>'
+          + '<div style="border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px">'
+          + '<div style="display:flex;justify-content:space-between;align-items:center"><div style="font-weight:600;color:#0f172a">形象大小</div><span id="avatar-size-label" style="font-size:13px;color:#2563eb;font-weight:600">' + avatarSize + 'px</span></div>'
+          + '<input type="range" id="avatar-size" min="120" max="360" step="10" value="' + avatarSize + '" style="width:100%;margin-top:10px">'
+          + '<div style="display:flex;justify-content:space-between;color:#94a3b8;font-size:11px;margin-top:2px"><span>小 120px</span><span>默认 225px</span><span>大 360px</span></div></div>'
+          + '<div style="display:flex;justify-content:flex-end;gap:10px"><button class="sh-btn primary" id="avatar-save">保存</button></div>'
+          + '</div></div>';
+        var enabledInput = pane.querySelector('#avatar-enabled');
+        var sizeInput = pane.querySelector('#avatar-size');
+        var sizeLabel = pane.querySelector('#avatar-size-label');
+        pane.querySelector('#avatar-save').onclick = function () {
+          var enabled = enabledInput.checked;
+          var size = parseInt(sizeInput.value, 10) || 225;
+          if (typeof window.applyAvatarSettings === 'function') window.applyAvatarSettings(enabled, size, true);
+          var msg = sizeLabel;
+          msg.textContent = '已保存';
+          setTimeout(function () { msg.textContent = size + 'px'; }, 1200);
+        };
+        enabledInput.onchange = function () {
+          if (typeof window.applyAvatarSettings === 'function') window.applyAvatarSettings(enabledInput.checked, parseInt(sizeInput.value, 10) || 225, true);
+        };
+        sizeInput.oninput = function () { sizeLabel.textContent = sizeInput.value + 'px'; };
+        return;
+      }
       pane.innerHTML = '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:28px 30px;max-width:760px">'
         + '<div style="font-size:17px;font-weight:700;color:#0f172a;margin-bottom:10px">' + esc(categories.filter(function (c) { return c.id === id; })[0].label) + '</div>'
         + '<div style="color:#64748b;font-size:13px;line-height:1.8">' + esc(categoryDescriptions[id] || '') + '</div>'
