@@ -30,12 +30,22 @@
       '.notify-item .n-meta{color:#94a3b8;font-size:11px;margin-top:3px}',
       '.notify-item .n-body{color:#475569;margin-top:5px;white-space:pre-wrap}',
       '.notify-item.unread .n-title{color:#1d4ed8}',
-      '#daily-mask{position:fixed;inset:0;z-index:10000;background:rgba(15,23,42,.5);display:none;align-items:center;justify-content:center}',
+      '#daily-mask{position:fixed;inset:0;z-index:10000;background:rgba(15,23,42,.45);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center}',
       '#daily-mask.show{display:flex}',
-      '#daily-box{background:#fff;border-radius:16px;padding:22px 24px;width:min(480px,92vw);box-shadow:0 24px 60px rgba(15,23,42,.3)}',
-      '#daily-title{font-size:18px;font-weight:700;color:#0f172a;margin-bottom:10px}',
-      '#daily-body{font-size:13px;color:#475569;line-height:1.8;white-space:pre-wrap;max-height:50vh;overflow:auto}',
-      '#daily-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}',
+      '#daily-box{background:linear-gradient(180deg,#f8fbff 0%,#ffffff 32%);border-radius:18px;padding:0;width:min(500px,94vw);box-shadow:0 28px 70px rgba(15,23,42,.35);overflow:hidden}',
+      '#daily-hero{background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;padding:18px 24px;display:flex;align-items:center;gap:12px}',
+      '#daily-hero .ico{width:42px;height:42px;border-radius:12px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:22px}',
+      '#daily-hero .t{font-size:17px;font-weight:700;line-height:1.3}',
+      '#daily-hero .s{font-size:12px;opacity:.85;margin-top:2px}',
+      '#daily-close{position:absolute;top:12px;right:14px;z-index:2;border:0;background:rgba(255,255,255,.14);color:#fff;width:26px;height:26px;border-radius:999px;cursor:pointer;font-size:14px;line-height:1}',
+      '#daily-body{position:relative;padding:18px 24px 8px;font-size:13px;color:#334155;line-height:1.8;max-height:50vh;overflow:auto}',
+      '#daily-body .sec{font-weight:700;color:#1e40af;margin:12px 0 6px;font-size:14px}',
+      '#daily-body .row{display:flex;justify-content:space-between;gap:8px;background:#f8fafc;border:1px solid #eef2f7;border-radius:10px;padding:7px 11px;margin-bottom:5px;font-size:12px}',
+      '#daily-body .row .k{color:#64748b}',
+      '#daily-body .row .v{font-weight:600;color:#0f172a}',
+      '#daily-footer{padding:14px 24px 20px;display:flex;justify-content:flex-end;gap:8px;background:#fff;border-top:1px solid #f1f5f9}',
+      '#daily-footer .sh-btn{padding:7px 14px;border-radius:9px}',
+      '#daily-footer .primary{background:#2563eb;border-color:#2563eb;color:#fff}',
       ''
     ].join('\n');
     document.head.appendChild(style);
@@ -75,17 +85,41 @@
     if (panel.classList.contains('show')) loadNotifications();
   }
 
+  function dailyBodyHtml(body) {
+    const lines = String(body || '').split('\n');
+    let html = '';
+    lines.forEach(function (line) {
+      const t = line.trim();
+      if (!t) return;
+      const m = t.match(/^【(.+?)】$/);
+      if (m) { html += '<div class="sec">' + esc(m[1]) + '</div>'; return; }
+      const kv = t.match(/^(.+?)：(.*)$/);
+      if (kv) {
+        html += '<div class="row"><span class="k">' + esc(kv[1]) + '</span><span class="v">' + esc(kv[2]) + '</span></div>';
+        return;
+      }
+      html += '<div>' + esc(t) + '</div>';
+    });
+    return html || esc(body);
+  }
+
   function showDaily(n) {
     const mask = document.getElementById('daily-mask');
     if (!mask) return;
+    const periodLabel = { morning: '上午', afternoon: '下午', evening: '晚上' }[n.period] || '';
+    const emoji = { morning: '🌅', afternoon: '☀️', evening: '🌙' }[n.period] || '📩';
+    document.getElementById('daily-hero-ico').textContent = emoji;
     document.getElementById('daily-title').textContent = n.title;
-    document.getElementById('daily-body').textContent = n.body;
+    document.getElementById('daily-sub').textContent = n.period_date + (periodLabel ? ' · ' + periodLabel + '工作摘要' : '');
+    document.getElementById('daily-close').style.display = 'block';
+    document.getElementById('daily-body').innerHTML = dailyBodyHtml(n.body);
     mask.classList.add('show');
     const close = function () {
       mask.classList.remove('show');
       fetch('/notifications/' + n.id + '/shown', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
         .then(function () { loadNotifications(); });
     };
+    document.getElementById('daily-close').onclick = close;
     document.getElementById('daily-ok').onclick = close;
     document.getElementById('daily-view').onclick = function () {
       close();
@@ -117,7 +151,7 @@
     document.body.appendChild(panel);
     const mask = document.createElement('div');
     mask.id = 'daily-mask';
-    mask.innerHTML = '<div id="daily-box"><div id="daily-title"></div><div id="daily-body"></div><div id="daily-actions"><button class="sh-btn" id="daily-view">查看通知</button><button class="sh-btn primary" id="daily-ok">知道了</button></div></div>';
+    mask.innerHTML = '<div id="daily-box"><div id="daily-hero"><div class="ico" id="daily-hero-ico">📩</div><div><div class="t" id="daily-title"></div><div class="s" id="daily-sub"></div></div></div><button id="daily-close" type="button">×</button><div id="daily-body"></div><div id="daily-footer"><button class="sh-btn" id="daily-view">查看通知</button><button class="sh-btn primary" id="daily-ok">知道了</button></div></div>';
     document.body.appendChild(mask);
 
     notifyBtn.onclick = function () {
