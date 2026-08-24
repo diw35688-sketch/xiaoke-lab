@@ -6,45 +6,100 @@
     });
   }
 
+  function badgeHtml(status) {
+    if (status === 'REVIEWED') {
+      return '<span class="prep-badge reviewed">已复核</span>';
+    }
+    return '<span class="prep-badge unreviewed">未复核</span>';
+  }
+
   function renderPrep(p) {
-    var badge = p.review_status === 'REVIEWED' ? '<span style="color:#16a34a">已复核</span>' : '<span style="color:#d97706">未复核</span>';
-    return '<div class="prep-card" data-id="' + esc(p.reagent_prep_id) + '" style="background:var(--n-00,#fff);border:1px solid var(--bd-1,#e2e8f0);border-radius:12px;padding:12px 14px;margin-bottom:10px;cursor:pointer">'
-      + '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>' + esc(p.name_zh) + '</b><span style="font-size:12px">' + badge + '</span></div>'
-      + '<div style="color:#64748b;font-size:13px;margin-top:4px">' + esc(p.purpose) + '</div>'
-      + '<div style="color:#334155;font-size:13px;margin-top:6px">目标：' + esc(p.target_concentration || '未指定') + ' · 体积：' + esc(p.target_volume || '按需') + ' · 溶剂：' + esc(p.solvent || '未指定') + '</div>'
+    return '<div class="prep-card" data-id="' + esc(p.reagent_prep_id) + '" data-name="' + esc(p.name_zh.toLowerCase()) + '" data-purpose="' + esc((p.purpose || '').toLowerCase()) + '">'
+      + '<div class="prep-card-head"><div class="prep-name">' + esc(p.name_zh) + '</div>' + badgeHtml(p.review_status) + '</div>'
+      + '<div class="prep-purpose">' + esc(p.purpose) + '</div>'
+      + '<div class="prep-target">目标：' + esc(p.target_concentration || '未指定') + ' · 体积：' + esc(p.target_volume || '按需') + ' · 溶剂：' + esc(p.solvent || '未指定') + '</div>'
+      + '<div class="prep-actions"><button class="sh-btn" type="button" data-detail="' + esc(p.reagent_prep_id) + '">查看配置</button></div>'
       + '</div>';
   }
 
   function showPrepDetail(host, prep) {
     var steps = (prep.steps || []).map(function (s, i) {
-      return '<div style="margin:5px 0 0 18px;color:#475569;font-size:13px">' + (i + 1) + '. ' + esc(s) + '</div>';
+      return '<div class="prep-step">' + (i + 1) + '. ' + esc(s) + '</div>';
     }).join('');
     var safety = (prep.safety || []).map(function (s) {
-      return '<div style="margin-top:6px;color:#b91c1c;font-size:12px">⚠ ' + esc(s.name) + '：' + esc((s.statements || []).join('；')) + '</div>';
+      return '<div class="prep-safety">⚠ ' + esc(s.name) + '：' + esc((s.statements || []).join('；')) + '</div>';
     }).join('');
-    var badge = prep.review_status === 'REVIEWED' ? '<span style="color:#16a34a">已复核</span>' : '<span style="color:#d97706">未复核</span>';
-    host.innerHTML = '<div style="max-width:820px">'
+    var badge = badgeHtml(prep.review_status);
+    host.innerHTML = '<div class="prep-detail">'
       + '<button class="sh-btn" id="prep-back">← 返回配置列表</button>'
-      + '<div style="margin:14px 0 4px;font-size:18px;font-weight:700;color:#0f172a">' + esc(prep.name_zh) + '</div>'
-      + '<div style="color:#64748b;font-size:12px;margin-bottom:14px">' + esc(prep.purpose) + ' · ' + badge + '</div>'
-      + '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;margin-bottom:12px">'
-      + '<div style="color:#334155;font-size:13px;line-height:1.8">目标：' + esc(prep.target_concentration || '未指定') + '<br>体积：' + esc(prep.target_volume || '按需') + '<br>溶剂：' + esc(prep.solvent || '未指定') + '<br>保存：' + esc(prep.storage_condition || '未指定') + '<br>有效期：' + esc(prep.expiry || '未指定') + '</div></div>'
-      + '<div style="font-size:13px;font-weight:700;color:#0f172a;margin:10px 0 8px">配制步骤</div>'
-      + '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px 15px">' + steps + '</div>'
-      + (safety ? '<div style="font-size:13px;font-weight:700;color:#0f172a;margin:12px 0 8px">安全提示</div><div style="background:#fff;border:1px solid #fee2e2;border-radius:12px;padding:12px 15px">' + safety + '</div>' : '')
-      + '<div style="margin-top:12px;font-size:12px;color:#94a3b8">来源：' + esc(prep.source || '未注明') + (prep.source_url ? ' · <a href="' + esc(prep.source_url) + '" target="_blank">查看来源</a>' : '') + '</div>'
+      + '<div class="prep-detail-title">' + esc(prep.name_zh) + '</div>'
+      + '<div class="prep-detail-sub">' + esc(prep.purpose) + ' · ' + badge + '</div>'
+      + '<div class="prep-detail-box">'
+      + '<div>目标：' + esc(prep.target_concentration || '未指定') + '</div>'
+      + '<div>体积：' + esc(prep.target_volume || '按需') + '</div>'
+      + '<div>溶剂：' + esc(prep.solvent || '未指定') + '</div>'
+      + '<div>保存：' + esc(prep.storage_condition || '未指定') + '</div>'
+      + '<div>有效期：' + esc(prep.expiry || '未指定') + '</div>'
+      + '</div>'
+      + '<div class="prep-section-title">配制步骤</div>'
+      + '<div class="prep-detail-box">' + steps + '</div>'
+      + (safety ? '<div class="prep-section-title">安全提示</div><div class="prep-detail-box prep-safety-box">' + safety + '</div>' : '')
+      + '<div class="prep-source">来源：' + esc(prep.source || '未注明') + (prep.source_url ? ' · <a href="' + esc(prep.source_url) + '" target="_blank">查看来源</a>' : '') + '</div>'
       + '</div>';
     host.querySelector('#prep-back').onclick = function () { window.shellShow('reagent_prep'); };
   }
 
+  function ensureStyles(host) {
+    if (host.querySelector('#prep-grid-style')) return;
+    var style = document.createElement('style');
+    style.id = 'prep-grid-style';
+    style.textContent = [
+      '.prep-card{background:var(--n-00,#fff);border:1px solid var(--bd-1,#e2e8f0);border-radius:12px;padding:12px 14px;cursor:pointer;transition:border-color .15s,box-shadow .15s}',
+      '.prep-card:hover{border-color:var(--brand,#3b67e8);box-shadow:0 4px 12px rgba(59,103,232,.08)}',
+      '.prep-card-head{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}',
+      '.prep-name{font-weight:700;color:#0f172a;line-height:1.3}',
+      '.prep-badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;white-space:nowrap;flex:0 0 auto}',
+      '.prep-badge.reviewed{background:#dcfce7;color:#15803d}',
+      '.prep-badge.unreviewed{background:#fef3c7;color:#b45309}',
+      '.prep-purpose{color:#64748b;font-size:13px;margin-top:4px}',
+      '.prep-target{color:#334155;font-size:13px;margin-top:6px;line-height:1.5}',
+      '.prep-actions{margin-top:9px}',
+      '.prep-actions .sh-btn{padding:3px 9px;font-size:12px}',
+      '.prep-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--n-00,#fff);border:1px solid var(--bd-1,#e2e8f0);border-radius:12px;padding:10px 12px;margin-bottom:12px}',
+      '.prep-toolbar .search-wrap{flex:1;min-width:180px}',
+      '.prep-toolbar input[type=search]{width:100%;box-sizing:border-box;padding:8px 11px;border:1px solid #cbd5e1;border-radius:10px;font-size:13px;font-family:inherit;background:#fff;color:#0f172a}',
+      '.prep-toolbar input[type=search]:focus{outline:2px solid rgba(59,103,232,.25);border-color:var(--brand,#3b67e8)}',
+      '.prep-toolbar .sh-btn{white-space:nowrap}',
+      '.prep-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-top:12px}',
+      '.prep-empty{color:#94a3b8;font-size:13px;margin:20px 0}',
+      '.prep-detail{max-width:1024px}',
+      '.prep-detail-title{font-size:20px;font-weight:700;color:#0f172a;margin:16px 0 4px}',
+      '.prep-detail-sub{color:#64748b;font-size:13px;margin-bottom:14px}',
+      '.prep-detail-box{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;margin-bottom:12px;color:#334155;font-size:13px;line-height:1.8}',
+      '.prep-step{margin:4px 0 0 18px;color:#475569;font-size:13px}',
+      '.prep-section-title{font-size:14px;font-weight:700;color:#0f172a;margin:12px 0 8px}',
+      '.prep-safety-box{border-color:#fee2e2}',
+      '.prep-safety{color:#b91c1c;font-size:12px;margin-top:6px}',
+      '.prep-source{color:#94a3b8;font-size:12px;margin-top:10px}',
+      '@media(max-width:900px){.prep-list{grid-template-columns:1fr}}',
+      ''
+    ].join('\n');
+    host.appendChild(style);
+  }
+
   window.shellRegisterView('reagent_prep', function (host) {
-    host.innerHTML = '<h3>试剂配置库'
-      + '<input type="file" id="prep-file" accept=".json,application/json" style="margin-left:12px;font-size:12px">'
-      + '<button class="sh-btn" id="prep-upload" style="margin-left:8px">上传 JSON</button>'
-      + '<span id="prep-upload-msg" style="margin-left:8px;font-size:12px;color:#64748b"></span></h3>'
-      + '<div style="color:#64748b;font-size:12px;margin:8px 0 6px">JSON 格式：{"reagent_preps":[{...}]}，字段见契约说明。上传会严格校验，不通过不落盘。</div>'
-      + '<div style="margin:8px 0 12px"><button class="sh-btn primary" id="prep-chat-create">在右侧对话中创建试剂配置</button>'
-      + '<span style="margin-left:8px;font-size:12px;color:#64748b">告诉 AI 浓度、体积、溶剂、保存条件即可</span></div>'
+    ensureStyles(host);
+
+    host.innerHTML = '<div class="prep-page">'
+      + '<div class="prep-toolbar">'
+      + '<input type="search" id="prep-search" placeholder="搜索试剂名称 / 用途…" autocomplete="off">'
+      + '<input type="file" id="prep-file" accept=".json,application/json" style="display:none">'
+      + '<button class="sh-btn" id="prep-file-btn">选择文件</button>'
+      + '<button class="sh-btn" id="prep-upload">上传 JSON</button>'
+      + '<button class="sh-btn primary" id="prep-chat-create">AI 生成</button>'
+      + '<span id="prep-upload-msg" style="font-size:12px;color:#64748b"></span>'
+      + '</div>'
+      + '<div style="color:#64748b;font-size:12px;margin:-4px 0 8px">JSON 格式：{"reagent_preps":[{...}]}，字段见契约说明。上传会严格校验，不通过不落盘。</div>'
       + '<div id="prep-form-box" style="display:none;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px 18px;margin-bottom:14px">'
       + '<div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:10px">填写试剂配置信息</div>'
       + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
@@ -62,20 +117,39 @@
       + '<span id="pf-msg" style="font-size:12px;color:#64748b"></span>'
       + '</div>'
       + '</div>'
-      + '<div id="prep-list" style="margin-top:12px">加载中…</div>';
+      + '<div id="prep-list" class="prep-list">加载中…</div>'
+      + '</div>';
 
-    function load() {
+    function load(filterText) {
       fetch('/reagent-prep').then(function (r) { return r.json(); }).then(function (d) {
-        host.querySelector('#prep-list').innerHTML = (d.items || []).map(renderPrep).join('') || '<div style="color:#94a3b8">暂无配置。</div>';
+        var items = (d.items || []).filter(function (p) {
+          if (!filterText) return true;
+          var q = filterText.toLowerCase();
+          return (p.name_zh || '').toLowerCase().indexOf(q) >= 0 || (p.purpose || '').toLowerCase().indexOf(q) >= 0;
+        });
+        host.querySelector('#prep-list').innerHTML = items.map(renderPrep).join('') || '<div class="prep-empty">没有匹配的试剂配置。</div>';
         Array.prototype.forEach.call(host.querySelectorAll('.prep-card'), function (card) {
-          card.onclick = function () {
+          card.onclick = function (e) {
+            if (e.target.closest('[data-detail]')) return;
             var item = (d.items || []).filter(function (x) { return x.reagent_prep_id === card.dataset.id; })[0];
+            if (item) showPrepDetail(host, item);
+          };
+        });
+        Array.prototype.forEach.call(host.querySelectorAll('.prep-actions [data-detail]'), function (btn) {
+          btn.onclick = function (e) {
+            e.stopPropagation();
+            var id = btn.getAttribute('data-detail');
+            var item = (d.items || []).filter(function (x) { return x.reagent_prep_id === id; })[0];
             if (item) showPrepDetail(host, item);
           };
         });
       });
     }
 
+    var searchInput = host.querySelector('#prep-search');
+    searchInput.addEventListener('input', function () { load(searchInput.value.trim()); });
+
+    host.querySelector('#prep-file-btn').onclick = function () { host.querySelector('#prep-file').click(); };
     host.querySelector('#prep-chat-create').onclick = function () {
       var box = host.querySelector('#prep-form-box');
       box.style.display = '';
@@ -128,7 +202,7 @@
           }).then(function (res) {
             if (!res.ok) { msg.textContent = res.d.detail || '上传失败'; return; }
             msg.textContent = '已新增 ' + res.d.added + ' 条';
-            load();
+            load(searchInput.value.trim());
           }).catch(function (e) { msg.textContent = '上传失败：' + e.message; });
         } catch (e) {
           msg.textContent = 'JSON 解析失败：' + e.message;
@@ -137,6 +211,6 @@
       reader.readAsText(input.files[0]);
     };
 
-    load();
+    load('');
   });
 })();

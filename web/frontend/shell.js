@@ -38,7 +38,7 @@
     '#sh-conversation-panel{flex:0 0 210px;border-right:1px solid var(--bd-1);display:flex;flex-direction:column;min-height:0}',
     '#sh-conversation-panel .sh-panel-title{padding:12px 12px 6px;font-size:12px;font-weight:600;color:var(--n-500)}',
     '#sh-conversation-list{flex:1;overflow:auto;padding:0 8px 8px}',
-    '#sh-chat-main{flex:1;min-width:0;display:flex;flex-direction:column}',
+    '#sh-chat-main{flex:1;min-width:400px;display:flex;flex-direction:column}',
     '#sh-chat-head{height:44px;flex:0 0 44px;border-bottom:1px solid var(--bd-1);display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 12px 0 16px;font-size:14px;font-weight:600;color:var(--n-800)}#sh-chat-actions{display:flex;align-items:center;gap:8px}#sh-chat-head .sh-btn{padding:4px 10px;font-size:12px;font-weight:400}#sh-call.active{background:var(--red-500);border-color:var(--red-500);color:#fff}',
     '#sh-chat-host{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}',
     '.sh-btn{border:1px solid var(--bd-2);background:var(--n-00);border-radius:var(--r-md);padding:5px 11px;cursor:pointer;font-size:var(--fs-sm);font-family:inherit;color:var(--n-800)}',
@@ -47,6 +47,7 @@
     '.sh-btn.primary:hover{background:var(--brand-strong)}',
     // 收拾队友页面里的浮动元素
     '#chat-card .avatar-stage,#chat-card .avatar,#avatar-stage,.assistant-portrait{display:none!important}',
+    '#assistant-avatar.avatar-hidden{display:none!important}',
     '#chat-card{background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important}',
     '#chat{padding:16px 16px 10px!important;height:auto!important;display:flex!important;flex-direction:column!important;gap:14px!important}',
     '.chat-form{display:none!important}',
@@ -118,6 +119,8 @@
     el('sh-title').textContent = titles[view] || view;
     var canvas = el('sh-canvas');
     canvas.classList.remove('empty');
+    var avatar = document.getElementById('assistant-avatar');
+    if (avatar) avatar.classList.toggle('avatar-hidden', view !== 'run');
     if (view === 'run') {
       if (window.runCanvasRender) window.runCanvasRender(canvas);
       return;
