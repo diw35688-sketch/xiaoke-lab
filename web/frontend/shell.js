@@ -44,6 +44,10 @@
     '#sh-conversation-list{flex:1;overflow:auto;padding:0 8px 8px}',
     '#sh-chat-main{flex:1;min-width:400px;display:flex;flex-direction:column}',
     '#sh-chat-head{height:44px;flex:0 0 44px;border-bottom:1px solid var(--bd-1);display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 12px 0 16px;font-size:14px;font-weight:600;color:var(--n-800)}#sh-chat-actions{display:flex;align-items:center;gap:8px}#sh-chat-head .sh-btn{padding:4px 10px;font-size:12px;font-weight:400}#sh-call.active{background:var(--red-500);border-color:var(--red-500);color:#fff}',
+    '#sh-more-wrap{position:relative;display:inline-flex}',
+    '#sh-more{position:relative;z-index:3}',
+    '#sh-more-menu{position:absolute;right:0;top:calc(100% + 4px);z-index:20;background:var(--n-00);border:1px solid var(--bd-2);border-radius:var(--r-md);box-shadow:0 8px 24px rgba(15,23,42,.12);padding:5px;min-width:84px;display:flex;flex-direction:column;gap:2px}',
+    '#sh-more-menu .sh-btn{text-align:left}',
     '#sh-chat-host{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}',
     '.sh-btn{border:1px solid var(--bd-2);background:var(--n-00);border-radius:var(--r-md);padding:5px 11px;cursor:pointer;font-size:var(--fs-sm);font-family:inherit;color:var(--n-800)}',
     '.sh-btn:hover{background:var(--n-60)}',
@@ -108,7 +112,7 @@
     '    <div id="sh-conversation-list"></div>',
     '  </div>',
     '  <div id="sh-chat-main">',
-    '    <div id="sh-chat-head"><span>实验对话</span><span id="sh-chat-actions"><button class="sh-btn" id="sh-toggle-conversation" type="button" title="显示/隐藏会话列表">会话</button><button class="sh-btn" id="sh-phone" type="button">手机</button><button class="sh-btn" id="sh-call" type="button">通话</button><button class="sh-btn" id="sh-new-chat" type="button">新对话</button></span></div>',
+    '    <div id="sh-chat-head"><span>实验对话</span><span id="sh-chat-actions"><button class="sh-btn" id="sh-toggle-conversation" type="button" title="显示/隐藏会话列表">会话</button><button class="sh-btn" id="sh-new-chat" type="button">新对话</button><div id="sh-more-wrap"><button class="sh-btn" id="sh-more" type="button" title="更多">⋯</button><div id="sh-more-menu" style="display:none"><button class="sh-btn" id="sh-phone" type="button">手机</button><button class="sh-btn" id="sh-call" type="button">通话</button></div></div></span></div>',
     '    <div id="sh-chat-host"></div>',
     '  </div>',
     '</div>'
@@ -210,8 +214,19 @@
         var hidden = shell.classList.toggle('conversation-hidden');
         localStorage.setItem('lab-conversation-hidden', hidden ? '1' : '0');
         convoBtn.classList.toggle('active', !hidden);
-        convoBtn.textContent = hidden ? '会话' : '会话';
       };
+    }
+    var moreBtn = el('sh-more');
+    var moreMenu = el('sh-more-menu');
+    if (moreBtn && moreMenu) {
+      moreBtn.onclick = function (e) {
+        e.stopPropagation();
+        var open = moreMenu.style.display === 'block';
+        moreMenu.style.display = open ? 'none' : 'block';
+      };
+      document.addEventListener('click', function (e) {
+        if (!e.target.closest('#sh-more-wrap')) moreMenu.style.display = 'none';
+      });
     }
 
     function initChatResizer() {
