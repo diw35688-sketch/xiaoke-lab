@@ -37,6 +37,8 @@
     '#sh-chat-resizer:hover,#sh-chat-resizer.dragging{background:rgba(59,103,232,.25)}',
     '#sh-chat{flex:0 0 640px;background:var(--n-00);border-left:1px solid var(--bd-1);display:flex;flex-direction:row;transition:flex-basis .18s;min-width:0}',
     '#shell.chat-closed #sh-chat{flex-basis:0;overflow:hidden;border-left:0}',
+    '#sh-toggle-conversation.active{background:var(--brand-50);color:var(--brand-strong)}',
+    '#shell.conversation-hidden #sh-conversation-panel{display:none!important;border-right:0}',
     '#sh-conversation-panel{flex:0 0 210px;border-right:1px solid var(--bd-1);display:flex;flex-direction:column;min-height:0}',
     '#sh-conversation-panel .sh-panel-title{padding:12px 12px 6px;font-size:12px;font-weight:600;color:var(--n-500)}',
     '#sh-conversation-list{flex:1;overflow:auto;padding:0 8px 8px}',
@@ -106,7 +108,7 @@
     '    <div id="sh-conversation-list"></div>',
     '  </div>',
     '  <div id="sh-chat-main">',
-    '    <div id="sh-chat-head"><span>实验对话</span><span id="sh-chat-actions"><button class="sh-btn" id="sh-phone" type="button">手机</button><button class="sh-btn" id="sh-call" type="button">通话</button><button class="sh-btn" id="sh-new-chat" type="button">新对话</button></span></div>',
+    '    <div id="sh-chat-head"><span>实验对话</span><span id="sh-chat-actions"><button class="sh-btn" id="sh-toggle-conversation" type="button" title="显示/隐藏会话列表">会话</button><button class="sh-btn" id="sh-phone" type="button">手机</button><button class="sh-btn" id="sh-call" type="button">通话</button><button class="sh-btn" id="sh-new-chat" type="button">新对话</button></span></div>',
     '    <div id="sh-chat-host"></div>',
     '  </div>',
     '</div>'
@@ -197,6 +199,18 @@
       var closed = shell.classList.toggle('chat-closed');
       el('sh-toggle-chat').textContent = closed ? '显示对话' : '隐藏对话';
     };
+    var convoBtn = el('sh-toggle-conversation');
+    if (convoBtn) {
+      var convoHidden = localStorage.getItem('lab-conversation-hidden') === '1';
+      shell.classList.toggle('conversation-hidden', convoHidden);
+      convoBtn.classList.toggle('active', !convoHidden);
+      convoBtn.onclick = function () {
+        var hidden = shell.classList.toggle('conversation-hidden');
+        localStorage.setItem('lab-conversation-hidden', hidden ? '1' : '0');
+        convoBtn.classList.toggle('active', !hidden);
+        convoBtn.textContent = hidden ? '会话' : '会话';
+      };
+    }
 
     function initChatResizer() {
       var resizer = el('sh-chat-resizer');
