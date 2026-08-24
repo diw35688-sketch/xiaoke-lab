@@ -5,6 +5,27 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c];
     });
   }
+  function ensureCardStyles() {
+    if (document.getElementById('card-grid-style')) return;
+    var style = document.createElement('style');
+    style.id = 'card-grid-style';
+    style.textContent = [
+      '.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-top:12px}',
+      '.card-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--n-00,#fff);border:1px solid var(--bd-1,#e2e8f0);border-radius:12px;padding:10px 12px;margin-bottom:12px}',
+      '.card-toolbar input[type=search]{flex:1;min-width:180px;box-sizing:border-box;padding:8px 11px;border:1px solid #cbd5e1;border-radius:10px;font-size:13px;font-family:inherit;background:#fff;color:#0f172a}',
+      '.card-toolbar input[type=search]:focus{outline:2px solid rgba(59,103,232,.25);border-color:#3b67e8}',
+      '.card-toolbar .sh-btn{white-space:nowrap}',
+      '.p-card,.reagent-card,.record-card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;cursor:pointer;transition:border-color .15s,box-shadow .15s;position:relative}',
+      '.p-card:hover,.reagent-card:hover,.record-card:hover{border-color:#3b67e8;box-shadow:0 4px 12px rgba(59,103,232,.08)}',
+      '.p-card.active{border-color:#2563eb;box-shadow:0 0 0 2px #bfdbfe}',
+      '.card-tip{color:#64748b;font-size:12px;margin:8px 0 4px}',
+      '.card-empty{color:#94a3b8;font-size:13px;margin:20px 0}',
+      '.search-note{font-size:12px;color:#64748b;margin:8px 0 0}',
+      '@media(max-width:900px){.card-grid{grid-template-columns:1fr}}',
+      ''
+    ].join('\n');
+    document.head.appendChild(style);
+  }
   function api(path, method, payload) {
     var options = { method: method || 'GET' };
     if (payload) {
@@ -198,31 +219,71 @@
   // ---------- 实验方案页 ----------
   window.shellRegisterView('protocols', function (host) {
     api('/protocols').then(function (d) {
-      var cards = (d.protocols || []).map(function (p) {
-        var on = session && session.mode === 'protocol' && session.protocol.id === p.id;
-        return '<div class="p-card" data-id="' + p.id + '" style="background:#fff;border:1px solid '
-          + (on ? '#2563eb' : '#e2e8f0') + ';border-radius:12px;padding:15px 17px;margin-bottom:11px;cursor:pointer'
-          + (on ? ';box-shadow:0 0 0 2px #bfdbfe' : '') + '">'
-          + '<div style="font-weight:600;color:#0f172a;margin-bottom:5px">' + esc(p.title)
-          + (on ? '<span style="color:#2563eb;font-size:12px;margin-left:8px">进行中</span>' : '') + '</div>'
-          + '<div style="color:#64748b;font-size:12px;line-height:1.6">共 ' + p.total_steps + ' 步 · ' + esc(p.source) + '</div></div>';
-      }).join('');
-      host.innerHTML = '<div style="max-width:760px">'
-        + '<div class="p-card" data-id="" style="background:#fff;border:1px solid '
-        + (session && session.mode === 'free' ? '#2563eb' : '#e2e8f0')
-        + ';border-radius:12px;padding:15px 17px;margin-bottom:11px;cursor:pointer">'
-        + '<div style="font-weight:600;color:#0f172a">自由记录模式</div>'
-        + '<div style="color:#64748b;font-size:12px;margin-top:4px">不按方案，只做记录，不产生方案性追问</div></div>'
-        + cards
-        + '<div style="margin-top:18px;border-top:1px dashed #cbd5e1;padding-top:14px">'
-        + '<div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:8px">新增方案</div>'
-        + '<button class="sh-btn primary" id="protocol-chat-create">在右侧对话中创建方案</button>'
-        + '<input type="file" id="protocol-file" accept=".json,.pdf,.png,.jpg,.jpeg" style="margin-left:10px;font-size:12px">'
-        + '<span id="protocol-file-msg" style="color:#64748b;font-size:12px;margin-left:10px"></span>'
-        + '<span style="color:#94a3b8;font-size:12px;margin-left:10px">文件自动识别：JSON 直接入库；PDF/图片走 OCR 识别成方案</span></div>'
+      ensureCardStyles();
+      host.innerHTML = '<div class="card-toolbar">'
+        + '<input type="search" id="protocol-search" placeholder="搜索方案名称 / 来源…" autocomplete="off">'
+        + '<button class="sh-btn primary" id="protocol-chat-create">AI 创建</button>'
+        + '<button class="sh-btn" id="protocol-file-btn">选择文件</button>'
+        + '<input type="file" id="protocol-file" accept=".json,.pdf,.png,.jpg,.jpeg" style="display:none">'
+        + '<span id="protocol-file-msg" style="font-size:12px;color:#64748b"></span>'
+        + '</div>'
+        + '<div class="search-note">文件自动识别：JSON 直接入库；PDF/图片走 OCR 识别成方案</div>'
+        + '<div id="protocol-grid" class="card-grid"></div>'
         + '<div id="ai-draft-box"></div>'
-        + '<div id="ocr-draft-box"></div>'
-        + '</div>';
+        + '<div id="ocr-draft-box"></div>';
+
+      function renderProtocols(items, all) {
+        var cards = items.map(function (p) {
+          var on = session && session.mode === 'protocol' && session.protocol.id === p.id;
+          return '<div class="p-card' + (on ? ' active' : '') + '" data-id="' + p.id + '">'
+            + '<div style="font-weight:600;color:#0f172a;margin-bottom:5px">' + esc(p.title)
+            + (on ? '<span style="color:#2563eb;font-size:12px;margin-left:8px">进行中</span>' : '') + '</div>'
+            + '<div style="color:#64748b;font-size:12px;line-height:1.6">共 ' + p.total_steps + ' 步 · ' + esc(p.source) + '</div>'
+            + '<div style="margin-top:8px"><button class="sh-btn" type="button" data-view-detail="' + p.id + '" style="padding:3px 9px;font-size:12px">查看方案</button></div></div>';
+        }).join('');
+        var freeActive = session && session.mode === 'free';
+        var grid = host.querySelector('#protocol-grid');
+        grid.innerHTML = '<div class="p-card' + (freeActive ? ' active' : '') + '" data-id="">'
+          + '<div style="font-weight:600;color:#0f172a">自由记录模式</div>'
+          + '<div style="color:#64748b;font-size:12px;margin-top:4px">不按方案，只做记录，不产生方案性追问</div>'
+          + '<div style="margin-top:8px"><button class="sh-btn" type="button" data-view-detail="" style="padding:3px 9px;font-size:12px">进入</button></div></div>'
+          + cards || '<div class="card-empty">没有匹配的方案。</div>';
+        Array.prototype.forEach.call(grid.querySelectorAll('.p-card'), function (card) {
+          card.onclick = function (e) {
+            if (e.target.closest('[data-view-detail]')) return;
+            if (!card.dataset.id) {
+              api('/protocols/session', 'POST', { protocol_id: null }).then(function () {
+                refreshStatus();
+                window.shellShow('run');
+              });
+              return;
+            }
+            showProtocolDetail(host, card.dataset.id);
+          };
+        });
+        Array.prototype.forEach.call(grid.querySelectorAll('[data-view-detail]'), function (btn) {
+          btn.onclick = function (e) {
+            e.stopPropagation();
+            var id = btn.getAttribute('data-view-detail');
+            if (!id) {
+              api('/protocols/session', 'POST', { protocol_id: null }).then(function () {
+                refreshStatus();
+                window.shellShow('run');
+              });
+              return;
+            }
+            showProtocolDetail(host, id);
+          };
+        });
+      }
+      renderProtocols(d.protocols || [], d.protocols || []);
+      var searchInput = host.querySelector('#protocol-search');
+      searchInput.addEventListener('input', function () {
+        var q = searchInput.value.trim().toLowerCase();
+        renderProtocols((d.protocols || []).filter(function (p) {
+          return !q || (p.title || '').toLowerCase().indexOf(q) >= 0 || (p.source || '').toLowerCase().indexOf(q) >= 0;
+        }), d.protocols || []);
+      });
       var chatCreate = host.querySelector('#protocol-chat-create');
       if (chatCreate) chatCreate.onclick = function () {
         var message = document.getElementById('message');
@@ -232,6 +293,8 @@
           message.setSelectionRange(message.value.length, message.value.length);
         }
       };
+      var fileBtn = host.querySelector('#protocol-file-btn');
+      if (fileBtn) fileBtn.onclick = function () { fileInput.click(); };
       var fileInput = host.querySelector('#protocol-file');
       if (fileInput) fileInput.onchange = function () {
         var file = fileInput.files && fileInput.files[0];
@@ -464,17 +527,49 @@
   // ---------- 试剂安全库页 ----------
   window.shellRegisterView('reagents', function (host) {
     api('/protocols/reagents').then(function (d) {
-      var cards = (d.reagents || []).map(function (r) {
-        return '<div class="reagent-card" data-name="' + esc(r.name) + '" style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px 14px;margin-bottom:10px;cursor:pointer">'
-          + '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>' + esc(r.name) + '</b>'
-          + (r.critical
-              ? '<span style="background:#fee2e2;color:#b91c1c;border-radius:5px;padding:2px 8px;font-size:11px">高危 ' + (r.codes || []).join('/') + '</span>'
-              : '<span style="color:#94a3b8;font-size:12px">无高危项</span>') + '</div>'
-          + '<div style="color:#64748b;font-size:12px;margin-top:5px">CAS ' + esc(r.cas || '—') + ' · ' + esc(r.formula || '') + '</div></div>';
-      }).join('');
-      host.innerHTML = '<div style="max-width:860px">'
-        + '<div style="color:#64748b;font-size:12px;line-height:1.7;margin-bottom:14px">共 ' + d.count + ' 种试剂。' + esc(d.note) + '</div>'
-        + cards + '</div>';
+      ensureCardStyles();
+      host.innerHTML = '<div class="card-toolbar">'
+        + '<input type="search" id="reagent-search" placeholder="搜索试剂名称 / CAS / 分子式…" autocomplete="off">'
+        + '<span style="font-size:12px;color:#64748b">共 ' + d.count + ' 种试剂</span>'
+        + '</div>'
+        + '<div class="search-note">' + esc(d.note || '') + '</div>'
+        + '<div id="reagent-grid" class="card-grid"></div>';
+
+      function renderReagents(items) {
+        var grid = host.querySelector('#reagent-grid');
+        grid.innerHTML = items.map(function (r) {
+          return '<div class="reagent-card" data-name="' + esc(r.name) + '">'
+            + '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>' + esc(r.name) + '</b>'
+            + (r.critical
+                ? '<span style="background:#fee2e2;color:#b91c1c;border-radius:5px;padding:2px 8px;font-size:11px;white-space:nowrap">高危 ' + (r.codes || []).join('/') + '</span>'
+                : '<span style="color:#94a3b8;font-size:12px">无高危项</span>') + '</div>'
+            + '<div style="color:#64748b;font-size:12px;margin-top:5px">CAS ' + esc(r.cas || '—') + ' · ' + esc(r.formula || '') + '</div>'
+            + '<div style="margin-top:8px"><button class="sh-btn" type="button" data-reagent-detail="' + esc(r.name) + '" style="padding:3px 9px;font-size:12px">查看详情</button></div></div>';
+        }).join('') || '<div class="card-empty">没有匹配的试剂。</div>';
+        Array.prototype.forEach.call(grid.querySelectorAll('.reagent-card'), function (card) {
+          card.onclick = function (e) {
+            if (e.target.closest('[data-reagent-detail]')) return;
+            var item = (d.reagents || []).filter(function (r) { return r.name === card.dataset.name; })[0];
+            if (item) showReagentDetail(item);
+          };
+        });
+        Array.prototype.forEach.call(grid.querySelectorAll('[data-reagent-detail]'), function (btn) {
+          btn.onclick = function (e) {
+            e.stopPropagation();
+            var item = (d.reagents || []).filter(function (r) { return r.name === btn.getAttribute('data-reagent-detail'); })[0];
+            if (item) showReagentDetail(item);
+          };
+        });
+      }
+      renderReagents(d.reagents || []);
+      var searchInput = host.querySelector('#reagent-search');
+      searchInput.addEventListener('input', function () {
+        var q = searchInput.value.trim().toLowerCase();
+        renderReagents((d.reagents || []).filter(function (r) {
+          if (!q) return true;
+          return (r.name || '').toLowerCase().indexOf(q) >= 0 || (r.cas || '').toLowerCase().indexOf(q) >= 0 || (r.formula || '').toLowerCase().indexOf(q) >= 0;
+        }));
+      });
 
       function showReagentDetail(item) {
         var statements = (item.statements || []).map(function (s) {
@@ -510,15 +605,22 @@
         host.innerHTML = '<div style="color:#94a3b8;font-size:13px">本次会话还没有记录。</div>';
         return;
       }
-      host.innerHTML = '<div style="max-width:820px"><div style="color:#64748b;font-size:12px;margin-bottom:12px">会话 '
-        + esc(d.session_id) + ' · 共 ' + d.count + ' 段</div>'
-        + d.items.map(function (it) {
+      ensureCardStyles();
+      host.innerHTML = '<div class="card-toolbar">'
+        + '<input type="search" id="record-search" placeholder="搜索记录内容 / 字段…" autocomplete="off">'
+        + '<span style="font-size:12px;color:#64748b">会话 ' + esc(d.session_id) + ' · 共 ' + d.count + ' 段</span>'
+        + '</div>'
+        + '<div id="record-grid" class="card-grid"></div>';
+
+      function renderRecords(items) {
+        var grid = host.querySelector('#record-grid');
+        grid.innerHTML = items.map(function (it) {
           var ents = Object.keys(it.entities || {}).map(function (k) {
             return '<span style="background:#e0e7ff;color:#3730a3;border-radius:5px;padding:2px 7px;margin:2px 4px 2px 0;display:inline-block;font-size:11px">'
               + esc(k) + '=' + esc(it.entities[k]) + '</span>';
           }).join('') || '<span style="color:#94a3b8;font-size:12px">未抽到结构化字段</span>';
           var ev = it.evaluation || {};
-          return '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;margin-bottom:11px">'
+          return '<div class="record-card">'
             + '<div style="font-size:12px;color:#94a3b8;margin-bottom:5px">第 ' + it.segment_id + ' 段 · ' + esc(it.at) + '</div>'
             + '<div style="color:#0f172a;margin-bottom:8px">' + esc(it.transcript) + '</div>'
             + '<div>' + ents + '</div>'
@@ -529,7 +631,18 @@
                   + esc(x.field) + ' 实际 ' + esc(x.actual_value) + '，方案 ' + esc(x.protocol_value) + '</div>';
               }).join('')
             + '</div>';
-        }).join('') + '</div>';
+        }).join('') || '<div class="card-empty">没有匹配的记录。</div>';
+      }
+      renderRecords(d.items || []);
+      var searchInput = host.querySelector('#record-search');
+      searchInput.addEventListener('input', function () {
+        var q = searchInput.value.trim().toLowerCase();
+        renderRecords((d.items || []).filter(function (it) {
+          if (!q) return true;
+          var hay = (it.transcript || '') + ' ' + Object.keys(it.entities || {}).join(' ') + ' ' + Object.values(it.entities || {}).join(' ');
+          return hay.toLowerCase().indexOf(q) >= 0;
+        }));
+      });
     });
   });
 
