@@ -50,7 +50,7 @@
   }
 
   function ensureStyles(host) {
-    if (host.querySelector('#prep-grid-style')) return;
+    if (document.getElementById('prep-grid-style')) return;
     var style = document.createElement('style');
     style.id = 'prep-grid-style';
     style.textContent = [
@@ -70,7 +70,7 @@
       '.prep-toolbar input[type=search]{width:100%;box-sizing:border-box;padding:8px 11px;border:1px solid #cbd5e1;border-radius:10px;font-size:13px;font-family:inherit;background:#fff;color:#0f172a}',
       '.prep-toolbar input[type=search]:focus{outline:2px solid rgba(59,103,232,.25);border-color:var(--brand,#3b67e8)}',
       '.prep-toolbar .sh-btn{white-space:nowrap}',
-      '.prep-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-top:12px}',
+      '.prep-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-top:12px}',
       '.prep-empty{color:#94a3b8;font-size:13px;margin:20px 0}',
       '.prep-detail{max-width:1024px}',
       '.prep-detail-title{font-size:20px;font-weight:700;color:#0f172a;margin:16px 0 4px}',
@@ -84,7 +84,7 @@
       '@media(max-width:900px){.prep-list{grid-template-columns:1fr}}',
       ''
     ].join('\n');
-    host.appendChild(style);
+    document.head.appendChild(style);
   }
 
   window.shellRegisterView('reagent_prep', function (host) {
