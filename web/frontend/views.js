@@ -677,7 +677,8 @@
           return '<div class="settings-nav" data-pane="' + c.id + '" style="padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13px;color:#334155;margin-bottom:2px">' + esc(c.label) + '</div>';
         }).join('')
       + '</div>'
-      + '<div style="flex:1;min-width:0" id="settings-pane"></div></div>';
+      + '<div style="flex:1;min-width:0" id="settings-pane"></div>'
+      + '<div id="settings-inline-holder" style="display:none"></div></div>';
 
     var pane = host.querySelector('#settings-pane');
     function showPane(id) {
@@ -686,18 +687,25 @@
         nav.style.color = nav.dataset.pane === id ? '#1d4ed8' : '#334155';
         nav.style.fontWeight = nav.dataset.pane === id ? '600' : '400';
       });
+      var holder = document.getElementById('settings-inline-holder');
+      var modal = document.getElementById('settings-modal');
+      if (holder && holder.firstElementChild && modal) {
+        modal.appendChild(holder.firstElementChild);
+        holder.style.display = 'none';
+      }
       if (id === 'model') {
-        pane.innerHTML = '<div id="settings-inline"></div>';
+        pane.innerHTML = '<div style="color:#64748b;font-size:12px;padding:10px 2px">模型配置已内嵌显示，可直接编辑。</div>';
         var modal = document.getElementById('settings-modal');
         if (modal) {
           var box = modal.querySelector('.settings-box');
-          if (box) {
+          if (box && holder) {
             box.style.boxShadow = 'none';
             box.style.maxHeight = 'none';
             box.style.width = '100%';
             var head = box.querySelector('.settings-head');
             if (head) head.style.display = 'none';
-            pane.querySelector('#settings-inline').appendChild(box);
+            holder.appendChild(box);
+            holder.style.display = 'block';
           }
         }
         if (window.__ttsAttach) window.__ttsAttach();
