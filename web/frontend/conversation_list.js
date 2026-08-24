@@ -1,4 +1,5 @@
 // DeepSeekHarness 式会话列表：后端会话是唯一事实，聊天框只切换当前会话。
+// 支持搜索、重命名、删除、相对时间、消息数。
 (function () {
   var KEY = 'lab-agent-conversation-id';
 
@@ -30,6 +31,27 @@
   }
   window.appNewConversation = createConversation;
 
+  function parseTime(str) {
+    var t = str ? new Date(String(str).replace(' ', 'T')) : null;
+    return t && !isNaN(t.getTime()) ? t : null;
+  }
+
+  function timeAgo(str) {
+    if (!str) return '';
+    var t = parseTime(str);
+    if (!t) return '';
+    var diff = Date.now() - t.getTime();
+    var minutes = Math.floor(diff / 60000);
+    if (minutes < 1) return '刚刚';
+    if (minutes < 60) return minutes + ' 分钟前';
+    var hours = Math.floor(minutes / 60);
+    if (hours < 24) return hours + ' 小时前';
+    var days = Math.floor(hours / 24);
+    if (days === 1) return '昨天';
+    if (days < 7) return days + ' 天前';
+    return t.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' });
+  }
+
   function renameConversation(id, currentTitle) {
     var title = prompt('会话名称', currentTitle || '');
     if (!title || title.trim() === currentTitle) return;
@@ -53,21 +75,35 @@
   function load() {
     var host = document.getElementById('sh-conversation-list');
     if (!host) return Promise.resolve();
+    var searchEl = document.getElementById('sh-conversation-search');
+    var q = searchEl ? searchEl.value.trim().toLowerCase() : '';
     return fetch('/chat/conversations').then(function (r) { return r.json(); }).then(function (d) {
       var active = currentId();
-      host.innerHTML = (d.items || []).map(function (item) {
-        var last = String(item.last_message || '').replace(/\s+/g, ' ').slice(0, 30);
+      var items = (d.items || []).filter(function (item) {
+        if (!q) return true;
+        var hay = String(item.title || '') + ' ' + String(item.last_message || '');
+        return hay.toLowerCase().indexOf(q) >= 0;
+      });
+      host.innerHTML = items.map(function (item) {
+        var last = String(item.last_message || '').replace(/\s+/g, ' ').slice(0, 34);
         return '<div class="sh-conversation' + (item.id === active ? ' active' : '') + '" data-id="' + esc(item.id) + '" data-title="' + esc(item.title || '新会话') + '">'
           + '<div class="sh-conversation-title">' + esc(item.title || '新会话') + '</div>'
           + '<div class="sh-conversation-meta">' + esc(last || '空会话') + '</div>'
-          + '<button class="sh-conversation-delete" title="删除">×</button></div>';
-      }).join('') || '<div style="font-size:11px;color:#94a3b8;padding:6px 9px">暂无会话</div>';
+          + '<div class="sh-conversation-sub">' + esc(timeAgo(item.updated_at)) + (item.message_count ? ' · ' + item.message_count + ' 条' : '') + '</div>'
+          + '<div class="sh-conversation-actions">'
+          + '<button class="sh-conversation-rename" title="重命名">✎</button>'
+          + '<button class="sh-conversation-delete" title="删除">×</button>'
+          + '</div></div>';
+      }).join('') || '<div style="font-size:11px;color:#94a3b8;padding:6px 9px">' + (q ? '没有匹配的会话' : '暂无会话') + '</div>';
       Array.prototype.forEach.call(host.querySelectorAll('.sh-conversation'), function (row) {
         row.onclick = function (event) {
-          if (event.target.closest('.sh-conversation-delete')) return;
+          if (event.target.closest('.sh-conversation-delete') || event.target.closest('.sh-conversation-rename')) return;
           switchTo(row.dataset.id);
         };
         row.ondblclick = function () { renameConversation(row.dataset.id, row.dataset.title); };
+        row.querySelector('.sh-conversation-rename').onclick = function (event) {
+          event.stopPropagation(); renameConversation(row.dataset.id, row.dataset.title);
+        };
         row.querySelector('.sh-conversation-delete').onclick = function (event) {
           event.stopPropagation(); deleteConversation(row.dataset.id);
         };
@@ -78,6 +114,8 @@
   document.addEventListener('shell-ready', function () {
     var button = document.getElementById('sh-new-session');
     if (button) button.onclick = createConversation;
+    var search = document.getElementById('sh-conversation-search');
+    if (search) search.addEventListener('input', load);
     load();
   });
   document.addEventListener('conversation-changed', load);
