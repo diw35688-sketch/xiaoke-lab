@@ -83,8 +83,9 @@
   }
 
   function loadNotifications() {
-    return fetch('/notifications?unread=1').then(function (r) { return r.json(); }).then(function (d) {
-      const items = d.items || [];
+    return fetch('/notifications').then(function (r) { return r.json(); }).then(function (d) {
+      const allItems = d.items || [];
+      const items = allItems.filter(function (n) { return !n.acknowledged_at; });
       const btn = document.getElementById('sh-notify');
       const badge = document.getElementById('sh-notify-badge');
       const count = document.getElementById('notify-count');
@@ -94,13 +95,14 @@
       const list = document.getElementById('notify-list');
       if (list) {
         const periodLabel = { morning: '上午', afternoon: '下午', evening: '晚上' };
-        list.innerHTML = items.map(function (n) {
+        list.innerHTML = allItems.map(function (n) {
+          const unread = !n.acknowledged_at;
           const label = periodLabel[n.period] || n.period || '通知';
-          return '<div class="notify-item unread" data-id="' + n.id + '">'
+          return '<div class="notify-item' + (unread ? ' unread' : '') + '" data-id="' + n.id + '">'
             + '<div class="n-top"><span class="n-period ' + esc(n.period) + '">' + esc(label) + '</span><span class="n-time">' + esc(n.created_at || '') + '</span></div>'
             + '<div class="n-title">' + esc(n.title) + '</div>'
             + '<div class="n-body">' + esc(n.body) + '</div>'
-            + '<div class="n-actions"><button class="sh-btn" data-ack="' + n.id + '">标记已读</button></div></div>';
+            + '<div class="n-actions">' + (unread ? '<button class="sh-btn" data-ack="' + n.id + '">标记已读</button>' : '<span style="font-size:11px;color:#94a3b8">已读</span>') + '</div></div>';
         }).join('') || '<div style="color:#94a3b8;font-size:12px;padding:26px 4px;text-align:center">暂无未读通知</div>';
         Array.prototype.forEach.call(list.querySelectorAll('.notify-item'), function (item) {
           item.onclick = function (e) {
@@ -119,11 +121,15 @@
     }).catch(function () { return []; });
   }
 
+  function closePanel() {
+    const panel = document.getElementById('notify-panel');
+    if (panel) panel.classList.remove('show');
+  }
   function openPanel() {
     const panel = document.getElementById('notify-panel');
     if (!panel) return;
-    panel.classList.toggle('show');
-    if (panel.classList.contains('show')) loadNotifications();
+    panel.classList.add('show');
+    loadNotifications();
   }
 
   function dailyBodyHtml(body) {
@@ -255,7 +261,8 @@
     document.body.appendChild(mask);
 
     notifyBtn.onclick = function () {
-      openPanel();
+      const panel = document.getElementById('notify-panel');
+      if (panel && panel.classList.contains('show')) closePanel(); else openPanel();
     };
     document.getElementById('notify-readall').onclick = function () {
       fetch('/notifications?unread=1').then(function (r) { return r.json(); }).then(function (d) {
@@ -267,7 +274,7 @@
         chain.then(function () { loadNotifications(); });
       });
     };
-    document.getElementById('notify-close').onclick = function () { panel.classList.remove('show'); };
+    document.getElementById('notify-close').onclick = function (e) { e.stopPropagation(); closePanel(); };
     document.addEventListener('click', function (e) {
       if (!e.target.closest('#notify-panel') && !e.target.closest('#sh-notify')) panel.classList.remove('show');
     });
