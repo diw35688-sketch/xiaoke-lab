@@ -123,12 +123,13 @@
 
   function closePanel() {
     const panel = document.getElementById('notify-panel');
-    if (panel) panel.classList.remove('show');
+    if (panel) { panel.classList.remove('show'); panel.style.display = 'none'; }
   }
   function openPanel() {
     const panel = document.getElementById('notify-panel');
     if (!panel) return;
     panel.classList.add('show');
+    panel.style.display = '';
     loadNotifications();
   }
 
@@ -235,6 +236,8 @@
   document.addEventListener('shell-ready', function () {
     ensureStyle();
     const notifyBtn = document.getElementById('sh-notify');
+    const existingPanel = document.getElementById('notify-panel');
+    if (existingPanel) existingPanel.remove();
     const panel = document.createElement('div');
     panel.id = 'notify-panel';
     panel.innerHTML = '<div id="notify-head"><b>消息通知 <span id="notify-count" style="display:none">0</span></b><div id="notify-head-actions"><button id="notify-readall">全部已读</button><button id="notify-close">×</button></div></div><div id="notify-list"></div>';
@@ -275,8 +278,14 @@
       });
     };
     document.getElementById('notify-close').onclick = function (e) { e.stopPropagation(); closePanel(); };
+    panel.addEventListener('click', function (e) {
+      if (e.target.id === 'notify-close') { e.stopPropagation(); closePanel(); }
+    });
     document.addEventListener('click', function (e) {
-      if (!e.target.closest('#notify-panel') && !e.target.closest('#sh-notify')) panel.classList.remove('show');
+      if (!e.target.closest('#notify-panel') && !e.target.closest('#sh-notify')) closePanel();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closePanel();
     });
 
     loadNotifications();
