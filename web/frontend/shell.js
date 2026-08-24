@@ -130,6 +130,7 @@
                    records: '本次记录', settings: '设置' };
     el('sh-title').textContent = titles[view] || view;
     var canvas = el('sh-canvas');
+    if (current === 'settings' && window.__settingsCleanup) window.__settingsCleanup();
     canvas.classList.remove('empty');
     var avatar = document.getElementById('assistant-avatar');
     if (avatar) avatar.classList.toggle('avatar-hidden', view !== 'run');
