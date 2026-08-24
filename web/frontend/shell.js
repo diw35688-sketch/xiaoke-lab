@@ -33,6 +33,8 @@
     '#sh-canvas{flex:1;overflow:auto;padding:16px 20px}',
     '#sh-canvas.empty{display:flex;align-items:center;justify-content:center;color:var(--n-500);font-size:var(--fs-md);text-align:center;line-height:1.9}',
     // 右侧对话
+    '#sh-chat-resizer{flex:0 0 6px;cursor:col-resize;background:transparent;position:relative;z-index:5;transition:background .15s}',
+    '#sh-chat-resizer:hover,#sh-chat-resizer.dragging{background:rgba(59,103,232,.25)}',
     '#sh-chat{flex:0 0 640px;background:var(--n-00);border-left:1px solid var(--bd-1);display:flex;flex-direction:row;transition:flex-basis .18s;min-width:0}',
     '#shell.chat-closed #sh-chat{flex-basis:0;overflow:hidden;border-left:0}',
     '#sh-conversation-panel{flex:0 0 210px;border-right:1px solid var(--bd-1);display:flex;flex-direction:column;min-height:0}',
@@ -89,6 +91,7 @@
     '    <button class="sh-btn" id="sh-toggle-chat">隐藏对话</button></div>',
     '  <div id="sh-canvas"></div>',
     '</div>',
+    '<div id="sh-chat-resizer"></div>',
     '<div id="sh-chat">',
     '  <div id="sh-conversation-panel">',
     '    <div class="sh-panel-title">会话管理</div>',
@@ -188,9 +191,42 @@
       el('sh-toggle-chat').textContent = closed ? '显示对话' : '隐藏对话';
     };
 
+    function initChatResizer() {
+      var resizer = el('sh-chat-resizer');
+      var chat = el('sh-chat');
+      var key = 'lab-chat-width';
+      var saved = parseInt(localStorage.getItem(key), 10) || 640;
+      chat.style.flex = '0 0 ' + saved + 'px';
+      var startX = 0, startWidth = 0;
+      resizer.addEventListener('mousedown', function (e) {
+        e.preventDefault();
+        startX = e.clientX;
+        startWidth = chat.getBoundingClientRect().width;
+        resizer.classList.add('dragging');
+        document.body.style.userSelect = 'none';
+        chat.style.transition = 'none';
+        function move(ev) {
+          var width = startWidth - (ev.clientX - startX);
+          var min = 380, max = Math.min(window.innerWidth * 0.6, 900);
+          width = Math.max(min, Math.min(max, width));
+          chat.style.flex = '0 0 ' + Math.round(width) + 'px';
+        }
+        function up() {
+          resizer.classList.remove('dragging');
+          document.body.style.userSelect = '';
+          chat.style.transition = '';
+          localStorage.setItem(key, String(Math.round(chat.getBoundingClientRect().width)));
+          window.removeEventListener('mousemove', move);
+          window.removeEventListener('mouseup', up);
+        }
+        window.addEventListener('mousemove', move);
+        window.addEventListener('mouseup', up);
+      });
+    }
     function responsive() {
       if (window.innerWidth < AUTO_COLLAPSE) shell.classList.add('side-collapsed');
     }
+    initChatResizer();
     responsive();
     window.addEventListener('resize', responsive);
 
