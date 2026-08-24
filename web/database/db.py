@@ -100,3 +100,16 @@ def initialize_database():
             FOREIGN KEY(location_id) REFERENCES storage_locations(id))""")
         connection.execute("CREATE INDEX IF NOT EXISTS idx_storage_items_location ON storage_items(location_id)")
         connection.execute("CREATE INDEX IF NOT EXISTS idx_storage_items_name ON storage_items(name)")
+        # 通知/每日工作弹窗：记录创建、展示、确认，用于溯源
+        connection.execute("""CREATE TABLE IF NOT EXISTS notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            kind TEXT NOT NULL DEFAULT 'daily',
+            period TEXT NOT NULL DEFAULT '',
+            period_date TEXT NOT NULL DEFAULT '',
+            title TEXT NOT NULL,
+            body TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            shown_at TEXT NOT NULL DEFAULT '',
+            acknowledged_at TEXT NOT NULL DEFAULT '',
+            source TEXT NOT NULL DEFAULT '')""")
+        connection.execute("CREATE INDEX IF NOT EXISTS idx_notifications_period ON notifications(period_date,period)")

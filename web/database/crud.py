@@ -407,3 +407,141 @@ def storage_stats():
                WHERE expires_at != '' AND expires_at < date('now','localtime')"""
         ).fetchone()["c"]
     return {"total": total, "by_type": by_type, "expiring": expiring, "expired": expired}
+
+
+# ---------- 通知 / 每日工作弹窗 ----------
+
+PERIODS = ("morning", "afternoon", "evening")
+
+
+def period_for_now():
+    """按当前时间返回 period；凌晨不弹。"""
+    from datetime import datetime
+    hour = datetime.now().hour
+    if 6 <= hour < 12:
+        return "morning"
+    if 12 <= hour < 18:
+        return "afternoon"
+    if 18 <= hour < 24:
+        return "evening"
+    return ""
+
+
+def work_summary(prev_days=0):
+    """按日期汇总实验记录、实验、储存库变动，用于每日工作弹窗。"""
+    initialize_database()
+    with get_connection() as connection:
+        date_sql = "date('now', ?)" if prev_days else "date('now','localtime')"
+        if prev_days:
+            date_sql = "date('now','localtime',? )"
+        # 今日/昨日实验记录
+        if prev_days:
+            records = connection.execute(
+                "SELECT COUNT(*) AS c FROM lab_records WHERE date(at) = date('now','localtime',?)",
+                (f"-{prev_days} day",),
+            ).fetchone()["c"]
+        else:
+            records = connection.execute(
+                "SELECT COUNT(*) AS c FROM lab_records WHERE date(at) = date('now','localtime')"
+            ).fetchone()["c"]
+
+        # 今日新增储存物品
+        if prev_days:
+            storage_added = connection.execute(
+                "SELECT COUNT(*) AS c FROM storage_items WHERE date(stored_at) = date('now','localtime',?)",
+                (f"-{prev_days} day",),
+            ).fetchone()["c"]
+        else:
+            storage_added = connection.execute(
+                "SELECT COUNT(*) AS c FROM storage_items WHERE date(stored_at) = date('now','localtime')"
+            ).fetchone()["c"]
+
+        # 今日消息数（user）
+        if prev_days:
+            msgs = connection.execute(
+                "SELECT COUNT(*) AS c FROM messages WHERE role='user' AND date(created_at) = date('now','localtime',?)",
+                (f"-{prev_days} day",),
+            ).fetchone()["c"]
+        else:
+            msgs = connection.execute(
+                "SELECT COUNT(*) AS c FROM messages WHERE role='user' AND date(created_at) = date('now','localtime')"
+            ).fetchone()["c"]
+
+    today_records = records
+    storage_total = storage_added
+    user_messages = msgs
+    return {
+        "records": today_records,
+        "storage_added": storage_total,
+        "user_messages": user_messages,
+    }
+
+
+def get_notification_by_period(period, period_date):
+    initialize_database()
+    with get_connection() as connection:
+        row = connection.execute(
+            "SELECT * FROM notifications WHERE period=? AND period_date=? ORDER BY id DESC LIMIT 1",
+            (period, period_date),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def create_daily_notification(period, period_date, title, body):
+    initialize_database()
+    with get_connection() as connection:
+        existing = connection.execute(
+            "SELECT * FROM notifications WHERE period=? AND period_date=? LIMIT 1",
+            (period, period_date),
+        ).fetchone()
+        if existing:
+            return dict(existing)
+        cursor = connection.execute(
+            "INSERT INTO notifications (kind,period,period_date,title,body,source) VALUES ('daily',?,?,?,?,?)",
+            (period, period_date, title, body, "system"),
+        )
+        row = connection.execute(
+            "SELECT * FROM notifications WHERE id=?", (cursor.lastrowid,)
+        ).fetchone()
+    return dict(row)
+
+
+def mark_notification_shown(notification_id):
+    initialize_database()
+    with get_connection() as connection:
+        connection.execute(
+            "UPDATE notifications SET shown_at=CURRENT_TIMESTAMP WHERE id=?",
+            (notification_id,),
+        )
+        row = connection.execute(
+            "SELECT * FROM notifications WHERE id=?", (notification_id,)
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def mark_notification_ack(notification_id):
+    initialize_database()
+    with get_connection() as connection:
+        connection.execute(
+            "UPDATE notifications SET acknowledged_at=CURRENT_TIMESTAMP WHERE id=?",
+            (notification_id,),
+        )
+        row = connection.execute(
+            "SELECT * FROM notifications WHERE id=?", (notification_id,)
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def list_notifications(limit=50, unread_only=False):
+    initialize_database()
+    with get_connection() as connection:
+        if unread_only:
+            rows = connection.execute(
+                "SELECT * FROM notifications WHERE acknowledged_at='' ORDER BY id DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        else:
+            rows = connection.execute(
+                "SELECT * FROM notifications ORDER BY id DESC LIMIT ?", (limit,)
+            ).fetchall()
+    return [dict(row) for row in rows]

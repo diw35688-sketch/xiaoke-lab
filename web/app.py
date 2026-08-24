@@ -11,6 +11,7 @@ from api.chat import router as chat_router
 from api.experiments import router as experiments_router
 from api.memories import router as memories_router
 from api.network import router as network_router
+from api.notifications import router as notifications_router
 from api.protocols import router as protocols_router
 from api.reagent_prep import router as reagent_prep_router
 from api.record import router as record_router
@@ -63,6 +64,7 @@ def home():
         '<script src="/static/protocol_editor.js"></script>'
         '<script src="/static/reagent_prep.js?v=20260820"></script>'
         '<script src="/static/storage.js?v=20260821"></script>'
+        '<script src="/static/notifications.js?v=20260821"></script>'
         '<script src="/static/composer.js?v=20260816"></script>'
           '<script src="/static/phone_call.js"></script>'
     )
@@ -136,6 +138,7 @@ app.include_router(calculator_router)
 app.include_router(experiments_router)
 app.include_router(memories_router)
 app.include_router(network_router)
+app.include_router(notifications_router)
 app.include_router(templates_router)
 app.include_router(tasks_router)
 app.include_router(settings_router)
