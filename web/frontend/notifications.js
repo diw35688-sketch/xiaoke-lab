@@ -243,7 +243,7 @@
     mask.id = 'daily-mask';
     const detail = document.createElement('div');
     detail.id = 'detail-mask';
-    detail.innerHTML = '<div id="detail-box"><div id="detail-head"><b>通知详情</b><button id="detail-close">×</button></div>'
+    detail.innerHTML = '<div id="detail-box"><div id="detail-head"><b id="detail-title">通知详情</b><button id="detail-close">×</button></div>'
       + '<div id="detail-body"><div class=""></div><div id="detail-body-text" style="display:none"></div>'
       + '<div id="detail-full-body" class="full"></div>'
       + '<div class="todo-section-title">待办清单</div><div id="detail-todos"></div>'
