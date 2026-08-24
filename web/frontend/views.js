@@ -677,8 +677,10 @@
           return '<div class="settings-nav" data-pane="' + c.id + '" style="padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13px;color:#334155;margin-bottom:2px">' + esc(c.label) + '</div>';
         }).join('')
       + '</div>'
-      + '<div style="flex:1;min-width:0" id="settings-pane"></div>'
-      + '<div id="settings-inline-holder" style="display:none"></div></div>';
+      + '<div style="flex:1;min-width:0;position:relative" id="settings-body">'
+      + '<div id="settings-pane"></div>'
+      + '<div id="settings-inline-holder" style="display:none;position:absolute;inset:0"></div>'
+      + '</div></div>'
 
     var pane = host.querySelector('#settings-pane');
     window.__settingsCleanup = function () {
@@ -698,8 +700,10 @@
         modal.appendChild(holder.firstElementChild);
         holder.style.display = 'none';
       }
+      if (holder) holder.style.display = 'none';
       if (id === 'model') {
-        pane.innerHTML = '<div style="color:#64748b;font-size:12px;padding:10px 2px">模型配置已内嵌显示，可直接编辑。</div>';
+        pane.innerHTML = '';
+        pane.style.display = 'none';
         var modal = document.getElementById('settings-modal');
         if (modal) {
           var box = modal.querySelector('.settings-box');
@@ -716,6 +720,7 @@
         if (window.__ttsAttach) window.__ttsAttach();
         return;
       }
+      pane.style.display = '';
       if (id === 'appearance') {
         var avatarOn = localStorage.getItem('lab-avatar-enabled') !== '0';
         var avatarSize = parseInt(localStorage.getItem('lab-avatar-size'), 10) || 225;

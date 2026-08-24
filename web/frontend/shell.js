@@ -33,7 +33,7 @@
     '#sh-canvas{flex:1;overflow:auto;padding:16px 20px}',
     '#sh-canvas.empty{display:flex;align-items:center;justify-content:center;color:var(--n-500);font-size:var(--fs-md);text-align:center;line-height:1.9}',
     // 右侧对话
-    '#sh-chat-resizer{flex:0 0 6px;cursor:col-resize;background:transparent;position:relative;z-index:5;transition:background .15s}',
+    '#sh-chat-resizer{flex:0 0 9px;cursor:col-resize;background:rgba(148,163,184,.12);position:relative;z-index:5;border-left:1px solid var(--bd-2);border-right:1px solid var(--bd-2);transition:background .15s}',
     '#sh-chat-resizer:hover,#sh-chat-resizer.dragging{background:rgba(59,103,232,.25)}',
     '#sh-chat{flex:0 0 640px;background:var(--n-00);border-left:1px solid var(--bd-1);display:flex;flex-direction:row;transition:flex-basis .18s;min-width:0}',
     '#shell.chat-closed #sh-chat{flex-basis:0;overflow:hidden;border-left:0}',
