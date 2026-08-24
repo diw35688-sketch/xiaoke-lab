@@ -106,16 +106,84 @@ def save_memory(content, category="general"):
     return dict(row)
 
 
-def ensure_conversation(conversation_id=None):
-    initialize_database(); conversation_id = conversation_id or str(uuid.uuid4())
+def create_conversation(title="新会话", conversation_id=None):
+    initialize_database()
+    conversation_id = conversation_id or str(uuid.uuid4())
+    title = str(title or "新会话").strip() or "新会话"
     with get_connection() as connection:
-        connection.execute("INSERT OR IGNORE INTO conversations (id) VALUES (?)", (conversation_id,))
+        connection.execute(
+            "INSERT OR IGNORE INTO conversations (id,title) VALUES (?,?)",
+            (conversation_id, title),
+        )
     return conversation_id
+
+
+def ensure_conversation(conversation_id=None):
+    if conversation_id is None:
+        return create_conversation()
+    initialize_database()
+    with get_connection() as connection:
+        connection.execute(
+            "INSERT OR IGNORE INTO conversations (id,title) VALUES (?,?)",
+            (conversation_id, "新会话"),
+        )
+    return conversation_id
+
+
+def list_conversations(limit=50):
+    initialize_database()
+    with get_connection() as connection:
+        rows = connection.execute(
+            """SELECT c.id,c.title,c.created_at,c.updated_at,
+                      COUNT(m.id) AS message_count,
+                      (SELECT content FROM messages lm
+                       WHERE lm.conversation_id=c.id
+                       ORDER BY lm.id DESC LIMIT 1) AS last_message
+               FROM conversations c
+               LEFT JOIN messages m ON m.conversation_id=c.id
+               GROUP BY c.id
+               ORDER BY c.updated_at DESC
+               LIMIT ?""",
+            (limit,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def rename_conversation(conversation_id, title):
+    title = str(title or "").strip()
+    if not title:
+        raise ValueError("会话标题不能为空。")
+    initialize_database()
+    with get_connection() as connection:
+        cursor = connection.execute(
+            "UPDATE conversations SET title=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
+            (title, conversation_id),
+        )
+    return bool(cursor.rowcount)
+
+
+def delete_conversation(conversation_id):
+    initialize_database()
+    with get_connection() as connection:
+        connection.execute("DELETE FROM agent_tasks WHERE conversation_id=?", (conversation_id,))
+        connection.execute("DELETE FROM messages WHERE conversation_id=?", (conversation_id,))
+        cursor = connection.execute("DELETE FROM conversations WHERE id=?", (conversation_id,))
+    return bool(cursor.rowcount)
 
 
 def add_message(conversation_id, role, content):
     with get_connection() as connection:
         connection.execute("INSERT INTO messages (conversation_id,role,content) VALUES (?,?,?)", (conversation_id, role, content))
+        if role == "user":
+            row = connection.execute(
+                "SELECT title FROM conversations WHERE id=?", (conversation_id,)
+            ).fetchone()
+            if row is not None and row["title"] == "新会话":
+                title = str(content).strip().replace("\n", " ")[:32] or "新会话"
+                connection.execute(
+                    "UPDATE conversations SET title=? WHERE id=?",
+                    (title, conversation_id),
+                )
         connection.execute("UPDATE conversations SET updated_at=CURRENT_TIMESTAMP WHERE id=?", (conversation_id,))
 
 
@@ -123,7 +191,6 @@ def get_recent_messages(conversation_id, limit=20):
     with get_connection() as connection:
         rows = connection.execute("SELECT role,content FROM messages WHERE conversation_id=? ORDER BY id DESC LIMIT ?", (conversation_id, limit)).fetchall()
     return [dict(row) for row in reversed(rows)]
-
 
 
 def get_messages(conversation_id, limit=100):
@@ -143,3 +210,200 @@ def latest_conversation():
             "SELECT id FROM conversations ORDER BY updated_at DESC LIMIT 1"
         ).fetchone()
     return row["id"] if row is not None else None
+
+
+# ---------- 储存库：存储位置与存储物品 ----------
+
+def list_storage_locations():
+    initialize_database()
+    with get_connection() as connection:
+        rows = connection.execute(
+            "SELECT * FROM storage_locations ORDER BY enabled DESC, id"
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def create_storage_location(location):
+    initialize_database()
+    with get_connection() as connection:
+        cursor = connection.execute(
+            """INSERT INTO storage_locations (name,type,temperature,capacity,notes,enabled)
+            VALUES (?,?,?,?,?,?)""",
+            (
+                str(location.get("name", "")).strip(),
+                str(location.get("type", "其他")).strip() or "其他",
+                str(location.get("temperature", "")).strip(),
+                str(location.get("capacity", "")).strip(),
+                str(location.get("notes", "")).strip(),
+                1 if location.get("enabled", True) else 0,
+            ),
+        )
+        row = connection.execute(
+            "SELECT * FROM storage_locations WHERE id=?", (cursor.lastrowid,)
+        ).fetchone()
+    return dict(row)
+
+
+def update_storage_location(location_id, location):
+    initialize_database()
+    fields = []
+    values = []
+    for key in ("name", "type", "temperature", "capacity", "notes"):
+        if key in location:
+            fields.append(f"{key}=?")
+            values.append(str(location[key]).strip())
+    if "enabled" in location:
+        fields.append("enabled=?")
+        values.append(1 if location["enabled"] else 0)
+    if not fields:
+        raise ValueError("没有可更新的字段。")
+    values.append(location_id)
+    with get_connection() as connection:
+        cursor = connection.execute(
+            f"UPDATE storage_locations SET {', '.join(fields)} WHERE id=?", values
+        )
+        if not cursor.rowcount:
+            return None
+        row = connection.execute(
+            "SELECT * FROM storage_locations WHERE id=?", (location_id,)
+        ).fetchone()
+    return dict(row)
+
+
+def delete_storage_location(location_id):
+    initialize_database()
+    with get_connection() as connection:
+        connection.execute(
+            "UPDATE storage_items SET location_id=NULL WHERE location_id=?", (location_id,)
+        )
+        cursor = connection.execute(
+            "DELETE FROM storage_locations WHERE id=?", (location_id,)
+        )
+    return bool(cursor.rowcount)
+
+
+def list_storage_items(q="", item_type="", location_id=None, status="", limit=500):
+    initialize_database()
+    where = []
+    params = []
+    if q:
+        where.append("(s.name LIKE ? OR s.notes LIKE ? OR s.position LIKE ? OR s.concentration LIKE ?)")
+        like = f"%{q}%"
+        params.extend([like, like, like, like])
+    if item_type:
+        where.append("item_type=?")
+        params.append(item_type)
+    if location_id:
+        where.append("location_id=?")
+        params.append(location_id)
+    if status:
+        where.append("status=?")
+        params.append(status)
+    where_sql = ("WHERE " + " AND ".join(where)) if where else ""
+    params.append(limit)
+    with get_connection() as connection:
+        rows = connection.execute(
+            f"""SELECT s.*, l.name AS location_name, l.temperature AS location_temperature,
+                       CASE WHEN s.expires_at != '' AND s.expires_at < date('now','localtime') THEN 'expired'
+                            WHEN s.expires_at != '' AND s.expires_at <= date('now','localtime','+7 day') THEN 'expiring'
+                            ELSE 'ok' END AS expiry_state
+                FROM storage_items s
+                LEFT JOIN storage_locations l ON l.id=s.location_id
+                {where_sql}
+                ORDER BY s.updated_at DESC, s.id DESC
+                LIMIT ?""",
+            params,
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def create_storage_item(item):
+    initialize_database()
+    with get_connection() as connection:
+        cursor = connection.execute(
+            """INSERT INTO storage_items
+            (item_type,name,quantity,unit,concentration,location_id,position,
+             storage_condition,owner,source_experiment_id,stored_at,expires_at,status,notes)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                str(item.get("item_type", "其他")).strip() or "其他",
+                str(item.get("name", "")).strip(),
+                str(item.get("quantity", "")).strip(),
+                str(item.get("unit", "")).strip(),
+                str(item.get("concentration", "")).strip(),
+                item.get("location_id"),
+                str(item.get("position", "")).strip(),
+                str(item.get("storage_condition", "")).strip(),
+                str(item.get("owner", "")).strip(),
+                str(item.get("source_experiment_id", "")).strip(),
+                str(item.get("stored_at", "")).strip(),
+                str(item.get("expires_at", "")).strip(),
+                str(item.get("status", "in_storage")).strip() or "in_storage",
+                str(item.get("notes", "")).strip(),
+            ),
+        )
+        row = connection.execute(
+            "SELECT * FROM storage_items WHERE id=?", (cursor.lastrowid,)
+        ).fetchone()
+    return dict(row)
+
+
+def update_storage_item(item_id, item):
+    initialize_database()
+    whitelist = (
+        "item_type", "name", "quantity", "unit", "concentration", "location_id",
+        "position", "storage_condition", "owner", "source_experiment_id",
+        "stored_at", "expires_at", "status", "notes",
+    )
+    fields = []
+    values = []
+    for key in whitelist:
+        if key in item:
+            fields.append(f"{key}=?")
+            values.append(item[key])
+    if not fields:
+        raise ValueError("没有可更新的字段。")
+    fields.append("updated_at=CURRENT_TIMESTAMP")
+    values.append(item_id)
+    with get_connection() as connection:
+        cursor = connection.execute(
+            f"UPDATE storage_items SET {', '.join(fields)} WHERE id=?", values
+        )
+        if not cursor.rowcount:
+            return None
+        row = connection.execute(
+            f"""SELECT s.*, l.name AS location_name
+                FROM storage_items s LEFT JOIN storage_locations l ON l.id=s.location_id
+                WHERE s.id=?""",
+            (item_id,),
+        ).fetchone()
+    return dict(row)
+
+
+def delete_storage_item(item_id):
+    initialize_database()
+    with get_connection() as connection:
+        cursor = connection.execute("DELETE FROM storage_items WHERE id=?", (item_id,))
+    return bool(cursor.rowcount)
+
+
+def storage_stats():
+    initialize_database()
+    with get_connection() as connection:
+        total = connection.execute("SELECT COUNT(*) AS c FROM storage_items").fetchone()["c"]
+        by_type = {
+            row["item_type"]: row["c"]
+            for row in connection.execute(
+                "SELECT item_type, COUNT(*) AS c FROM storage_items GROUP BY item_type"
+            ).fetchall()
+        }
+        expiring = connection.execute(
+            """SELECT COUNT(*) AS c FROM storage_items
+               WHERE expires_at != '' AND expires_at > date('now','localtime')
+                 AND expires_at <= date('now','localtime','+7 day')"""
+        ).fetchone()["c"]
+        expired = connection.execute(
+            """SELECT COUNT(*) AS c FROM storage_items
+               WHERE expires_at != '' AND expires_at < date('now','localtime')"""
+        ).fetchone()["c"]
+    return {"total": total, "by_type": by_type, "expiring": expiring, "expired": expired}

@@ -15,6 +15,7 @@ from api.protocols import router as protocols_router
 from api.reagent_prep import router as reagent_prep_router
 from api.record import router as record_router
 from api.settings import router as settings_router
+from api.storage import router as storage_router
 from api.tasks import router as tasks_router
 from api.templates import router as templates_router
 from api.tts import router as tts_router
@@ -61,6 +62,7 @@ def home():
         '<script src="/static/views.js?v=20260820"></script>'
         '<script src="/static/protocol_editor.js"></script>'
         '<script src="/static/reagent_prep.js?v=20260820"></script>'
+        '<script src="/static/storage.js?v=20260821"></script>'
         '<script src="/static/composer.js?v=20260816"></script>'
           '<script src="/static/phone_call.js"></script>'
     )
@@ -139,6 +141,7 @@ app.include_router(tasks_router)
 app.include_router(settings_router)
 app.include_router(protocols_router)
 app.include_router(reagent_prep_router)
+app.include_router(storage_router)
 app.include_router(asr_router)
 app.include_router(record_router)
 app.include_router(tts_router)

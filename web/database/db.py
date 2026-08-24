@@ -33,6 +33,7 @@ def initialize_database():
         connection.execute("""CREATE TABLE IF NOT EXISTS conversations (
             id TEXT PRIMARY KEY, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
+        _ensure_column(connection, "conversations", "title", "TEXT NOT NULL DEFAULT '新会话'")
         connection.execute("""CREATE TABLE IF NOT EXISTS messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT, conversation_id TEXT NOT NULL,
             role TEXT NOT NULL CHECK(role IN ('user','assistant')), content TEXT NOT NULL,
@@ -68,3 +69,34 @@ def initialize_database():
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(session_id, segment_id))""")
         connection.execute("CREATE INDEX IF NOT EXISTS idx_lab_records_session ON lab_records(session_id, segment_id)")
+        # 储存库：全局存储位置与存储物品资产库
+        connection.execute("""CREATE TABLE IF NOT EXISTS storage_locations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            type TEXT NOT NULL DEFAULT '其他',
+            temperature TEXT NOT NULL DEFAULT '',
+            capacity TEXT NOT NULL DEFAULT '',
+            notes TEXT NOT NULL DEFAULT '',
+            enabled INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
+        connection.execute("""CREATE TABLE IF NOT EXISTS storage_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            item_type TEXT NOT NULL DEFAULT '其他',
+            name TEXT NOT NULL,
+            quantity TEXT NOT NULL DEFAULT '',
+            unit TEXT NOT NULL DEFAULT '',
+            concentration TEXT NOT NULL DEFAULT '',
+            location_id INTEGER,
+            position TEXT NOT NULL DEFAULT '',
+            storage_condition TEXT NOT NULL DEFAULT '',
+            owner TEXT NOT NULL DEFAULT '',
+            source_experiment_id TEXT NOT NULL DEFAULT '',
+            stored_at TEXT NOT NULL DEFAULT '',
+            expires_at TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'in_storage',
+            notes TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(location_id) REFERENCES storage_locations(id))""")
+        connection.execute("CREATE INDEX IF NOT EXISTS idx_storage_items_location ON storage_items(location_id)")
+        connection.execute("CREATE INDEX IF NOT EXISTS idx_storage_items_name ON storage_items(name)")
