@@ -39,8 +39,10 @@
     '#shell.chat-closed #sh-chat{flex-basis:0;overflow:hidden;border-left:0}',
     '#sh-toggle-conversation.active{background:var(--brand-50);color:var(--brand-strong)}',
     '#shell.conversation-hidden #sh-conversation-panel{display:none!important;border-right:0}',
-    '#sh-conversation-panel{flex:0 0 210px;border-right:1px solid var(--bd-1);display:flex;flex-direction:column;min-height:0}',
-    '#sh-conversation-panel .sh-panel-title{padding:12px 12px 6px;font-size:12px;font-weight:600;color:var(--n-500)}',
+    '#sh-conversation-panel{flex:0 0 236px;border-right:1px solid var(--bd-1);display:flex;flex-direction:column;min-height:0}',
+    '#sh-conversation-panel .sh-panel-title{display:flex;align-items:center;justify-content:space-between;padding:12px 12px 6px;font-size:12px;font-weight:600;color:var(--n-500)}',
+    '#sh-close-conversation{border:0;background:transparent;color:var(--n-400);cursor:pointer;font-size:16px;line-height:1;padding:0 2px}',
+    '#sh-close-conversation:hover{color:#b91c1c}',
     '#sh-conversation-list{flex:1;overflow:auto;padding:0 8px 8px}',
     '#sh-chat-main{flex:1;min-width:400px;display:flex;flex-direction:column}',
     '#sh-chat-head{height:44px;flex:0 0 44px;border-bottom:1px solid var(--bd-1);display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 12px 0 16px;font-size:14px;font-weight:600;color:var(--n-800)}#sh-chat-actions{display:flex;align-items:center;gap:8px}#sh-chat-head .sh-btn{padding:4px 10px;font-size:12px;font-weight:400}#sh-call.active{background:var(--red-500);border-color:var(--red-500);color:#fff}',
@@ -106,7 +108,7 @@
     '<div id="sh-chat-resizer"></div>',
     '<div id="sh-chat">',
     '  <div id="sh-conversation-panel">',
-    '    <div class="sh-panel-title">会话管理</div>',
+    '    <div class="sh-panel-title"><span>会话管理</span><button id="sh-close-conversation" type="button" title="关闭会话列表">✕</button></div>',
     '    <input id="sh-conversation-search" type="search" placeholder="搜索会话…" autocomplete="off">',
     '    <button class="sh-btn" id="sh-new-session" type="button">＋ 新会话</button>',
     '    <div id="sh-conversation-list"></div>',
@@ -210,11 +212,14 @@
       var convoHidden = localStorage.getItem('lab-conversation-hidden') === '1';
       shell.classList.toggle('conversation-hidden', convoHidden);
       convoBtn.classList.toggle('active', !convoHidden);
-      convoBtn.onclick = function () {
-        var hidden = shell.classList.toggle('conversation-hidden');
+      function setConvoHidden(hidden) {
+        shell.classList.toggle('conversation-hidden', hidden);
         localStorage.setItem('lab-conversation-hidden', hidden ? '1' : '0');
         convoBtn.classList.toggle('active', !hidden);
-      };
+      }
+      convoBtn.onclick = function () { setConvoHidden(!shell.classList.contains('conversation-hidden')); };
+      var closeConvo = el('sh-close-conversation');
+      if (closeConvo) closeConvo.onclick = function () { setConvoHidden(true); };
     }
     var moreBtn = el('sh-more');
     var moreMenu = el('sh-more-menu');
