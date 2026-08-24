@@ -117,8 +117,8 @@
       var locOptions = locations.map(function (l) {
         return '<option value="' + l.id + '">' + esc(l.name) + (l.temperature ? ' · ' + esc(l.temperature) : '') + '</option>';
       }).join('');
-      host.querySelector('#st-location').innerHTML = '<option value="">全部位置</option>' + html.slice(html.indexOf('<option value=') + '<option value="">未分配</option>'.length);
-      host.querySelector('#stf-location').innerHTML = html;
+      host.querySelector('#st-location').innerHTML = '<option value="">全部位置</option>' + locOptions;
+      host.querySelector('#stf-location').innerHTML = '<option value="">未分配</option>' + locOptions;
     }
 
     function load() {
