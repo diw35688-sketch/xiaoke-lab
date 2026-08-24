@@ -113,3 +113,11 @@ def initialize_database():
             acknowledged_at TEXT NOT NULL DEFAULT '',
             source TEXT NOT NULL DEFAULT '')""")
         connection.execute("CREATE INDEX IF NOT EXISTS idx_notifications_period ON notifications(period_date,period)")
+        connection.execute("""CREATE TABLE IF NOT EXISTS notification_todos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            notification_id INTEGER NOT NULL,
+            text TEXT NOT NULL,
+            done INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(notification_id) REFERENCES notifications(id))""")
+        connection.execute("CREATE INDEX IF NOT EXISTS idx_notification_todos_notification ON notification_todos(notification_id,id)")

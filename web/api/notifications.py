@@ -15,6 +15,11 @@ class DailyPayload(BaseModel):
     period: str
 
 
+class TodoPayload(BaseModel):
+    text: str | None = None
+    done: bool | None = None
+
+
 class AckPayload(BaseModel):
     ack: bool = True
 
@@ -55,6 +60,53 @@ def daily(payload: DailyPayload):
     ])
     title = f"{period}工作摘要 · {today}"
     return crud.create_daily_notification(period, today, title, body)
+
+
+@router.get("/{notification_id}")
+def detail(notification_id: int):
+    items = crud.list_notifications(limit=1000)
+    item = next((x for x in items if x["id"] == notification_id), None)
+    if item is None:
+        # fallback direct fetch
+        try:
+            item = crud.list_notifications(limit=1000)[0]
+        except Exception:
+            item = None
+    if item is None:
+        raise HTTPException(status_code=404, detail="通知不存在。")
+    item["todos"] = crud.list_notification_todos(notification_id)
+    return item
+
+
+@router.post("/todos")
+def add_todo(payload: TodoPayload):
+    raise HTTPException(status_code=400, detail="缺少 notification_id。")
+
+
+@router.delete("/todos/{todo_id}")
+def remove_todo(todo_id: int):
+    if not crud.delete_notification_todo(todo_id):
+        raise HTTPException(status_code=404, detail="待办不存在。")
+    return {"ok": True}
+
+
+@router.patch("/todos/{todo_id}")
+def edit_todo(todo_id: int, payload: TodoPayload):
+    try:
+        result = crud.update_notification_todo(todo_id, text=payload.text, done=payload.done)
+    except Exception as error:
+        raise HTTPException(status_code=400, detail=str(error))
+    if result is None:
+        raise HTTPException(status_code=404, detail="待办不存在。")
+    return result
+
+
+@router.post("/{notification_id}/todos")
+def add_notification_todo(notification_id: int, payload: TodoPayload):
+    try:
+        return crud.add_notification_todo(notification_id, payload.text or "")
+    except Exception as error:
+        raise HTTPException(status_code=400, detail=str(error))
 
 
 @router.post("/{notification_id}/shown")
