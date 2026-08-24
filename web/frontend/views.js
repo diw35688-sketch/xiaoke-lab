@@ -26,6 +26,11 @@
     ].join('\n');
     document.head.appendChild(style);
   }
+  function shortHazardCodes(codes) {
+    if (!codes || !codes.length) return '';
+    if (codes.length <= 2) return codes.join('/');
+    return codes.slice(0, 2).join('/') + ' 等 ' + codes.length + ' 项';
+  }
   function api(path, method, payload) {
     var options = { method: method || 'GET' };
     if (payload) {
@@ -541,7 +546,7 @@
           return '<div class="reagent-card" data-name="' + esc(r.name) + '">'
             + '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>' + esc(r.name) + '</b>'
             + (r.critical
-                ? '<span style="background:#fee2e2;color:#b91c1c;border-radius:5px;padding:2px 8px;font-size:11px;white-space:nowrap">高危 ' + (r.codes || []).join('/') + '</span>'
+                ? '<span title="' + esc((r.codes || []).join('/')) + '" style="background:#fee2e2;color:#b91c1c;border-radius:999px;padding:2px 9px;font-size:11px;white-space:nowrap;max-width:170px;overflow:hidden;text-overflow:ellipsis">高危 ' + esc(shortHazardCodes(r.codes)) + '</span>'
                 : '<span style="color:#94a3b8;font-size:12px">无高危项</span>') + '</div>'
             + '<div style="color:#64748b;font-size:12px;margin-top:5px">CAS ' + esc(r.cas || '—') + ' · ' + esc(r.formula || '') + '</div>'
             + '<div style="margin-top:8px"><button class="sh-btn" type="button" data-reagent-detail="' + esc(r.name) + '" style="padding:3px 9px;font-size:12px">查看详情</button></div></div>';
