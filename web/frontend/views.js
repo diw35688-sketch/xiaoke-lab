@@ -681,6 +681,11 @@
       + '<div id="settings-inline-holder" style="display:none"></div></div>';
 
     var pane = host.querySelector('#settings-pane');
+    window.__settingsCleanup = function () {
+      var holder = document.getElementById('settings-inline-holder');
+      var modal = document.getElementById('settings-modal');
+      if (holder && holder.firstElementChild && modal) modal.appendChild(holder.firstElementChild);
+    };
     function showPane(id) {
       Array.prototype.forEach.call(host.querySelectorAll('.settings-nav'), function (nav) {
         nav.style.background = nav.dataset.pane === id ? '#eff6ff' : '';
