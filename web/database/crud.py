@@ -500,8 +500,23 @@ def create_daily_notification(period, period_date, title, body):
             "INSERT INTO notifications (kind,period,period_date,title,body,source) VALUES ('daily',?,?,?,?,?)",
             (period, period_date, title, body, "system"),
         )
+        notification_id = cursor.lastrowid
+        summary = work_summary(0)
+        stats = storage_stats()
+        default_todos = [
+            f"确认今日实验记录 {summary['records']} 条",
+            f"整理今日新增储存 {summary['storage_added']} 项",
+            f"检查用户消息 {summary['user_messages']} 条",
+        ]
+        if stats.get("expiring") or stats.get("expired"):
+            default_todos.append(f"处理储存过期提醒 {stats.get('expiring', 0) + stats.get('expired', 0)} 项")
+        for text in default_todos:
+            connection.execute(
+                "INSERT INTO notification_todos (notification_id,text) VALUES (?,?)",
+                (notification_id, text),
+            )
         row = connection.execute(
-            "SELECT * FROM notifications WHERE id=?", (cursor.lastrowid,)
+            "SELECT * FROM notifications WHERE id=?", (notification_id,)
         ).fetchone()
     return dict(row)
 
@@ -545,3 +560,66 @@ def list_notifications(limit=50, unread_only=False):
                 "SELECT * FROM notifications ORDER BY id DESC LIMIT ?", (limit,)
             ).fetchall()
     return [dict(row) for row in rows]
+
+
+# ---------- 通知待办清单 ----------
+
+def list_notification_todos(notification_id):
+    initialize_database()
+    with get_connection() as connection:
+        rows = connection.execute(
+            "SELECT * FROM notification_todos WHERE notification_id=? ORDER BY done,id",
+            (notification_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def add_notification_todo(notification_id, text):
+    text = str(text or "").strip()
+    if not text:
+        raise ValueError("待办内容不能为空。")
+    initialize_database()
+    with get_connection() as connection:
+        cursor = connection.execute(
+            "INSERT INTO notification_todos (notification_id,text) VALUES (?,?)",
+            (notification_id, text),
+        )
+        row = connection.execute(
+            "SELECT * FROM notification_todos WHERE id=?", (cursor.lastrowid,)
+        ).fetchone()
+    return dict(row)
+
+
+def update_notification_todo(todo_id, text=None, done=None):
+    initialize_database()
+    fields = []
+    values = []
+    if text is not None:
+        text = str(text or "").strip()
+        if not text:
+            raise ValueError("待办内容不能为空。")
+        fields.append("text=?")
+        values.append(text)
+    if done is not None:
+        fields.append("done=?")
+        values.append(1 if done else 0)
+    if not fields:
+        raise ValueError("没有可更新的字段。")
+    values.append(todo_id)
+    with get_connection() as connection:
+        cursor = connection.execute(
+            f"UPDATE notification_todos SET {', '.join(fields)} WHERE id=?", values
+        )
+        if not cursor.rowcount:
+            return None
+        row = connection.execute(
+            "SELECT * FROM notification_todos WHERE id=?", (todo_id,)
+        ).fetchone()
+    return dict(row)
+
+
+def delete_notification_todo(todo_id):
+    initialize_database()
+    with get_connection() as connection:
+        cursor = connection.execute("DELETE FROM notification_todos WHERE id=?", (todo_id,))
+    return bool(cursor.rowcount)

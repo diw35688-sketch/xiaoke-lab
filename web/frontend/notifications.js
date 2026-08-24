@@ -58,6 +58,25 @@
       '#daily-footer{padding:14px 24px 20px;display:flex;justify-content:flex-end;gap:8px;background:#fff;border-top:1px solid #f1f5f9}',
       '#daily-footer .sh-btn{padding:7px 14px;border-radius:9px}',
       '#daily-footer .primary{background:#2563eb;border-color:#2563eb;color:#fff}',
+      '#detail-mask{position:fixed;inset:0;z-index:10001;background:rgba(15,23,42,.45);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center}',
+      '#detail-mask.show{display:flex}',
+      '#detail-box{background:#fff;border-radius:18px;width:min(560px,94vw);max-height:85vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 28px 70px rgba(15,23,42,.35)}',
+      '#detail-head{display:flex;align-items:center;justify-content:space-between;padding:15px 18px;border-bottom:1px solid #f1f5f9}',
+      '#detail-head b{font-size:15px;color:#0f172a}',
+      '#detail-close{border:0;background:transparent;font-size:20px;cursor:pointer;color:#94a3b8}',
+      '#detail-body{padding:16px 18px;overflow:auto;flex:1}',
+      '#detail-body .full{background:#f8fafc;border:1px solid #eef2f7;border-radius:12px;padding:12px 14px;color:#475569;font-size:13px;line-height:1.8;white-space:pre-wrap}',
+      '.todo-section-title{font-size:13px;font-weight:700;color:#0f172a;margin:16px 0 8px}',
+      '.todo-row{display:flex;align-items:center;gap:10px;padding:8px 9px;border:1px solid #eef2f7;border-radius:10px;margin-bottom:6px;background:#fff}',
+      '.todo-row .todo-check{width:17px;height:17px;border-radius:50%;border:1.5px solid #cbd5e1;background:#fff;cursor:pointer;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;font-size:10px;color:#fff;transition:.15s}',
+      '.todo-row.done .todo-check{background:#22c55e;border-color:#22c55e}',
+      '.todo-row.done .todo-text{text-decoration:line-through;color:#94a3b8}',
+      '.todo-row .todo-text{flex:1;font-size:13px;color:#334155}',
+      '.todo-row .todo-edit{border:0;background:transparent;color:#64748b;cursor:pointer;font-size:13px;padding:2px 5px}',
+      '.todo-row .todo-del{border:0;background:transparent;color:#b91c1c;cursor:pointer;font-size:13px;padding:2px 5px}',
+      '#detail-add{display:flex;gap:8px;margin-top:10px}',
+      '#detail-add input{flex:1;padding:8px 10px;border:1px solid #cbd5e1;border-radius:9px;font-size:13px;font-family:inherit}',
+
       ''
     ].join('\n');
     document.head.appendChild(style);
@@ -77,12 +96,18 @@
         const periodLabel = { morning: '上午', afternoon: '下午', evening: '晚上' };
         list.innerHTML = items.map(function (n) {
           const label = periodLabel[n.period] || n.period || '通知';
-          return '<div class="notify-item unread">'
+          return '<div class="notify-item unread" data-id="' + n.id + '">'
             + '<div class="n-top"><span class="n-period ' + esc(n.period) + '">' + esc(label) + '</span><span class="n-time">' + esc(n.created_at || '') + '</span></div>'
             + '<div class="n-title">' + esc(n.title) + '</div>'
             + '<div class="n-body">' + esc(n.body) + '</div>'
             + '<div class="n-actions"><button class="sh-btn" data-ack="' + n.id + '">标记已读</button></div></div>';
         }).join('') || '<div style="color:#94a3b8;font-size:12px;padding:26px 4px;text-align:center">暂无未读通知</div>';
+        Array.prototype.forEach.call(list.querySelectorAll('.notify-item'), function (item) {
+          item.onclick = function (e) {
+            if (e.target.closest('[data-ack]')) return;
+            openDetail(item.getAttribute('data-id'));
+          };
+        });
         Array.prototype.forEach.call(list.querySelectorAll('[data-ack]'), function (btn) {
           btn.onclick = function () {
             fetch('/notifications/' + btn.getAttribute('data-ack') + '/ack', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
@@ -119,6 +144,49 @@
     return html || esc(body);
   }
 
+  function renderTodos(todos) {
+    const box = document.getElementById('detail-todos');
+    if (!box) return;
+    box.innerHTML = todos.map(function (todo) {
+      return '<div class="todo-row' + (todo.done ? ' done' : '') + '" data-id="' + todo.id + '">'
+        + '<span class="todo-check" title="标记完成">✓</span>'
+        + '<span class="todo-text">' + esc(todo.text) + '</span>'
+        + '<button class="todo-edit" title="修改">✎</button>'
+        + '<button class="todo-del" title="删除">×</button>'
+        + '</div>';
+    }).join('') || '<div style="color:#94a3b8;font-size:12px">暂无待办</div>';
+    Array.prototype.forEach.call(box.querySelectorAll('.todo-row'), function (row) {
+      row.querySelector('.todo-check').onclick = function () {
+        const id = row.getAttribute('data-id');
+        const done = !row.classList.contains('done');
+        fetch('/notifications/todos/' + id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ done: done }) })
+          .then(function () { openDetail(currentDetailId); });
+      };
+      row.querySelector('.todo-edit').onclick = function () {
+        const id = row.getAttribute('data-id');
+        const text = row.querySelector('.todo-text').textContent;
+        const input = prompt('修改待办', text);
+        if (!input || input.trim() === text) return;
+        fetch('/notifications/todos/' + id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: input.trim() }) })
+          .then(function () { openDetail(currentDetailId); });
+      };
+      row.querySelector('.todo-del').onclick = function () {
+        const id = row.getAttribute('data-id');
+        if (!confirm('删除这条待办？')) return;
+        fetch('/notifications/todos/' + id, { method: 'DELETE' }).then(function () { openDetail(currentDetailId); });
+      };
+    });
+  }
+  var currentDetailId = null;
+  function openDetail(id) {
+    currentDetailId = id;
+    fetch('/notifications/' + id).then(function (r) { return r.json(); }).then(function (n) {
+      document.getElementById('detail-title').textContent = n.title;
+      document.getElementById('detail-full-body').textContent = n.body;
+      renderTodos(n.todos || []);
+      document.getElementById('detail-mask').classList.add('show');
+    });
+  }
   function showDaily(n) {
     const mask = document.getElementById('daily-mask');
     if (!mask) return;
@@ -167,6 +235,22 @@
     document.body.appendChild(panel);
     const mask = document.createElement('div');
     mask.id = 'daily-mask';
+    const detail = document.createElement('div');
+    detail.id = 'detail-mask';
+    detail.innerHTML = '<div id="detail-box"><div id="detail-head"><b>通知详情</b><button id="detail-close">×</button></div>'
+      + '<div id="detail-body"><div class=""></div><div id="detail-body-text" style="display:none"></div>'
+      + '<div id="detail-full-body" class="full"></div>'
+      + '<div class="todo-section-title">待办清单</div><div id="detail-todos"></div>'
+      + '<div id="detail-add"><input id="detail-add-input" placeholder="添加新待办…"><button class="sh-btn" id="detail-add-btn">添加</button></div>'
+      + '</div></div>';
+    document.body.appendChild(detail);
+    document.getElementById('detail-close').onclick = function () { detail.classList.remove('show'); };
+    document.getElementById('detail-add-btn').onclick = function () {
+      const text = document.getElementById('detail-add-input').value.trim();
+      if (!text || !currentDetailId) return;
+      fetch('/notifications/' + currentDetailId + '/todos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: text }) })
+        .then(function () { document.getElementById('detail-add-input').value = ''; openDetail(currentDetailId); });
+    };
     mask.innerHTML = '<div id="daily-box"><div id="daily-hero"><div class="ico" id="daily-hero-ico">📩</div><div><div class="t" id="daily-title"></div><div class="s" id="daily-sub"></div></div></div><button id="daily-close" type="button">×</button><div id="daily-body"></div><div id="daily-footer"><button class="sh-btn" id="daily-view">查看通知</button><button class="sh-btn primary" id="daily-ok">知道了</button></div></div>';
     document.body.appendChild(mask);
 
