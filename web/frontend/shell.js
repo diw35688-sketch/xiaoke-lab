@@ -122,6 +122,7 @@
 
   var current = 'run';
   function show(view) {
+    var previous = current;
     current = view;
     Array.prototype.forEach.call(document.querySelectorAll('.sh-item'), function (n) {
       n.classList.toggle('active', n.dataset.view === view);
@@ -130,7 +131,7 @@
                    records: '本次记录', settings: '设置' };
     el('sh-title').textContent = titles[view] || view;
     var canvas = el('sh-canvas');
-    if (current === 'settings' && window.__settingsCleanup) window.__settingsCleanup();
+    if (previous === 'settings' && window.__settingsCleanup) window.__settingsCleanup();
     canvas.classList.remove('empty');
     var avatar = document.getElementById('assistant-avatar');
     if (avatar) avatar.classList.toggle('avatar-hidden', view !== 'run');
