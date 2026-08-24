@@ -28,7 +28,7 @@
       '#notify-readall{border:0;background:transparent;color:#2563eb;font-size:12px;cursor:pointer}',
       '#notify-close{border:0;background:transparent;font-size:18px;cursor:pointer;color:#94a3b8}',
       '#notify-list{padding:10px 12px;overflow:auto;flex:1}',
-      '.notify-item{padding:11px 12px;border:1px solid #eef2f7;border-radius:12px;margin-bottom:8px;background:#fff;transition:border-color .15s}',
+      '.notify-item{padding:11px 12px;border:1px solid #eef2f7;border-radius:12px;margin-bottom:8px;background:#fff;transition:border-color .15s;cursor:pointer}',
       '.notify-item:hover{border-color:#bfdbfe}',
       '.notify-item.unread{border-color:#dbeafe;background:#f8fbff}',
       '.notify-item .n-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px}',
@@ -104,12 +104,12 @@
             + '<div class="n-body">' + esc(n.body) + '</div>'
             + '<div class="n-actions">' + (unread ? '<button class="sh-btn" data-ack="' + n.id + '">标记已读</button>' : '<span style="font-size:11px;color:#94a3b8">已读</span>') + '</div></div>';
         }).join('') || '<div style="color:#94a3b8;font-size:12px;padding:26px 4px;text-align:center">暂无未读通知</div>';
-        Array.prototype.forEach.call(list.querySelectorAll('.notify-item'), function (item) {
-          item.onclick = function (e) {
-            if (e.target.closest('[data-ack]')) return;
-            openDetail(item.getAttribute('data-id'));
-          };
-        });
+        list.onclick = function (e) {
+          if (!e.target.closest('[data-ack]')) {
+            const item = e.target.closest('.notify-item');
+            if (item) openDetail(item.getAttribute('data-id'));
+          }
+        };
         Array.prototype.forEach.call(list.querySelectorAll('[data-ack]'), function (btn) {
           btn.onclick = function () {
             fetch('/notifications/' + btn.getAttribute('data-ack') + '/ack', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
