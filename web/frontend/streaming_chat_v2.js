@@ -96,6 +96,10 @@
     st.textContent = state; st.className = 'st ' + (view.status || 'done');
     row.querySelector('.chat-tool-body').textContent = lines.join('\n');
     row.classList.toggle('tool-error', view.status === 'error');
+    if (view.status === 'done' && view.ui_action && row.dataset.uiActionApplied !== '1') {
+      row.dataset.uiActionApplied = '1';
+      window.appApplyUiAction?.(view.ui_action);
+    }
     chat.scrollTop = chat.scrollHeight;
   }
 
@@ -109,8 +113,54 @@
     add(WELCOME_TEXT, 'assistant');
   }
 
-  function loadHistory() {
-    const id = localStorage.getItem(conversationKey);
+
+  function addHistoryThink(text) {
+    const row = document.createElement('div');
+    row.className = 'message think done';
+    row.innerHTML = '<div class="chat-think"><div class="chat-think-head"><span class="ic">☰</span><span class="tt">思考过程</span><span class="st">已完成</span></div><div class="chat-think-body"></div></div>';
+    row.querySelector('.chat-think-body').textContent = String(text || '').trim();
+    chat.appendChild(row);
+  }
+
+  function addHistoryTool(data) {
+    let view;
+    try { view = JSON.parse(String(data || '').trim()); }
+    catch (_) { view = { title: String(data || '工具调用'), status: 'done', lines: [] }; }
+    const row = document.createElement('div');
+    row.className = 'message tool' + (view.status === 'error' ? ' tool-error' : '');
+    row.innerHTML = '<div class="chat-tool"><div class="chat-tool-head"><span class="ic">⚙</span><span class="tt"></span><span class="st"></span></div><div class="chat-tool-body"></div></div>';
+    row.querySelector('.chat-tool-head .tt').textContent = view.title || '工具调用';
+    const st = row.querySelector('.chat-tool-head .st');
+    st.textContent = view.status === 'pending' ? '进行中' : (view.status === 'error' ? '失败' : '完成');
+    st.className = 'st ' + (view.status || 'done');
+    row.querySelector('.chat-tool-body').textContent = (view.lines || []).filter(Boolean).join('\n');
+    chat.appendChild(row);
+    if (view.status === 'done' && view.ui_action) window.appApplyUiAction?.(view.ui_action);
+  }
+
+  function renderHistoryContent(content, role) {
+    const parts = String(content || '').split(/(\[\[LABTHINK\]\]|\[\[LABCARD\]\])/g);
+    let pendingText = '';
+    const flushText = () => {
+      if (pendingText.trim()) add(pendingText, role);
+      pendingText = '';
+    };
+    for (let i = 0; i < parts.length; i += 1) {
+      if (parts[i] === '[[LABTHINK]]') {
+        flushText();
+        addHistoryThink(parts[++i] || '');
+      } else if (parts[i] === '[[LABCARD]]') {
+        flushText();
+        addHistoryTool(parts[++i] || '');
+      } else {
+        pendingText += parts[i] || '';
+      }
+    }
+    flushText();
+  }
+
+  function loadHistory(conversationId) {
+    const id = conversationId || localStorage.getItem(conversationKey);
     const url = id
       ? `/chat/history?conversation_id=${encodeURIComponent(id)}`
       : '/chat/history';
@@ -118,18 +168,33 @@
       if (!response.ok) throw new Error('读取对话历史失败');
       return response.json();
     }).then(data => {
-      if (data.conversation_id) localStorage.setItem(conversationKey, data.conversation_id);
+      if (data.conversation_id) {
+        localStorage.setItem(conversationKey, data.conversation_id);
+        document.dispatchEvent(new CustomEvent('conversation-changed'));
+      }
       const messages = data.messages || [];
       if (!messages.length) return;   // 没有历史时保留初始欢迎语
       chat.textContent = '';
       messages.forEach(item => {
-          const clean = String(item.content || '').replace(/\[\[LABTHINK\]\]|\[\[LABCARD\]\]/g, '');
-          add(clean, item.role === 'user' ? 'user' : 'assistant');
+          renderHistoryContent(item.content, item.role === 'user' ? 'user' : 'assistant');
         });
+      chat.scrollTop = chat.scrollHeight;
     }).catch(() => {
       /* 服务端没有历史或接口失败时，保留当前欢迎语即可。 */
     });
   }
+
+  window.switchConversation = function (id) {
+    if (!id) return;
+    stopCurrentResponse(false);
+    localStorage.setItem(conversationKey, id);
+    activeThinkRow = null; toolRows = {};
+    window.runClearStream?.();
+    clearChat();
+    loadHistory(id);
+    document.dispatchEvent(new CustomEvent('conversation-changed', { detail: { conversationId: id } }));
+    input?.focus();
+  };
 
     document.addEventListener('click', event => {
       const phone = event.target.closest('#sh-phone');
@@ -141,10 +206,13 @@
   document.addEventListener('click', event => {
     const button = event.target.closest('#sh-new-chat');
     if (!button) return;
-    localStorage.removeItem(conversationKey);
-    activeThinkRow = null; toolRows = {};
-    window.runClearStream?.();
-    clearChat();
+    if (window.appNewConversation) {
+      window.appNewConversation();
+      return;
+    }
+    fetch('/chat/conversations', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
+    }).then(r => r.json()).then(data => window.switchConversation?.(data.conversation_id));
   });
 
   loadHistory();
@@ -236,7 +304,7 @@
               continue;
             }
             answer += text;
-            reply.textContent = answer;
+            reply.innerHTML = mdToHtml(answer);
             chat.scrollTop = chat.scrollHeight;
             if (autoSpeak.checked) {
               const extracted = takeCompletedSentences(speechBuffer + text);
@@ -244,8 +312,9 @@
               extracted.sentences.forEach(sentence => window.enqueueSpeech?.(sentence));
             }
           } else if (data.type === 'task_queued') {
-            answer = data.answer; reply.textContent = answer;
+            answer = data.answer; reply.innerHTML = mdToHtml(answer);
             if (data.conversation_id) localStorage.setItem(conversationKey, data.conversation_id);
+            document.dispatchEvent(new CustomEvent('conversation-changed'));
             if (autoSpeak.checked) window.enqueueSpeech?.(answer);
             avatar('listening');
             window.refreshTaskPanel?.();
@@ -257,6 +326,7 @@
               avatarThought('···');
             }
             if (data.conversation_id) localStorage.setItem(conversationKey, data.conversation_id);
+            document.dispatchEvent(new CustomEvent('conversation-changed'));
             if (autoSpeak.checked) {
               const extracted = takeCompletedSentences(speechBuffer, true);
               extracted.sentences.forEach(sentence => window.enqueueSpeech?.(sentence));
