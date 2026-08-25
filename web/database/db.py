@@ -6,7 +6,6 @@ def get_connection():
     connection = sqlite3.connect(DATABASE_PATH, timeout=5)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA busy_timeout=5000")
-    connection.execute("PRAGMA journal_mode=WAL")
     return connection
 
 
@@ -18,6 +17,7 @@ def _ensure_column(connection, table, name, definition):
 
 def initialize_database():
     with get_connection() as connection:
+        connection.execute("PRAGMA journal_mode=WAL")
         connection.execute("""CREATE TABLE IF NOT EXISTS experiments (
             id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
             goal TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'pending',
@@ -27,7 +27,6 @@ def initialize_database():
         _ensure_column(connection, "experiments", "plan_id", "INTEGER")
         _ensure_column(connection, "experiments", "step_order", "INTEGER")
         _ensure_column(connection, "experiments", "depends_on", "TEXT NOT NULL DEFAULT ''")
-        connection.execute("UPDATE experiments SET status='pending' WHERE status IS NULL OR status NOT IN ('pending','in_progress','completed')")
         connection.execute("""CREATE TABLE IF NOT EXISTS experiment_plans (
             id INTEGER PRIMARY KEY AUTOINCREMENT, template_id TEXT NOT NULL,
             name TEXT NOT NULL, start_at TEXT NOT NULL,

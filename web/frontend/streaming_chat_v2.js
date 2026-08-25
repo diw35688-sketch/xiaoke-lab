@@ -141,22 +141,42 @@
   function renderHistoryContent(content, role) {
     const parts = String(content || '').split(/(\[\[LABTHINK\]\]|\[\[LABCARD\]\])/g);
     let pendingText = '';
+    let thinkBuffer = '';
+    let thinkMode = false;
     const flushText = () => {
-      if (pendingText.trim()) add(pendingText, role);
+      if (pendingText.trim()) {
+        if (thinkBuffer.trim()) { addHistoryThink(thinkBuffer); thinkBuffer = ''; }
+        add(pendingText, role);
+      }
       pendingText = '';
     };
+    const flushThink = () => {
+      if (thinkBuffer.trim()) addHistoryThink(thinkBuffer);
+      thinkBuffer = '';
+      thinkMode = false;
+    };
     for (let i = 0; i < parts.length; i += 1) {
-      if (parts[i] === '[[LABTHINK]]') {
+      const part = parts[i];
+      if (part === '[[LABTHINK]]') {
+        thinkMode = true;
+        continue;
+      }
+      if (part === '[[LABCARD]]') {
         flushText();
-        addHistoryThink(parts[++i] || '');
-      } else if (parts[i] === '[[LABCARD]]') {
-        flushText();
+        flushThink();
         addHistoryTool(parts[++i] || '');
+        continue;
+      }
+      if (thinkMode) {
+        thinkBuffer += part || '';
+        thinkMode = false;
       } else {
-        pendingText += parts[i] || '';
+        if (thinkBuffer.trim()) { addHistoryThink(thinkBuffer); thinkBuffer = ''; }
+        pendingText += part || '';
       }
     }
     flushText();
+    flushThink();
   }
 
   function loadHistory(conversationId) {
