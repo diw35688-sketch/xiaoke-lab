@@ -37,18 +37,22 @@
       '.storage-map-toolbar{display:flex;gap:8px;align-items:center;margin-top:10px}',
       '.storage-view-btn{border:1px solid #e2e8f0;background:#fff;border-radius:999px;padding:4px 12px;font-size:12px;cursor:pointer;color:#64748b}',
       '.storage-view-btn.active{background:#2563eb;color:#fff;border-color:#2563eb}',
-      '.storage-map{display:flex;gap:14px;overflow-x:auto;padding:4px 0 16px;margin-top:12px;align-items:flex-start}',
-      '.storage-map-loc{flex:0 0 260px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:12px;min-height:200px;transition:border-color .15s,background .15s}',
-      '.storage-map-loc.dragover{border-color:#3b67e8;background:#eff6ff}',
-      '.storage-map-loc-title{font-weight:700;color:#0f172a;font-size:13px;margin-bottom:2px}',
-      '.storage-map-loc-sub{color:#94a3b8;font-size:11px;margin-bottom:8px}',
-      '.storage-map-slot{margin-top:8px;border:1px dashed #e2e8f0;border-radius:10px;padding:8px;min-height:58px;background:#f8fafc}',
-      '.storage-map-slot.dragover{border-color:#3b67e8;background:#f0f9ff}',
-      '.storage-map-slot-title{font-size:11px;color:#64748b;font-weight:600;margin-bottom:4px}',
-      '.storage-chip{display:block;background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:5px 7px;margin-bottom:5px;cursor:grab;font-size:11px;line-height:1.4;box-shadow:0 1px 3px rgba(15,23,42,.05)}',
-      '.storage-chip.dragging{opacity:.5}',
-      '.storage-chip .tn{font-weight:600;color:#0f172a}',
-      '.storage-chip .tm{color:#94a3b8;font-size:10px}',
+      '.storage-tree{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px 16px;margin-top:12px}',
+      '.tree-node{cursor:pointer;padding:6px 8px;border-radius:8px;position:relative}',
+      '.tree-node:hover{background:#f8fafc}',
+      '.tree-node.dragover{background:#eff6ff;outline:2px solid rgba(59,103,232,.25)}',
+      '.tree-caret{display:inline-block;width:14px;color:#94a3b8;font-size:10px;transition:transform .15s}',
+      '.tree-node.open .tree-caret{transform:rotate(90deg)}',
+      '.tree-loc{font-weight:700;color:#0f172a;font-size:13px}',
+      '.tree-loc-sub{color:#94a3b8;font-size:11px;margin-left:4px}',
+      '.tree-children{padding-left:22px;display:none}',
+      '.tree-node.open>.tree-children{display:block}',
+      '.tree-slot{display:flex;align-items:center;gap:8px;color:#475569;font-size:12px;padding:4px 0}',
+      '.tree-item{display:flex;align-items:center;gap:8px;padding:4px 8px;border-radius:8px;cursor:grab;background:#f8fafc;border:1px solid #eef2f7;margin:3px 0}',
+      '.tree-item.dragging{opacity:.5}',
+      '.tree-item .tn{font-weight:600;color:#0f172a;font-size:12px}',
+      '.tree-item .tm{color:#94a3b8;font-size:11px}',
+      '.tree-item .st-badge{margin-left:auto}',
       '.storage-map-empty{color:#94a3b8;font-size:12px;padding:20px 0}',
       '.storage-card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:13px 15px;cursor:pointer;transition:border-color .15s,box-shadow .15s}',
       '.storage-card:hover{border-color:#3b67e8;box-shadow:0 4px 12px rgba(59,103,232,.08)}',
@@ -142,42 +146,50 @@
 
     function renderMap(locations, items) {
       var map = host.querySelector('#st-map');
-      var locMap = {};
-      locations.forEach(function (l) { locMap[l.id] = l; });
       var unassigned = items.filter(function (i) { return !i.location_id; });
       var assigned = items.filter(function (i) { return i.location_id; });
-      map.innerHTML = locations.map(function (loc) {
-        var locItems = assigned.filter(function (i) { return i.location_id == loc.id; });
-        var groups = {};
-        locItems.forEach(function (i) {
-          var key = i.position || '未分格';
-          (groups[key] = groups[key] || []).push(i);
-        });
-        var slots = Object.keys(groups).map(function (key) {
-          var chips = groups[key].map(function (i) {
-            return '<div class="storage-chip" draggable="true" data-id="' + i.id + '">'
-              + '<div class="tn">' + esc(i.name) + '</div>'
-              + '<div class="tm">' + esc(i.quantity || '') + ' ' + esc(i.unit || '') + ' · ' + statusHtml(i.status) + '</div></div>';
-          }).join('');
-          return '<div class="storage-map-slot" data-loc="' + loc.id + '" data-pos="' + esc(key) + '"><div class="storage-map-slot-title">' + esc(key) + '</div>' + (chips || '<div style="color:#cbd5e1;font-size:11px">空</div>') + '</div>';
-        }).join('') || '<div class="storage-map-slot" data-loc="' + loc.id + '" data-pos=""><div class="storage-map-slot-title">未分格</div><div style="color:#cbd5e1;font-size:11px">空</div></div>';
-        return '<div class="storage-map-loc" data-loc="' + loc.id + '">'
-          + '<div class="storage-map-loc-title">' + esc(loc.name) + '</div>'
-          + '<div class="storage-map-loc-sub">' + esc(loc.type || '') + (loc.temperature ? ' · ' + esc(loc.temperature) : '') + ' · ' + locItems.length + ' 项</div>'
-          + slots
-          + '</div>';
-      }).join('') + (unassigned.length ? '<div class="storage-map-loc" data-loc="" style="border-style:dashed"><div class="storage-map-loc-title">未分配</div><div class="storage-map-loc-sub">' + unassigned.length + ' 项</div><div class="storage-map-slot" data-loc="" data-pos=""><div class="storage-map-slot-title">拖到这里</div>' + unassigned.map(function (i) {
-        return '<div class="storage-chip" draggable="true" data-id="' + i.id + '"><div class="tn">' + esc(i.name) + '</div><div class="tm">' + esc(i.quantity || '') + ' ' + esc(i.unit || '') + '</div></div>';
-      }).join('') + '</div></div>' : '');
+      map.innerHTML = '<div class="storage-tree">'
+        + locations.map(function (loc) {
+          var locItems = assigned.filter(function (i) { return i.location_id == loc.id; });
+          var groups = {};
+          locItems.forEach(function (i) {
+            var key = i.position || '未分格';
+            (groups[key] = groups[key] || []).push(i);
+          });
+          var slotHtml = Object.keys(groups).map(function (key) {
+            var rows = groups[key].map(function (i) {
+              return '<div class="tree-item" draggable="true" data-id="' + i.id + '">'
+                + '<span class="tn">' + esc(i.name) + '</span>'
+                + '<span class="tm">' + esc(i.quantity || '') + ' ' + esc(i.unit || '') + '</span>'
+                + statusHtml(i.status) + '</div>';
+            }).join('');
+            return '<div class="tree-node" data-loc="' + loc.id + '" data-pos="' + esc(key) + '"><span class="tree-caret">▶</span><span class="tree-slot">' + esc(key) + ' · ' + groups[key].length + ' 项</span><div class="tree-children">' + rows + '</div></div>';
+          }).join('') || '<div class="tree-node" data-loc="' + loc.id + '" data-pos=""><span class="tree-caret">▶</span><span class="tree-slot">未分格 · 0 项</span><div class="tree-children"></div></div>';
+          return '<div class="tree-node" data-loc="' + loc.id + '"><span class="tree-caret">▶</span><span class="tree-loc">' + esc(loc.name) + '</span><span class="tree-loc-sub">' + esc(loc.type || '') + (loc.temperature ? ' · ' + esc(loc.temperature) : '') + ' · ' + locItems.length + ' 项</span><div class="tree-children">' + slotHtml + '</div></div>';
+        }).join('')
+        + '<div class="tree-node" data-loc=""><span class="tree-caret">▶</span><span class="tree-loc">未分配</span><span class="tree-loc-sub">' + unassigned.length + ' 项</span><div class="tree-children">' + unassigned.map(function (i) {
+          return '<div class="tree-item" draggable="true" data-id="' + i.id + '"><span class="tn">' + esc(i.name) + '</span><span class="tm">' + esc(i.quantity || '') + ' ' + esc(i.unit || '') + '</span></div>';
+        }).join('') + '</div></div>'
+        + '</div>';
 
-      Array.prototype.forEach.call(map.querySelectorAll('.storage-chip'), function (chip) {
-        chip.addEventListener('dragstart', function (e) {
-          e.dataTransfer.setData('text/plain', chip.getAttribute('data-id'));
-          chip.classList.add('dragging');
-        });
-        chip.addEventListener('dragend', function () { chip.classList.remove('dragging'); });
+      // Toggle tree nodes
+      Array.prototype.forEach.call(map.querySelectorAll('.storage-tree > .tree-node'), function (node) {
+        node.onclick = function (e) {
+          if (e.target.closest('.tree-item')) return;
+          node.classList.toggle('open');
+        };
       });
-      Array.prototype.forEach.call(map.querySelectorAll('.storage-map-loc, .storage-map-slot'), function (zone) {
+      // Drag items
+      Array.prototype.forEach.call(map.querySelectorAll('.tree-item'), function (item) {
+        item.addEventListener('dragstart', function (e) {
+          e.stopPropagation();
+          e.dataTransfer.setData('text/plain', item.getAttribute('data-id'));
+          item.classList.add('dragging');
+        });
+        item.addEventListener('dragend', function () { item.classList.remove('dragging'); });
+      });
+      // Drop on location/slot nodes
+      Array.prototype.forEach.call(map.querySelectorAll('.tree-node'), function (zone) {
         zone.addEventListener('dragover', function (e) { e.preventDefault(); zone.classList.add('dragover'); });
         zone.addEventListener('dragleave', function () { zone.classList.remove('dragover'); });
         zone.addEventListener('drop', function (e) {
