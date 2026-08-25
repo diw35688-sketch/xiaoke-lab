@@ -14,6 +14,7 @@ class SettingsPayload(BaseModel):
     base_url: str | None = None
     model_name: str | None = None
     tts_enabled: bool | None = None
+    speak_record_ack: bool | None = None
     tts_url: str | None = None
     tts_provider: str | None = None
     tts_api_key: str | None = None

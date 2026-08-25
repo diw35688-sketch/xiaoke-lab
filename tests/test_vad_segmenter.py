@@ -44,6 +44,15 @@ class FakeVad:
         self._segments.pop(0)
 
 
+class InvalidatingFakeVad(FakeVad):
+    """模拟 sherpa：pop 后 front 对象的底层 samples 立即失效。"""
+
+    def pop(self):
+        self.pop_count += 1
+        segment = self._segments.pop(0)
+        segment.samples = np.array([], dtype=np.float32)
+
+
 def make_segmenter(**kwargs):
     kwargs.setdefault("vad", FakeVad([]))
     return VadSegmenter(
@@ -55,6 +64,20 @@ def make_segmenter(**kwargs):
 
 
 class VadSegmenterBasicTests(unittest.TestCase):
+    def test_segment_is_copied_before_vad_pop_invalidates_front(self):
+        audio = np.zeros(SAMPLE_RATE, dtype=np.float32)
+        vad = InvalidatingFakeVad(
+            [FakeSegment(samples=[0.9, 0.8, 0.7], start=8_000)]
+        )
+
+        segment = make_segmenter(vad=vad).segment_audio(audio)[0]
+
+        self.assertEqual(vad.pop_count, 1)
+        np.testing.assert_array_equal(
+            segment.samples[-3:],
+            np.array([0.9, 0.8, 0.7], dtype=np.float32),
+        )
+
     def test_single_segment_includes_pre_roll(self):
         audio = np.zeros(SAMPLE_RATE, dtype=np.float32)
         vad = FakeVad([FakeSegment(samples=[0.9, 0.8, 0.7], start=8_000)])

@@ -4253,3 +4253,358 @@ web 会直接断供。本轮把桥迁到统一链，并补齐 `recent_context` �
 - 反面例子：继续叫 `asr_listening` 会让维护者误以为它只在 ASR 工作时为真，进而删掉短停顿期间的保护逻辑。
 - 确认点：为什么运行状态要保留两个字段，而播放快照可以合并成一个 `voice_input_busy`？
 
+## 2026-08-23（VOICE-C5-D3/D4）：共享业务服务以后，入口还需要自己的呈现适配
+
+- 白话：聊天工具和网页按钮现在都去同一个“后厨”保存记录，但工具不能把后厨对象原样扔给用户，也不能再请模型自由改写一遍；它需要一个薄适配层，把同一份业务意图稳定地变成聊天回复。
+- 最小知识块：① D3 让 `record_observation` 构造 `RecordCommand` 并调用 `SharedRecordService`；② 工具保留原五字段合同，避免一次迁移同时破坏调用方；③ D4 用 `PresentationDeliveryPlan` 和 `WebRenderer` 生成确定性结果；④ 同轮工具全部执行完后再呈现，不能为了提前回复而跳过后续工具。
+- 专业术语：入口适配器（inbound adapter）、输出适配器（outbound/presentation adapter）、合同兼容（contract compatibility）、确定性投影（deterministic projection）。
+- 项目实际体现：`web/lab_tools.py` 删除内联抽取、评估、段号和保存；`web/tool_presentation.py` 新增工具呈现；`web/agent/core.py` 用 `_run_tool_with_presentation()` 统一同步与流式工具路径。D3 相邻回归 `104/104`；D4 核心与呈现回归 `111/111`，流事件合同 `7/7`。
+- 反面例子：只让工具调用共享服务，却继续让第二次 LLM 自由生成“已记录”，可能把保存结果、追问和最终话术再次改乱；反过来，如果共享服务直接返回 Web JSON，它又会依赖具体页面格式。
+- 确认点：为什么“共享记录业务”不等于“所有入口必须返回同一种最终 JSON”？
+
+## 2026-08-23（VOICE-C5-D5）：屏幕文字不是播放命令
+
+- 白话：一段回复能显示在屏幕上，不代表它现在可以从扬声器念出来。D5 先把普通聊天正文改成 `screen_delta`，只让它上屏，不让它顺手操作 TTS。
+- 最小知识块：① `screen_delta` 只携带 `type/text`；② 前端只累积文字并更新 DOM；③ 事件不携带 `voice_text`，也不检查语音开关；④ 内容资格和运行时播放要由后续独立合同处理。
+- 专业术语：渠道分离（channel separation）、事件单一语义（single semantic meaning）、命令—事件分离（command-event separation）、能力边界（capability boundary）。
+- 项目实际体现：`web/stream_contract.py::agent_chunk_event()` 把普通字符串映射为屏幕事件；`web/api/chat.py` 使用统一合同；`web/frontend/streaming_chat_v2.js` 的 `screen_delta` 分支只更新 reply。组合回归 `124/124`，Node 语法检查通过。
+- 反面例子：前端看到任意 `delta` 就调用 `enqueueSpeech()`，会让普通正文绕过用户讲话状态、播放优先级和抢占规则；即使后端有 Scheduler，也只是一套表面架构。
+- 确认点：为什么 `text` 本身不应该被视为操作扬声器的许可？
+
+## 2026-08-23（VOICE-C5-D7/D6/D8）：建立新语音事件前后，都必须清除旧播放旁路
+
+- 白话：新建一条受控高速公路还不够，旧土路如果仍能直达扬声器，车辆就会绕过收费站。第 23 项先删除 `delta` 直播，第 22 项再建立 `voice_delivery` 候选事件，第 24 项继续删除 `task_queued` 直播。
+- 最小知识块：① `delta` 和 `task_queued` 保留显示与状态职责，但失去直接播放能力；② `voice_delivery` 携带稳定 `intent_id/kind/priority/voice_text`；③ `CONTENT_ELIGIBLE` 只表示内容适合播报，不表示现在可以播放；④ 同轮工具计划先合并后重算语音预算，防止每个工具分别获得完整预算。
+- 专业术语：旁路（bypass）、影子执行路径（shadow execution path）、资格判断（eligibility）、运行时授权（runtime authorization）、预算聚合（budget aggregation）。
+- 项目实际体现：两份 `streaming_chat*.js` 删除 `delta → enqueueSpeech` 和 `task_queued → enqueueSpeech`；`web/tool_presentation.py` 新增 `ToolVoiceDeliveryBatch/merge_tool_plans()`；`web/stream_contract.py` 新增类型化语音事件。第 23 项组合回归 `125/125`，第 22 项 `130/130`，第 24 项针对性 `24/24`、组合 `133/133`。
+- 反面例子：如果每个工具独立计算“最多一问”，一轮三个工具就可能念三条问题；如果 `CONTENT_ELIGIBLE` 到浏览器便直接播放，内容政策就被错误地当成运行时许可。
+- 确认点：为什么“适合播报”和“此刻允许播报”必须由两层不同规则回答？
+
+## 2026-08-23（VOICE-C5-D9）：浏览器执行端必须默认拒绝未知授权
+
+- 白话：浏览器像最后一道门卫。它不能因为事件里有 `voice_text` 就开门，只有结构合法、用户启用语音，而且授权明确是 `READY` 或 `PREEMPT` 时才操作 TTS。
+- 最小知识块：① 先验证 payload 和稳定意图字段；② `CONTENT_ELIGIBLE/DEFERRED/DROP/未知状态` 都没有播放副作用；③ `READY` 才排队；④ `PREEMPT` 才停止旧语音并替换播放；⑤ 缺少浏览器 TTS 能力时明确返回不可用，而不是偷偷从屏幕文字恢复直播。
+- 专业术语：执行端口（execution port）、防腐层（anti-corruption layer）、默认拒绝（deny by default）、状态协议（state protocol）。
+- 项目实际体现：新增 `web/frontend/voice_delivery_client.js`；活动与遗留流客户端只调用 `window.consumeVoiceDelivery(data)`。Node spy 行为测试验证候选零调用、READY 调用序列、PREEMPT 的 stop/speak/enqueue 顺序；Python 专项 `27/27`，组合回归 `136/136`。
+- 反面例子：对未知授权使用“默认播放”，服务端以后拼错字符串也会触发扬声器；对坏 payload 静默降级到正文播放，则重新打开了刚删除的旁路。
+- 确认点：为什么执行副作用的边界应该“只接受明确允许”，而不是“没有明确禁止就执行”？
+
+## 2026-08-23（VOICE-C5-D10）：统一调度不等于服务器已经知道浏览器现实
+
+- 白话：三个入口已经共用一个调度员，但调度员当时还没收到浏览器的“用户正在讲话、旧语音正在播放”实时报告，所以它只能根据默认空闲快照批准内容；架构接通不等于“不抢话”已经真实完成。
+- 最小知识块：① `WebPlaybackService` 把 `VoiceDeliveryItem` 转为带 TTL 的 `PlaybackRequest`；② `/record` 和 chat tool 共用同一个 Scheduler；③ `BrowserPlaybackExecutionPort` 表达批准后交给浏览器执行；④ 桌面和手机只消费授权事件；⑤ 浏览器 VAD/TTS 事实尚未回传时，服务器状态可能与现实不一致。
+- 专业术语：集中式调度（centralized scheduling）、分布式状态一致性（distributed state consistency）、执行端口（execution port）、时效约束/TTL（time-to-live）。
+- 项目实际体现：新增 `web/playback_runtime.py`；`web/api/record.py` 和 chat 工具流接入共享 `web_playback_service`；`voice_asr.js/mobile.js` 删除从 `messages.voice_text` 直接发声。纯调度/事件专项 `18/18`、相邻回归 `31/31`、Node 行为测试通过。
+- 反面例子：看到三个入口都调用 Scheduler 就宣称“用户讲话期间绝不会播放”，忽略服务器未收到真实 VAD/TTS 状态，是把结构接线证据扩大成真实行为证据。
+- 确认点：为什么服务器默认快照为空闲时，统一调度仍不能证明真实“不抢话”？
+
+## 2026-08-23（VOICE-C5-E1）：架构约束必须成为可执行测试
+
+- 白话：只在文档里写“正文不能直播、记录入口必须共用调度”不够；以后任何人都可能无意中加回一行 `enqueueSpeech()`。E1 把这些禁止事项写成测试，让违规修改自动变红。
+- 最小知识块：① DeliveryPlan 不读取运行状态或 TTS；② Gate 只做决定；③ `/record` 和 chat tool 共用播放服务；④ 记录客户端只消费授权事件；⑤ 流式客户端不得从正文和 done 恢复播放；⑥ 合法的后台任务完成通知作为明确例外保护。
+- 专业术语：架构适应度函数（architecture fitness function）、特征测试（characterization test）、依赖方向（dependency direction）、回归护栏（regression guardrail）。
+- 项目实际体现：新增 `tests/test_c5_architecture_freeze.py` 七类护栏，并删除两份流式客户端中虽不可达但可复活的 `speechBuffer/done→enqueueSpeech` 残留。冻结专项 `20/20`、C5 组合回归 `190/190`；当时项目 discover 的 17 个错误来自 NumPy/Pydantic ABI 导入环境，不被伪报为业务断言通过。
+- 反面例子：只因为旧 `speechBuffer` 当前没人写入就保留它，未来某次赋值会无意中复活正文直播，而普通功能测试未必能指出这是架构退化。
+- 确认点：为什么“当前不可达的副作用代码”仍值得删除并加入架构测试？
+
+## 2026-08-24（真实验收复盘）：UI 状态、配置状态和设备事实不能混为一谈
+
+- 白话：录音键变红只说明按钮换了样式，不证明麦克风真的在采集；喇叭显示开启只说明配置或图标状态，不自动等于当前语音能立即停止。真实体验把自动测试没有覆盖的状态错位暴露出来。
+- 最小知识块：① UI 表示状态要从真实媒体状态投影，不能把点击动作直接当作成功；② “允许未来播报”是配置，“立即停止当前声音”是命令；③ 真实验收要观察权限、媒体流、音频帧、请求、保存、呈现和播放整条链；④ 找不到“立即静音”控件时，不能用代码中的 stop 能力冒充产品已经提供该操作。
+- 专业术语：表示状态（presentation state）、设备状态（device state）、乐观 UI（optimistic UI）、配置—命令分离（configuration-command separation）、可供性/可发现性（affordance/discoverability）。
+- 项目实际体现：桌面录音入口位于 `web/frontend/voice_asr.js`；播放配置与执行分散在 `tts_settings.js/settings.js/local_tts.js/voice_delivery_client.js`。用户真实报告“按钮变红但不录”“播报一直开启”“立即静音不存在”，这些是 UX 证据，不由自动测试替代。
+- 反面例子：看到按钮 class 已切换就写“录音成功”，或看到 `stopSpeech()` 函数存在就写“页面支持立即静音”，都是把内部能力误报成用户可用功能。
+- 确认点：验收录音按钮时，除了颜色变化，至少还要观察哪三个真实状态？
+
+## 2026-08-24（VOICE-C5-E2）：沿字段生命周期定位追问为何消失
+
+- 白话：自由实验只回“已记录”并不是模型不会追问。模型已经产生缺失字段和问题，但 Web 桥没完整搬运，后面的自由模式空方案评估又把语义追问覆盖掉了。
+- 最小知识块：① 从最终现象反向列出模型、桥、服务、保存、呈现五个可能断点；② 追踪 `missing_fields/should_ask_follow_up/follow_up_question` 的产生、映射、覆盖和持久化；③ 自由模式没有确定性方案依据，正常 experiment 分支的语义追问拥有权威；④ 方案模式仍以确定性评估为权威；⑤ 保存成功后才能产生 clarification。
+- 专业术语：程序切片（program slicing）、数据合同漂移（data contract drift）、信息丢失（information loss）、权威来源（source of truth）、提交后副作用（post-commit side effect）。
+- 项目实际体现：`web/llm_bridge.py` 透传追问合同；`web/record_service.py::_select_effective_evaluation()` 只在 free、非 degraded、experiment 且合同完整时采用语义追问；`_shared_result_after_save()` 位于 `_save_record()` 之后。专项 `17/17`、相邻回归 `59/59`、全量 `1012/1012`。
+- 反面例子：直接加强提示词无法修复后端字段丢失；前端看到 `missing_fields` 就自己拼问题，会绕过模式权威、持久化状态和保存失败边界。
+- 确认点：为什么方案模式下不能因为模型生成了更自然的问题，就无条件覆盖确定性方案问题？
+
+## 2026-08-24（VOICE-C5-E3）：优化首次反馈不能提前承诺成功
+
+- 白话：旧 `/record` 要等模型完整理解、保存和最终响应后页面才变化，最近模型阶段本身约 3.42～4.73 秒。E3 没有假装模型更快，而是先告诉用户“正在理解”，保存成功后才发最终结果。
+- 最小知识块：① 区分端到端延迟和首次反馈延迟；② `POST /record/stream` 使用一行一个完整 JSON 的 NDJSON；③ `record_status` 是不承诺数据成功的进度事件；④ `record_result` 必须在共享记录事务成功后产生；⑤ 保存失败发送 `record_error` 并结束；⑥ 前端用 `ReadableStream.getReader()` 和行缓冲处理任意网络分片。
+- 专业术语：首次反馈时间（time to first feedback）、NDJSON、流式传输（streaming transport）、消息分帧（message framing）、提交后最终事件（post-commit final event）。
+- 项目实际体现：`web/api/record.py::_record_events()` 先 yield status，再调用原 `_record_response()`；桌面 `voice_asr.js::streamRecord()` 与手机 `mobile.js::postRecord()` 增量解析。专项 `44/44`、相邻复验 `40/40`、全量 `1017/1017`，两份 JavaScript 语法检查通过。
+- 反面例子：让模型结构化 JSON 按 token 直接驱动业务，可能在 JSON 尚未闭合时产生半截追问；保存前流式显示“已记录”则会在落盘失败时制造虚假成功。
+- 确认点：为什么“正在理解”可以在保存前发送，而“已记录”和正式追问必须等保存后？
+
+## 2026-08-24（本对话学习方法校准）：读代码要找第一次变坏的位置
+
+- 白话：学习不能只看 Agent 的总结。每个问题先写用户输入、预期结果、实际结果和要追踪的字段，再从入口沿数据流逐层比较输入输出；哪一层输入仍正确、输出第一次错误，根因通常就在这层。
+- 最小知识块：① 从用户动作定位前端入口和 HTTP/SSE 接口；② 用字段搜索做程序切片，不从文件第一行漫读；③ 同时追踪数据、状态和真实副作用；④ 把复杂 `if` 转成决策表；⑤ 修改前画问题地图和代码阅读地图；⑥ 修改后检查 diff 范围并按静态、单元、集成、全量、真实验收分级结论。
+- 专业术语：可证伪假设（falsifiable hypothesis）、故障域隔离（fault-domain isolation）、程序切片（program slicing）、决策表（decision table）、副作用边界（side-effect boundary）、证据等级（evidence hierarchy）。
+- 项目实际体现：第 28 项从页面“只记录”追踪到桥接字段和 evaluation 权威；第 29 项从 `llm_seconds` 测量定位首次反馈瓶颈，而不是凭感觉重写模型；详见 `docs/本对话工作逐项梳理_第19至29项.md`。
+- 反面例子：从最终文案直接猜“提示词不够强”，或一次把前端、模型、数据库、TTS 全改掉，会让失败无法归因，也让用户无法检查修改是否越界。
+- 确认点：面对“网页没有追问”，你会选择追踪哪三个字段，并从哪个入口开始？
+
+## 2026-08-24（本次对话补录）：从多入口融合到 VAD 回归，以及如何亲自沿代码核对 Agent
+
+> 补录范围：本次对话已经推进但尚未完整进入学习日志的第 19～32 项，以及用户明确要求掌握的
+> 代码阅读方法。逐项结果和文件索引另见 `docs/VOICE_WEB_CONVERSATION_REVIEW_2026-08-24.md`；
+> 本节不重复任务流水账，只归纳可迁移的工程知识。
+
+### 知识 1：多个入口可以不同，但业务成功只能有一个权威定义
+
+- **白话解释**：网页录音、Agent 工具和聊天就像三个前台窗口。它们收单的方式不同，但不能各自决定
+  “什么时候算记录成功、成功后该不该追问”。三个窗口都应把单据交给同一个后厨；只有数据真正保存后，
+  后厨才允许说“已记录”或提出下一问。
+- **最小知识块**：① 入口只负责把 HTTP、工具参数或聊天事件翻译成应用命令；②
+  `SharedRecordService` 统一理解、保存和保存后投影的顺序；③ `PresentedToolResult` 与
+  `voice_delivery` 再把业务结果翻译到屏幕和语音渠道；④ `/record`、tool、chat 最终共用
+  `PlaybackScheduler`，而不是复制三份播放判断。
+- **专业术语**：多入口单用例（multiple adapters, one use case）、薄控制器（thin controller）、
+  事务提交点（transaction commit point）、统一执行路径（single execution path）。
+- **真实代码/运行输出**：第 19～27 项涉及 `web/lab_tools.py`、`web/record_service.py`、
+  `web/tool_presentation.py`、`web/api/record.py`、`web/api/chat.py`、`web/playback_runtime.py`、
+  `web/frontend/voice_delivery_client.js` 和 `tests/test_c5_architecture_freeze.py`。旧的
+  `delta → enqueueSpeech` 与 `task_queued → enqueueSpeech` 被移除，前端只消费后端明确授权的
+  `voice_delivery`；当前计划把第 19～27 项标为 `AUTO_OK`。
+- **反面例子**：如果 `/record` 保存失败，但路由在调用共享服务前已经生成“已记录”，用户会得到虚假
+  成功；如果 chat delta 仍可直接朗读，即使服务器 Gate 判定 `DEFERRED`，浏览器旁路也会抢话。
+- **确认点**：检查一个新入口时，能否指出“协议转换在哪里结束、共享业务从哪里开始、成功反馈在哪个
+  保存动作之后产生”？
+
+### 知识 2：屏幕文字、状态通知和语音授权是三种不同事件
+
+- **白话解释**：屏幕上出现一句字，不代表系统获准把它念出来；“任务已排队”也只是状态，不是一句
+  待播台词。只有后端明确盖过“允许语音交付”的章，前端播放器才可以动作。
+- **最小知识块**：① `screen_delta` 只负责增量显示；② `task_queued` 只表达任务状态；③
+  `voice_delivery` 携带经过播放规则处理的语音交付；④ 前端客户端校验协议，但不重新发明播放规则；
+  ⑤ 架构冻结测试防止旧朗读旁路再次出现。
+- **专业术语**：渠道分离（channel separation）、事件语义单一化（single-purpose event）、
+  能力授权（capability authorization）、架构适应度函数（architecture fitness function）。
+- **真实代码/运行输出**：`web/stream_contract.py` 定义流事件，`web/api/chat.py` 发送事件，
+  `web/frontend/streaming_chat.js` 与 `streaming_chat_v2.js` 只渲染 delta，
+  `web/frontend/voice_delivery_client.js` 只执行获准播放事件，
+  `tests/test_c5_architecture_freeze.py` 冻结职责边界。
+- **反面例子**：把每个模型 token 都送去 TTS，会产生断断续续的朗读，也完全绕过用户讲话状态；把
+  `task_queued` 当台词，会让一个内部状态词在不合适的时机突然出声。
+- **确认点**：看到一个新前端事件时，能否先问“它只负责显示、报告状态，还是正式授予播放能力”？
+
+### 知识 3：中间层必须保留语义，首次反馈不能冒充最终结果
+
+- **白话解释**：统一理解已经发现“还缺体积”并准备好追问，中间转交时不能只递“记录成功”这一半；
+  同样，用户等待期间可以先看到“正在理解”，但这张进度牌不能冒充已经保存好的最终结果。
+- **最小知识块**：① 第 28 项沿数据链保留 `missing_fields / should_ask_follow_up /
+  follow_up_question`；② 自由实验使用统一理解产生的语义追问，方案模式继续使用确定性评估；③ 只有
+  保存成功后才投影 `CLARIFICATION`；④ 第 29 项的 `/record/stream` 先发
+  `record_status/understanding`，事务成功后发 `record_result`，失败只发 `record_error`；⑤ 这是首反馈
+  流式，不是模型 token 或 TTS 内容级流式。
+- **专业术语**：语义保真（semantic preservation）、数据血缘（data lineage）、提交后投影
+  （post-commit projection）、渐进反馈（progressive feedback）、NDJSON 流。
+- **真实代码/运行输出**：第 28 项主要落在 LLM Web 桥接、`web/record_service.py` 及对应测试；
+  第 29 项主要落在 `web/api/record.py` 与桌面/手机 `ReadableStream` 消费代码。计划记录第 28 项专项
+  17/17、相邻回归 59/59、全量 1012/1012；第 29 项流式/前端专项 44/44、相关合同 40/40、全量
+  1017/1017，均为自动化证据而非真实浏览器体感裁决。
+- **反面例子**：桥接层漏掉 `follow_up_question`，用户只看到“已记录”却不知道缺什么；连接一建立就发
+  `record_result`，保存随后失败，页面已经撒了一个无法撤回的成功谎言。
+- **确认点**：追踪一个字段时，能否说出它在哪里产生、经过哪些对象、在哪里保存、最终由谁展示？
+
+### 知识 4：VAD 判断声学边界，ASR 转文字；短暂停顿不等于一句结束
+
+- **白话解释**：人说“加入……五毫升缓冲液”时，中间停一下可能只是在想词。VAD 像听声音边界的
+  门卫，负责报告开始、短暂停顿、继续和断句；ASR 像书记员，只把已经封好的完整音频段写成文字。
+  门卫不能在每次安静时都宣布“这句话结束了”。
+- **最小知识块**：① 第 30 项先固定 16 kHz 单声道、512 采样点帧和四类事件合同；② 第 31 项连续
+  通话优先启用 Silero，成功时不再创建 RMS 麦克风链，初始化或运行失败才停 Silero 并回退 RMS；③
+  第 32 项修复 `VadSegmenter` 先 `pop()` 再读样本造成空段，改为先复制和组装成功、再出队；④ 固定
+  WAV、静音和噪音只能证明这些样本，不能证明真实房间分类质量。
+- **专业术语**：端点检测（endpoint detection）、主路径/降级路径（primary/fallback path）、
+  异常安全（exception safety）、先构造后提交（construct before commit）、证据边界（evidence boundary）。
+- **真实代码/运行输出**：合同在 `src/core/silero_vad_contract.py`；浏览器适配在
+  `web/frontend/call_silero_vad.js`；连续通话接线在 `web/frontend/phone_call.js`；段读取修复在
+  `src/audio/vad_segmenter.py`；真实固定样本测试在 `tests/test_vad_real_model_regression.py`。计划记录
+  第 30 项全量 1040/1040、第 31 项全量 1043/1043、第 32 项 VAD 单元 20/20、真实模型固定样本
+  3/3、组合 69/69、全量 1047/1047；真实浏览器、房间、外放和耳机仍未验收。
+- **反面例子**：Silero 和 RMS 同时持有麦克风，会让同一段声音被重复提交；先把 sherpa 队首弹掉再读
+  样本，读到的可能只剩空段；固定 WAV 通过后直接宣布“真实环境不会误触”，则把样本证据错误扩大了。
+- **确认点**：为什么 `USER_SPEECH_PAUSED` 不能直接等同于 `SEGMENT_FINALIZED`，更不能直接授权 TTS
+  播放？
+
+### 知识 5：自己读代码时，沿“入口—数据—状态—决定—副作用—证据”追踪
+
+- **白话解释**：不要从第一行一路读到最后一行。先选一个真实动作，例如“用户开始讲话”，像查快递
+  一样逐站核对：谁收件、包裹变成什么对象、谁登记状态、谁决定能不能走、谁真的播放、测试只证明到
+  哪一站。这样既能读懂系统，也能发现 Agent 把某一站讲漏或走错路。
+- **最小知识块**：① 先写一句预期用户行为；② 从按钮、URL 或事件名找到外部入口；③ 每遇到函数只问
+  调用者、输入、输出、状态修改、外部动作；④ 沿核心数据对象检查字段新增、保留、丢失；⑤ 对每个关键
+  决定寻找唯一所有者；⑥ 反向读测试名称和 Arrange–Act–Assert；⑦ 最后单独检查空输入、保存失败、
+  模型失败、会话结束等失败路径。
+- **专业术语**：入口驱动追踪（entry-point-driven tracing）、调用链追踪（call-chain tracing）、
+  数据流分析（data-flow analysis）、数据血缘（data lineage）、单一事实来源（single source of truth）、
+  Arrange–Act–Assert。
+- **真实代码/运行输出**：以“不抢话”为例可沿
+  `phone_call.js → call_silero_vad.js → VoiceRuntimeEvent → VoiceStateCoordinator →
+  PlaybackContextFactory → PlaybackGate → PlaybackScheduler → TTSAdapter` 阅读；播放请求的数据链是
+  `PlaybackRequest → PlaybackContext → PlaybackDecision → voice_delivery → TTS event`。本次补录文档
+  `docs/VOICE_WEB_CONVERSATION_REVIEW_2026-08-24.md` 已按“结果—用户操作链—代码—重要性—一个下一步”
+  列出第 1～32 项，供逐项对照源码。
+- **反面例子**：只看文件名会误以为模块已经接入主流程；只看正常路径会漏掉保存失败仍显示成功；只看
+  测试全绿会把固定样本通过夸大成真实麦克风可用；只听 Agent 总结则无法发现它跳过了一条旧旁路。
+- **确认点**：以后审查一项改动时，能否不用先读懂所有语法，而是先画出“入口、数据对象、状态写入者、
+  决策者、副作用执行者、测试证据”六个位置？
+
+### 知识 6：环境故障要按证据归因，测试范围要按风险选择
+
+- **白话解释**：门禁不让人进办公室，不等于办公室里的电脑坏了。同理，受限执行环境拒绝启动项目
+  Python，不等于 `.venv` 启动器失效。测试也像体检：局部小改先查对应部位，改到共享血管或准备阶段
+  收口时再做全身检查。
+- **最小知识块**：① 先区分沙箱/权限、解释器启动、导入、断言失败四类现象；② 受限环境失败后，在
+  获准边界用同一项目 `.venv` 命令重试；③ 不用另一版本 Python 混装 `.venv\Lib\site-packages`
+  冒充正式验收；④ 局部纯逻辑跑专项和相邻回归，共享合同、Web 接线、存储、主流程或阶段收口跑全量；
+  ⑤ 只报告实际执行的测试层级。
+- **专业术语**：故障归因（fault attribution）、执行环境隔离（execution environment isolation）、
+  Python ABI 兼容、风险分层测试（risk-based testing）、回归范围（regression scope）。
+- **真实代码/运行输出**：项目规则已写入 `CLAUDE.md` 的“项目 `.venv` 与沙箱误判禁止规则”；纠错证据
+  是在获准环境用项目原命令得到 `Ran 889 tests ... OK`。本对话后续各项按风险选择专项、相邻或全量，
+  没跑全量时不得写“全量通过”。
+- **反面例子**：看到 `Unable to create process` 就宣布环境损坏，会诱导重建环境；用 Python 3.14 强载
+  Python 3.11 的二进制扩展，产生的导入错误只能证明解释器混用失败，不能证明项目依赖坏了。
+- **确认点**：遇到测试无法启动时，能否先说清“命令有没有真正进入测试框架”，再判断它是环境阻止、
+  导入错误还是测试断言失败？
+
+## 2026-08-24：从用户行为沿生产调用链看代码，而不是只相信总结
+
+### 知识点一：用垂直切片核查一个用户行为
+
+- **白话解释**：不要从“把整个前端读完”或“把所有播放类读完”开始。先拿一个用户能感受到的动作，例如“我一开口，系统会不会停止旧语音并且不再播新语音”，然后像查快递一样逐站确认：谁发现开口、谁发消息、谁保存状态、谁做决定、谁执行停止或播放。
+- **最小知识块**：① 用户动作是链路起点；② producer 产生事实；③ transport 把事实跨进程传递；④ state owner 保存事实；⑤ policy 根据事实做决定；⑥ executor 执行副作用。每一个箭头都必须能对应到真实函数调用、网络消息或事件消费，找不到的箭头就是当前断点。
+- **专业术语**：垂直切片（vertical slice）、事件追踪（event trace）、端到端调用链（end-to-end call chain）、生产者—消费者关系（producer-consumer relationship）。
+- **项目实际体现**：当前切片是 `call_silero_vad.js` 的 `onSpeechStart` → `phone_call.js` 的 `handleSileroEvent('speech_started')` → `window.stopSpeech()`。继续向后核查时，没有找到把 `USER_SPEECH_STARTED` 发送到服务端并交给 `VoiceStateCoordinator.consume()` 的生产消息；而 `web/playback_runtime.py` 已经存在服务端 Coordinator 和 Scheduler。由此只能得出“浏览器本地打断已接，服务端不抢话尚未闭环”，不能得出“整个不抢话已经完成”。
+- **反面例子**：只看到 `PlaybackGate` 有 `user_speaking` 规则，就直接说“不抢话已实现”。测试可以手动构造 `user_speaking=True`，但生产浏览器若从未发送这个事实，Gate 实际看到的仍是默认空闲状态。
+- **确认点**：如果一项测试直接构造 `PlaybackContext(user_speaking=True)`，它能证明 Gate 的哪一段行为，又不能证明浏览器生产链的哪一段行为？
+
+### 知识点二：合同完成、生产接线和真实验收是三个不同层级
+
+- **白话解释**：有交通规则，不代表道路已经修通；道路修通，也不代表真实高峰期已经跑过。代码中的类型和纯规则相当于交通规则，入口到出口的真实调用相当于道路，真机运行证据才是实际通车。
+- **最小知识块**：① Contract complete：对象、枚举和非法组合已经定义；② Unit complete：纯规则对构造输入能给出正确结果；③ Integration complete：真实生产入口会产生并传递这些输入；④ Operational validation：真实浏览器、麦克风和扬声器证明用户体验符合预期。状态必须依据当前最高证据层级表达，不能跨级。
+- **专业术语**：合同完整性（contract completeness）、单元完整性（unit completeness）、集成完整性（integration completeness）、运行验证（operational validation）、证据边界（evidence boundary）。
+- **项目实际体现**：`PlaybackContext`、`PlaybackDecision`、`PlaybackGate` 和相关单元测试证明播放规则合同与纯判断已经完成；`web_playback_service` 证明候选语音会经过 Scheduler；但浏览器 VAD/TTS 实时事实尚缺服务端反馈通道，因此 C3 仍是 `NEXT`，不能标 `REAL_OK`。
+- **反面例子**：看到“组合回归 190/190”就把 C5 写成真实体验通过。自动测试没有真实打开浏览器麦克风，也没有证明用户讲话时服务器收到状态，更没有验证扬声器自激和耳机漏检。
+- **确认点**：为什么 `AUTO_OK` 可以证明规则和接线没有违反测试合同，却不能代替 `REAL_OK` 或 `UX_CONFIRMED`？
+
+### 知识点三：检查所有写入者、读取者和旁路
+
+- **白话解释**：系统说“只有一个正门”，不能只检查新正门建好了，还要绕建筑一圈找有没有没封的后门。统一播放机制也是一样：除了确认 Scheduler 存在，还要搜索有没有旧代码直接调用 `enqueueSpeech()`、`window.speak()` 或 `/tts`。
+- **最小知识块**：① 找出对象的创建者；② 找出所有状态写入者；③ 找出所有读取者；④ 找出最终副作用执行者；⑤ 全局搜索能直接触发相同副作用的其他入口；⑥ 对保留的例外明确登记职责和测试边界。
+- **专业术语**：所有权分析（ownership analysis）、读写分析（read/write analysis）、旁路审计（bypass audit）、单一权威（single authority）、副作用出口（side-effect boundary）。
+- **项目实际体现**：`VoiceStateCoordinator` 是服务端语音状态的唯一写入者；`PlaybackContextFactory` 读取快照；`PlaybackGate` 做决定；`PlaybackScheduler` 编排副作用；`voice_delivery_client.js` 执行浏览器授权。此前对 `streaming_chat_v2.js` 的审计发现 `delta/task_queued/done → enqueueSpeech` 旁路并逐项删除，架构冻结测试继续防止这些入口复活。
+- **反面例子**：只把 `/record` 接到 Scheduler，却保留 chat `delta → enqueueSpeech`。这样测试 `/record` 会全部通过，但普通聊天仍会绕过重要性、过期和讲话状态直接发声。
+- **确认点**：审核“唯一播放入口”时，为什么既要找谁调用新入口，也要全局搜索旧 TTS 调用？
+
+### 可复用的个人代码核查模板
+
+```text
+我要核查的用户行为：
+
+用户实际操作：
+A → B → C → D
+
+每个箭头的代码证据：
+A 调 B：文件、函数、事件或网络请求
+B 调 C：文件、函数、事件或网络请求
+C 调 D：文件、函数、事件或网络请求
+
+谁产生事实：
+谁保存状态：
+谁拥有最终判断权：
+谁执行副作用：
+
+正常路径：
+失败路径：
+是否存在旁路：
+
+测试能证明：
+测试不能证明：
+
+当前证据等级：
+只定义合同 / 单元完成 / 生产接线完成 / REAL_OK / UX_CONFIRMED
+
+唯一下一步：
+```
+
+本轮方法论的唯一练习题：沿 `call_silero_vad.js → phone_call.js → 服务端 API → voice_runtime_state.py` 核查“用户开始讲话”事实是否真正进入服务端。当前已确认浏览器本地调用 `stopSpeech()`，但尚缺浏览器到服务端的正式状态消息。
+
+## 33 阶段持续学习日志入口
+
+从真实浏览器验收暴露“普通 Chat 无语音候选、前端双状态、隐式模式”开始，第 33 阶段改用独立的持续学习日志：
+
+- `docs/VOICE_C6_LEARNING_LOG.md`
+
+该日志按“用户现象 → 真实缺口 → 白话理解 → 专业概念 → 数据流 → 代码复核 → 证据边界 → 唯一下一步”维护，覆盖单聊天时间线、自由聊天/自由实验/方案实验模式、Turn/Block 合同、三种输出策略与真实播放验收。主复盘继续保留全项目知识地图，避免把阶段性连续记录全部堆入本文件。
+
+## 2026-08-25：让一键启动不认识开发者的用户名
+
+### 知识点：位置无关启动与本机配置隔离
+
+- **白话解释**：旧批处理像一张只写“去小明家书桌第二格”的说明，文件搬到别人电脑就找错地方。新批处理先问“我自己现在放在哪”，再从这里寻找 `scripts`、`.venv` 和 `web`。密钥、模型和虚拟环境则像每户自己的钥匙与电器，不塞进公共施工图，而是在新电脑第一次使用时生成。
+- **最小知识块**：① 入口先确定仓库根目录；② 根目录以下路径只做相对组合；③ 命令路径加引号，兼容空格；④ `.venv`、模型、密钥属于机器相关状态；⑤ `--doctor` 只观察准备状态，不做下载和启动副作用；⑥ 自动测试锁住“入口无个人路径”这一合同。
+- **专业术语**：位置无关路径（location-independent path）、批处理参数展开（batch parameter expansion）、仓库根定位（repository root discovery）、本地配置隔离（local configuration isolation）、幂等初始化（idempotent bootstrap）、预检/体检（preflight/doctor command）。
+- **真实代码/运行输出**：根目录四个 `.bat` 使用 `cd /d "%~dp0"`；Python 入口继续使用 `Path(__file__).resolve().parent.parent`；`scripts/start_best.py --doctor` 从仓库外作为工作目录运行仍打印真实仓库位置；`tests/test_portable_launcher.py` 同时检查路径合同和体检命令。实际得到专项 `Ran 2 tests ... OK`、项目全量 `Ran 1144 tests in 8.356s ... OK`，`git diff --check` 也通过。
+- **反面例子**：写死 `cd /d C:\Users\dahli\Documents\107` 后，别人即使把完整项目放在 `D:\比赛项目\107`，双击仍会访问不存在的 C 盘目录；把 `.venv` 和 `.env` 一起打包，则可能同时带去不兼容的二进制依赖和开发者密钥。
+- **确认点**：复核一个新启动脚本时，能否分别指出“仓库共享源码”和“每台电脑首次生成的本机状态”各包含什么？
+
+六要素自检：①白话✓ ②最小知识块✓ ③专业术语✓ ④真实代码/运行输出✓ ⑤反面例子✓ ⑥确认点✓。
+
+### 本轮修复后的真实闭环
+
+- 文件过滤与目录剪枝同时补齐，避免仅跳过写入却仍遍历整套便携 Python。
+- Windows 包装器先保存 `%errorlevel%`，`pause` 后再 `exit /b`，使人工窗口和自动化都能看到真实成败。
+- 新包从 601 项、60,656,779 字节降到 507 项、35,967,522 字节；必需文件全部存在，十类禁止内容全部为 0，开箱验收 `PASS`。
+
+## 2026-08-26：压缩包生成成功不等于交付成功
+
+- **白话解释**：打包就像整理寄给别人的行李。拉链能拉上，只证明箱子做出来了；还必须开箱核对，避免把钥匙、私人录音和工作草稿一起寄走。
+- **最小知识块**：① 验证命令真实执行；② 检查退出码；③ 检查必需文件；④ 检查禁止文件；⑤ 在内容合同通过前禁止分享。
+- **专业术语**：制品验收（artifact validation）、允许清单（allowlist）、禁止清单（denylist）、敏感数据泄漏（sensitive data leakage）、退出码传播（exit-code propagation）。
+- **真实代码/运行输出**：移动后的 `package_source.bat` 生成 601 项、60,656,779 字节 ZIP；必需入口存在，但发现 `.runtime-python311*` 37 项、录音 26 项、结果 4 项，因此判 `NOT_SAFE_TO_SHARE`。
+- **反面例子**：只看到脚本退出码 `0` 和“打包完成”就把 ZIP 发出，会把真实录音和运行记录泄露给接收者；第一次受限执行甚至 Python 未启动，`pause` 仍掩盖了失败码。
+- **确认点**：以后验收交付包时，能否同时回答“该有的是否都在”和“不该有的是否都不在”？
+
+六要素自检：①白话✓ ②最小知识块✓ ③专业术语✓ ④真实代码/运行输出✓ ⑤反面例子✓ ⑥确认点✓。
+
+## 2026-08-26：根目录是项目门厅，不是储物间
+
+### 知识点：按使用者职责组织项目入口
+
+- **白话解释**：根目录像教学楼门厅，访客应该一眼看到“从哪里进”，而不是先分辨十几扇已经停用的门。开发者工具、历史档案和诊断工具仍然有价值，但应分别放进工具间和档案室。
+- **最小知识块**：① 区分普通用户入口、开发者工具、诊断脚本和历史证据；② 移动文件时同时修正调用者；③ 唯一公开入口留在最显眼位置；④ 不确定是否仍被使用的本机运行时不擅自移动；⑤ 用测试约束目录规则，避免以后重新变乱。
+- **专业术语**：关注点分离（separation of concerns）、信息架构（information architecture）、公开入口（public entry point）、内部工具（internal tooling）、历史归档（historical archive）、引用完整性（reference integrity）。
+- **真实代码/运行输出**：根目录 Windows 入口由多个 `.bat` 收敛为唯一 `start.bat`；`scripts/windows/` 保存有效开发命令，`scripts/legacy_launchers/` 保存历史兼容入口，`scripts/launcher.py` 继续作为 PyInstaller 入口；`tests/test_portable_launcher.py` 检查根目录 `.bat` 白名单和打包引用。实际得到专项 `Ran 4 tests ... OK`、全量 `Ran 1148 tests in 9.902s ... OK`，移动入口编译与差异检查通过。
+- **反面例子**：只把 `launcher.py` 拖进 `scripts/`，却不改 `ROOT = Path(__file__).parent` 和 `build_exe.py`，会让打包器把 `scripts/` 错认成仓库根，最终找不到 `web/`、`models/`；这叫“视觉整理成功、生产调用链断裂”。
+- **确认点**：以后看到一个新脚本时，能否先判断它面向普通用户、开发者、诊断还是历史追溯，再决定它应放在哪一层？
+
+六要素自检：①白话✓ ②最小知识块✓ ③专业术语✓ ④真实代码/运行输出✓ ⑤反面例子✓ ⑥确认点✓。
+
+## 2026-08-26：输入来源不能靠字段名称假装
+
+### 知识点：来源可信的输入合同
+
+- **白话解释**：键盘文字像手写记录，录音转写像“录音文件加转写单”。两者都能交给理解器，但手写记录不能凭空贴一张“来自录音”的标签，否则以后查错时会寻找根本不存在的音频证据。
+- **最小知识块**：① 保存请求和回合身份；② 模式与输入来源在提交时冻结；③ 文字来源只带原文；④ 单次录音和连续通话必须带最终 `ASRResult`；⑤ 提交原文必须与忠实 ASR 转写完全一致；⑥ 合同只携带数据，不理解、不保存、不执行。
+- **专业术语**：证据来源（provenance）、判别联合约束（discriminated input invariant）、不可变快照（immutable snapshot）、可信边界（trust boundary）。
+- **真实代码/运行输出**：`src/core/experiment_turn_input.py::ExperimentTurnInput` 分别校验三种 `InputSource`；测试先因模块不存在红灯，补实现后专项 `Ran 9 tests ... OK`、相邻 `Ran 35 tests ... OK`、正式全量 `Ran 1162 tests in 8.756s ... OK`。
+- **反面例子**：若把键盘文字包装成 `ASRResult(model="keyboard")`，后面的统一链会误以为存在模型原始输出、音频时长和录音文件；若语音原文能与 ASR 转写不同，改写或串线也会被伪装成原始识别结果。
+- **确认点**：看到一条实验输入时，能否先分清“用户提交的原文”和“证明这段原文来自语音识别的 ASR 证据”分别是什么？
+
+六要素自检：①白话✓ ②最小知识块✓ ③专业术语✓ ④真实代码/运行输出✓ ⑤反面例子✓ ⑥确认点✓。
+
+## 2026-08-26：有状态理解必须先分房间再排队
+
+### 知识点：按会话隔离状态并串行修改
+
+- **白话解释**：每场实验都要有自己的记录本和取号窗口。A 实验的追问不能写进 B 的记录本；同一场实验同时交来两句话时，要按号码依次处理，不能让两个工作人员同时改同一页。
+- **最小知识块**：① 用 `(conversation_id, lab_session_id)` 找到唯一会话；② 会话独占 `ReplyCoordinator` 和 `SessionContext`；③ 单工作线程保证同会话 FIFO；④ 不同会话使用不同执行器，可并行；⑤ 精确重试复用已有任务；⑥ 冲突请求和队列满必须显式拒绝。
+- **专业术语**：会话所有权（session ownership）、键控注册表（keyed registry）、FIFO 串行化、幂等（idempotency）、背压（backpressure）。
+- **真实代码/运行输出**：`web/experiment_runtime_sessions.py` 实现注册表和会话容器；`tests/test_experiment_runtime_sessions.py` 验证状态隔离、并发创建、顺序、跨会话并行、幂等、冲突和背压。专项 `Ran 11 tests ... OK`、相邻 `Ran 43 tests ... OK`、正式全量 `Ran 1175 tests in 8.485s ... OK`。
+- **反面例子**：全局共享一个 `ReplyCoordinator` 会让 A 的“对，是 5 毫升”回答到 B 的问题；同一会话由多个线程同时修改版本和追问状态会发生竞态；无限接收任务又会让慢 LLM 把内存队列越堆越长。
+- **确认点**：为什么“全局只有一个协调器”和“每个会话一个协调器，但允许多个线程同时改它”都会出问题？
+
+六要素自检：①白话✓ ②最小知识块✓ ③专业术语✓ ④真实代码/运行输出✓ ⑤反面例子✓ ⑥确认点✓。
+

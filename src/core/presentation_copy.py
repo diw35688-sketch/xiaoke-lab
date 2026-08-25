@@ -75,6 +75,7 @@ _PASSTHROUGH_KINDS = frozenset({
     MessageKind.TRANSCRIPT,
     MessageKind.STAGE_SUMMARY,
     MessageKind.SYSTEM_ISSUE,
+    MessageKind.ASSISTANT_REPLY,
 })
 
 

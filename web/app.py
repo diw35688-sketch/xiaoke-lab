@@ -16,6 +16,7 @@ from api.settings import router as settings_router
 from api.tasks import router as tasks_router
 from api.templates import router as templates_router
 from api.tts import router as tts_router
+from api.voice_runtime import router as voice_runtime_router
 from config import BASE_DIR
 from database.db import initialize_database
 from scheduler import start_daily_scheduler
@@ -32,6 +33,8 @@ def startup():
     task_manager.start()
 
 
+
+
 def _is_mobile(user_agent: str) -> bool:
     """粗略判断是否为手机/平板浏览器：根路径自动进手机专用页。"""
     ua = (user_agent or "").lower()
@@ -44,14 +47,13 @@ def home(request: Request):
     if _is_mobile(request.headers.get("user-agent", "")):
         return HTMLResponse((BASE_DIR / "frontend" / "mobile.html").read_text(encoding="utf-8"))
     page = (BASE_DIR / "frontend" / "index.html").read_text(encoding="utf-8")
-    page = page.replace('/static/inworld_tts.js', '/static/local_tts.js?v=20260820')
+    page = page.replace('/static/inworld_tts.js', '/static/local_tts.js?v=20260826-shared-warmup')
     page = page.replace('</head>', '<link rel="stylesheet" href="/static/theme.css"></head>')
     # 注入模型设置面板（任何人都能在网页里配置模型）
     page = page.replace('</body>', ('<script src="/static/settings.js"></script>'
                                    '<script src="/static/tts_settings.js"></script>'
-                                   '<script src="/static/tool_cards.js"></script>'
                                    '<script src="/static/speak.js?v=20260820"></script>'
-                                   '<script src="/static/lab_panel.js?v=20260820"></script>'
+                                   '<script src="/static/interaction_mode_state.js?v=20260825"></script>'
                                    '<script src="/static/voice_asr.js?v=20260824-stream"></script>'
                                    '</body>'))
     scripts = (
@@ -61,16 +63,20 @@ def home(request: Request):
         '<script src="/static/memory_panel.js"></script>'
         '<script src="/static/conversation.js"></script>'
         '<script src="/static/avatar.js"></script>'
-        '<script src="/static/voice_delivery_client.js"></script>'
-        '<script src="/static/streaming_chat_v2.js"></script>'
+        '<script src="/static/voice_delivery_client.js?v=20260825-voice-timing"></script>'
+        '<script src="/static/conversation_turn_store.js?v=20260825"></script>'
+        '<script src="/static/conversation_block_view.js?v=20260826-startup-progress"></script>'
+        '<script src="/static/conversation_context_blocks.js?v=20260825"></script>'
+        '<script src="/static/streaming_chat_v2.js?v=20260825-record-turn-id"></script>'
         '<script src="/static/template_planner.js"></script>'
         '<script src="/static/task_panel.js"></script>'
-        '<script src="/static/shell.js?v=20260816"></script>'
-        '<script src="/static/run_canvas.js"></script>'
-        '<script src="/static/views.js"></script>'
+        '<script src="/static/shell.js?v=20260825-one-mic"></script>'
+        '<script src="/static/views.js?v=20260825-protocol-sync"></script>'
         '<script src="/static/protocol_editor.js"></script>'
-        '<script src="/static/composer.js?v=20260818"></script>'
-          '<script src="/static/phone_call.js?v=20260820c"></script>'
+        '<script src="/static/composer.js?v=20260825-mode-sync"></script>'
+          '<script src="/static/voice_startup_ui.js?v=20260826"></script>'
+          '<script src="/static/call_silero_vad.js?v=20260826-visible-progress"></script>'
+          '<script src="/static/phone_call.js?v=20260826-visible-progress"></script>'
     )
     return HTMLResponse(page.replace("</body>", scripts + "</body>"))
 
@@ -154,3 +160,4 @@ app.include_router(protocols_router)
 app.include_router(asr_router)
 app.include_router(record_router)
 app.include_router(tts_router)
+app.include_router(voice_runtime_router)

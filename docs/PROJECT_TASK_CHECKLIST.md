@@ -1,12 +1,12 @@
 # asr_demo 项目任务清单
 
-最后更新：2026-08-20（VOICE-WEB-MIGRATION-01 Phase C1/C2a 三张嘴收敛 + 词在后端，见维护日志）
+最后更新：2026-08-25（可搬家的一键启动与新手交付指南，见维护日志）
 
 > 本文件是当前任务、优先级和验收状态的唯一来源。架构说明、环境命令和下一会话摘要
 > 分别见 `PROJECT_ARCHITECTURE.md`、`ENVIRONMENT_SETUP.md` 和
 > `NEXT_SESSION_HANDOFF_2026-08-09.md`；第 6 节维护日志只作证据追溯，不决定当前下一项。
 
-真实项目：`C:\Users\dahli\Desktop\asr_demo`
+项目根目录：以仓库实际存放位置为准；启动器不得依赖个人绝对路径。
 
 ## 1. 使用规则
 
@@ -71,7 +71,7 @@ TODO → DESIGN → CODED → AUTO_OK → REAL_OK
 
 ## 2. 当前测试基线
 
-- 当前全量自动测试：`896 tests OK`（项目 `.venv`，2026-08-23，VOICE-C5-C5 完成后用项目原命令实测）
+- 当前全量自动测试：`1091 tests OK`（Python 3.11.9 一次性运行时 + 现有 `.venv` 依赖，2026-08-25，VOICE-C6-A3 完成后实测；现有 `.venv` 启动器仍指向已缺失的 Python 3.11）
 - 环境执行纪律：受限环境出现进程启动错误时，必须先在获准的非受限环境用同一条项目 `.venv` 原命令重试；不得直接诊断 `.venv` 或启动器损坏，也不得用另一解释器混载 `.venv` 包代替正式全量验收
 - 最近 PRESENT 真实验收会话：`20260815_212615`（补充复验 `20260815_213926`）
 - 最近 PRESENT 双会话复验：`20260816_143151` → `20260816_143201`（同进程再次唤醒成功，零第三方泄漏）
@@ -80,7 +80,7 @@ TODO → DESIGN → CODED → AUTO_OK → REAL_OK
 恢复工作时先运行：
 
 ```powershell
-cd C:\Users\dahli\Documents\107
+Set-Location <项目目录>
 
 .\.venv\Scripts\python.exe -B -m unittest discover `
     -s tests `
@@ -89,7 +89,64 @@ cd C:\Users\dahli\Documents\107
 
 ## 3. 当前唯一下一项
 
-**`VOICE-C4-1-SILERO-CONTRACT`：定义通话模式 Silero VAD 适配合同。**
+**`VOICE-C3-1-PLAYBACK-TIMING-REAL`（33g）：在真实浏览器分别验收 Chat、Record、Tool 的播放时机。**
+
+33b 已完成自动软件闭环：新增唯一前端 `ConversationTurnStore`，当前 Chat 的用户文字、服务端助手正文、think 状态和 Tool 卡片只写 Store，再由聊天时间线订阅渲染；运行画布删除 `stream/pendingIndex` 与 `runPushThink/runPushTool/runClearStream`，旧 `tool_cards.js` 转发器不再加载。Tool 事件由服务端补稳定 `tool_call_id`，同一调用的 pending/result 更新同一 Block。Store 以 `(conversation_id, request_id)` 处理完全相同重放并拒绝内容/模式版本冲突，但不保存数据库、不执行 Tool、不播放。专项组合 `27/27`、4 个 Node 行为测试、JS/Python 语法、`git diff --check` 和项目全量 `1083/1083` 通过，因此仅标 `AUTO_OK`；尚未做真实浏览器走查。
+
+第 32 阶段剩余生产链已完成自动闭环：
+
+- `segment_finalized` 与 ASR 开始/成功/失败进入同一 conversation 状态；
+- 每个 conversation 拥有共享同一 `VoiceStateCoordinator` 的 Scheduler 与延后队列，A 讲话只延后 A，B 不受影响；
+- ASR/TTS 状态变空闲时重评延后项，未过期返回 `READY`，过期返回 `DROP/expired`；
+- 浏览器播放单元携带 `intent_id/priority`，回报 `tts_started/finished/stopped/failed`；
+- 专项 `48/48`、全部 3 个 Node 行为测试、JS 语法与全量 `1060/1060` 通过。未做真实设备验收，因此仅为 `AUTO_OK`。
+
+纠偏子项 `VOICE-C4-3C-SPEECH-RESUMED-BRIDGE` 已完成自动验收：
+
+- Silero `speech_resumed` 携带现有 `conversation_id` 发送 `user_speech_resumed`；
+- 服务端将其映射到 `USER_SPEECH_RESUMED`，同一片段内只使 `user_speaking=false -> true`，`segment_capturing` 继续为 `true`；
+- 重复继续请求幂等，不串改其他会话；会话/路由专项 `8/8`、纯合同 `24/24` 和 Node 行为测试通过。
+- 未接断句、ASR、按会话 Scheduler 或 TTS 反馈，不产生真机结论。
+
+纠偏子项 `VOICE-C4-3B-SPEECH-PAUSED-BRIDGE` 已完成自动验收：
+
+- Silero `speech_paused` 携带浏览器现有 `conversation_id` 请求 `/voice/runtime/event`；
+- 服务端映射为 `USER_SPEECH_PAUSED`，仅使同一会话 `user_speaking=false`，保留 `segment_capturing=true`；
+- 重复停顿请求幂等，不串改其他会话，也不伪造断句；
+- Python 会话/路由专项 `6/6`、相关组合 `43/43`、Node 行为测试和项目全量 `1053/1053` 通过。
+- 未接恢复、断句、ASR/TTS 事件或 Scheduler，未做真实浏览器/麦克风验收。
+
+纠偏子项 `VOICE-C4-3A-SPEECH-STARTED-BRIDGE` 已完成自动验收：
+
+- Silero `speech_started` 携带浏览器现有 `conversation_id` 请求 `/voice/runtime/event`；
+- 服务端查库确认会话已存在，不存在返回 404，不偷偷新建会话；
+- 每个会话使用独立 `VoiceStateCoordinator`，开始事件使 `user_speaking=true` 且 `segment_capturing=true`；
+- Python 会话/路由专项 `4/4` 与 Node 浏览器行为测试通过；未接停顿、恢复、断句，未让 Scheduler 消费该状态，未做真机验收。
+- 相关组合回归 `20/20`，项目原 `.venv` 全量 `1051/1051` 通过。
+
+上一项 `VOICE-C4-3-VAD-REGRESSION` 已完成自动验收：
+
+- 红灯测试复现真实 sherpa `front` 在 `pop()` 后底层 samples 失效、随后被误判为空段的问题；修复为先复制/组装 `VoiceSegment`，成功后再出队；
+- 使用 Git 已跟踪的 `web/voice/reference.wav`，确定性重采样至 16 kHz 并补 3 秒尾静音，本地真实 Silero 产出 1 个非空语音段；
+- 同一真实模型对固定 2 秒静音和固定种子、固定幅度的 3 秒低水平宽带噪音均产出 0 个语音段；
+- 浏览器概率状态机覆盖短暂停顿/继续/断句/misfire，Node 行为测试覆盖初始化失败、运行期失败、单一麦克风路径及挂断后重启；
+- VAD 单元测试 `20/20`、真实模型固定样例 `3/3`、相关组合回归 `69/69`、项目正式全量 `1047/1047` 通过。
+
+上一项 `VOICE-C4-2-SILERO-INTEGRATION` 已完成自动验收：
+
+- 新增浏览器 `call_silero_vad.js`，按固定版本动态加载 ONNX Runtime 与 `vad-web`，把模型回调转换为第 30 项四类语义事件；
+- `phone_call.js` 以 Silero 为正常主路径，直接接收其 16 kHz 音频段并进入原 WAV/ASR 队列，不再同时启动 RMS 麦克风链；
+- Silero 初始化或运行失败时先停用适配器，再回退原 RMS 采集；两条路径不会同时持有麦克风；
+- 固定概率样例证明低人声概率不建段，并覆盖开始、停顿、继续、断句顺序；这是适配状态机证据，不是实际模型音频准确率证据；
+- Silero/状态/页面/C5 组合回归 `46/46`，新增 Node 行为测试均通过，项目正式全量 `1043/1043` 通过。
+
+上一项 `VOICE-C4-1-SILERO-CONTRACT` 已完成自动验收：
+
+- 固定适配器输入为 16 kHz、单声道、每帧 512 个归一化浮点采样，并校验序号与单调时间；
+- 定义讲话开始、短暂停顿、继续和断句四类语义事件，纯映射到现有 `VoiceRuntimeEventType`；
+- 模型运行时不可用、加载失败、推理失败或输出非法时，合同明确回退现有 RMS；失败结果不得同时伪造状态事件；
+- 合同不加载模型、不访问麦克风、不修改 Coordinator，也不替换 `phone_call.js` 的 RMS；
+- 合同与相邻状态链回归 `30/30`，项目正式全量 `1040/1040` 通过。
 
 上一项 `VOICE-C5-E1-AUTO-ACCEPTANCE` 已完成自动验收：
 
@@ -106,9 +163,9 @@ cd C:\Users\dahli\Documents\107
 结果；保存失败只发错误事件。桌面和手机均增量消费，旧 `/record` 保持兼容。专项 `44/44`、相关
 合同 `40/40`、项目全量 `1017/1017` 通过；真实浏览器体感尚待用户裁决。
 
-第 30 项固定范围：只定义通话模式 Silero VAD 的输入帧、输出事件、失败回退与
-VoiceStateCoordinator 对接合同；不在合同项中替换现有 RMS 实现，不下载模型，不接真实麦克风，
-也不改 C5 播放职责。
+第 33 项是真机验收：在真实浏览器和麦克风条件下，分别用外放与耳机观察用户讲话期间不抢播、
+讲话结束后延后项恢复、过期追问不补播，并留下设备、浏览器、输入、终端和观察记录。该项需要用户
+参与真实环境裁决；不把第 32 项的本地模型或模拟回归替代为真机结论。
 
 `END_ONLY` 第四刀已完成自动闭环：结束时只交付一个结构化摘要，合并实验步骤数与待确认明细；
 零待确认也明确说明，旧“提交 M 段实验口述”内部术语已删除。专项 41/41、全量 571/571 通过。
@@ -147,7 +204,7 @@ PRESENT 之外的 Query/Safety/RAG 真实接入、ASR 路演稳定性和 LLM 格
 
 > 本看板只放近期事项；完整任务库与历史证据见第 4 节和维护日志。
 
-### 3.1-VOICE 语音 Web 当前唯一施工清单（2026-08-24 增补，共 41 项）
+### 3.1-VOICE 语音 Web 当前唯一施工清单（2026-08-26 更新，41 个主项 + 已登记子项）
 
 > 本表取代此前对话中临时列出的 27 项；旧表遗漏了播放许可层，不能继续作为执行依据。
 > 一次只推进一项，顺序以本表为准；完整设计说明见
@@ -180,16 +237,31 @@ PRESENT 之外的 Query/Safety/RAG 真实接入、ASR 路演稳定性和 LLM 格
 | 23 | `VOICE-C5-D7-REMOVE-DELTA-TTS` | 删除前端 `delta → enqueueSpeech` | `AUTO_OK` | 流式文本继续显示但不直接发声 |
 | 24 | `VOICE-C5-D8-REMOVE-TASK-QUEUED-TTS` | 删除前端 `task_queued → enqueueSpeech` | `AUTO_OK` | 排队结果不绕过统一门控 |
 | 25 | `VOICE-C5-D9-FRONTEND-PLAYBACK-EVENT` | 前端只消费获准播放事件 | `AUTO_OK` | 未获 READY/PREEMPT 的项不能调用 TTS |
-| 26 | `VOICE-C5-D10-THREE-ENTRY-INTEGRATION` | `/record`、tool、chat 经过同一 PlaybackScheduler | `AUTO_OK` | 三入口集成测试证明唯一播放执行入口 |
+| 26 | `VOICE-C5-D10-VOICE-CANDIDATE-INTEGRATION` | `/record` 与 chat tool 已有语音候选经过同一 PlaybackScheduler | `AUTO_OK` | 只证明已有候选共用播放执行入口；不代表普通 chat 或前端回合已统一 |
 | 27 | `VOICE-C5-E1-AUTO-ACCEPTANCE` | C5 全量自动回归与职责冻结 | `AUTO_OK` | 内容、资格、状态、时机、调度、执行边界齐全 |
 | 28 | `VOICE-C5-E2-FREE-FOLLOWUP-PRESERVATION` | 恢复自由实验统一语义追问并保持保存后呈现 | `AUTO_OK` | 语义追问不被空方案评估覆盖；保存成功后才生成 clarification；新增红灯测试转绿 |
 | 29 | `VOICE-C5-E3-RECORD-STREAMING-FEEDBACK` | `/record` 流式首反馈与提交后最终结果 | `AUTO_OK` | status 必须先到；保存成功后才有 result；保存失败无结果/回执/播放 |
-| 30 | `VOICE-C4-1-SILERO-CONTRACT` | 定义通话模式 Silero VAD 适配合同 | **NEXT** | 与音频帧及 Coordinator 事件兼容 |
-| 31 | `VOICE-C4-2-SILERO-INTEGRATION` | 通话模式由 RMS 判断切换到 Silero | `TODO` | 噪音与人声固定样例自动验证 |
-| 32 | `VOICE-C4-3-VAD-REGRESSION` | VAD 边界、失败回退和前端回归 | `TODO` | 短暂停顿/继续/断句边界稳定 |
-| 33 | `VOICE-C3-1-PLAYBACK-TIMING-REAL` | 真机验证不抢话、延后恢复和过期不补播 | `TODO` | 外放/耳机留真实证据 |
+| 30 | `VOICE-C4-1-SILERO-CONTRACT` | 定义通话模式 Silero VAD 适配合同 | `AUTO_OK` | 与音频帧及 Coordinator 事件兼容 |
+| 31 | `VOICE-C4-2-SILERO-INTEGRATION` | 通话模式由 RMS 判断切换到 Silero | `AUTO_OK` | 噪音与人声固定样例自动验证 |
+| 32 | `VOICE-C4-3-VAD-REGRESSION` | VAD 边界、失败回退和前端回归 | `AUTO_OK` | 短暂停顿/继续/断句边界稳定 |
+| 32a | `VOICE-C4-3A-SPEECH-STARTED-BRIDGE` | 讲话开始事件进入按会话隔离的服务端状态 | `AUTO_OK` | 现有会话才可写；A/B 状态不串；重试幂等 |
+| 32b | `VOICE-C4-3B-SPEECH-PAUSED-BRIDGE` | 短暂停顿事件进入同一会话状态 | `AUTO_OK` | 只改 `user_speaking`，不把停顿误当断句 |
+| 32c | `VOICE-C4-3C-SPEECH-RESUMED-BRIDGE` | 停顿后继续讲话进入同一会话状态 | `AUTO_OK` | 恢复 `user_speaking`，保留同一采集片段 |
+| 32d | `VOICE-C4-3D-SEGMENT-FINALIZED-ASR-BRIDGE` | 断句与 ASR 处理事件进入同一会话 | `AUTO_OK` | 断句后关闭采集；ASR 成功/失败都清理忙状态 |
+| 32e | `VOICE-C4-3E-SESSION-PLAYBACK-STATE` | PlaybackScheduler 读取同一 conversation 的语音状态 | `AUTO_OK` | A 讲话只延后 A；B 不受影响 |
+| 32f | `VOICE-C4-3F-TTS-FEEDBACK-REEVALUATION` | 浏览器 TTS 事实反馈与延后项重评 | `AUTO_OK` | STARTED/FINISHED/STOPPED/FAILED 闭环；延后项可恢复或过期丢弃 |
+| 33 | `VOICE-C6-UNIFIED-CONVERSATION-SURFACE` | 单聊天时间线、显式模式、分策略输出与真实播放收口 | **NEXT** | 真实验收已暴露普通 chat 无语音、双前端状态和隐式模式缺口 |
+| 33a | `VOICE-C6-A1-TURN-BLOCK-CONTRACT` | 定义统一 Turn/Block 输出合同 | `AUTO_OK` | request/turn/block/voice 身份、mode_version 与纯幂等冲突判断；无副作用；专项 14/14、全量 1076/1076 |
+| 33b | `VOICE-C6-A2-SINGLE-CONVERSATION-STORE` | 前端建立唯一 ConversationTurnStore | `AUTO_OK` | 正文/think/tool 只写 Store；删除 run 双状态；稳定 tool_call_id；专项 27/27、全量 1083/1083 |
+| 33c | `VOICE-C6-A3-CHAT-FIRST-SURFACE` | 方案、步骤、安全、记录和 tool 收敛为聊天消息块 | `AUTO_OK` | 统一卡片骨架+BlockView；管理页保留，run 画布退役；专项 30/30、全量 1091/1091 |
+| 33d | `VOICE-C6-A4-EXPLICIT-MODE-SWITCH` | 显式切换自由聊天、自由实验记录、方案实验记录 | `AUTO_OK` | 唯一模式状态；提交快照；输入来源解耦；专项 22/22、全量 1098/1098，未做真实浏览器 |
+| 33e | `VOICE-C6-A5-MODE-OUTPUT-POLICIES` | 分离 chat、实验记录和 tool 输出策略 | `AUTO_OK` | Chat 禁止记录；free/protocol 显式保存策略；专项 46/46、全量 1105/1105 |
+| 33f | `VOICE-C6-A6-THREE-PRODUCER-AUTO-MATRIX` | chat、记录、tool 接同一输出外壳并完成交叉自动回归 | `AUTO_OK` | source_block_id 贯通；三生产者调度矩阵；专项 54/54、全量 1110/1110 |
+| 33g | `VOICE-C3-1-PLAYBACK-TIMING-REAL` | 三种模式真机验证不抢话、延后恢复和过期不补播 | `TODO` | 普通 chat、自由/方案记录、tool 分别留外放/耳机证据 |
+| 33h | `VOICE-C6-A7-REMOVE-TASK-RESULT-TTS-BYPASS` | 删除后台任务结果对播放器的直接调用 | `TODO` | 2026-08-25 计时样本出现 null intent；先仅显示，需播报时必须走正式 voice_delivery |
 | 34 | `VOICE-C3-2-BARGE-IN-REAL` | 真机验证自激、漏检和打断停止 | `TODO` | C1/C2a/C4/C5 联合 REAL_OK 证据 |
-| 35 | `VOICE-D1-SESSION-OWNERSHIP` | 服务端托管按对话隔离的有状态会话 | `TODO` | 并发对话不共享 reply/voice 状态 |
+| 35a | `VOICE-D0-INPUT-EVIDENCE-CONTRACT` | 定义文字/单次录音/连续通话进入实验统一链的来源可信输入合同 | `AUTO_OK` | 文字不得伪装 ASR；语音必须携带匹配的最终 ASRResult；专项 9/9、相邻 35/35、全量 1162/1162 |
+| 35 | `VOICE-D1-SESSION-OWNERSHIP` | 服务端按对话与实验会话托管有状态会话 | `AUTO_OK` | 并发对话不共享 reply/voice 状态 |
 | 36 | `VOICE-D2-REAL-OBSERVER` | `/record` 原始 ASRResult 接 UnifiedObserver | `TODO` | LLM 失败可降级，原始 ASR 不丢 |
 | 37 | `VOICE-D3-DROP-IN-SWAP` | 降级生产者切换为真实观察器 | `TODO` | 输出层不改且全量回归通过 |
 | 38 | `VOICE-D4-FIVE-BRANCH-CONTRACT` | 设计 `experiment/control/tool/chat/uncertain` 五分支 | `TODO` | 五分支互斥；理解层不执行工具 |
@@ -197,7 +269,7 @@ PRESENT 之外的 Query/Safety/RAG 真实接入、ASR 路演稳定性和 LLM 格
 | 40 | `VOICE-E1-FUNCTIONAL-REAL` | 真实录音到记录、追问、确认的功能验收 | `TODO` | 自由/方案模式分别留 session、终端和持久化证据 |
 | 41 | `VOICE-E2E3-UX-AND-CLOSEOUT` | 九维体验验收与明确不做清单收尾 | `TODO` | UX 由用户裁决，三份维护文档同步 |
 
-依赖关系固定为：`1–16 播放许可与执行架构 → 17–27 多入口融合 → 28 自由实验追问回归修复 → 29 流式首反馈 → 30–32 VAD → 33–34 真机 → 35–39 统一理解/路由 → 40–41 收尾`。
+依赖关系调整为：`1–16 播放许可与执行架构 → 17–27 已有语音候选融合 → 28 自由实验追问回归修复 → 29 流式首反馈 → 30–32f VAD 与会话播放状态 → 33a–33f 单聊天时间线/显式模式/分策略输出 → 35a–37 原始三分支统一链接入 → 33g–34 在最终实验链上做真机播放/打断 → 38–39 另行设计五分支与工具权限 → 40–41 收尾`。2026-08-26 用户将统一链接入与识别能力检验提到当前主线；33g–34 保留 `TODO`，不是取消。
 
 ### 3.1A 近期任务登记（兼含关联完成项）
 
@@ -1554,3 +1626,248 @@ matched_term 以后存知识库匹配到的标准术语（如 ASR 的"一液枪"
 - 自动证据：流式/统一理解专项 `44/44`；C5 冻结、手机页、record 与前端合同复验 `40/40`；项目正式全量 `1017/1017` 通过；两份 JavaScript `node --check` 通过。真实浏览器分块到达与体感仍待用户裁决，因此为 `AUTO_OK`。
 - 路线同步：新增第 29 项 `VOICE-C5-E3-RECORD-STREAMING-FEEDBACK`；原第 29–40 项顺延为 30–41，两份唯一施工表共 41 项且相对顺序不变。
 - 当前唯一下一项：第 30 项 `VOICE-C4-1-SILERO-CONTRACT`。
+
+## 2026-08-24 本轮维护记录：VOICE-C4-1 Silero VAD 适配合同
+
+- 新增 `src/core/silero_vad_contract.py`，只定义运行库无关的适配边界：输入固定为 16 kHz 单声道、512 个归一化浮点采样的不可变帧，并携带递增序号与单调采集时间。
+- 输出固定为 `SPEECH_STARTED / SPEECH_PAUSED / SPEECH_RESUMED / SEGMENT_FINALIZED` 四类事实；`to_voice_runtime_event()` 只映射到现有 Coordinator 事件，不直接写运行状态。
+- 失败合同覆盖运行时不可用、模型加载失败、推理失败和非法输出，统一显式选择 `USE_RMS`；失败与语音边界事件互斥，避免失败时伪造讲话状态。
+- 本项未加载或下载模型，未访问麦克风，未修改 `phone_call.js` RMS 主路径，未接真实设备，也未改变 C5 播放职责。
+- 自动证据：合同与相邻 Coordinator/ContextFactory 回归 `30/30`；项目正式 `.venv` 全量 `1040/1040` 通过。只标 `AUTO_OK`，不标 `REAL_OK`。
+- 当前唯一下一项：第 31 项 `VOICE-C4-2-SILERO-INTEGRATION`。
+
+## 2026-08-24 本轮维护记录：VOICE-C4-2 通话模式接入 Silero
+
+- 新增 `web/frontend/call_silero_vad.js`：按现有锁定版本动态加载 ONNX Runtime 1.19.2 与 `vad-web` 0.0.22，使用 Silero v5；适配器只转换开始、停顿、继续、断句事件和返回 16 kHz 音频段。
+- `web/app.py` 保证适配器先于 `phone_call.js` 加载；`phone_call.js` 的正常入口改为 `startPreferredCapture()`，Silero 成功时不创建旧 `AudioContext/ScriptProcessor` RMS 麦克风链。
+- 初始化失败时直接启动原 `startRmsCapture()`；运行期失败只处理一次，先停止/销毁 Silero，再启动 RMS。两条路径不并行持有麦克风，挂断时清理当前适配器及原有音频资源。
+- 新增 Node 行为测试：固定低概率噪音序列不产出事件；固定人声概率序列产出开始→停顿→继续→停顿→断句；Silero 正常时 RMS `getUserMedia` 调用为 0，初始化失败时为 1 且通话保持活动。
+- 证据边界：概率序列证明适配状态机和接线，不证明真实模型音频分类质量。仓库历史 WAV 未纳入 Git 固定语料；一次只读实模探查还触发现有后端 `VadSegmenter` 空段异常，留给第 32 项在可重复语料和明确边界下处理。
+- 自动证据：Silero/状态/页面/C5 组合回归 `46/46`；`call_silero_vad`、`phone_call_silero_fallback`、既有 `voice_delivery_client` 三条 Node 行为测试通过；四份相关 JS `node --check` 通过；项目正式 `.venv` 全量 `1043/1043` 通过；`git diff --check` 通过。
+- 当前只标 `AUTO_OK`，没有真实浏览器、真实麦克风、噪音分类或 barge-in 证据，不标 `REAL_OK`。
+- 当前唯一下一项：第 32 项 `VOICE-C4-3-VAD-REGRESSION`。
+
+## 2026-08-24 本轮维护记录：VOICE-C4-3 VAD 回归与真实模型固定样例
+
+- 真实缺陷复现：本地 Silero 对历史语音加尾静音后确实产出队列段，但 `VadSegmenter` 先保存 `front` 视图、再 `pop()`、最后才读取 samples；sherpa 出队后使底层视图失效，因而抛出“VAD 返回了空语音段”。
+- 先在 `tests/test_vad_segmenter.py` 增加 `InvalidatingFakeVad` 红灯测试，明确模拟 pop 后 samples 清空；修改前该测试稳定以相同空段错误失败。
+- 最小修复仅调整 `src/audio/vad_segmenter.py` 出队顺序：先 `_assemble_one()` 复制并组装成项目自己的 `VoiceSegment`，成功后才 `pop()`；未修改模型、阈值、预滚、最短/最长语音或缓冲参数。修复后 VAD 单元测试 `20/20`。
+- 新增 `tests/test_vad_real_model_regression.py`：使用 Git 已跟踪的单声道 24 kHz `web/voice/reference.wav`，确定性线性重采样至 16 kHz，追加固定 3 秒尾静音后，仓库本地 Silero ONNX 实际产出 1 个非空语音段；固定 2 秒静音与随机种子 `20260824`、标准差 `0.02` 的 3 秒低水平宽带噪音均产出 0 段，真实模型样例 `3/3` 通过。
+- 扩展 `test_phone_call_silero_fallback.js`：Silero 正常主路径后主动触发运行期推理失败，验证先停 Silero、只启动一次 RMS；挂断后再次启动并模拟初始化失败，验证新 RMS 链可建立，覆盖运行失败和重启生命周期。
+- 自动证据：浏览器适配器与回退 Node 行为测试通过；四份相关 JS `node --check` 通过；VAD/真实模型/状态/页面/C5 组合回归 `69/69`；最终项目 `.venv` 全量 `1047/1047` 通过；`git diff --check` 通过。
+- 证据边界：已验证一个已跟踪真实语音、全静音和一种合成宽带噪音，不等于真实房间空调、键盘、远场、扬声器自激或不同浏览器麦克风通过；本项只标 `AUTO_OK`，不标 `REAL_OK`。
+- 当前唯一下一项：第 33 项 `VOICE-C3-1-PLAYBACK-TIMING-REAL`。
+
+## 2026-08-25 本轮维护记录：VOICE-C4-3B 短停顿进入同一会话状态
+
+- 真实缺口是 `phone_call.js` 收到 Silero `speech_paused` 时只改页面提示，没有上报服务端；请求模型也只允许 `user_speech_started`。
+- 浏览器现在使用同一个 `reportVoiceRuntimeEvent()`，在停顿时携带当前 `conversation_id` 发送 `user_speech_paused`。
+- HTTP 路由将该类型显式映射为 `USER_SPEECH_PAUSED`，仍交给按会话隔离的 `VoiceRuntimeSessionRegistry` 和唯一写入者 `VoiceStateCoordinator`。
+- 最终状态只是 `user_speaking: true -> false`，`segment_capturing` 仍为 `true`；重试同一停顿事实返回 `applied=false`。
+- 自动证据：会话/路由 `6/6`，相关组合 `43/43`，两个 Node 行为测试通过，全量 `1053/1053` 通过；另有 Starlette/FastAPI 弃用警告，无失败。
+- 项目 `.venv` 启动器指向已缺失的 Python 3.11；本轮为不改用户环境，用 Python 官方 3.11.9 一次性运行时加载现有 `.venv` 依赖完成验证。
+- 证据不包括恢复、断句、ASR/TTS 事件、Scheduler 消费或真实设备体感；该记录当时曾误将第 33 项列为下一项，后续复核已增补 32c–32f 并纠正。
+
+## 2026-08-25 本轮维护记录：VOICE-C4-3C 停顿后继续讲话进入同一会话
+
+- 复核发现 Silero 已产生 `speech_resumed`，但 `phone_call.js` 只恢复页面聆听状态，未上报服务端。
+- 浏览器现携带原 `conversation_id` 发送 `user_speech_resumed`；HTTP 路由显式映射到 `USER_SPEECH_RESUMED`。
+- 最终状态仅为 `user_speaking: false -> true`，`segment_capturing` 保留 `true`，因此继续讲话仍属于同一音频片段。
+- 重复恢复事件返回原状态且 `applied=false`，其他 conversation 不受影响。
+- 验证：会话/HTTP 路由 `8/8`，纯合同 `24/24`，`call_silero_vad` 和 `phone_call_silero_fallback` Node 行为测试通过，JS 语法和 `git diff --check` 通过。
+- 项目原 `.venv` 启动器仍指向已缺失的 Python 3.11；本轮用一次性官方 Python 3.11.9 加载现有依赖，专项后继续完成全量 `1055/1055`，然后删除临时运行时。
+- 复核增补 32c–32f，第 33 项退回 `TODO`。当前唯一下一项是 32d：断句与 ASR 处理状态桥接。
+
+## 2026-08-25 本轮维护记录：VOICE-C4-3D–3F 语音事实到播放重评生产闭环
+
+- 纠正了“一小步”的粒度：本轮不再按单个事件分拆，而是一次完成浏览器事实、按会话状态、播放决策、TTS 反馈和延后重评的可独立验收能力。
+- `phone_call.js` 使用串行事件链保证 `PAUSED -> FINALIZED -> ASR_STARTED -> ASR_FINISHED/FAILED` 顺序，并消费状态请求返回的重评播放事件。
+- `VoiceRuntimeSessionRegistry` 暴露同一 conversation 的唯一 Coordinator；`ConversationPlaybackRegistry` 为每个 conversation 绑定共享该 Coordinator 的 Scheduler 和延后队列。
+- chat 与 `/record` 的播放候选携带 conversation 进入共享服务；无 Web conversation 的记录使用 `record:<session_id>` 隔离。
+- `local_tts.js` 的每个播放单元保留 runtime hooks；`voice_delivery_client.js` 将 `intent_id/priority` 随 STARTED/FINISHED/STOPPED/FAILED 回报服务端。
+- Scheduler 新增显式 `reevaluate()`：只在 ASR 输入空闲或 TTS 结束事实后重评已延后队列；仍忙则保留，已过期则 DROP，可播则交回浏览器。
+- 专项 `48/48`、全部 3 个 Node 行为测试、五份相关 JS 语法、`git diff --check` 和全量 `1060/1060` 通过。仅能证明自动环境下的软件闭环，不能证明真实麦克风、外放、耳机、浏览器时序或听感。
+- 当前唯一下一项恢复为第 33 项真实播放时机验收。
+
+## 2026-08-25 真实验收纠偏：VOICE-C6 单聊天时间线与显式模式前置批次
+
+- 第 33 项首次真实浏览器验收发现：ASR 与普通 chat 文字回复正常，但普通正文没有生成 `voice_delivery`，因此在通话和喇叭均开启时仍无声音。服务端日志证明没有 `/tts` 或 TTS 生命周期请求；这不是用户操作问题。
+- 当前试验改动为普通回复补了 `ASSISTANT_REPLY` 候选，并完成相关专项 `43/43`；但它暂时复用了实验语音首句/25 字预算，只用于证明缺口位置，不视为最终 chat 输出策略，也不把第 33 项标为通过。
+- 复核确认第 26 项此前所谓“三入口统一”实际只覆盖 `/record` 与 chat tool 已有语音候选共用 PlaybackScheduler；普通 chat 仍是 `screen_delta`，前端也没有统一 Turn 状态。因此第 26 项名称和结论已收窄，保留原自动证据，不扩大为完整界面/输出统一。
+- 产品交互改为单聊天时间线：用户/助手文字、方案、步骤、安全、记录、tool、确认和状态都成为同一 `turn_id` 下的消息块；原中间运行画布不再保存第二份实时 think/tool 状态，方案库、记录库、安全库等管理页可继续承担完整浏览与编辑。
+- 模式显式分为：`chat`、`experiment/free`、`experiment/protocol`。文字、单次录音、连续通话只是 `input_source`，不得暗中决定业务模式；每个请求携带提交时的模式快照，避免异步处理期间切换模式导致串线。
+- 自由实验记录仍必须保留第 28 项已修复的语义追问：先保存原始事实，保存成功后最多追问一个影响复现/判断/安全的关键缺口；方案实验按方案已知值、现场必测与偏差追问；自由 chat 不自动保存实验事实。
+- 内容策略分开但输出机制统一：实验记录使用严格短回执/追问，chat 使用自然回答与按句语音，tool 只呈现真实执行结果；三者统一生成 Turn/Block/voice identity，并共用会话 PlaybackScheduler、TTS 反馈、延后、过期和失败边界。
+- 新增 33a–33f 作为真实播放前置：合同 → 单一 Store → chat-first 界面 → 显式模式 → 分策略输出 → 三生产者交叉自动回归；原真实播放时机验收后移为 33g，第 34 项仍负责真实打断、自激和漏检。
+- 35–39 的五分支理解保持在输出收口之后：`experiment/control/tool/chat/uncertain` 只决定输入去向；第 39 项再统一 tool 参数、风险、确认和执行权限，不允许理解层直接保存、执行或播放。
+- 当前唯一下一项：33a `VOICE-C6-A1-TURN-BLOCK-CONTRACT`，先定义可追溯而无副作用的统一回合/消息块合同；本记录不宣称真实声音、单聊天界面或模式切换已经完成。
+
+## 2026-08-25 VOICE-C6-A1-TURN-BLOCK-CONTRACT 自动闭环
+
+- 新增纯数据合同 `ConversationTurn / ConversationBlock`，以及 interaction mode、experiment context、input source 和 block type 枚举；`request_id` 提供幂等身份，模式、上下文、`mode_version` 和输入来源在提交时形成不可变快照。
+- 用户/助手文字以及方案、步骤、安全、记录、tool、确认和系统状态卡片均是可见 Block；VOICE Block 不复制正文，必须用 `source_block_id` 引用本 turn 非语音 Block，并携带唯一 `intent_id` 和 `MessagePriority`。
+- 新增纯函数 `decide_turn_replay()`：不同 `(conversation_id, request_id)` 是新请求；完全相同合同是幂等重放；同一请求改变 `mode_version` 明确报模式版本冲突；其他内容变化报请求内容冲突。函数不读写 Store。
+- 合同拒绝空/重复身份、跨 turn 或 voice-to-voice 引用、非法模式上下文组合和非 JSON payload；嵌套 payload 深层不可变，`to_wire()` 产出 JSON 可序列化字典。
+- 专项 `14/14`、相邻呈现/播放合同 `39/39`、`py_compile`、`git diff --check` 与项目全量 `1076/1076` 通过，因此标 `AUTO_OK`。这是纯合同自动证据，不证明 Store、单 Composer/聊天页面、模式切换、Chat/实验保存策略、Tool 权限、TTS 或真实浏览器/设备。
+- 当前唯一下一项：33b `VOICE-C6-A2-SINGLE-CONVERSATION-STORE`；把事件写入唯一 Store 并移除 chat/run 双份 think/tool 状态。本轮不提前实现。
+
+## 2026-08-25 VOICE-C6-A2-SINGLE-CONVERSATION-STORE 自动闭环
+
+- 新增浏览器 `ConversationTurnStore`：`beginTurn/upsertBlock/pushThink/pushTool/subscribe/clear/getSnapshot` 是当前 Turn 的唯一前端事实入口；快照深拷贝，外部不能反向篡改 Store。
+- Chat 服务端正文统一 upsert 为 `assistant_text`，think 映射为 `system_status(kind=think)`，Tool 映射为 `tool_card`；聊天 DOM 只订阅渲染，不再直接接收这些服务端事实。
+- `run_canvas.js` 删除实时 `stream/pendingIndex`、think/tool HTML 生产和 `runPushThink/runPushTool/runClearStream`；运行画布继续只显示现有方案与步骤，不再保存第二份实时事件。
+- Tool pending/result 由服务端携带同一个 `tool_call_id`，Store 以稳定调用身份更新同一 Block，不再依赖标题作为首选身份。
+- Store 对相同 `(conversation_id, request_id)` 的原始请求重放保持已有 Block；内容或 `mode_version` 改变则拒绝冲突。此为浏览器内存 Store 行为，不是数据库持久化或跨刷新幂等。
+- 专项组合 `27/27`、`conversation_turn_store: OK`，其余 3 个既有 Node 行为测试通过，JS/Python 语法、`git diff --check` 与项目全量 `1083/1083` 通过。自动证据不证明真实浏览器布局、刷新恢复或用户体验。
+- 当前唯一下一项：33c `VOICE-C6-A3-CHAT-FIRST-SURFACE`；将方案、步骤、安全、记录、确认和状态正式渲染为同一聊天时间线 Block。本轮不提前实现。
+
+## 2026-08-25 VOICE-C6-A3-CHAT-FIRST-SURFACE 自动闭环
+
+- 七类卡片 Block 共用一个 BlockView 适配器和聊天卡片骨架；类型差异只决定标题、正文、元信息、状态和色调，不复制七套 DOM。
+- 方案/步骤/安全从既有只读会话事实投影进每个 Turn；单次录音建立 experiment Turn，保存结果进入 record/confirmation Block。
+- 原“实验进行中”run 画布不再加载；方案、试剂安全、记录和设置继续作为管理页，不保存第二份实时状态。
+- 专项 `30/30`、5 个 Node 行为测试、JS 语法、`git diff --check` 与全量 `1091/1091` 通过，仅标 `AUTO_OK`；真实布局、滚动和用户体验未验收。
+- 当前唯一下一项：33d `VOICE-C6-A4-EXPLICIT-MODE-SWITCH`。
+
+## 2026-08-25 VOICE-C6-A4-EXPLICIT-MODE-SWITCH 专项自动闭环
+
+- 唯一 Composer 显式提供自由聊天、自由实验记录、方案实验记录三档；模式变化才递增 `mode_version`。
+- 文字、单次录音和连续通话只贡献 `input_source`；提交时冻结 `interaction_mode / experiment_context / mode_version / input_source`，之后切换不改变旧快照。
+- Chat 的 Store Turn 与 `/chat/stream` 请求复用同一快照；单次录音开始时冻结并同时交给 Store 与 `/record/stream`；连续通话明确标记 `continuous_call`。
+- 服务端 Chat/Record 请求继承同一个模式快照校验器，拒绝 chat+实验上下文、experiment+none 和非正版本；本项不按模式改变保存、Tool、回复或 TTS 策略。
+- 实际证据：33d/33c/33b 专项 `22/22`，项目目录既有 Python 3.11 运行时加载现有依赖完成全量 `1098/1098`；新旧 3 个 Node 合同测试、相关 JS `node --check`、Python `py_compile`、`git diff --check` 均通过。
+- 证据限制：未做真实浏览器布局、模式切换和录音/连续通话走查，不标 `REAL_OK/UX_CONFIRMED`。
+- 当前唯一下一项：33e `VOICE-C6-A5-MODE-OUTPUT-POLICIES`。
+
+## 2026-08-25 VOICE-C6-A5-MODE-OUTPUT-POLICIES 自动闭环
+
+- 新增纯策略选择 `select_output_policy()`：Chat 不保存、不允许记录 Tool；自由/方案实验保存原始事实，最多一个追问。
+- 文字和连续通话在统一 Composer 提交后按冻结模式分流；单次录音在 Chat 模式回到 Chat，在实验模式才进入 `/record/stream`，因此 input_source 不再决定业务去向。
+- Chat 服务端同时隐藏并硬阻断 `record_observation`，提示词不再把“提到实验事实”解释成自动保存；实验模式请求误入 Chat、Chat 请求误入 Record 均返回 409。
+- 自由实验显式覆盖当前已加载方案，保留统一理解的关键语义追问；方案实验必须已有有效方案，否则在抽取和保存前失败；成功投影严格发生在保存之后。
+- Tool 仍只把真实执行 outcome 交给既有 Tool Card/DeliveryPlan，不新增模型伪造结果或旁路播放。
+- 验证：专项 `46/46`，项目全量 `1105/1105`，6 个相关 Node 行为测试、5 份 JS 语法与 `git diff --check` 通过，仅标 `AUTO_OK`。
+- 未做真实浏览器模式切换、文字/单次录音/连续通话和卡片顺序验收，不标 `REAL_OK/UX_CONFIRMED`。
+- 当前唯一下一项：33f `VOICE-C6-A6-THREE-PRODUCER-AUTO-MATRIX`。
+
+## 2026-08-25 VOICE-C6-A6-THREE-PRODUCER-AUTO-MATRIX 自动闭环
+
+- 矩阵盘点发现 33a 的 `source_block_id` 仍停留在纯合同，实际 `VoiceDeliveryItem/PlaybackRequest/voice_delivery` 未携带屏幕来源；本轮将该身份贯穿内容计划、调度和浏览器边界。
+- Chat/Tool 语音绑定当前助手 Block；Record 追问绑定当前 confirmation Block；请求同时携带 `request_id/turn_id`，两者必须同时出现。
+- 浏览器仅在 `source_block_id` 引用当前 Turn 已存在 Block 时接受 READY/PREEMPT，拒绝孤儿语音；调度的 DEFERRED、恢复 READY 和过期 DROP 均保持来源身份不变。
+- 新增 Python 三生产者矩阵：Chat/Record/Tool × READY/DEFERRED/恢复/DROP × A/B 会话隔离；新增 Node 矩阵覆盖三种可见 Block、播放引用、完全相同重放和 `mode_version` 冲突。
+- 第一次全量的 2 个失败来自旧架构护栏匹配 `authorize(output.items)` 精确字符串；更新为检查 `bind_voice_items(...)` 后仍进入同一 Scheduler，没有回退生产实现。
+- 验证：专项组合 `54/54`、全量 `1110/1110`、7 个 Node 行为测试、JS/Python 语法及 `git diff --check` 通过，仅标 `AUTO_OK`。
+- 未进行真实浏览器、麦克风、扬声器、耳机、TTS 听感或真实时序验收。
+- 当前唯一下一项：33g `VOICE-C3-1-PLAYBACK-TIMING-REAL`。
+
+## 2026-08-25 维护记录：33c-UX 单主视图纠偏
+
+- 真实页面复核发现 `shell.js` 虽已取消 run 画布的实时 think/tool 状态，却仍默认把方案管理画布与聊天左右并排，造成用户看到两处主界面。
+- 本轮把 Chat 设为默认且唯一可见主视图；方案、试剂安全、记录和设置改为导航触发的互斥管理页。
+- `chat / experiment/free / experiment/protocol` 不再选择不同屏幕区域，只决定同一聊天时间线中产生哪些 Block。
+- 针对性模式/Block/三生产者回归 `27/27`、JS 语法与 `git diff --check` 通过，仅标 `AUTO_OK / UX_PENDING`。
+- 尚未做真实浏览器布局、滚动、管理页往返和状态保留走查。当前唯一下一项是完成单主视图真实浏览器 UX 复验，确认后再继续 33g。
+
+## 2026-08-25 维护记录：33g 前置语音输入输出恢复
+
+- ASR warmup 503 的根因是受限 Uvicorn 进程中 FunASR 调用 `ffmpeg -version` 被 Windows 拒绝；服务改为核验 PID 后以同项目 Python 3.11 非受限隐藏启动，ASR `loaded=true`，固定真实 WAV 转写成功。
+- 普通 Chat 的 `ASSISTANT_REPLY` 错误使用永不播放的 `ROUTINE`，Scheduler 返回 `DROP/context_lost`；现改为低于安全/追问、可在空闲播放的 `REVIEW`，真实 SSE 返回 `READY/playback_window_open`。
+- 火山 TTS 首探针出现一次代理 TLS EOF，随后连续 `3/3` 返回 200、每次 17,760 字节；不能据此宣称外部网络永远稳定。
+- 专项 `38/38`、项目全量 `1111/1111` 通过。当前唯一下一项是用户用真实麦克风验证“说话→文字进入唯一聊天→模型回复→实际出声”。
+
+### 2026-08-25 浏览器最后一公里补充
+
+- 用户复验时日志显示真实 `/asr/transcribe 200` 与 `/chat/stream 200`，但没有 `/tts` 或 TTS 生命周期请求，证明故障在浏览器 READY 消费边界。
+- 单主视图隐藏了头像及其 `tts-muted` 控件，历史静音值可能继续阻断播放且用户无法解除；现将“语音开启/关闭”移到唯一聊天头部，并让 PLAYED、PLAYBACK_DISABLED、REJECTED_PAYLOAD、TTS_UNAVAILABLE 成为可观察浏览器事件。
+- Node 行为测试、JS 语法、差异检查及相关组合 `50/50` 通过；服务以同配置重启为 PID 29900，首页新缓存版本和按钮均已现场确认，ASR 已重新预热。
+- 唯一下一项仍是用户刷新后确认按钮显示“语音开启”，再完成一次真实说话与人耳播放。
+
+### 2026-08-25 自由实验重复呈现纠偏
+
+- 用户截图证明同一第 71 段记录同时进入聊天 Blocks 与遗留 `lab_panel.js` 右侧面板；数据库 `/record/history` 显示该段仅 1 条，因此是重复投影而非重复保存。
+- 桌面首页停止加载 `lab_panel.js`，`voice_asr.js` 删除第二个 `labRender()` 消费者；方案、安全、记录管理仍由 shell 管理页保留，实时结果只进入唯一 ConversationTurnStore。
+- 相关回归 `43/43`、JS 语法和差异检查通过；服务 PID 25484 已确认首页不含旧面板、ASR `loaded=true`。唯一下一项是刷新后复验自由实验只出现一组 Blocks 且仍有语音。
+
+### 2026-08-25 方案模式与活动方案同步纠偏
+
+- 用户点“方案实验记录”后仍看到“自由实验”，根因是 Composer 只切换浏览器语义模式，没有建立服务端活动方案；两套状态发生分裂。
+- 现在方案模式入口先读取 `/protocols/session`：没有活动方案时只打开方案选择页，不提前切换模式；点中具体方案且 POST 成功后，才把 `interactionModeState` 切为 `experiment/protocol` 并返回唯一聊天时间线。选择“自由记录模式”则同步切到 `experiment/free`。
+- 专项相关组合 `29/29`、两份 JS 语法和差异检查通过，仅证明自动合同，不代表真实浏览器选择、返回和方案 Block 已由用户确认。
+- 唯一下一项：真实浏览器刷新后点“方案实验记录”→选一个具体方案→自动回主聊天→录入一条事实，确认显示该方案/步骤而非自由实验。
+
+### 2026-08-25 Chat 语音合同设计决定（未编码）
+
+- 默认 Chat：可朗读正文单独成为可见 Block，屏幕正文与 `voice_text` 逐字一致；生成阶段以约 10 秒为目标，禁止下游首句/25 字机械截断。
+- “继续说”：只为当前回合建立 continuation 详细 Block，不形成永久详细偏好；用户指定重读时按原可见 Block 重新合成，不重新生成答案。
+- 打断：先暂停，不自动恢复。误触反馈前两次可见且朗读，第三次起只显示；有效 `user_text` 建立后清零，连续监听始终保持开启。
+- 状态为 `DESIGN_DECIDED / NOT_CODED`；现有 `MAX_ITEM_CHARS = 25` 尚未移除，Free/Protocol 语音矩阵尚未决定，不能标为自动或真实验收通过。
+
+### 2026-08-25 Free / Protocol Experiment 语音合同设计决定（未编码）
+
+- 共同规则：一个 Experiment Turn 可以有多个业务 Block，但最多只产生一个独立、可见的语音汇总 Block；实际 `voice_text` 与该来源 Block 正文逐字一致，估算最长约 15 秒。用户原话不回读，保存成功 `record_card` 只显示不朗读，保存失败不得产生成功反馈，现有通用 `safety_alert` 只显示不读。
+- Free：先保存原始事实，成功后最多一个关键语义追问；追问和本轮必要解释显示并朗读，没有追问时允许静默保存，不受后台残留方案约束。
+- Protocol：必须先有活动方案；`protocol_card` 只在进入/切换/版本变化时出现，`step_card` 只在进入/切换/版本变化时出现；本轮新偏差、必测缺口或确认 Block 分别维护业务状态，但需说内容统一进入至多一个约 15 秒的可见语音汇总 Block，既有上下文不重复显示或朗读。
+- 当前 `publishProtocolContextBlocks(turnId)` 仍按每个 Turn 重建方案/步骤卡，首句/25 字限制仍存在；明确危险动作判断和 `danger_intervention` 均不存在。本项为 `DESIGN_DECIDED / NOT_CODED`，不能标为自动或真实验收通过。
+
+### 2026-08-25 统一可见语音 Block 纯合同（AUTO_OK，未接生产）
+
+- 新增纯 `spoken_output` 合同：Chat 默认 50 字估算约 10 秒，单回合 continuation 不套默认预算，Free/Protocol 整 Turn 唯一自动语音 75 字估算约 15 秒。
+- 一次构造只产生一个可见 `assistant_text(role=spoken)` 与一个引用它的 VOICE；语音文字直接从可见 Block正文派生，不保存第二份副本，超预算在发布前失败而不是截断。
+- 新增专项 `6/6`、相关组合 `30/30`、全量 `1119/1119`、编译与差异检查通过，标 `AUTO_OK`。
+- 尚未接生产 Chat/Record、前端、Scheduler 或 TTS；页面仍使用旧首句/25 字策略。唯一下一步只接普通 Chat 生产链。
+
+### 2026-08-25 普通 Chat 可见语音 Block 生产接入
+
+- `CHAT_POLICY`生成最多50字的纯文本完整短答；`chat_stream`缓冲并验证后，屏幕一次发布`${turnId}:spoken`的`assistant_text(role=spoken)`，唯一voice item逐字读取同一正文并进入共享Scheduler。
+- 新增预算贯穿`VoiceDeliveryItem → PlaybackRequest → WebPlaybackService`；普通Chat可使用50字预算，既有Record/Tool仍默认25字，没有全局放宽旧内容策略。
+- 前端只改Chat Block ID、role和发布时间；没有新增/隐藏界面区域，Experiment路径未改。最终全量`1123/1123`、编译、JS语法和差异检查通过。
+- PID 14492真实官方DeepSeek探针得到screen/voice逐字相同、`:spoken`来源、READY；真实TTS返回200、118560字节MP3，ASR`loaded=true`。状态为软件与真实服务探针通过、真实浏览器/人耳`PENDING`。
+- 唯一下一步：用户`Ctrl+F5`后用普通Chat验证一段完整短答在屏幕和语音中逐字一致且不中途截断。
+
+### 2026-08-25 可搬家的一键启动与转交
+
+- `start.bat`、`build_exe.bat`、`package.bat`、`upload.bat` 删除个人绝对路径，统一用 `%~dp0` 从批处理自身位置定位仓库；带空格路径也使用引号保护。
+- `scripts/start_best.py --doctor` 可只报告仓库、Python、虚拟环境、Web 入口、ASR 模型和本地配置状态，不下载、不启动服务。
+- 新增 `docs/ONE_CLICK_START_GUIDE.md`，面向新手说明首次启动、密钥边界、常见失败、源码/EXE 两种交付和证据边界；README 快速开始改为双击 `start.bat`。
+- 自动证据：启动器专项 `2/2`、项目原 `.venv` 全量 `1144/1144`、`git diff --check` 通过；另一台电脑的首次下载、浏览器、麦克风、API 和防火墙仍需目标机真实验收，因此只标 `AUTO_OK`。
+- 本项只解决可搬家启动与交付说明，不改变 Chat/Record/TTS 业务逻辑；语音主线唯一下一项保持不变。
+
+### 2026-08-26 根目录按使用者职责归类
+
+- 根目录只保留普通用户唯一入口 `start.bat`；有效开发批处理进入 `scripts/windows/`，10 个已弃用批处理进入 `scripts/legacy_launchers/`。
+- EXE 入口移动为 `scripts/launcher.py`，同步修正仓库根计算和 `scripts/build_exe.py` 的 PyInstaller 入口；VAD 诊断进入 `scripts/diagnostics/`。
+- 两份旧交接文档、页面 dump 和终端抓取记录进入 `docs/history/`；文件均保留，没有删除历史证据。
+- README 新增根目录文件职责表；专项测试锁定“根目录只能有 start.bat”及新打包入口。专项 `4/4`、移动入口 `py_compile`、项目原 `.venv` 全量 `1148/1148`（9.902 秒）和 `git diff --check` 均通过，仅标 `AUTO_OK`。
+- 本轮不移动 `.runtime-python311*`：它们是未跟踪的本机备用运行时，当前是否仍被外部命令使用缺少证据，贸然移动可能破坏当前开发环境。
+
+### 2026-08-26 移动后源码打包真实测试
+
+- 非受限环境真实运行 `scripts/windows/package_source.bat` 成功，证明批处理能从新目录返回仓库根并调用项目 `.venv`；生成 `dist/ai107-source-20260826-004317.zip`，601 个条目、60,656,779 字节。
+- 内容验收失败：必需入口均存在，`.env/.venv/web/settings.json/web/lab_agent.db/web/certs` 已排除；但错误包含 `.runtime-python311*` 37 项、`audio/recordings/` 26 项和 `results/` 4 项。
+- 当前 ZIP 仅在本机、未上传，但含真实录音和运行结果，明确标记为 `NOT_SAFE_TO_SHARE`。根因修复应补齐 `scripts/package.py` 排除合同，并让批处理在 Python 失败时传播非零退出码；本次仅按用户要求测试，尚未修复。
+
+### 2026-08-26 源码包隐私排除修复与复验
+
+- `scripts/package.py` 新增目录剪枝和文件过滤：排除 `.runtime-python*`、`audio/raw`、`audio/recordings`、`results` 和运行日志；`package_source.bat` 保存并传播 Python 退出码。
+- 合同与入口专项 `7/7` 通过后真实生成 `dist/ai107-source-20260826-004548.zip`：507 项、35,967,522 字节。
+- 开箱验收：`start.bat/README/.env.example/package_source.bat/scripts/launcher.py/ONE_CLICK_START_GUIDE` 全部存在；`.env/.venv/.runtime-python*/settings/数据库/证书/录音/results/log` 全部 0 项，结果 `PASS / SAFE_CONTENT_CONTRACT`。
+- 旧 `004317.zip` 仍留在本机且标记 `NOT_SAFE_TO_SHARE`，未上传；本轮未获删除授权，因此不删除。
+
+### 2026-08-26 VOICE-D0 来源可信输入合同
+
+- 新增纯数据合同 `ExperimentTurnInput`，冻结 `conversation_id / request_id / turn_id`、实验模式快照、输入来源、原文和可选 ASR 证据；不调用 LLM、不保存、不分派、不更新问题状态。
+- 文字输入只能携带原文；单次录音和连续通话必须携带与原文完全一致的最终 `ASRResult`。
+- 当前 `Documents\107` 是唯一实现基线；`Desktop\asr_demo` 只用于核对设计初衷，禁止复制或覆盖当前核心文件。
+- 红灯先证明模块不存在；实现后专项 `9/9`、相邻回归 `35/35`、项目正式 `.venv` 全量 `1162/1162` 通过，仅标 `AUTO_OK`。
+- 尚未接 `/asr`、`/record`、`UnifiedObserver`、`ReplyCoordinator` 或真实 LLM，不能证明统一链已接入或识别能力。
+- 当前唯一下一项：第 35 项 `VOICE-D1-SESSION-OWNERSHIP`，建立按 `(conversation_id, lab_session_id)` 隔离的会话状态和有序处理边界。
+
+### 2026-08-26 VOICE-D1 会话所有权与有序处理
+
+- 新增 `web/experiment_runtime_sessions.py`；每个 `(conversation_id, lab_session_id)` 独立持有 `ReplyCoordinator`、`SessionContext` 和单工作线程队列，不与其他实验会话共享问题状态。
+- 同一会话按提交顺序串行修改状态，不同会话可以并行；相同 `request_id` 的完全一致重试复用原序号和 `Future`，内容冲突拒绝，队列达到上限时对新请求施加背压。
+- 专项 `11/11`、相邻回归 `43/43`、项目正式 `.venv` 全量 `1175/1175`（8.485 秒）通过，仅标 `AUTO_OK`。
+- 本轮没有从 `Desktop\asr_demo` 复制或覆盖任何实现；当前 `Documents\107` 仍是唯一施工基线。
+- 尚未把注册表接到 `/record`，也未调用 `UnifiedObserver` 或真实 LLM；因此当前不能声称生产统一链已接入，也不能评价识别能力。
+- 当前唯一下一项：第 36 项先让统一观察器在该会话边界内处理 `ExperimentTurnInput`，以受控测试验证真实观察结果；生产 `/record` 切换留到观察器合同稳定后。

@@ -98,11 +98,15 @@
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); });
   }
 
-  async function streamRecord(text, onEvent) {
+  async function streamRecord(text, modeSnapshot, onEvent) {
     var response = await fetch('/record/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ transcript: text })
+      body: JSON.stringify({
+        transcript: text,
+        conversation_id: window.localStorage?.getItem('lab-agent-conversation-id') || null,
+        ...modeSnapshot
+      })
     });
     if (!response.ok) {
       var failure = await response.json().catch(function () { return {}; });
@@ -125,6 +129,7 @@
     }
     if (buffer.trim()) onEvent(JSON.parse(buffer));
   }
+  window.streamExperimentRecord = streamRecord;
 
   function init() {
     var style = document.createElement('style');
@@ -142,9 +147,11 @@
       if (!d.loaded) say('本地识别未加载，首次使用需等待模型加载');
     }).catch(function () {});
 
+    var recordingModeSnapshot = null;
     el('asr-btn').onclick = function () {
       var button = el('asr-btn');
       if (!recording) {
+        recordingModeSnapshot = window.interactionModeState.capture('single_recording');
         button.disabled = true;
         start().then(function () {
           button.disabled = false;
@@ -175,10 +182,18 @@
           return;
         }
         say('正在连接理解服务…');
-        // 完整链路（B4+用户拍板 2026-08-18）：语音口述一律直连 /record，
-        // 不再送聊天框绕 agent——记录类口述走统一输出层（messages 渲染 + copy 话术），
-        // 追问/回执由后端判断、前端只按 kind/screen_target 上样式、显示/朗读 text。
-        streamRecord(text, function (event) {
+        // 33e：录音只是 input_source。Chat 回到聊天策略；实验模式才保存原始事实。
+        var submittedModeSnapshot = recordingModeSnapshot;
+        recordingModeSnapshot = null;
+        if (submittedModeSnapshot.interaction_mode === 'chat') {
+          window.composerSend?.(text, {
+            inputSource: 'single_recording', modeSnapshot: submittedModeSnapshot
+          });
+          say('已作为自由聊天发送，不会保存为实验记录');
+          return;
+        }
+        Promise.resolve(window.beginRecordSurface?.(text, submittedModeSnapshot)).then(function (identity) {
+          return streamRecord(text, Object.assign({}, submittedModeSnapshot, identity || {}), function (event) {
           if (event.type === 'record_status') {
             say(event.text || '正在处理…');
             return;
@@ -189,13 +204,14 @@
           }
           if (event.type !== 'record_result') return;
           var d = event.data || {};
-          if (window.labRender) window.labRender(d);
+          window.publishRecordSurface?.(d);
           // C5-D10：messages 只负责显示；只有 Scheduler 授权事件可以发声。
           (d.voice_delivery_events || []).forEach(function (delivery) {
             window.consumeVoiceDelivery?.(delivery);
           });
           say('已记录');
           if (window.labStepsReload) setTimeout(window.labStepsReload, 800);
+          });
         }).catch(function (err) { say('处理失败：' + err.message); });
       }).catch(function (err) {
         button.disabled = false;

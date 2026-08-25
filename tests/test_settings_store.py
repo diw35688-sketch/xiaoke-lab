@@ -31,6 +31,7 @@ class SettingsStoreFileReadTests(unittest.TestCase):
             "base_url": "https://example.com/v1",
             "model_name": "test-model",
             "tts_enabled": True,
+            "speak_record_ack": True,
             "tts_url": "http://127.0.0.1:8001/tts",
             "tts_provider": "volcano",
             "tts_api_key": "appid123:tok456",
@@ -52,6 +53,22 @@ class SettingsStoreFileReadTests(unittest.TestCase):
         self.assertEqual(settings.tts_voice, "BV001_streaming")
         self.assertEqual(settings.tts_speed, 1.2)
         self.assertTrue(settings.tts_enabled)
+        self.assertTrue(settings.speak_record_ack)
+
+    def test_speak_record_ack_defaults_on_when_absent_from_file(self):
+        payload = {
+            "api_key": "sk-test",
+            "base_url": "https://example.com/v1",
+            "model_name": "test-model",
+            "tts_enabled": True,
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            settings_file = Path(directory) / "settings.json"
+            settings_file.write_text(json.dumps(payload), encoding="utf-8")
+            with mock.patch.object(settings_store, "SETTINGS_FILE", settings_file):
+                settings = settings_store.current()
+
+        self.assertTrue(settings.speak_record_ack)
 
 
 if __name__ == "__main__":

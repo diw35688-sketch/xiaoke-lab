@@ -16,6 +16,7 @@ from src.core.playback_context_factory import PlaybackContextFactory
 from src.core.playback_decision import PlaybackDecision, PlaybackDisposition
 from src.core.playback_gate import PlaybackGate
 from src.core.playback_request import PlaybackRequest
+from src.core.playback_reevaluation import ReevaluationTrigger, reevaluate_deferred
 from src.core.tts_adapter import TTSExecutionEvent, TTSExecutionEventType
 from src.core.tts_failure_boundary import (
     TTSFailureBoundary,
@@ -179,6 +180,33 @@ class PlaybackScheduler:
         context = self._context_factory.create(session_phase=session_phase)
         decision = self._gate.evaluate(pending.request, context)
         return self._route(pending.request, context, decision, session_phase)
+
+    def reevaluate(
+        self,
+        trigger: ReevaluationTrigger,
+        *,
+        session_phase: PlaybackSessionPhase,
+    ) -> tuple[PlaybackScheduleResult, ...]:
+        """Reevaluate queued requests after an explicit runtime transition."""
+        context = self._context_factory.create(session_phase=session_phase)
+        batch = reevaluate_deferred(
+            self._deferred_queue,
+            trigger=trigger,
+            context=context,
+        )
+        results = []
+        for outcome in batch.outcomes:
+            if outcome.decision.disposition is PlaybackDisposition.DEFERRED:
+                continue
+            results.append(
+                self._route(
+                    outcome.entry.request,
+                    context,
+                    outcome.decision,
+                    session_phase,
+                )
+            )
+        return tuple(results)
 
     def _route(
         self,

@@ -130,7 +130,10 @@
     var response = await fetch("/record/stream", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ transcript: text })
+      body: JSON.stringify({
+        transcript: text,
+        conversation_id: window.localStorage?.getItem('lab-agent-conversation-id') || null
+      })
     });
     if (!response.ok) {
       var failure = await response.json().catch(function () { return {}; });

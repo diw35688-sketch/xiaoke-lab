@@ -1,6 +1,5 @@
 // 对话流 v2：回答、思考链、工具调用链都在右侧对话框内可见。
-// - [[LABTHINK]] 渲染为可折叠的“思考过程”行（同时同步到 Live2D 气泡）。
-// - [[LABCARD]] 渲染为紧凑的“工具调用”行，并继续转发到中间画布。
+// - [[LABTHINK]] / [[LABCARD]] 先进入唯一 ConversationTurnStore，再由聊天时间线渲染。
 // - 普通 delta 仍是 assistant 文本，不混入任何标记。
 (() => {
   const $ = id => document.getElementById(id);
@@ -8,7 +7,10 @@
         conversationKey = 'lab-agent-conversation-id';
   const avatar = state => window.dispatchAvatarState?.(state);
   let activeController = null, activeReply = null, requestId = 0;
-  let activeThinkRow = null, toolRows = {};
+  let activeThinkRow = null, blockRows = {};
+  const turnStore = window.conversationTurnStore;
+  const blockView = window.conversationBlockView;
+  if (!turnStore) throw new Error('ConversationTurnStore 未加载');
 
   // 朗读开关统一来源：通话模式强制勾选的 #auto-speak，或设置面板的 tts_enabled（后端）。
   // 页面加载时读后端配置，避免"设置里开了播报、对话却不朗读"的断链。
@@ -71,14 +73,15 @@
     chat.scrollTop = chat.scrollHeight;
   }
 
-  function ensureToolRow(view, reply) {
-    let row = toolRows[view.title];
+  function ensureToolRow(block, reply) {
+    const view = block.payload;
+    let row = blockRows[block.block_id];
     if (!row) {
       row = document.createElement('div');
       row.className = 'message tool';
       row.innerHTML = '<div class="chat-tool"><div class="chat-tool-head"><span class="ic">⚙</span><span class="tt"></span><span class="st">进行中</span></div><div class="chat-tool-body"></div></div>';
       chat.insertBefore(row, messageRow(reply));
-      toolRows[view.title] = row;
+      blockRows[block.block_id] = row;
     }
     const state = view.status === 'pending' ? '进行中' : (view.status === 'error' ? '失败' : '完成');
     const lines = (view.lines || []).filter(Boolean).slice(0, 4);
@@ -90,8 +93,42 @@
     chat.scrollTop = chat.scrollHeight;
   }
 
-  window.chatPushThink = (text, running) => { if (activeReply) updateThink(activeReply, text, running); };
-  window.chatPushTool = view => { if (activeReply) ensureToolRow(view, activeReply); };
+  function ensureCardRow(block, reply) {
+    const view = blockView?.(block);
+    if (!view) return;
+    let row = blockRows[block.block_id];
+    if (!row) {
+      row = document.createElement('div');
+      row.className = `message block-card tone-${view.tone}`;
+      row.dataset.blockId = block.block_id;
+      row.innerHTML = '<div class="chat-block"><div class="chat-block-head"><span class="label"></span><span class="title"></span><span class="status"></span></div><div class="chat-block-lines"></div><div class="chat-block-meta"></div></div>';
+      chat.insertBefore(row, messageRow(reply) || null);
+      blockRows[block.block_id] = row;
+    }
+    row.className = `message block-card tone-${view.tone}`;
+    row.querySelector('.label').textContent = view.label;
+    row.querySelector('.title').textContent = view.title;
+    row.querySelector('.status').textContent = view.status;
+    row.querySelector('.chat-block-lines').textContent = view.lines.join('\n');
+    row.querySelector('.chat-block-meta').textContent = view.meta.join(' · ');
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  turnStore.subscribe(turn => {
+    if (!turn) return;
+    turn.blocks.forEach(block => {
+      if (block.type === 'system_status' && block.payload.kind === 'think' && activeReply) {
+        updateThink(activeReply, block.payload.text, block.payload.running);
+      } else if (block.type === 'tool_card' && activeReply) {
+        ensureToolRow(block, activeReply);
+      } else if (block.type === 'assistant_text' && activeReply) {
+        activeReply.textContent = block.payload.text || '';
+        chat.scrollTop = chat.scrollHeight;
+      } else {
+        ensureCardRow(block, activeReply);
+      }
+    });
+  });
 
   const WELCOME_TEXT = '你好！我是实验助手。你可以让我记录实验口述、查询试剂安全、推进实验步骤，或安排实验。';
 
@@ -133,8 +170,8 @@
     const button = event.target.closest('#sh-new-chat');
     if (!button) return;
     localStorage.removeItem(conversationKey);
-    activeThinkRow = null; toolRows = {};
-    window.runClearStream?.();
+    activeThinkRow = null; blockRows = {};
+    turnStore.clear();
     clearChat();
   });
 
@@ -158,25 +195,75 @@
     event.preventDefault();
     const message = input.value.trim();
     if (!message) return;
+    window.__voiceTurnStartedAt = window.performance?.now?.() ?? Date.now();
+    const modeSnapshot = window.consumeComposerModeSnapshot(form, 'text');
     stopCurrentResponse(false);
     const ownId = ++requestId;
 
-    window.runClearStream?.();
-    activeThinkRow = null; toolRows = {};
+    activeThinkRow = null; blockRows = {};
     add(message, 'user');
     input.value = '';
     const reply = add('正在思考…', 'assistant');
     activeReply = reply;
+    const localRequestId = `web-${Date.now()}-${ownId}`;
+    const localTurnId = `turn-${localRequestId}`;
+    const assistantBlockId = modeSnapshot.interaction_mode === 'chat'
+      ? `${localTurnId}:spoken` : `${localTurnId}:assistant`;
+    turnStore.beginTurn({
+      conversation_id: localStorage.getItem(conversationKey) || 'pending-conversation',
+      request_id: localRequestId,
+      turn_id: localTurnId,
+      ...modeSnapshot,
+      blocks: [{
+        block_id: `${localTurnId}:user`,
+        type: 'user_text',
+        payload: { text: message },
+      }],
+    });
+    if (modeSnapshot.interaction_mode === 'experiment') {
+      window.publishProtocolContextBlocks?.(localTurnId).catch(() => {});
+    }
+    const publishAnswer = text => turnStore.upsertBlock({
+      block_id: assistantBlockId,
+      type: 'assistant_text',
+      payload: modeSnapshot.interaction_mode === 'chat'
+        ? { role: 'spoken', text } : { text },
+    });
     activeController = new AbortController();
     stopButton.disabled = false;
     avatar('thinking');
 
     let answer = '';
     try {
+      if (modeSnapshot.interaction_mode === 'experiment') {
+        await window.streamExperimentRecord(message, {
+          ...modeSnapshot, request_id: localRequestId, turn_id: localTurnId
+        }, data => {
+          if (data.type === 'record_status') {
+            publishAnswer(data.text || '正在保存原始事实…');
+          } else if (data.type === 'record_error') {
+            throw new Error(data.detail || '实验记录失败');
+          } else if (data.type === 'record_result') {
+            const result = data.data || {};
+            window.publishRecordSurface?.(result);
+            answer = (result.messages || []).map(item => item.text).filter(Boolean).join('\n');
+            publishAnswer(answer || '原始事实已保存。');
+            window.__voiceLastScreenAt = window.performance?.now?.() ?? Date.now();
+            (result.voice_delivery_events || []).forEach(delivery => {
+              window.consumeVoiceDelivery?.(delivery);
+            });
+          }
+        });
+        avatar('listening');
+        return;
+      }
       const response = await fetch('/chat/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, conversation_id: localStorage.getItem(conversationKey) || null }),
+        body: JSON.stringify({
+          message, conversation_id: localStorage.getItem(conversationKey) || null,
+          request_id: localRequestId, turn_id: localTurnId, ...modeSnapshot
+        }),
         signal: activeController.signal,
       });
       if (!response.ok || !response.body) throw new Error('无法建立流式回复。');
@@ -195,8 +282,8 @@
 
           if (data.type === 'screen_delta' && data.text) {
             answer += data.text;
-            reply.textContent = answer;
-            chat.scrollTop = chat.scrollHeight;
+            publishAnswer(answer);
+            window.__voiceLastScreenAt = window.performance?.now?.() ?? Date.now();
           } else if (data.type === 'voice_delivery') {
             window.consumeVoiceDelivery?.(data);
           } else if (data.type === 'delta' && data.text) {
@@ -205,10 +292,8 @@
               const parts = text.split('[[LABTHINK]]');
               answer += parts[0];
               thinkBuffer += parts.slice(1).join('');
-              window.chatPushThink(thinkBuffer, true);
-              window.runPushThink?.(thinkBuffer, true);
-              reply.textContent = answer;
-              chat.scrollTop = chat.scrollHeight;
+              turnStore.pushThink(thinkBuffer, true);
+              publishAnswer(answer);
               continue;
             }
             if (text.indexOf('[[LABCARD]]') >= 0) {
@@ -217,26 +302,22 @@
               for (let i = 1; i < parts.length; i++) {
                 try {
                   const view = JSON.parse(parts[i]);
-                  window.chatPushTool(view);
-                  window.labToolCard?.(view);
+                  turnStore.pushTool(view);
                 } catch (e) { answer += parts[i]; }
               }
-              reply.textContent = answer;
-              chat.scrollTop = chat.scrollHeight;
+              publishAnswer(answer);
               continue;
             }
             answer += text;
-            reply.textContent = answer;
-            chat.scrollTop = chat.scrollHeight;
+            publishAnswer(answer);
           } else if (data.type === 'task_queued') {
-            answer = data.answer; reply.textContent = answer;
+            answer = data.answer; publishAnswer(answer);
             if (data.conversation_id) localStorage.setItem(conversationKey, data.conversation_id);
             avatar('listening');
             window.refreshTaskPanel?.();
           } else if (data.type === 'done') {
             if (thinkBuffer) {
-              window.chatPushThink(thinkBuffer, false);
-              window.runPushThink?.(thinkBuffer, false);
+              turnStore.pushThink(thinkBuffer, false);
             } else {
               avatarThought('···');
             }
@@ -248,7 +329,7 @@
           }
         }
       }
-      if (!answer) reply.textContent = '模型没有返回文字内容。';
+      if (!answer) publishAnswer('模型没有返回文字内容。');
     } catch (error) {
       if (error.name === 'AbortError' || ownId !== requestId) return;
       reply.textContent = `出错了：${error.message}`;

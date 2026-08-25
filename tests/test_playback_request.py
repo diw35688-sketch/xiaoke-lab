@@ -45,6 +45,9 @@ class PlaybackRequestContractTests(unittest.TestCase):
             ttl=timedelta(seconds=5),
         )
 
+        self.assertEqual(request.source_block_id, item.source_block_id)
+        self.assertEqual(request.max_chars, item.max_chars)
+
         self.assertEqual(request.intent_id, item.intent_id)
         self.assertEqual(request.priority, MessagePriority.CRITICAL)
         self.assertIsNone(request.supersession_key)
