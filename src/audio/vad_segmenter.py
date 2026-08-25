@@ -178,10 +178,12 @@ class VadSegmenter:
             segments: list[VoiceSegment] = []
             while not self._vad.empty():
                 vad_segment = self._vad.front
-                self._vad.pop()
                 segments.append(
                     self._assemble_one(full, vad_segment)
                 )
+                # sherpa 的 front 是队列底层数据视图；pop 后该对象可能立即
+                # 失效。必须先复制/组装成项目自己的 VoiceSegment，再出队。
+                self._vad.pop()
             return segments
         finally:
             self._vad.reset()

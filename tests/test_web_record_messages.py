@@ -11,6 +11,7 @@ import json
 import sys
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 from fastapi import HTTPException
@@ -86,9 +87,26 @@ class RecordMessagesShadowTests(unittest.TestCase):
         self.assertEqual(event["items"][0]["intent_id"], result["messages"][0]["intent_id"])
 
     def test_silent_record_ack_creates_no_playback_event(self):
-        result = self._call(RECORD_EVALUATION)
+        with mock.patch(
+            "api.record.settings_store.current",
+            return_value=SimpleNamespace(speak_record_ack=False, tts_speed=1.0),
+        ):
+            result = self._call(RECORD_EVALUATION)
 
         self.assertEqual(result["voice_delivery_events"], [])
+
+    def test_enabled_record_ack_creates_playback_event_after_save(self):
+        with mock.patch(
+            "api.record.settings_store.current",
+            return_value=SimpleNamespace(speak_record_ack=True, tts_speed=1.0),
+        ):
+            result = self._call(RECORD_EVALUATION)
+
+        self.assertEqual(result["voice_delivery_events"][0]["type"], "voice_delivery")
+        self.assertEqual(
+            result["voice_delivery_events"][0]["items"][0]["voice_text"],
+            "已记录。",
+        )
 
     def test_record_preserves_original_fields(self):
         result = self._call(FOLLOWUP_EVALUATION)

@@ -61,6 +61,24 @@ class ScreenDeltaContractTests(unittest.TestCase):
 
 
 class VoiceDeliveryContractTests(unittest.TestCase):
+    def test_assistant_reply_is_voice_eligible_but_constrained(self):
+        from src.core.presentation_delivery import build_delivery_plan
+        from src.core.presentation_intent import PresentationIntent, ScreenTarget
+
+        plan = build_delivery_plan((PresentationIntent(
+            intent_id="chat-reply-1",
+            kind=MessageKind.ASSISTANT_REPLY,
+            args={"text": "这是普通聊天回复，应在完整回答后交给播放调度器。第二句保留在屏幕。"},
+            priority=MessagePriority.REVIEW,
+            screen_target=ScreenTarget.DIALOGUE,
+        ),), ui_mode="user")
+
+        self.assertEqual(len(plan.voice_items), 1)
+        self.assertEqual(plan.voice_items[0].kind, MessageKind.ASSISTANT_REPLY)
+        self.assertEqual(plan.voice_items[0].priority, MessagePriority.REVIEW)
+        self.assertLessEqual(len(plan.voice_items[0].voice_text), 25)
+        self.assertTrue(plan.voice_items[0].voice_text.endswith("。"))
+
     def test_serializes_explicit_voice_permission(self):
         event = voice_delivery_event((
             _voice("ack-1", MessageKind.CONFIRMATION_ACK, "已确认问题一。"),

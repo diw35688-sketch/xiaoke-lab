@@ -30,6 +30,8 @@
     '  <input id="tts-speed" type="range" min="0.5" max="2" step="0.1" value="1" /></label>',
     '<label class="settings-field settings-inline">',
     '  <input id="tts-enabled" type="checkbox" /><span>自动播报追问与安全提示</span></label>',
+    '<label class="settings-field settings-inline">',
+    '  <input id="speak-record-ack" type="checkbox" /><span>朗读“已记录”反馈</span></label>',
     '<div class="settings-actions">',
     '  <button id="tts-test" class="ghost">测试合成并计时</button></div>',
     '<p id="tts-result" class="settings-result"></p>'
@@ -64,6 +66,7 @@
       el('tts-speed').value = cur.speed || 1;
       el('tts-speed-label').textContent = (cur.speed || 1).toFixed ? (cur.speed || 1).toFixed(1) : cur.speed;
       el('tts-enabled').checked = !!cur.enabled;
+      el('speak-record-ack').checked = !!cur.speak_record_ack;
       el('tts-key').placeholder = cur.api_key_set ? '已保存，留空表示不修改' : '留空表示不修改';
       applyProvider(el('tts-provider').value);
       if (cur.voice) el('tts-voice').value = cur.voice;
@@ -77,7 +80,8 @@
       tts_model: el('tts-model').value.trim(),
       tts_voice: el('tts-voice').value || '',
       tts_speed: parseFloat(el('tts-speed').value),
-      tts_enabled: el('tts-enabled').checked
+      tts_enabled: el('tts-enabled').checked,
+      speak_record_ack: el('speak-record-ack').checked
     };
     var key = el('tts-key').value.trim();
     if (key) data.tts_api_key = key;

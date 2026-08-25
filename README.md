@@ -67,22 +67,24 @@
 
 ## 快速开始
 
-```powershell
-# 1. 创建并激活虚拟环境（Python 3.11.9）
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1        # Windows PowerShell 激活
+Windows 新用户先安装 **Python 3.11 64 位**（勾选 `Add python.exe to PATH`），然后直接双击仓库根目录的 **`start.bat`**。首次运行会自动创建虚拟环境、安装依赖并下载语音识别模型；以后仍双击同一个文件即可。
 
-# 2. 安装依赖
-pip install -r requirements.txt
+项目目录可以移动、改名或放在其他盘符，启动器会按 `start.bat` 自己的位置寻找项目，不再依赖开发者电脑路径。API 密钥请在网页设置中填写，不要把 `.env` 或 `web/settings.json` 发给别人。
 
-# 3. 配置 DeepSeek：复制 .env.example 为 .env，填 API Key
-#    （.env 已被 .gitignore 排除，不提交）
+完整的新手步骤、体检命令、失败排查和交付边界见：[一键启动与转交指南](docs/ONE_CLICK_START_GUIDE.md)。
 
-# 4. 启动（在项目根目录）
-python -B -m src.main
-```
+### 根目录里该看什么
 
-启动后：说「小科小科」唤醒 → 听到提示音 → 开始口述实验过程 → 说完说「结束实验记录」（或自然表达"今天先记录到这里吧"再确认）。
+| 文件 | 给谁用 | 作用 |
+|---|---|---|
+| `start.bat` | 普通用户 | Windows 唯一启动入口，直接双击 |
+| `README.md` | 所有人 | 项目简介和最短上手说明 |
+| `.env.example` | 配置人员 | 无密钥的配置示例，复制后填写本机配置 |
+| `requirements.txt` | 开发者 | 桌面语音链 Python 依赖 |
+| `CLAUDE.md` | 开发协作者 | 工程协作、测试和验收约定 |
+| `LEARNING_REVIEW_FROM_DEVELOPMENT.md` | 学习/维护者 | 开发知识与历史复盘 |
+
+开发脚本统一放在 `scripts/`，历史材料统一放在 `docs/history/`。根目录不再摆放旧启动器和临时诊断脚本。
 
 ---
 

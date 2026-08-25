@@ -20,22 +20,32 @@ from src.core.record_observation_result import (
     RecordObservationResult,
     RecordStructureStatus,
 )
+from src.core.conversation_turn import ExperimentContext
 
 
 class RecordPersistenceError(RuntimeError):
     """The observation could not be saved, so no success result exists."""
 
 
+class RecordModeConflictError(RuntimeError):
+    """The frozen experiment context conflicts with the active protocol state."""
+
+
 @dataclass(frozen=True)
 class RecordCommand:
     transcript: str
     extract: bool = True
+    experiment_context: ExperimentContext | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.transcript, str) or not self.transcript.strip():
             raise ValueError("transcript 不能为空。")
         if type(self.extract) is not bool:
             raise TypeError("extract 必须是 bool。")
+        if self.experiment_context is not None and not isinstance(
+            self.experiment_context, ExperimentContext
+        ):
+            raise TypeError("experiment_context 必须是 ExperimentContext 或 None。")
 
 
 @dataclass(frozen=True)
@@ -113,6 +123,11 @@ class SharedRecordService:
         text = command.transcript.strip()
         session_id = self._current_session_id()
         segment_id = self._next_segment_id(session_id)
+        step = self._step_view()
+        if command.experiment_context == ExperimentContext.PROTOCOL and (
+            not isinstance(step, Mapping) or step.get("mode") != "protocol"
+        ):
+            raise RecordModeConflictError("方案实验模式需要先选择一个有效实验方案。")
         entities: dict[str, str] = {}
         extraction: Mapping[str, object] | None = None
         extraction_source = "none"
@@ -153,8 +168,16 @@ class SharedRecordService:
                 entities.update(rule_fields)
                 extraction_source = "rule"
 
-        protocol_evaluation = self._evaluate(entities)
-        step = self._step_view()
+        if command.experiment_context == ExperimentContext.FREE:
+            protocol_evaluation = {
+                "missing_fields": [], "follow_up_question": None,
+                "follow_up_required": False, "deviations": [],
+            }
+            step = {"mode": "free", "protocol": None, "step": None}
+        elif command.experiment_context == ExperimentContext.PROTOCOL:
+            protocol_evaluation = self._evaluate(entities)
+        else:
+            protocol_evaluation = self._evaluate(entities)
         evaluation = _select_effective_evaluation(
             extraction=extraction,
             protocol_evaluation=protocol_evaluation,

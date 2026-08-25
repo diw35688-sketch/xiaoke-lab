@@ -4,5 +4,6 @@ python-multipart>=0.0.9
 openai>=1.0,<3.0
 python-dotenv>=1.0,<2.0
 httpx>=0.28,<1.0
+websockets>=15,<18
 cryptography>=42.0
 qrcode>=7.4
