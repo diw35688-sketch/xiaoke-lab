@@ -1,3 +1,5 @@
+"""开发诊断：检查当前 VAD 页面，不属于普通用户启动入口。"""
+
 import urllib.request
 
 t = urllib.request.urlopen(

@@ -1,5 +1,6 @@
 @echo off
-cd /d C:\Users\dahli\Documents\107
+setlocal
+cd /d "%~dp0\..\.."
 
 echo [1/4] 暂存当前源码（已自动忽略 dist/build/密钥/证书/音频缓存等）
 git add -A
