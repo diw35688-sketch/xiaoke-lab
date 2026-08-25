@@ -220,7 +220,28 @@ def main() -> None:
         default="lan",
         help="auto=有隧道用隧道，否则局域网；lan=只局域网；tunnel=只公网隧道",
     )
+    parser.add_argument(
+        "--doctor",
+        action="store_true",
+        help="只检查路径与启动条件，不下载模型、不启动服务",
+    )
     args = parser.parse_args()
+
+    if args.doctor:
+        checks = {
+            "仓库目录": REPO_ROOT.is_dir(),
+            "启动脚本": (REPO_ROOT / "start.bat").is_file(),
+            "虚拟环境": Path(sys.executable).resolve().parent.name.lower() == "scripts",
+            "Web 入口": (WEB_DIR / "app.py").is_file(),
+            "ASR 模型": MODEL_FILE.is_file(),
+            "本地配置": (REPO_ROOT / ".env").is_file() or (WEB_DIR / "settings.json").is_file(),
+        }
+        print(f"仓库目录：{REPO_ROOT}")
+        print(f"Python：{Path(sys.executable).resolve()}")
+        for name, ready in checks.items():
+            print(f"[{'OK' if ready else '--'}] {name}")
+        print("体检完成：-- 表示首次启动时仍需自动准备，不代表程序损坏。")
+        return
 
     ensure_ready()
 

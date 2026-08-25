@@ -109,6 +109,8 @@ class SenseVoiceBackendTests(unittest.TestCase):
         self.assertTrue(kwargs["disable_update"])
         self.assertTrue(kwargs["disable_pbar"])
         self.assertTrue(kwargs["disable_log"])
+        self.assertNotIn("vad_model", kwargs)
+        self.assertTrue(Path(kwargs["model"]).is_dir())
 
     def test_converts_model_output_to_shared_result(self):
         engine = FakeEngine([

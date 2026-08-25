@@ -14,6 +14,8 @@ class FrontendTtsToggleTests(unittest.TestCase):
         self.assertNotIn("tts_enabled:", model_settings)
         self.assertIn('id="tts-enabled"', tts_settings)
         self.assertIn("tts_enabled: el('tts-enabled').checked", tts_settings)
+        self.assertIn('id="speak-record-ack"', tts_settings)
+        self.assertIn("speak_record_ack: el('speak-record-ack').checked", tts_settings)
 
     def test_saved_tts_setting_updates_runtime_flag(self):
         source = (FRONTEND / "tts_settings.js").read_text(encoding="utf-8")

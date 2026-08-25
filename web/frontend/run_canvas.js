@@ -1,7 +1,6 @@
 ﻿// 工作画布：实验进行中的可视化主区。
 // 参考 deepseek-harness：
 //   - 工具调用用 presentCall/presentResult 卡片，调用前先出待执行卡
-//   - 思维链是可折叠行（Think），流式时只显示最新一行 + 扫光动画
 //   - 步骤时间线在顶部，当前步高亮
 (function () {
   var CSS = [
@@ -73,10 +72,7 @@
     '.rc-sec-title::after{content:"";flex:1;height:1px;background:var(--bd-1)}'
   ].join('');
 
-  var ICON = { read: '读', execute: '执', search: '查', other: '·' };
   var session = null;
-  var stream = [];          // 画布事件流：think / tool
-  var pendingIndex = {};
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>]/g, function (c) {
@@ -91,12 +87,6 @@
     }
     return fetch(path, options).then(function (r) { return r.json(); });
   }
-  function lastLine(text) {
-    var visible = String(text || '').trimEnd();
-    var index = visible.lastIndexOf('\n');
-    return index === -1 ? visible : visible.slice(index + 1);
-  }
-
   function stepsHtml() {
     if (!session || session.mode !== 'protocol' || !session.all_steps) return '';
     var cur = session.step.number;
@@ -159,33 +149,6 @@
       + '<button class="sh-btn primary" id="rc-next">下一步</button></div></div></div>';
   }
 
-  function streamHtml() {
-    if (!stream.length) return '';
-    return '<div class="rc-sec-title">本轮活动</div>' + stream.map(function (item, index) {
-      if (item.type === 'think') {
-        return '<div class="rc-think' + (item.running ? ' running' : '') + (item.open ? ' open' : '') + '" data-i="' + index + '">'
-          + '<div class="rc-think-row"><span class="ic">&#8855;</span><span class="tt">Think</span>'
-          + '<span class="dot">&middot;</span><span class="sm">' + esc(item.running ? lastLine(item.text) : (item.text.split('\n')[0] || '')) + '</span>'
-          + '</div>'
-          + '<div class="rc-think-body">' + esc(item.text) + '</div></div>';
-      }
-      var v = item.view;
-      var kind = v.kind || 'other';
-      var state = v.status === 'pending' ? '<span class="rc-spin"></span>'
-        : (v.status === 'error' ? '失败' : '完成');
-      var lines = (v.lines || []).map(function (l) {
-        return '<div' + (/^⚠|偏差|高危/.test(l) ? ' class="warn"' : '') + '>' + esc(l) + '</div>';
-      }).join('');
-      return '<div class="rc-tool ' + v.status + '"><div class="rc-tool-h">'
-        + '<span class="rc-ic">' + (ICON[kind] || '&middot;') + '</span>'
-        + '<span class="rc-name">' + esc(v.title) + '</span>'
-        + '<span class="dot">&middot;</span>'
-        + '<span class="rc-sum">' + esc((v.lines || [])[0] || (v.status === 'pending' ? '执行中' : '')) + '</span>'
-        + '<span class="rc-state">' + state + '</span></div>'
-        + (lines && v.status !== 'pending' ? '<div class="rc-tool-b">' + lines + '</div>' : '') + '</div>';
-    }).join('');
-  }
-
   function paint() {
     var canvas = window.shellCanvas && window.shellCanvas();
     if (!canvas || window.shellCurrentView() !== 'run') return;
@@ -195,7 +158,7 @@
       return;
     }
     canvas.classList.remove('empty');
-    canvas.innerHTML = '<div id="rc">' + stepsHtml() + stepCardHtml() + streamHtml() + '</div>';
+    canvas.innerHTML = '<div id="rc">' + stepsHtml() + stepCardHtml() + '</div>';
 
     Array.prototype.forEach.call(canvas.querySelectorAll('.rc-step'), function (node) {
       node.onclick = function () {
@@ -208,12 +171,6 @@
     var prev = document.getElementById('rc-prev'), next = document.getElementById('rc-next');
     if (prev) prev.onclick = function () { api('/protocols/session/move', 'POST', { action: 'prev' }).then(reload); };
     if (next) next.onclick = function () { api('/protocols/session/move', 'POST', { action: 'next' }).then(reload); };
-    Array.prototype.forEach.call(canvas.querySelectorAll('.rc-think'), function (node) {
-      node.querySelector('.rc-think-row').onclick = function () {
-        var item = stream[parseInt(node.dataset.i, 10)];
-        if (item) { item.open = !item.open; paint(); }
-      };
-    });
   }
 
   function reload() {
@@ -221,31 +178,6 @@
       .catch(function () {});
   }
 
-  // ---- 对外接口：供聊天流推送思维链与工具卡片 ----
-  window.runPushThink = function (text, running) {
-    var last = stream[stream.length - 1];
-    if (last && last.type === 'think' && last.running) {
-      last.text = text;
-      last.running = running;
-    } else {
-      stream.push({ type: 'think', text: text, running: running, open: false });
-    }
-    paint();
-  };
-  window.runPushTool = function (view) {
-    if (view.status === 'pending') {
-      stream.push({ type: 'tool', view: view });
-      pendingIndex[view.title] = stream.length - 1;
-    } else {
-      var at = pendingIndex[view.title];
-      if (at != null && stream[at]) stream[at].view = view;
-      else stream.push({ type: 'tool', view: view });
-      delete pendingIndex[view.title];
-      reload();
-    }
-    paint();
-  };
-  window.runClearStream = function () { stream = []; pendingIndex = {}; paint(); };
   window.runCanvasRender = function () { paint(); reload(); };
   window.runReload = reload;
 

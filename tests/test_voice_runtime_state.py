@@ -132,7 +132,7 @@ class VoiceRuntimeStateTests(unittest.TestCase):
 
         self.assertIs(coordinator.snapshot(), original)
 
-    def test_user_speech_and_tts_overlap_is_preserved_as_fact(self):
+    def test_user_speech_started_ends_old_tts_occupancy_for_barge_in(self):
         coordinator = VoiceStateCoordinator()
         coordinator.consume(
             _event(
@@ -146,7 +146,27 @@ class VoiceRuntimeStateTests(unittest.TestCase):
         )
 
         self.assertTrue(state.user_speaking)
-        self.assertTrue(state.tts_playing)
+        self.assertTrue(state.segment_capturing)
+        self.assertFalse(state.tts_playing)
+        self.assertIsNone(state.active_tts_priority)
+
+    def test_user_speech_resumed_ends_old_tts_occupancy_for_barge_in(self):
+        coordinator = VoiceStateCoordinator(
+            VoiceRuntimeState(
+                segment_capturing=True,
+                tts_playing=True,
+                active_tts_priority=MessagePriority.DIRECT_ACK,
+            )
+        )
+
+        state = coordinator.consume(
+            _event(VoiceRuntimeEventType.USER_SPEECH_RESUMED)
+        )
+
+        self.assertTrue(state.user_speaking)
+        self.assertTrue(state.segment_capturing)
+        self.assertFalse(state.tts_playing)
+        self.assertIsNone(state.active_tts_priority)
 
     def test_coordinator_has_no_device_context_or_decision_api(self):
         coordinator = VoiceStateCoordinator()

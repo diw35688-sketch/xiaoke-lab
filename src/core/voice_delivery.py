@@ -18,6 +18,7 @@ _SPEAKABLE_KINDS = frozenset({
     MessageKind.SAFETY_ALERT,
     MessageKind.SYSTEM_ISSUE,
     MessageKind.SESSION_CLOSING_SUMMARY,
+    MessageKind.ASSISTANT_REPLY,
 })
 _CODE_BLOCK = re.compile(r"```[\s\S]*?```")
 _URL = re.compile(r"(?:https?://|www\.)\S+", re.IGNORECASE)
@@ -40,10 +41,22 @@ def constrain_voice_text(text: str, *, max_chars: int = MAX_ITEM_CHARS) -> str:
     return selected[: max_chars - 1].rstrip("，,；;：:。！？!?") + suffix
 
 
-def voice_text_for_intent(intent: PresentationIntent, text: str) -> str | None:
+def voice_text_for_intent(
+    intent: PresentationIntent,
+    text: str,
+    *,
+    speak_record_ack: bool = False,
+) -> str | None:
     """Return constrained speech or None when policy makes the intent silent."""
 
-    if intent.kind not in _SPEAKABLE_KINDS:
+    successful_record_ack = (
+        intent.kind == MessageKind.RECORD_ACK
+        and intent.args.get("result") in {"recorded", "recorded_no_step"}
+    )
+    speakable = intent.kind in _SPEAKABLE_KINDS or (
+        speak_record_ack and successful_record_ack
+    )
+    if not speakable:
         return None
     constrained = constrain_voice_text(text)
     return constrained or None

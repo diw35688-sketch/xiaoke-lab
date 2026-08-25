@@ -64,7 +64,7 @@ def main() -> None:
         "--add-data", f"{ROOT / 'data'};data",
         "--add-data", f"{BIN_DIR};bin",
         "--add-data", f"{ROOT / 'requirements.txt'};.",
-        str(ROOT / "launcher.py"),
+        str(ROOT / "scripts" / "launcher.py"),
     ]
     subprocess.check_call(cmd, cwd=ROOT)
     print("=" * 60)

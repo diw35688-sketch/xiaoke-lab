@@ -58,8 +58,10 @@
       Array.prototype.forEach.call(host.querySelectorAll('.p-card'), function (card) {
         card.onclick = function () {
           api('/protocols/session', 'POST', { protocol_id: card.dataset.id || null }).then(function () {
+            window.interactionModeState.select(card.dataset.id ? 'protocol' : 'free');
             refreshStatus();
-            window.shellShow('protocols');
+            window.shellShow('chat');
+            if (window.composerRefresh) window.composerRefresh();
             if (window.labStepsReload) window.labStepsReload();
           });
         };

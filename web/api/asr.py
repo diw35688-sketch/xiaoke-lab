@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import tempfile
 import threading
+import time
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, UploadFile, File
@@ -18,21 +19,24 @@ router = APIRouter(prefix="/asr", tags=["语音识别"])
 _lock = threading.Lock()
 _backend = None
 _load_error: str | None = None
+_load_ms: int | None = None
 
 
 def _get_backend():
     """惰性加载 ASR 模型：首次调用才加载，避免拖慢服务启动。"""
-    global _backend, _load_error
+    global _backend, _load_error, _load_ms
     with _lock:
         if _backend is not None:
             return _backend
         if _load_error is not None:
             raise RuntimeError(_load_error)
         try:
+            started = time.perf_counter()
             import domain  # noqa: F401  确保仓库根目录已在 sys.path
             from src.asr.factory import create_asr_backend
 
             _backend = create_asr_backend()
+            _load_ms = round((time.perf_counter() - started) * 1000)
             return _backend
         except Exception as error:
             _load_error = f"{type(error).__name__}: {error}"
@@ -46,6 +50,7 @@ def status():
         "loaded": _backend is not None,
         "error": _load_error,
         "engine": "SenseVoiceSmall",
+        "load_ms": _load_ms,
     }
 
 
@@ -56,7 +61,7 @@ def warmup():
         _get_backend()
     except Exception as error:
         raise HTTPException(status_code=503, detail=str(error))
-    return {"loaded": True, "engine": "SenseVoiceSmall"}
+    return {"loaded": True, "engine": "SenseVoiceSmall", "load_ms": _load_ms}
 
 
 @router.post("/transcribe")

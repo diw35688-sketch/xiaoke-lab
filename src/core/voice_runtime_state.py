@@ -104,7 +104,16 @@ class VoiceStateCoordinator:
         if kind is VoiceRuntimeEventType.USER_SPEECH_STARTED:
             if state.segment_capturing:
                 raise ValueError("片段已在采集；请使用 USER_SPEECH_RESUMED。")
-            return replace(state, user_speaking=True, segment_capturing=True)
+            # 连续通话的 USER_SPEECH_STARTED 与浏览器 stopSpeech() 是同一
+            # 次 barge-in 的两面。即使独立的 TTS_STOPPED HTTP 事实丢失或
+            # 倒序，用户开口也必须立即终止服务端的旧播放占用；旧内容不恢复。
+            return replace(
+                state,
+                user_speaking=True,
+                segment_capturing=True,
+                tts_playing=False,
+                active_tts_priority=None,
+            )
 
         if kind is VoiceRuntimeEventType.USER_SPEECH_PAUSED:
             if not state.user_speaking:
@@ -114,7 +123,14 @@ class VoiceStateCoordinator:
         if kind is VoiceRuntimeEventType.USER_SPEECH_RESUMED:
             if state.user_speaking or not state.segment_capturing:
                 raise ValueError("只有未结束片段中的停顿可以继续讲话。")
-            return replace(state, user_speaking=True)
+            # 恢复讲话同样属于 barge-in。即使独立的 TTS_STOPPED 事件
+            # 丢失或晚到，也不能让旧播放占用阻塞本轮后续回复。
+            return replace(
+                state,
+                user_speaking=True,
+                tts_playing=False,
+                active_tts_priority=None,
+            )
 
         if kind is VoiceRuntimeEventType.SEGMENT_FINALIZED:
             if state.user_speaking or not state.segment_capturing:

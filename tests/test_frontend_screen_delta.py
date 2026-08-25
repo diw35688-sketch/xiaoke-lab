@@ -26,7 +26,7 @@ class FrontendScreenDeltaTests(unittest.TestCase):
         end = source.index("data.type === 'delta'", start)
         branch = source[start:end]
 
-        self.assertIn("reply.textContent = answer", branch)
+        self.assertIn("publishAnswer(answer)", branch)
         self.assertNotIn("enqueueSpeech", branch)
         self.assertNotIn("window.speak", branch)
 
@@ -36,7 +36,7 @@ class FrontendScreenDeltaTests(unittest.TestCase):
         end = source.index("data.type === 'task_queued'", start)
         delta_branch = source[start:end]
 
-        self.assertIn("reply.textContent = answer", delta_branch)
+        self.assertIn("publishAnswer(answer)", delta_branch)
         self.assertNotIn("enqueueSpeech", delta_branch)
         self.assertNotIn("window.speak", delta_branch)
 
@@ -55,7 +55,7 @@ class FrontendScreenDeltaTests(unittest.TestCase):
         end = source.index("data.type === 'done'", start)
         branch = source[start:end]
 
-        self.assertIn("reply.textContent = answer", branch)
+        self.assertIn("publishAnswer(answer)", branch)
         self.assertIn("localStorage.setItem", branch)
         self.assertIn("avatar('listening')", branch)
         self.assertIn("refreshTaskPanel", branch)
@@ -87,12 +87,25 @@ class FrontendScreenDeltaTests(unittest.TestCase):
 
     def test_chat_tool_voice_uses_shared_playback_service(self):
         source = CHAT_API.read_text(encoding="utf-8")
-        self.assertIn("web_playback_service.authorize(output.items)", source)
+        self.assertIn("web_playback_service.authorize(", source)
+        self.assertIn("bind_voice_items(tool_voice_items, assistant_block_id)", source)
+        self.assertIn("conversation_id=conversation_id", source)
         self.assertNotIn("voice_delivery_event(output.items", source)
+
+    def test_plain_chat_reply_also_uses_shared_playback_service_once(self):
+        source = CHAT_API.read_text(encoding="utf-8")
+
+        self.assertIn("kind=MessageKind.ASSISTANT_REPLY", source)
+        self.assertIn("_prepare_chat_spoken_delivery(", source)
+        self.assertIn("_build_chat_spoken_delivery(refined, turn_id)", source)
+        self.assertIn("screen_delta_event(answer)", source)
+        self.assertIn("(reply_item,), conversation_id=conversation_id", source)
 
     def test_record_voice_uses_the_same_shared_playback_service(self):
         source = RECORD_API.read_text(encoding="utf-8")
-        self.assertIn("web_playback_service.authorize(plan.voice_items)", source)
+        self.assertIn("web_playback_service.authorize(", source)
+        self.assertIn("plan.voice_items,", source)
+        self.assertIn("conversation_id=", source)
 
     def test_record_frontends_only_consume_scheduler_events(self):
         desktop = VOICE_ASR.read_text(encoding="utf-8")
