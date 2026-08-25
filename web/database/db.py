@@ -101,6 +101,8 @@ def initialize_database():
             FOREIGN KEY(location_id) REFERENCES storage_locations(id))""")
         _ensure_column(connection, 'storage_locations', 'grid_rows', 'INTEGER NOT NULL DEFAULT 2')
         _ensure_column(connection, 'storage_locations', 'grid_cols', 'INTEGER NOT NULL DEFAULT 4')
+        _ensure_column(connection, 'storage_locations', 'map_x', 'INTEGER NOT NULL DEFAULT 0')
+        _ensure_column(connection, 'storage_locations', 'map_y', 'INTEGER NOT NULL DEFAULT 0')
         connection.execute("CREATE INDEX IF NOT EXISTS idx_storage_items_location ON storage_items(location_id)")
         connection.execute("CREATE INDEX IF NOT EXISTS idx_storage_items_name ON storage_items(name)")
         # 通知/每日工作弹窗：记录创建、展示、确认，用于溯源

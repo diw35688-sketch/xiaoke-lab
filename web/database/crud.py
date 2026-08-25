@@ -227,8 +227,8 @@ def create_storage_location(location):
     initialize_database()
     with get_connection() as connection:
         cursor = connection.execute(
-            """INSERT INTO storage_locations (name,type,temperature,capacity,notes,enabled,grid_rows,grid_cols)
-            VALUES (?,?,?,?,?,?,?,?)""",
+            """INSERT INTO storage_locations (name,type,temperature,capacity,notes,enabled,grid_rows,grid_cols,map_x,map_y)
+            VALUES (?,?,?,?,?,?,?,?,?,?)""",
             (
                 str(location.get("name", "")).strip(),
                 str(location.get("type", "其他")).strip() or "其他",
@@ -238,6 +238,8 @@ def create_storage_location(location):
                 1 if location.get("enabled", True) else 0,
                 int(location.get("grid_rows", 2) or 2),
                 int(location.get("grid_cols", 4) or 4),
+                int(location.get("map_x", 0) or 0),
+                int(location.get("map_y", 0) or 0),
             ),
         )
         row = connection.execute(
@@ -250,13 +252,17 @@ def update_storage_location(location_id, location):
     initialize_database()
     fields = []
     values = []
-    for key in ("name", "type", "temperature", "capacity", "notes", "grid_rows", "grid_cols"):
+    for key in ("name", "type", "temperature", "capacity", "notes"):
         if key in location:
             fields.append(f"{key}=?")
             values.append(str(location[key]).strip())
     if "enabled" in location:
         fields.append("enabled=?")
         values.append(1 if location["enabled"] else 0)
+    for int_key in ("grid_rows", "grid_cols", "map_x", "map_y"):
+        if int_key in location:
+            fields.append(f"{int_key}=?")
+            values.append(int(location[int_key] or 0))
     if not fields:
         raise ValueError("没有可更新的字段。")
     values.append(location_id)

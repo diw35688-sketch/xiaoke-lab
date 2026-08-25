@@ -68,6 +68,16 @@
       '.rack-other{margin-top:8px;border:1px dashed #fecaca;border-radius:10px;padding:8px;background:#fff7ed}',
       '.rack-other .cell-label{font-size:10px;color:#b45309;margin-bottom:4px}',
       '.storage-map-empty{color:#94a3b8;font-size:12px;padding:20px 0}',
+      '.storage-canvas{position:relative;height:640px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;overflow:auto;margin-top:12px;background-image:linear-gradient(#eef2f7 1px,transparent 1px),linear-gradient(90deg,#eef2f7 1px,transparent 1px);background-size:24px 24px}',
+      '.storage-canvas .hint{position:absolute;left:16px;top:12px;color:#94a3b8;font-size:12px;pointer-events:none}',
+      '.canvas-loc{position:absolute;background:#fff;border:1px solid #cbd5e1;border-radius:12px;padding:9px 11px;box-shadow:0 3px 12px rgba(15,23,42,.06);cursor:move;min-width:170px;max-width:300px;user-select:none}',
+      '.canvas-loc.dragging{box-shadow:0 8px 24px rgba(15,23,42,.16);opacity:.95;z-index:5}',
+      '.canvas-loc .cl-title{font-weight:700;color:#0f172a;font-size:13px}',
+      '.canvas-loc .cl-sub{color:#94a3b8;font-size:11px;margin:2px 0 6px}',
+      '.canvas-loc .cl-actions{display:flex;gap:4px;margin-top:5px}',
+      '.canvas-loc .cl-actions .sh-btn{padding:2px 7px;font-size:11px}',
+      '.canvas-loc .cl-count{display:inline-block;background:#eff6ff;color:#1d4ed8;border-radius:999px;padding:1px 7px;font-size:10px;margin-left:5px}',
+
       '.storage-card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:13px 15px;cursor:pointer;transition:border-color .15s,box-shadow .15s}',
       '.storage-card:hover{border-color:#3b67e8;box-shadow:0 4px 12px rgba(59,103,232,.08)}',
       '.storage-card .name{font-weight:700;color:#0f172a}',
@@ -148,6 +158,7 @@
     var locPanel = host.querySelector('#st-locations');
     var editId = null;
     var allItems = [];
+    var allLocations = [];
     var mapMode = false;
 
     function fillLocationSelects(locations) {
@@ -156,6 +167,51 @@
       }).join('');
       host.querySelector('#st-location').innerHTML = '<option value="">全部位置</option>' + locOptions;
       host.querySelector('#stf-location').innerHTML = '<option value="">未分配</option>' + locOptions;
+    }
+
+    function locationBoxHtml(loc, assigned) {
+      var locItems = assigned.filter(function (i) { return i.location_id == loc.id; });
+      var rows = parseInt(loc.grid_rows, 10) || 2;
+      var cols = parseInt(loc.grid_cols, 10) || 4;
+      var mini = '<div style="display:grid;grid-template-columns:repeat(' + cols + ',1fr);gap:3px;margin-top:5px">';
+      for (var r = 0; r < rows; r += 1) {
+        for (var c = 0; c < cols; c += 1) {
+          var label = String.fromCharCode(65 + r) + '-' + String(c + 1).toString().padStart(2, '0');
+          var cellItems = locItems.filter(function (i) { return (i.position || '') === label; });
+          mini += '<div style="min-height:18px;border-radius:4px;border:1px dashed #e2e8f0;background:#f8fafc;font-size:9px;line-height:18px;text-align:center;color:#94a3b8">' + (cellItems.length ? esc(cellItems[0].name.slice(0, 6)) : label) + '</div>';
+        }
+      }
+      mini += '</div>';
+      return '<div class="canvas-loc" data-loc="' + loc.id + '" style="left:' + (loc.map_x || 0) + 'px;top:' + (loc.map_y || 0) + 'px">'
+        + '<div class="cl-title">' + esc(loc.name) + '<span class="cl-count">' + locItems.length + '</span></div>'
+        + '<div class="cl-sub">' + esc(loc.type || '') + (loc.temperature ? ' · ' + esc(loc.temperature) : '') + ' · ' + rows + '×' + cols + '</div>'
+        + mini
+        + '<div class="cl-actions"><button class="sh-btn" type="button" data-edit-loc="' + loc.id + '">编辑</button><button class="sh-btn" type="button" data-del-loc="' + loc.id + '" style="color:#b91c1c">删除</button></div>'
+        + '</div>';
+    }
+
+    function openLocationEditor(loc) {
+      var name = prompt('位置名称', loc ? loc.name : '');
+      if (name === null) return;
+      var type = prompt('类型（冰箱/冰柜/试剂柜/其他）', loc ? (loc.type || '冰箱') : '冰箱');
+      if (type === null) return;
+      var temp = prompt('温度（如 4℃ / -20℃）', loc ? (loc.temperature || '') : '');
+      if (temp === null) return;
+      var rowsStr = prompt('行数', loc ? loc.grid_rows : 2);
+      if (rowsStr === null) return;
+      var colsStr = prompt('列数', loc ? loc.grid_cols : 4);
+      if (colsStr === null) return;
+      var rows = parseInt(rowsStr, 10) || 2;
+      var cols = parseInt(colsStr, 10) || 4;
+      var payload = { name: name, type: type || '其他', temperature: temp || '', grid_rows: rows, grid_cols: cols };
+      var url = loc ? '/storage/locations/' + loc.id : '/storage/locations';
+      var method = loc ? 'PATCH' : 'POST';
+      if (!loc) {
+        payload.map_x = (allLocations.length * 30) % 600;
+        payload.map_y = (allLocations.length * 40) % 400;
+      }
+      fetch(url, { method: method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        .then(function () { load(); });
     }
 
     function slotLabel(row, col) {
@@ -172,67 +228,64 @@
       var map = host.querySelector('#st-map');
       var unassigned = items.filter(function (i) { return !i.location_id; });
       var assigned = items.filter(function (i) { return i.location_id; });
-      map.innerHTML = '<div class="storage-racks">'
-        + locations.map(function (loc) {
-          var rows = parseInt(loc.grid_rows, 10) || 2;
-          var cols = parseInt(loc.grid_cols, 10) || 4;
-          var locItems = assigned.filter(function (i) { return i.location_id == loc.id; });
-          var knownSlots = {};
-          var cellHtml = '';
-          for (var r = 0; r < rows; r += 1) {
-            for (var c = 0; c < cols; c += 1) {
-              var label = slotLabel(r, c);
-              var cellItems = locItems.filter(function (i) { return (i.position || '') === label; });
-              knownSlots[label] = true;
-              cellHtml += '<div class="rack-cell" data-loc="' + loc.id + '" data-pos="' + label + '">'
-                + '<div class="cell-label">' + label + '</div>'
-                + (cellItems.map(rackItemHtml).join('') || '<div style="color:#cbd5e1;font-size:10px">空</div>')
-                + '</div>';
-            }
-          }
-          var other = locItems.filter(function (i) { return !knownSlots[i.position || '']; });
-          var otherHtml = other.length ? '<div class="rack-other" data-loc="' + loc.id + '" data-pos=""><div class="cell-label">其他格位</div>' + other.map(rackItemHtml).join('') + '</div>' : '';
-          return '<div class="rack">'
-            + '<div class="rack-title">' + esc(loc.name) + '</div>'
-            + '<div class="rack-sub">' + esc(loc.type || '') + (loc.temperature ? ' · ' + esc(loc.temperature) : '') + ' · ' + locItems.length + ' 项</div>'
-            + '<div class="rack-grid" style="grid-template-columns:repeat(' + cols + ',1fr)">' + cellHtml + '</div>'
-            + otherHtml
-            + '</div>';
-        }).join('')
-        + (unassigned.length ? '<div class="rack" style="border-style:dashed"><div class="rack-title">未分配</div><div class="rack-sub">' + unassigned.length + ' 项</div><div class="rack-other" data-loc="" data-pos=""><div class="cell-label">拖到这里</div>' + unassigned.map(rackItemHtml).join('') + '</div></div>' : '')
+      map.innerHTML = '<div class="storage-canvas" id="st-canvas">'
+        + '<div class="hint">拖动蓝色方块可移动冰箱/柜子；点击“编辑”修改信息；拖动物品到格位可在顶部“列表”中操作</div>'
+        + locations.map(function (loc) { return locationBoxHtml(loc, assigned); }).join('')
+        + '<div class="canvas-loc" data-loc="" style="left:12px;top:12px;border-style:dashed;opacity:.8"><div class="cl-title">未分配<span class="cl-count">' + unassigned.length + '</span></div><div class="cl-sub">点击“编辑位置”添加新冰箱</div><div class="cl-actions"><button class="sh-btn primary" type="button" id="st-canvas-add">添加位置</button></div></div>'
         + '</div>';
 
-      // Drag items
-      Array.prototype.forEach.call(map.querySelectorAll('.rack-item'), function (item) {
-        item.addEventListener('dragstart', function (e) {
-          e.dataTransfer.setData('text/plain', item.getAttribute('data-id'));
-          item.classList.add('dragging');
-        });
-        item.addEventListener('dragend', function () { item.classList.remove('dragging'); });
-      });
-      // Drop on cells and other/unassigned zones
-      Array.prototype.forEach.call(map.querySelectorAll('.rack-cell, .rack-other, .rack'), function (zone) {
-        zone.addEventListener('dragover', function (e) { e.preventDefault(); zone.classList.add('dragover'); });
-        zone.addEventListener('dragleave', function () { zone.classList.remove('dragover'); });
-        zone.addEventListener('drop', function (e) {
+      // Add location from canvas
+      var addBtn = host.querySelector('#st-canvas-add');
+      if (addBtn) addBtn.onclick = function () { openLocationEditor(null); };
+
+      // Drag locations on the canvas
+      Array.prototype.forEach.call(map.querySelectorAll('.canvas-loc[data-loc]'), function (box) {
+        var locId = box.getAttribute('data-loc');
+        if (!locId) return;
+        box.addEventListener('pointerdown', function (e) {
+          if (e.target.closest('button')) return;
           e.preventDefault();
-          zone.classList.remove('dragover');
-          var id = e.dataTransfer.getData('text/plain');
-          if (!id) return;
-          var locId = zone.getAttribute('data-loc') || null;
-          var pos = zone.getAttribute('data-pos') || '';
-          if (zone.classList.contains('rack')) { locId = zone.getAttribute('data-loc'); pos = ''; }
-          fetch('/storage/items/' + id, {
-            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ location_id: locId ? parseInt(locId, 10) : null, position: pos })
-          }).then(function () { load(); });
+          var startX = e.clientX, startY = e.clientY;
+          var origLeft = parseInt(box.style.left, 10) || 0;
+          var origTop = parseInt(box.style.top, 10) || 0;
+          var moved = false;
+          box.classList.add('dragging');
+          function move(ev) {
+            var nx = origLeft + (ev.clientX - startX);
+            var ny = origTop + (ev.clientY - startY);
+            if (!moved && Math.abs(ev.clientX - startX) + Math.abs(ev.clientY - startY) > 3) moved = true;
+            box.style.left = nx + 'px';
+            box.style.top = ny + 'px';
+          }
+          function up(ev) {
+            box.classList.remove('dragging');
+            window.removeEventListener('pointermove', move);
+            window.removeEventListener('pointerup', up);
+            if (moved) {
+              fetch('/storage/locations/' + locId, {
+                method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ map_x: Math.max(0, Math.round(origLeft + (ev.clientX - startX))), map_y: Math.max(0, Math.round(origTop + (ev.clientY - startY))) })
+              }).then(function () { load(); });
+            }
+          }
+          window.addEventListener('pointermove', move);
+          window.addEventListener('pointerup', up);
         });
       });
-      // Open edit on click
-      Array.prototype.forEach.call(map.querySelectorAll('.rack-item'), function (item) {
-        item.onclick = function () {
-          var found = allItems.filter(function (x) { return x.id == item.getAttribute('data-id'); })[0];
-          if (found) openForm(found);
+
+      // Edit/delete location buttons
+      Array.prototype.forEach.call(map.querySelectorAll('[data-edit-loc]'), function (btn) {
+        btn.onclick = function (e) {
+          e.stopPropagation();
+          var loc = allLocations.filter(function (x) { return x.id == btn.getAttribute('data-edit-loc'); })[0];
+          if (loc) openLocationEditor(loc);
+        };
+      });
+      Array.prototype.forEach.call(map.querySelectorAll('[data-del-loc]'), function (btn) {
+        btn.onclick = function (e) {
+          e.stopPropagation();
+          if (!confirm('删除该位置？该位置下物品会变为未分配。')) return;
+          fetch('/storage/locations/' + btn.getAttribute('data-del-loc'), { method: 'DELETE' }).then(function () { load(); });
         };
       });
     }
@@ -250,6 +303,7 @@
       ]).then(function (out) {
         var stats = out[0], locations = out[1].items || [], items = out[2].items || [];
         allItems = items;
+        allLocations = locations;
         fillLocationSelects(locations);
         host.querySelector('#st-stats').innerHTML =
           '<span class="storage-stat">总数 ' + stats.total + '</span>'

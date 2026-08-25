@@ -18,6 +18,8 @@ class LocationPayload(BaseModel):
     enabled: bool = True
     grid_rows: int = 2
     grid_cols: int = 4
+    map_x: int = 0
+    map_y: int = 0
 
 
 class LocationUpdatePayload(BaseModel):
@@ -29,6 +31,8 @@ class LocationUpdatePayload(BaseModel):
     enabled: bool | None = None
     grid_rows: int | None = None
     grid_cols: int | None = None
+    map_x: int | None = None
+    map_y: int | None = None
 
 
 class ItemPayload(BaseModel):
