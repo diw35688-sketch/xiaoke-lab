@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 
 from src.core.presentation_delivery import VoiceDeliveryItem
 from src.core.presentation_intent import MessageKind, MessagePriority
+from src.core.voice_delivery import MAX_ITEM_CHARS
 
 
 @dataclass(frozen=True)
@@ -24,7 +25,10 @@ class PlaybackRequest:
     voice_text: str
     created_at: datetime
     ttl: timedelta
+    source_block_id: str | None = None
     supersession_key: str | None = None
+    max_chars: int = MAX_ITEM_CHARS
+    speech_rate: float = 1.0
 
     def __post_init__(self) -> None:
         if not isinstance(self.intent_id, str) or not self.intent_id.strip():
@@ -35,6 +39,21 @@ class PlaybackRequest:
             raise TypeError("priority 必须是 MessagePriority。")
         if not isinstance(self.voice_text, str) or not self.voice_text.strip():
             raise ValueError("voice_text 必须是非空字符串。")
+        if not isinstance(self.max_chars, int) or isinstance(self.max_chars, bool):
+            raise TypeError("max_chars 必须是正整数。")
+        if self.max_chars <= 0:
+            raise ValueError("max_chars 必须是正整数。")
+        if len(self.voice_text) > self.max_chars:
+            raise ValueError(f"voice_text 不能超过 {self.max_chars} 字。")
+        if not isinstance(self.speech_rate, (int, float)) or isinstance(self.speech_rate, bool):
+            raise TypeError("speech_rate 必须是数字。")
+        if not 0.5 <= float(self.speech_rate) <= 2.0:
+            raise ValueError("speech_rate 必须在 0.5 到 2.0 之间。")
+        object.__setattr__(self, "speech_rate", float(self.speech_rate))
+        source_block_id = self.source_block_id or f"intent:{self.intent_id}"
+        if not isinstance(source_block_id, str) or not source_block_id.strip():
+            raise ValueError("source_block_id 必须是非空字符串。")
+        object.__setattr__(self, "source_block_id", source_block_id)
         if not isinstance(self.created_at, datetime):
             raise TypeError("created_at 必须是 datetime。")
         if self.created_at.tzinfo is None or self.created_at.utcoffset() is None:
@@ -73,7 +92,10 @@ class PlaybackRequest:
             kind=item.kind,
             priority=item.priority,
             voice_text=item.voice_text,
+            source_block_id=item.source_block_id,
             created_at=created_at,
             ttl=ttl,
             supersession_key=supersession_key,
+            max_chars=item.max_chars,
+            speech_rate=item.speech_rate,
         )

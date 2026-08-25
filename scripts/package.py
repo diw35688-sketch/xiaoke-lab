@@ -32,6 +32,9 @@ EXCLUDE_DIR_NAMES = {
 
 # 精确相对路径排除的目录（源码包不包含运行产物/密钥/模型权重）
 EXCLUDE_DIR_PATHS = {
+    "audio/raw",
+    "audio/recordings",
+    "results",
     "web/certs",
     "web/uploads",
     "web/voice/outputs",
@@ -58,12 +61,17 @@ EXCLUDE_FILES = {
 
 
 def should_skip(rel: str) -> bool:
+    # 本机便携解释器及其压缩包可能很大，也不保证兼容接收者电脑。
+    if rel.split("/", 1)[0].startswith(".runtime-python"):
+        return True
     # 排除 .env / *.env（含密钥/本机路径），但保留 .env.example
     if rel.endswith(".env"):
         return True
     if rel in EXCLUDE_FILES:
         return True
     if rel.endswith((".pyc", ".pyo", ".spec")):
+        return True
+    if rel.endswith((".log", ".out.log", ".err.log")):
         return True
     # models/ 下只保留自定义唤醒词文本，其余模型缓存不进入源码包
     if rel.startswith("models/"):
@@ -76,6 +84,8 @@ def prune_dirs(dirpath: Path, dirnames: list[str]) -> None:
     keep: list[str] = []
     for name in dirnames:
         rel_dir = (dirpath / name).relative_to(ROOT).as_posix()
+        if name.startswith(".runtime-python"):
+            continue
         if name in EXCLUDE_DIR_NAMES:
             continue
         if rel_dir in EXCLUDE_DIR_PATHS:

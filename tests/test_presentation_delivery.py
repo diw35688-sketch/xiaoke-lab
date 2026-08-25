@@ -35,6 +35,36 @@ class PresentationDeliveryPlanTests(unittest.TestCase):
         self.assertEqual(plan.screen_intents, (intent,))
         self.assertEqual(plan.voice_items, ())
 
+    def test_record_ack_can_be_explicitly_spoken(self):
+        intent = _intent(
+            "record-1",
+            MessageKind.RECORD_ACK,
+            {"result": "recorded_no_step"},
+            ScreenTarget.STATUS,
+        )
+
+        plan = build_delivery_plan(
+            (intent,), ui_mode="user", speak_record_ack=True
+        )
+
+        self.assertEqual(plan.screen_intents, (intent,))
+        self.assertEqual(plan.voice_items[0].voice_text, "已记录。")
+
+    def test_record_ack_setting_does_not_speak_degraded_result(self):
+        intent = _intent(
+            "record-1",
+            MessageKind.RECORD_ACK,
+            {"result": "degraded"},
+            ScreenTarget.STATUS,
+        )
+
+        plan = build_delivery_plan(
+            (intent,), ui_mode="user", speak_record_ack=True
+        )
+
+        self.assertEqual(plan.screen_intents, (intent,))
+        self.assertEqual(plan.voice_items, ())
+
     def test_question_enters_voice_items(self):
         intent = _intent(
             "ask-1",
@@ -47,6 +77,20 @@ class PresentationDeliveryPlanTests(unittest.TestCase):
 
         self.assertEqual(plan.voice_items[0].voice_text, "离心时间是多少？")
         self.assertEqual(plan.voice_items[0].priority, MessagePriority.DIRECT_ACK)
+
+    def test_speech_rate_passes_through_to_voice_items(self):
+        intent = _intent(
+            "ask-1",
+            MessageKind.CLARIFICATION,
+            {"question": "离心时间是多少？"},
+            ScreenTarget.CURRENT_QUESTION,
+        )
+
+        plan = build_delivery_plan(
+            (intent,), ui_mode="user", speech_rate=1.2
+        )
+
+        self.assertEqual(plan.voice_items[0].speech_rate, 1.2)
 
     def test_plan_exposes_no_playback_timing_decision(self):
         intent = _intent(

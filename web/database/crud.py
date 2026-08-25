@@ -113,6 +113,16 @@ def ensure_conversation(conversation_id=None):
     return conversation_id
 
 
+def conversation_exists(conversation_id):
+    """只查询已存在的会话；语音事件不得借此隐式创建新会话。"""
+    initialize_database()
+    with get_connection() as connection:
+        row = connection.execute(
+            "SELECT 1 FROM conversations WHERE id=? LIMIT 1", (conversation_id,)
+        ).fetchone()
+    return row is not None
+
+
 def add_message(conversation_id, role, content):
     with get_connection() as connection:
         connection.execute("INSERT INTO messages (conversation_id,role,content) VALUES (?,?,?)", (conversation_id, role, content))

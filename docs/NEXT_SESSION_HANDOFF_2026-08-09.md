@@ -1,20 +1,20 @@
 # asr_demo 当前工作区交接说明
 
-最后整理：2026-08-20
+最后整理：2026-08-25
 
 > 本文件是下一会话的短入口，不保存完整历史。任务状态以
 > `PROJECT_TASK_CHECKLIST.md` 为准，架构原因见 `PROJECT_ARCHITECTURE.md`，
 > 文档关系见 `docs/README.md`。
 
-## 0. 工作区位置决策（2026-08-16 用户拍板：留在 C 盘）
+## 0. 工作区与启动路径
 
 - **正式工作区 = `C:\Users\dahli\Documents\107`**（本会话沙箱；最新代码 + .git + 未提交改动都在这里）。
 - 曾计划迁移到 `D:\me\ai107`（4 个 .bat 写死该路径），但 D 盘根目录 ACL 为"仅管理员可写"（`Everyone:(RX)`），
   普通账户无法写；授权 dahli 后本会话受限 token 仍拒写，最终用户决定**放弃迁移、留在 C 盘**。
 - `D:\me\ai107` 已有一份 robocopy 副本（无 .venv，61MB，ACL 已授权 dahli 完全控制），**保留不动**；
   若将来要迁，按"管理员建目录/复制 + icacls 授权 + 新会话工作区指向 D 盘"三步走，勿再重复踩权限坑。
-- 遗留小项：`start.bat`/`build_exe.bat`/`package.bat`/`upload.bat` 原写死 `cd /d D:\me\ai107`，
-  **已于 2026-08-16 改为 `cd /d C:\Users\dahli\Documents\107`**（留在 C 盘，双击即可启动）。
+- 2026-08-26 起，根目录只保留普通用户入口 `start.bat`；开发者批处理移至 `scripts/windows/`，旧入口移至 `scripts/legacy_launchers/`。所有有效入口继续用 `%~dp0` 定位仓库，不依赖当前用户名、盘符或个人绝对路径。
+- 新用户统一入口为根目录 `start.bat`，详细步骤见 `docs/ONE_CLICK_START_GUIDE.md`；目标电脑的网络、浏览器、麦克风和真实 API 仍需单独验收。
 
 ## 1. 当前结论
 
@@ -721,4 +721,44 @@ docs/                 任务清单、交接和学习记录
 - 播放合同字段由 `asr_listening` 无兼容双名迁移为 `voice_input_busy`；原因码同步为 `VOICE_INPUT_BUSY`，重新判断触发器同步为 `VOICE_INPUT_BECAME_IDLE`。
 - 语义保持不变：`voice_input_busy = segment_capturing or asr_processing`。运行时仍分别保存片段采集和 ASR 处理事实，只有播放快照将两者合并为“当前不可插话”。
 - 本次只改命名，不改变 Gate 顺序、队列行为或播放策略。
+
+### 2026-08-25 补充：可搬家的一键启动
+
+- 四个根目录批处理不再写死当前电脑路径，统一 `cd /d "%~dp0"`；项目可移动、改名或放到其他盘符。
+- `scripts/start_best.py --doctor` 提供无下载、无服务副作用的启动体检；`tests/test_portable_launcher.py` 防止个人绝对路径回归。
+- 新用户说明统一落在 `docs/ONE_CLICK_START_GUIDE.md`，README 只保留最短入口。
+- 尚未在第二台干净 Windows 电脑执行首次依赖/模型下载和真实浏览器麦克风验收，不得写成跨机器 `REAL_OK`。
+
+### 2026-08-26 补充：根目录职责归类
+
+- 根目录公开 Windows 入口只保留 `start.bat`；开发批处理、旧兼容入口、诊断脚本和历史材料分别归入 `scripts/windows/`、`scripts/legacy_launchers/`、`scripts/diagnostics/` 和 `docs/history/`。
+- `scripts/launcher.py` 与 `scripts/build_exe.py` 的 PyInstaller 调用关系已同步；README 和一键启动指南均更新新路径。
+- 专项 `4/4`、移动入口编译、全量 `1148/1148` 与差异检查通过；未真正生成 EXE，不能把这些证据解释为发行包真实验收。
+
+### 2026-08-26 补充：源码包内容验收失败
+
+- `scripts/windows/package_source.bat` 在非受限环境从新位置真实运行成功，说明移动后的路径链未断。
+- 生成 ZIP 错误包含便携 Python、26 个真实录音和 4 个运行结果；文件在本机 `dist/`，未发送，禁止对外分享。
+- 下一次修复需同时覆盖内容排除测试和批处理失败码传播，不能只看“生成了 ZIP”就判成功。
+
+### 2026-08-26 补充：源码包内容复验通过
+
+- 已补齐便携 Python、录音、结果和日志排除规则，并让 Windows 包装器传播 Python 失败码。
+- 新包 `dist/ai107-source-20260826-004548.zip` 的必需清单全部存在、禁止清单全部为 0，内容合同通过，可作为当前源码交付候选。
+- 旧 `004317.zip` 含真实数据，仍禁止分享；尚未删除。
+
+### 2026-08-26 补充：统一链输入合同
+
+- 当前 `Documents\107` 是唯一施工基线；`Desktop\asr_demo` 只参考设计初衷，禁止复制覆盖。
+- 新增 `src/core/experiment_turn_input.py::ExperimentTurnInput`：文字输入不得携带 ASR，语音输入必须携带匹配的最终 `ASRResult`，请求身份、模式和来源形成不可变快照。
+- 新增测试先红后绿；专项 `9/9`、相邻 `35/35`、正式全量 `1162/1162` 通过。
+- 尚未接生产 `/record`、`UnifiedObserver`、会话问题状态或真实 LLM，识别能力仍待后续检验。
+- 唯一下一项：按 `(conversation_id, lab_session_id)` 建立隔离的 `ReplyCoordinator / SessionContext / 有序处理` 会话边界。
+
+### 2026-08-26 补充：统一链会话所有权
+
+- 新增 `web/experiment_runtime_sessions.py`，按 `(conversation_id, lab_session_id)` 隔离 `ReplyCoordinator`、`SessionContext` 和 FIFO 单工作线程。
+- 相同请求的精确重试复用原任务；不同内容复用同一请求号会报冲突；待处理任务达到上限时拒绝新任务，但不破坏精确重试。
+- 专项 `11/11`、相邻 `43/43`、全量 `1175/1175` 通过；这只证明会话容器和并发规则，不证明 `/record` 已使用它。
+- 未复制或覆盖 `Desktop\asr_demo`；下一步在当前仓库中将 `UnifiedObserver` 接入该会话边界并单独检验观察结果。
 

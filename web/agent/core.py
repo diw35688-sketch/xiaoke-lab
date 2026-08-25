@@ -7,6 +7,7 @@ from tools.calculator import calculate
 from tools.experiment_tools import check_experiment_conflicts, confirm_pending_experiment, list_current_experiments, propose_experiment
 from tools.memory_tools import confirm_pending_memory, propose_memory
 import lab_tools
+from src.core.conversation_turn import InteractionMode
 from tool_presentation import (
     ToolVoiceDeliveryBatch,
     merge_tool_plans,
@@ -15,15 +16,17 @@ from tool_presentation import (
 
 INSTRUCTIONS = """你是实验室实验规划辅助助手。结合近期对话理解“它”“改到周五”等指代。准确计算必须调用 calculate，查询已有实验时调用 list_experiments。用户问时间/日期时调用 get_current_time，需要计时/定时时调用 start_timer，之后查询剩余时间用 check_timer。
 
-实验记录规则：当用户描述自己刚做了什么操作、测到什么数据（如“加热到六十度”“加了5毫升盐酸”“溶液颜色变蓝”“离心机八百转运行十分钟”）时，必须调用 record_observation 工具并把用户口述原文传给 transcript 参数，禁止不调用工具就直接回复“已记录/已保存”。只有 record_observation 返回成功（结果不含 error）后，才能向用户确认“已记录”；如果工具调用失败或返回 error，必须如实说明记录未保存成功。
-
 创建实验必须两步确认：用户要求创建时，先调用 check_conflicts，再调用 propose_experiment，绝对不要直接创建；提案成功后列出信息并请用户回复“确认创建”或“取消”。只有用户在最近一条消息明确确认创建时才调用 confirm_create_experiment。
 
 长期记忆规则：当用户说出明显长期稳定且对未来有帮助的信息（例如实验室设备数量、预约规则、用户偏好、固定流程）时，调用 propose_memory 暂存这条信息，然后明确询问“是否保存为长期记忆？请回复确认或取消”。不要把临时安排、一次性实验结果、敏感个人信息、未确认的推测自动提议为记忆。只有当用户最近一条消息明确确认保存长期记忆时，调用 confirm_save_memory。若实验创建和记忆确认同时可能发生，先请用户说明要确认哪一项，绝不擅自同时确认。
 
-当前没有 SOP 知识库，不要假装查询过 PDF、论文或实验记录。危险操作与关键参数只能作辅助建议，并提醒用户按本实验室 SOP 和负责人要求确认。
+当前没有 SOP 知识库，不要假装查询过 PDF、论文或实验记录。危险操作与关键参数只能作辅助建议，并提醒用户按本实验室 SOP 和负责人要求确认。"""
 
-语音/通话场景输出要求：回答必须简短、直接、口语化，优先用一两句话说完；不要输出大段文字、列表、Markdown 符号或重复解释。需要记录/追问时，直接给出关键字段和一句话追问。"""
+CHAT_POLICY = """当前请求是自由聊天。请直接给出自然、完整且可以独立理解的简短回答，正文最多50个中文字符（含标点），不要使用Markdown、标题、列表、链接、表情或“小科：”等称呼前缀。不要先写长回答再附摘要。即使用户提到刚做的实验、温度、剂量或现象，也只能自然讨论，不能调用 record_observation，不能声称已经保存。若用户确实想记录，请提醒其切换到自由实验记录或方案实验记录模式。"""
+
+CHAT_REFINEMENT_POLICY = """把下面的助手回答重新生成成一句自然、完整、可独立理解的中文短回复。最多{max_chars}个字符（标点也计数），不得使用Markdown、标题、列表、链接、表情或称呼前缀；保留原意和关键结论，不得只截取前半句，不得解释你的改写过程。只输出改写后的正文：\n\n{answer}"""
+
+EXPERIMENT_RECORD_POLICY = """当前请求属于实验记录。用户描述刚完成的操作或实测事实时，必须调用 record_observation 并传递原始 transcript；只有工具返回成功后才能声称已记录，失败必须如实说明未保存。"""
 
 TOOLS = [
     {"type":"function","function":{"name":"calculate","description":"执行基础数学计算。","parameters":{"type":"object","properties":{"expression":{"type":"string"}},"required":["expression"],"additionalProperties":False}}},
@@ -47,9 +50,11 @@ def run_tool(name, args, conversation_id):
     return result
 
 
-def _run_tool_with_presentation(name, args, conversation_id):
+def _run_tool_with_presentation(name, args, conversation_id, interaction_mode=None):
     """Execute a tool and retain any backend-owned presentation plan."""
 
+    if interaction_mode == InteractionMode.CHAT and name == "record_observation":
+        raise PermissionError("自由聊天模式禁止写入实验记录，请切换到实验记录模式。")
     handlers = {
         "calculate": lambda: calculate(args["expression"]),
         "list_experiments": list_current_experiments,
@@ -83,16 +88,74 @@ def _client():
     return OpenAI(api_key=s.api_key, base_url=s.base_url, timeout=httpx.Timeout(60, connect=10), max_retries=1)
 
 
-def _messages(history):
-    return [{"role":"system","content":INSTRUCTIONS + "\n\n" + _memory_context()}, *history]
+def refine_chat_answer(answer: str, max_chars: int = 50) -> str:
+    """Ask the model to regenerate an over-budget Chat answer; never slice it."""
 
-
-def run_agent(history, conversation_id):
+    original = str(answer or "").strip()
+    if not original:
+        raise ValueError("Chat 回复为空，无法建立可见语音正文。")
     client = _client()
-    messages = _messages(history)
+    try:
+        candidate = original
+        for _ in range(2):
+            response = client.chat.completions.create(
+                model=settings_store.current().model_name,
+                messages=[{
+                    "role": "user",
+                    "content": CHAT_REFINEMENT_POLICY.format(
+                        max_chars=max_chars,
+                        answer=candidate,
+                    ),
+                }],
+                extra_body={"thinking": {"type": "disabled"}},
+            )
+            candidate = (response.choices[0].message.content or "").strip()
+            if candidate and len(candidate) <= max_chars:
+                return candidate
+    except APITimeoutError as error:
+        raise ModelServiceError("DeepSeek 精炼回复超时，请重试。", 504) from error
+    except APIConnectionError as error:
+        raise ModelServiceError("无法连接 DeepSeek 精炼回复，请检查网络后重试。", 502) from error
+    except APIStatusError as error:
+        raise ModelServiceError(
+            f"DeepSeek 精炼回复返回异常（状态码 {error.status_code}）。", 502
+        ) from error
+    raise ValueError(
+        f"模型连续两次未能生成不超过 {max_chars} 字的完整回复，请重试。"
+    )
+
+
+def _messages(history, interaction_mode=None):
+    policy = (
+        CHAT_POLICY
+        if interaction_mode == InteractionMode.CHAT
+        else EXPERIMENT_RECORD_POLICY
+    )
+    return [{"role":"system","content":INSTRUCTIONS + "\n\n" + policy + "\n\n" + _memory_context()}, *history]
+
+
+def _tools_for_mode(interaction_mode=None):
+    if interaction_mode != InteractionMode.CHAT:
+        return TOOLS
+    return [tool for tool in TOOLS if tool["function"]["name"] != "record_observation"]
+
+
+def _execute_tool(name, args, conversation_id, interaction_mode=None):
+    """Keep legacy three-argument test/adaptor calls while enforcing new mode requests."""
+
+    if interaction_mode is None:
+        return _run_tool_with_presentation(name, args, conversation_id)
+    return _run_tool_with_presentation(
+        name, args, conversation_id, interaction_mode
+    )
+
+
+def run_agent(history, conversation_id, interaction_mode=None):
+    client = _client()
+    messages = _messages(history, interaction_mode)
     try:
         for _ in range(6):
-            response = client.chat.completions.create(model=settings_store.current().model_name, messages=messages, tools=TOOLS, extra_body={"thinking": {"type": "disabled"}})
+            response = client.chat.completions.create(model=settings_store.current().model_name, messages=messages, tools=_tools_for_mode(interaction_mode), extra_body={"thinking": {"type": "disabled"}})
             assistant = response.choices[0].message
             calls = assistant.tool_calls or []
             if not calls:
@@ -101,10 +164,10 @@ def run_agent(history, conversation_id):
             presentation_plans = []
             for call in calls:
                 try:
-                    result, presentation_plan = _run_tool_with_presentation(
+                    result, presentation_plan = _execute_tool(
                         call.function.name,
                         json.loads(call.function.arguments),
-                        conversation_id,
+                        conversation_id, interaction_mode,
                     )
                 except Exception as error:
                     result = {"error": str(error)}
@@ -123,15 +186,15 @@ def run_agent(history, conversation_id):
     return "工具调用次数过多，已停止本次请求。"
 
 
-def stream_agent(history, conversation_id):
+def stream_agent(history, conversation_id, interaction_mode=None):
     """逐段产出模型文字；遇到工具调用时先执行工具，再继续流式回答。"""
     client = _client()
-    messages = _messages(history)
+    messages = _messages(history, interaction_mode)
     try:
         for _ in range(6):
             text_parts = []
             calls_by_index = {}
-            stream = client.chat.completions.create(model=settings_store.current().model_name, messages=messages, tools=TOOLS, stream=True, extra_body={"thinking": {"type": "disabled"}})
+            stream = client.chat.completions.create(model=settings_store.current().model_name, messages=messages, tools=_tools_for_mode(interaction_mode), stream=True, extra_body={"thinking": {"type": "disabled"}})
             for chunk in stream:
                 if not chunk.choices:
                     continue
@@ -169,11 +232,13 @@ def stream_agent(history, conversation_id):
                 # 参考 deepseek-harness：执行前先推「待执行卡片」，
                 # 让用户看见系统正在做什么，而不是干等一段空白。
                 if name in lab_tools.names():
+                    call_view = dict(lab_tools.present_call(name, args))
+                    call_view["tool_call_id"] = call["id"]
                     yield "[[LABCARD]]" + json.dumps(
-                        lab_tools.present_call(name, args), ensure_ascii=False)
+                        call_view, ensure_ascii=False)
                 try:
-                    result, presentation_plan = _run_tool_with_presentation(
-                        name, args, conversation_id
+                    result, presentation_plan = _execute_tool(
+                        name, args, conversation_id, interaction_mode
                     )
                     outcome = {"ok": True, "result": result}
                 except Exception as error:
@@ -181,8 +246,10 @@ def stream_agent(history, conversation_id):
                     outcome = {"ok": False, "error": str(error)}
                     presentation_plan = None
                 if name in lab_tools.names():
+                    result_view = dict(lab_tools.present_result(name, args, outcome))
+                    result_view["tool_call_id"] = call["id"]
                     yield "[[LABCARD]]" + json.dumps(
-                        lab_tools.present_result(name, args, outcome), ensure_ascii=False)
+                        result_view, ensure_ascii=False)
                 messages.append({"role":"tool", "tool_call_id":call["id"], "content":json.dumps(result, ensure_ascii=False)})
                 if presentation_plan is not None:
                     presentation_plans.append(presentation_plan)

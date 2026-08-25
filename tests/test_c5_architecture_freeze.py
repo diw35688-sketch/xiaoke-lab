@@ -40,8 +40,14 @@ class C5ArchitectureFreezeTests(unittest.TestCase):
         record = _source(WEB / "api" / "record.py")
         chat = _source(WEB / "api" / "chat.py")
 
-        self.assertIn("web_playback_service.authorize(plan.voice_items)", record)
-        self.assertIn("web_playback_service.authorize(output.items)", chat)
+        self.assertIn("web_playback_service.authorize(", record)
+        self.assertIn("plan.voice_items,", record)
+        self.assertIn("conversation_id=", record)
+        self.assertIn("web_playback_service.authorize(", chat)
+        self.assertIn("bind_voice_items(tool_voice_items, assistant_block_id)", chat)
+        self.assertIn("_prepare_chat_spoken_delivery(", chat)
+        self.assertIn("_build_chat_spoken_delivery(refined, turn_id)", chat)
+        self.assertIn("conversation_id=conversation_id", chat)
         for source in (record, chat):
             with self.subTest(source=source[:20]):
                 self.assertNotIn("enqueueSpeech", source)
