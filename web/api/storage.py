@@ -100,11 +100,12 @@ def remove_location(location_id: int):
 def items(
     q: str = Query(default=""),
     item_type: str = Query(default=""),
-    location_id: int | None = Query(default=None),
+    location_id: str | None = Query(default=None),
     status: str = Query(default=""),
 ):
+    loc_id = int(location_id) if location_id else None
     return {
-        "items": crud.list_storage_items(q=q, item_type=item_type, location_id=location_id, status=status)
+        "items": crud.list_storage_items(q=q, item_type=item_type, location_id=loc_id, status=status)
     }
 
 
