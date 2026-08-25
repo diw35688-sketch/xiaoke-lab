@@ -15,7 +15,7 @@ if getattr(sys, "frozen", False):
     # PyInstaller onedir 把所有资源和依赖放在 _internal 里
     ROOT = Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent))
 else:
-    ROOT = Path(__file__).resolve().parent
+    ROOT = Path(__file__).resolve().parent.parent
 
 os.chdir(ROOT)
 for path in (str(ROOT), str(ROOT / "web"), str(ROOT / "scripts")):
