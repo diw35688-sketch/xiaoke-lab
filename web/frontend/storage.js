@@ -34,6 +34,22 @@
       '.storage-stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}',
       '.storage-stat{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:8px 14px;font-size:12px;color:#64748b}',
       '.storage-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px;margin-top:12px}',
+      '.storage-map-toolbar{display:flex;gap:8px;align-items:center;margin-top:10px}',
+      '.storage-view-btn{border:1px solid #e2e8f0;background:#fff;border-radius:999px;padding:4px 12px;font-size:12px;cursor:pointer;color:#64748b}',
+      '.storage-view-btn.active{background:#2563eb;color:#fff;border-color:#2563eb}',
+      '.storage-map{display:flex;gap:14px;overflow-x:auto;padding:4px 0 16px;margin-top:12px;align-items:flex-start}',
+      '.storage-map-loc{flex:0 0 260px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:12px;min-height:200px;transition:border-color .15s,background .15s}',
+      '.storage-map-loc.dragover{border-color:#3b67e8;background:#eff6ff}',
+      '.storage-map-loc-title{font-weight:700;color:#0f172a;font-size:13px;margin-bottom:2px}',
+      '.storage-map-loc-sub{color:#94a3b8;font-size:11px;margin-bottom:8px}',
+      '.storage-map-slot{margin-top:8px;border:1px dashed #e2e8f0;border-radius:10px;padding:8px;min-height:58px;background:#f8fafc}',
+      '.storage-map-slot.dragover{border-color:#3b67e8;background:#f0f9ff}',
+      '.storage-map-slot-title{font-size:11px;color:#64748b;font-weight:600;margin-bottom:4px}',
+      '.storage-chip{display:block;background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:5px 7px;margin-bottom:5px;cursor:grab;font-size:11px;line-height:1.4;box-shadow:0 1px 3px rgba(15,23,42,.05)}',
+      '.storage-chip.dragging{opacity:.5}',
+      '.storage-chip .tn{font-weight:600;color:#0f172a}',
+      '.storage-chip .tm{color:#94a3b8;font-size:10px}',
+      '.storage-map-empty{color:#94a3b8;font-size:12px;padding:20px 0}',
       '.storage-card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:13px 15px;cursor:pointer;transition:border-color .15s,box-shadow .15s}',
       '.storage-card:hover{border-color:#3b67e8;box-shadow:0 4px 12px rgba(59,103,232,.08)}',
       '.storage-card .name{font-weight:700;color:#0f172a}',
@@ -77,6 +93,7 @@
       + '<select id="st-status"><option value="">全部状态</option>' + STATUS_OPTIONS.map(function (x) { return '<option value="' + x[0] + '">' + x[1] + '</option>'; }).join('') + '</select>'
       + '<button class="sh-btn primary" id="st-add">新增物品</button>'
       + '<button class="sh-btn" id="st-loc-toggle">位置管理</button>'
+      + '<span class="storage-map-toolbar"><button type="button" class="storage-view-btn active" id="st-view-list">列表</button><button type="button" class="storage-view-btn" id="st-view-map">地图</button></span>'
       + '</div>'
       + '<div class="storage-stats" id="st-stats"></div>'
       + '<div class="storage-form" id="st-form">'
@@ -98,6 +115,7 @@
       + '<div style="margin-top:12px;display:flex;gap:8px"><button class="sh-btn primary" id="stf-save">保存</button><button class="sh-btn" id="stf-cancel">取消</button><span id="stf-msg" style="font-size:12px;color:#64748b"></span></div>'
       + '</div>'
       + '<div id="st-list" class="storage-grid">加载中…</div>'
+      + '<div id="st-map" class="storage-map" style="display:none"></div>'
       + '<div class="storage-locations" id="st-locations"><h4>存储位置</h4><div id="st-loc-list"></div>'
       + '<div style="display:flex;gap:8px;margin-top:10px"><input id="st-loc-name" placeholder="位置名称" style="flex:1;padding:8px 10px;border:1px solid #cbd5e1;border-radius:9px;font-family:inherit;font-size:13px">'
       + '<input id="st-loc-type" placeholder="类型（冰箱/柜/其他）" style="flex:1;padding:8px 10px;border:1px solid #cbd5e1;border-radius:9px;font-family:inherit;font-size:13px">'
@@ -112,6 +130,7 @@
     var locPanel = host.querySelector('#st-locations');
     var editId = null;
     var allItems = [];
+    var mapMode = false;
 
     function fillLocationSelects(locations) {
       var locOptions = locations.map(function (l) {
@@ -119,6 +138,61 @@
       }).join('');
       host.querySelector('#st-location').innerHTML = '<option value="">全部位置</option>' + locOptions;
       host.querySelector('#stf-location').innerHTML = '<option value="">未分配</option>' + locOptions;
+    }
+
+    function renderMap(locations, items) {
+      var map = host.querySelector('#st-map');
+      var locMap = {};
+      locations.forEach(function (l) { locMap[l.id] = l; });
+      var unassigned = items.filter(function (i) { return !i.location_id; });
+      var assigned = items.filter(function (i) { return i.location_id; });
+      map.innerHTML = locations.map(function (loc) {
+        var locItems = assigned.filter(function (i) { return i.location_id == loc.id; });
+        var groups = {};
+        locItems.forEach(function (i) {
+          var key = i.position || '未分格';
+          (groups[key] = groups[key] || []).push(i);
+        });
+        var slots = Object.keys(groups).map(function (key) {
+          var chips = groups[key].map(function (i) {
+            return '<div class="storage-chip" draggable="true" data-id="' + i.id + '">'
+              + '<div class="tn">' + esc(i.name) + '</div>'
+              + '<div class="tm">' + esc(i.quantity || '') + ' ' + esc(i.unit || '') + ' · ' + statusHtml(i.status) + '</div></div>';
+          }).join('');
+          return '<div class="storage-map-slot" data-loc="' + loc.id + '" data-pos="' + esc(key) + '"><div class="storage-map-slot-title">' + esc(key) + '</div>' + (chips || '<div style="color:#cbd5e1;font-size:11px">空</div>') + '</div>';
+        }).join('') || '<div class="storage-map-slot" data-loc="' + loc.id + '" data-pos=""><div class="storage-map-slot-title">未分格</div><div style="color:#cbd5e1;font-size:11px">空</div></div>';
+        return '<div class="storage-map-loc" data-loc="' + loc.id + '">'
+          + '<div class="storage-map-loc-title">' + esc(loc.name) + '</div>'
+          + '<div class="storage-map-loc-sub">' + esc(loc.type || '') + (loc.temperature ? ' · ' + esc(loc.temperature) : '') + ' · ' + locItems.length + ' 项</div>'
+          + slots
+          + '</div>';
+      }).join('') + (unassigned.length ? '<div class="storage-map-loc" data-loc="" style="border-style:dashed"><div class="storage-map-loc-title">未分配</div><div class="storage-map-loc-sub">' + unassigned.length + ' 项</div><div class="storage-map-slot" data-loc="" data-pos=""><div class="storage-map-slot-title">拖到这里</div>' + unassigned.map(function (i) {
+        return '<div class="storage-chip" draggable="true" data-id="' + i.id + '"><div class="tn">' + esc(i.name) + '</div><div class="tm">' + esc(i.quantity || '') + ' ' + esc(i.unit || '') + '</div></div>';
+      }).join('') + '</div></div>' : '');
+
+      Array.prototype.forEach.call(map.querySelectorAll('.storage-chip'), function (chip) {
+        chip.addEventListener('dragstart', function (e) {
+          e.dataTransfer.setData('text/plain', chip.getAttribute('data-id'));
+          chip.classList.add('dragging');
+        });
+        chip.addEventListener('dragend', function () { chip.classList.remove('dragging'); });
+      });
+      Array.prototype.forEach.call(map.querySelectorAll('.storage-map-loc, .storage-map-slot'), function (zone) {
+        zone.addEventListener('dragover', function (e) { e.preventDefault(); zone.classList.add('dragover'); });
+        zone.addEventListener('dragleave', function () { zone.classList.remove('dragover'); });
+        zone.addEventListener('drop', function (e) {
+          e.preventDefault();
+          zone.classList.remove('dragover');
+          var id = e.dataTransfer.getData('text/plain');
+          if (!id) return;
+          var locId = zone.getAttribute('data-loc') || null;
+          var pos = zone.getAttribute('data-pos') || '';
+          fetch('/storage/items/' + id, {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ location_id: locId ? parseInt(locId, 10) : null, position: pos })
+          }).then(function () { load(); });
+        });
+      });
     }
 
     function load() {
@@ -139,7 +213,15 @@
           '<span class="storage-stat">总数 ' + stats.total + '</span>'
           + '<span class="storage-stat">7天内到期 ' + stats.expiring + '</span>'
           + '<span class="storage-stat">已过期 ' + stats.expired + '</span>';
-        listEl.innerHTML = items.map(itemCard).join('') || '<div class="storage-empty">暂无存储物品。</div>';
+        if (mapMode) {
+          host.querySelector('#st-list').style.display = 'none';
+          host.querySelector('#st-map').style.display = '';
+          renderMap(locations, items);
+        } else {
+          host.querySelector('#st-map').style.display = 'none';
+          host.querySelector('#st-list').style.display = '';
+          listEl.innerHTML = items.map(itemCard).join('') || '<div class="storage-empty">暂无存储物品。</div>';
+        }
         host.querySelector('#st-loc-list').innerHTML = locations.map(function (l) {
           return '<div class="storage-loc-row"><span><b>' + esc(l.name) + '</b> · ' + esc(l.type) + ' · ' + esc(l.temperature || '') + '</span><button class="sh-btn" type="button" data-del-loc="' + l.id + '" style="padding:2px 7px;font-size:11px;color:#b91c1c">删除</button></div>';
         }).join('') || '<div style="color:#94a3b8;font-size:12px">暂无位置</div>';
@@ -230,6 +312,10 @@
     host.querySelector('#st-loc-toggle').onclick = function () {
       locPanel.style.display = locPanel.style.display === 'block' ? 'none' : 'block';
     };
+    var listBtn = host.querySelector('#st-view-list');
+    var mapBtn = host.querySelector('#st-view-map');
+    listBtn.onclick = function () { mapMode = false; listBtn.classList.add('active'); mapBtn.classList.remove('active'); load(); };
+    mapBtn.onclick = function () { mapMode = true; mapBtn.classList.add('active'); listBtn.classList.remove('active'); load(); };
     host.querySelector('#st-loc-add').onclick = function () {
       var name = host.querySelector('#st-loc-name').value.trim();
       if (!name) return;
