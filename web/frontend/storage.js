@@ -53,6 +53,20 @@
       '.tree-item .tn{font-weight:600;color:#0f172a;font-size:12px}',
       '.tree-item .tm{color:#94a3b8;font-size:11px}',
       '.tree-item .st-badge{margin-left:auto}',
+      '.storage-racks{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px}',
+      '.rack{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px 16px;min-width:260px}',
+      '.rack-title{font-weight:700;color:#0f172a;font-size:14px;margin-bottom:2px}',
+      '.rack-sub{color:#94a3b8;font-size:11px;margin-bottom:10px}',
+      '.rack-grid{display:grid;gap:6px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:10px;padding:8px}',
+      '.rack-cell{background:#fff;border:1px dashed #cbd5e1;border-radius:8px;min-height:56px;padding:5px;position:relative;transition:border-color .15s,background .15s}',
+      '.rack-cell.dragover{border-color:#3b67e8;background:#eff6ff}',
+      '.rack-cell .cell-label{font-size:10px;color:#94a3b8;margin-bottom:3px}',
+      '.rack-item{display:block;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:4px 5px;font-size:11px;cursor:grab;line-height:1.3;margin-bottom:3px}',
+      '.rack-item.dragging{opacity:.5}',
+      '.rack-item .rn{font-weight:600;color:#1d4ed8}',
+      '.rack-item .rm{color:#64748b;font-size:10px}',
+      '.rack-other{margin-top:8px;border:1px dashed #fecaca;border-radius:10px;padding:8px;background:#fff7ed}',
+      '.rack-other .cell-label{font-size:10px;color:#b45309;margin-bottom:4px}',
       '.storage-map-empty{color:#94a3b8;font-size:12px;padding:20px 0}',
       '.storage-card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:13px 15px;cursor:pointer;transition:border-color .15s,box-shadow .15s}',
       '.storage-card:hover{border-color:#3b67e8;box-shadow:0 4px 12px rgba(59,103,232,.08)}',
@@ -144,52 +158,60 @@
       host.querySelector('#stf-location').innerHTML = '<option value="">未分配</option>' + locOptions;
     }
 
+    function slotLabel(row, col) {
+      return String.fromCharCode(65 + row) + '-' + String(col + 1).toString().padStart(2, '0');
+    }
+
+    function rackItemHtml(i) {
+      return '<div class="rack-item" draggable="true" data-id="' + i.id + '">'
+        + '<div class="rn">' + esc(i.name) + '</div>'
+        + '<div class="rm">' + esc(i.quantity || '') + ' ' + esc(i.unit || '') + ' · ' + statusHtml(i.status) + '</div></div>';
+    }
+
     function renderMap(locations, items) {
       var map = host.querySelector('#st-map');
       var unassigned = items.filter(function (i) { return !i.location_id; });
       var assigned = items.filter(function (i) { return i.location_id; });
-      map.innerHTML = '<div class="storage-tree">'
+      map.innerHTML = '<div class="storage-racks">'
         + locations.map(function (loc) {
+          var rows = parseInt(loc.grid_rows, 10) || 2;
+          var cols = parseInt(loc.grid_cols, 10) || 4;
           var locItems = assigned.filter(function (i) { return i.location_id == loc.id; });
-          var groups = {};
-          locItems.forEach(function (i) {
-            var key = i.position || '未分格';
-            (groups[key] = groups[key] || []).push(i);
-          });
-          var slotHtml = Object.keys(groups).map(function (key) {
-            var rows = groups[key].map(function (i) {
-              return '<div class="tree-item" draggable="true" data-id="' + i.id + '">'
-                + '<span class="tn">' + esc(i.name) + '</span>'
-                + '<span class="tm">' + esc(i.quantity || '') + ' ' + esc(i.unit || '') + '</span>'
-                + statusHtml(i.status) + '</div>';
-            }).join('');
-            return '<div class="tree-node" data-loc="' + loc.id + '" data-pos="' + esc(key) + '"><span class="tree-caret">▶</span><span class="tree-slot">' + esc(key) + ' · ' + groups[key].length + ' 项</span><div class="tree-children">' + rows + '</div></div>';
-          }).join('') || '<div class="tree-node" data-loc="' + loc.id + '" data-pos=""><span class="tree-caret">▶</span><span class="tree-slot">未分格 · 0 项</span><div class="tree-children"></div></div>';
-          return '<div class="tree-node" data-loc="' + loc.id + '"><span class="tree-caret">▶</span><span class="tree-loc">' + esc(loc.name) + '</span><span class="tree-loc-sub">' + esc(loc.type || '') + (loc.temperature ? ' · ' + esc(loc.temperature) : '') + ' · ' + locItems.length + ' 项</span><div class="tree-children">' + slotHtml + '</div></div>';
+          var knownSlots = {};
+          var cellHtml = '';
+          for (var r = 0; r < rows; r += 1) {
+            for (var c = 0; c < cols; c += 1) {
+              var label = slotLabel(r, c);
+              var cellItems = locItems.filter(function (i) { return (i.position || '') === label; });
+              knownSlots[label] = true;
+              cellHtml += '<div class="rack-cell" data-loc="' + loc.id + '" data-pos="' + label + '">'
+                + '<div class="cell-label">' + label + '</div>'
+                + (cellItems.map(rackItemHtml).join('') || '<div style="color:#cbd5e1;font-size:10px">空</div>')
+                + '</div>';
+            }
+          }
+          var other = locItems.filter(function (i) { return !knownSlots[i.position || '']; });
+          var otherHtml = other.length ? '<div class="rack-other" data-loc="' + loc.id + '" data-pos=""><div class="cell-label">其他格位</div>' + other.map(rackItemHtml).join('') + '</div>' : '';
+          return '<div class="rack">'
+            + '<div class="rack-title">' + esc(loc.name) + '</div>'
+            + '<div class="rack-sub">' + esc(loc.type || '') + (loc.temperature ? ' · ' + esc(loc.temperature) : '') + ' · ' + locItems.length + ' 项</div>'
+            + '<div class="rack-grid" style="grid-template-columns:repeat(' + cols + ',1fr)">' + cellHtml + '</div>'
+            + otherHtml
+            + '</div>';
         }).join('')
-        + '<div class="tree-node" data-loc=""><span class="tree-caret">▶</span><span class="tree-loc">未分配</span><span class="tree-loc-sub">' + unassigned.length + ' 项</span><div class="tree-children">' + unassigned.map(function (i) {
-          return '<div class="tree-item" draggable="true" data-id="' + i.id + '"><span class="tn">' + esc(i.name) + '</span><span class="tm">' + esc(i.quantity || '') + ' ' + esc(i.unit || '') + '</span></div>';
-        }).join('') + '</div></div>'
+        + (unassigned.length ? '<div class="rack" style="border-style:dashed"><div class="rack-title">未分配</div><div class="rack-sub">' + unassigned.length + ' 项</div><div class="rack-other" data-loc="" data-pos=""><div class="cell-label">拖到这里</div>' + unassigned.map(rackItemHtml).join('') + '</div></div>' : '')
         + '</div>';
 
-      // Toggle tree nodes
-      Array.prototype.forEach.call(map.querySelectorAll('.storage-tree > .tree-node'), function (node) {
-        node.onclick = function (e) {
-          if (e.target.closest('.tree-item')) return;
-          node.classList.toggle('open');
-        };
-      });
       // Drag items
-      Array.prototype.forEach.call(map.querySelectorAll('.tree-item'), function (item) {
+      Array.prototype.forEach.call(map.querySelectorAll('.rack-item'), function (item) {
         item.addEventListener('dragstart', function (e) {
-          e.stopPropagation();
           e.dataTransfer.setData('text/plain', item.getAttribute('data-id'));
           item.classList.add('dragging');
         });
         item.addEventListener('dragend', function () { item.classList.remove('dragging'); });
       });
-      // Drop on location/slot nodes
-      Array.prototype.forEach.call(map.querySelectorAll('.tree-node'), function (zone) {
+      // Drop on cells and other/unassigned zones
+      Array.prototype.forEach.call(map.querySelectorAll('.rack-cell, .rack-other, .rack'), function (zone) {
         zone.addEventListener('dragover', function (e) { e.preventDefault(); zone.classList.add('dragover'); });
         zone.addEventListener('dragleave', function () { zone.classList.remove('dragover'); });
         zone.addEventListener('drop', function (e) {
@@ -199,11 +221,19 @@
           if (!id) return;
           var locId = zone.getAttribute('data-loc') || null;
           var pos = zone.getAttribute('data-pos') || '';
+          if (zone.classList.contains('rack')) { locId = zone.getAttribute('data-loc'); pos = ''; }
           fetch('/storage/items/' + id, {
             method: 'PATCH', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ location_id: locId ? parseInt(locId, 10) : null, position: pos })
           }).then(function () { load(); });
         });
+      });
+      // Open edit on click
+      Array.prototype.forEach.call(map.querySelectorAll('.rack-item'), function (item) {
+        item.onclick = function () {
+          var found = allItems.filter(function (x) { return x.id == item.getAttribute('data-id'); })[0];
+          if (found) openForm(found);
+        };
       });
     }
 

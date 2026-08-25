@@ -99,6 +99,8 @@ def initialize_database():
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(location_id) REFERENCES storage_locations(id))""")
+        _ensure_column(connection, 'storage_locations', 'grid_rows', 'INTEGER NOT NULL DEFAULT 2')
+        _ensure_column(connection, 'storage_locations', 'grid_cols', 'INTEGER NOT NULL DEFAULT 4')
         connection.execute("CREATE INDEX IF NOT EXISTS idx_storage_items_location ON storage_items(location_id)")
         connection.execute("CREATE INDEX IF NOT EXISTS idx_storage_items_name ON storage_items(name)")
         # 通知/每日工作弹窗：记录创建、展示、确认，用于溯源

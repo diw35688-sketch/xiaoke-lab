@@ -227,8 +227,8 @@ def create_storage_location(location):
     initialize_database()
     with get_connection() as connection:
         cursor = connection.execute(
-            """INSERT INTO storage_locations (name,type,temperature,capacity,notes,enabled)
-            VALUES (?,?,?,?,?,?)""",
+            """INSERT INTO storage_locations (name,type,temperature,capacity,notes,enabled,grid_rows,grid_cols)
+            VALUES (?,?,?,?,?,?,?,?)""",
             (
                 str(location.get("name", "")).strip(),
                 str(location.get("type", "其他")).strip() or "其他",
@@ -236,6 +236,8 @@ def create_storage_location(location):
                 str(location.get("capacity", "")).strip(),
                 str(location.get("notes", "")).strip(),
                 1 if location.get("enabled", True) else 0,
+                int(location.get("grid_rows", 2) or 2),
+                int(location.get("grid_cols", 4) or 4),
             ),
         )
         row = connection.execute(
@@ -248,7 +250,7 @@ def update_storage_location(location_id, location):
     initialize_database()
     fields = []
     values = []
-    for key in ("name", "type", "temperature", "capacity", "notes"):
+    for key in ("name", "type", "temperature", "capacity", "notes", "grid_rows", "grid_cols"):
         if key in location:
             fields.append(f"{key}=?")
             values.append(str(location[key]).strip())

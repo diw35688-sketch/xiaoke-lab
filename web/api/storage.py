@@ -16,6 +16,8 @@ class LocationPayload(BaseModel):
     capacity: str = ""
     notes: str = ""
     enabled: bool = True
+    grid_rows: int = 2
+    grid_cols: int = 4
 
 
 class LocationUpdatePayload(BaseModel):
@@ -25,6 +27,8 @@ class LocationUpdatePayload(BaseModel):
     capacity: str | None = None
     notes: str | None = None
     enabled: bool | None = None
+    grid_rows: int | None = None
+    grid_cols: int | None = None
 
 
 class ItemPayload(BaseModel):
