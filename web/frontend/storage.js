@@ -122,14 +122,14 @@
     }
 
     function load() {
+      var params = new URLSearchParams();
+      if (searchEl.value.trim()) params.set('q', searchEl.value.trim());
+      if (typeEl.value) params.set('item_type', typeEl.value);
+      if (locEl.value) params.set('location_id', locEl.value);
+      if (statusEl.value) params.set('status', statusEl.value);
       Promise.all([
         fetch('/storage/stats').then(function (r) { return r.json(); }),
         fetch('/storage/locations').then(function (r) { return r.json(); }),
-        var params = new URLSearchParams();
-        if (searchEl.value.trim()) params.set('q', searchEl.value.trim());
-        if (typeEl.value) params.set('item_type', typeEl.value);
-        if (locEl.value) params.set('location_id', locEl.value);
-        if (statusEl.value) params.set('status', statusEl.value);
         fetch('/storage/items?' + params.toString()).then(function (r) { return r.json(); })
       ]).then(function (out) {
         var stats = out[0], locations = out[1].items || [], items = out[2].items || [];
