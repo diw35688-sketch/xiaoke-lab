@@ -3,8 +3,10 @@ from config import DATABASE_PATH
 
 
 def get_connection():
-    connection = sqlite3.connect(DATABASE_PATH)
+    connection = sqlite3.connect(DATABASE_PATH, timeout=5)
     connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA busy_timeout=5000")
+    connection.execute("PRAGMA journal_mode=WAL")
     return connection
 
 
