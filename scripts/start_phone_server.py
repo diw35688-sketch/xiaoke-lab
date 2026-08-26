@@ -90,10 +90,13 @@ def print_ascii_qr(url: str) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="手机扫码访问实验助手")
     parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--ip", type=str, default=None,
+                        help="指定发布 IP（默认自动探测；多网卡时自动探测可能选错，"
+                             "用 route print 找默认网关所在网卡的 IP 传入）")
     parser.add_argument("--no-ssl", action="store_true", help="强制使用 HTTP（手机麦克风会被浏览器禁用）")
     args = parser.parse_args()
 
-    ip = phone_access.lan_ip()
+    ip = args.ip or phone_access.lan_ip()
     scheme = "http"
     ssl_kwargs: dict = {}
 

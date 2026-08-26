@@ -173,6 +173,45 @@ def session_steps():
     return domain.all_steps_view(domain.session())
 
 
+@router.get("/session/progress")
+def session_progress():
+    """当前步骤的进度事实：状态 / 已记录 / 还缺哪些必测字段。
+
+    供移动端卡片「完成本步」按钮核对用——用户点按钮只是"查账"，
+    是否完成仍由确定性状态机判定，不提供手点改状态的入口。
+    """
+    return domain.step_progress_view(domain.session())
+
+
+class CompletePayload(BaseModel):
+    """完成请求：manual=True 表示用户手动确认（直接打勾，人类责任确认）。"""
+
+    manual: bool = False
+
+
+@router.post("/session/steps/{step_number}/complete")
+def complete_step(step_number: int, payload: CompletePayload | None = None):
+    """完成当前步（后端状态机判定/落盘，前端无改状态入口）。
+
+    - manual=True：用户手动确认 → 直接打勾（不需要再口述数据）；
+    - manual=False：严格校验——必测字段记齐且无偏差才通过，否则拒绝并说明缺什么；
+    - 只能完成"当前步"（不能跨步、不能完成未来步）；
+    - 本接口不推进步骤（方案 B），翻页仍靠用户明确指示。
+    """
+    manual = bool(payload and payload.manual)
+    try:
+        progress = domain.complete_step(step_number, manual)
+    except ValueError as error:
+        raise HTTPException(400, str(error))
+    return {
+        "ok": True,
+        "step_number": step_number,
+        "status": progress["status"],
+        "progress": progress,
+        "manual": manual,
+    }
+
+
 @router.post("/session")
 def start(payload: SelectPayload):
     """选择方案开始会话；protocol_id 为空表示自由记录模式。"""
