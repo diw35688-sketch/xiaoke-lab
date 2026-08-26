@@ -18,8 +18,7 @@
       "storage_condition": "4°C 冷藏",
       "expiry": "建议 1 周内使用",
       "hazard_reagents": [
-        "磷酸二氢钠",
-        "磷酸氢二钠"
+        "磷酸"
       ],
       "source": "从 undergraduate_basic_protocols.json 的磷酸缓冲液配制方案提取，待补充原始公开来源",
       "source_url": null,
@@ -633,6 +632,55 @@
       "expiry": "建议 6 个月内使用",
       "hazard_reagents": [],
       "source": "本科实验教学通用配方",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "pyruvate-1-2-ms-gradient",
+      "name_zh": "丙酮酸 1/2 MS 梯度溶液",
+      "purpose": "用于梯度浓度处理实验",
+      "target_concentration": null,
+      "target_volume": null,
+      "solvent": "1/2 MS溶液",
+      "steps": [
+        "配100 mM丙酮酸母液50 mL：取352 μL纯丙酮酸液体（密度1.25 g/mL），用1/2 MS定容至50 mL。",
+        "梯度稀释：分别取母液0/7.5/15/22.5 mL，用1/2 MS定容至150 mL，得到0/5/10/15 mM梯度溶液。",
+        "调pH：各梯度用NaOH调至pH 5.7，建议定容前调好再补足体积；各梯度酸量不同，中和所需NaOH量以pH计实测为准。0 mM为纯1/2 MS对照，需确认pH为5.7。"
+      ],
+      "storage_condition": null,
+      "expiry": null,
+      "hazard_reagents": [
+        "丙酮酸",
+        "氢氧化钠"
+      ],
+      "source": "AI生成草稿",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "pyruvic-acid-stock-and-working-solution",
+      "name_zh": "丙酮酸母液及工作液",
+      "purpose": "用于植物体系丙酮酸处理实验",
+      "target_concentration": "1 M（母液）；0/5/10/15 mM（工作液）",
+      "target_volume": "5 mL母液，工作液各150 mL",
+      "solvent": "去离子水（母液）；1/2 MS培养基（工作液）",
+      "steps": [
+        "取15 mL离心管，加入约3 mL去离子水。",
+        "用移液枪准确吸取359 μL丙酮酸液体，缓慢加入水中，混匀。",
+        "容器置于冰浴中，逐滴加入5 M KOH，边加边搅拌，监测pH；先加至pH接近5.0，再改用1 M KOH缓慢调至5.7～5.8。",
+        "转移至5 mL容量瓶，加去离子水定容至5 mL，混匀。",
+        "用0.22 μm无菌滤膜过滤除菌，收集到无菌离心管中。",
+        "分装或直接使用，剩余-20℃避光冻存，避免反复冻融。",
+        "取4个无菌容器，分别标记0、5、10、15 mM，按对应体积（0、0.75、1.50、2.25 mL）加入1 M丙酮酸母液。",
+        "各容器加入冷却至50～55℃的1/2 MS培养基至150 mL，混匀，即得工作液。"
+      ],
+      "storage_condition": "母液-20℃避光冻存；工作液现配现用",
+      "expiry": "母液建议短期内使用，避免反复冻融；工作液建议当天使用",
+      "hazard_reagents": [
+        "氢氧化钾",
+        "丙酮酸"
+      ],
+      "source": "AI生成草稿",
       "source_url": null,
       "review_status": "UNREVIEWED"
     }
