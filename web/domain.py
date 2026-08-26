@@ -476,6 +476,10 @@ def _auto_hazard_reagents(raw_prep: dict) -> list[str]:
 
 def update_reagent_prep(reagent_prep_id: str, raw_prep: dict) -> dict:
     """校验并更新一条试剂配置；不通过绝不落盘。更新时自动识别步骤里的试剂名称。"""
+    existing = reagent_preps().get_by_id(reagent_prep_id)
+    if existing is not None:
+        for field in ("source", "source_url", "review_status"):
+            raw_prep.setdefault(field, getattr(existing, field))
     raw_prep["hazard_reagents"] = _auto_hazard_reagents(raw_prep)
     prep = reagent_preps().update(reagent_prep_id, raw_prep)
     return reagent_prep_view(prep)
