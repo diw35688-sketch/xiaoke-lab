@@ -81,10 +81,17 @@
         container.innerHTML = editSteps.map(function (s, i) {
           return '<div class="pe-step-row" style="display:flex;gap:6px;margin-top:6px;align-items:center">'
             + '<span style="width:24px;text-align:right;color:#94a3b8;font-size:12px;flex:0 0 auto">' + (i + 1) + '.</span>'
+            + '<button class="sh-btn" data-up-step="' + i + '" type="button" title="上移" style="padding:3px 6px;font-size:11px"' + (i === 0 ? ' disabled' : '') + '>↑</button>'
+            + '<button class="sh-btn" data-down-step="' + i + '" type="button" title="下移" style="padding:3px 6px;font-size:11px"' + (i === editSteps.length - 1 ? ' disabled' : '') + '>↓</button>'
+            + '<button class="sh-btn" data-add-after-step="' + i + '" type="button" title="在下方插入一行" style="padding:3px 8px;font-size:11px">＋</button>'
             + '<input class="pe-step-input" data-idx="' + i + '" value="' + esc(s) + '" placeholder="如：加入 1 mL 盐酸 + 2 mL 水" style="flex:1;padding:8px 10px;border:1px solid #cbd5e1;border-radius:9px;font-family:inherit">'
             + '<button class="sh-btn" data-del-step="' + i + '" type="button" style="color:#b91c1c;padding:4px 8px;font-size:11px">删除</button>'
             + '</div>';
         }).join('') || '<div style="color:#94a3b8;font-size:12px;margin-top:6px">暂无步骤，点“添加步骤”</div>';
+        function refocus(idx) {
+          var inputs = container.querySelectorAll('.pe-step-input');
+          if (inputs[idx]) inputs[idx].focus();
+        }
         Array.prototype.forEach.call(container.querySelectorAll('.pe-step-input'), function (input) {
           input.oninput = function () {
             var idx = parseInt(input.getAttribute('data-idx'), 10);
@@ -96,6 +103,37 @@
             var idx = parseInt(btn.getAttribute('data-del-step'), 10);
             editSteps.splice(idx, 1);
             renderStepRows();
+            refocus(Math.min(idx, editSteps.length - 1));
+          };
+        });
+        Array.prototype.forEach.call(container.querySelectorAll('[data-add-after-step]'), function (btn) {
+          btn.onclick = function () {
+            var idx = parseInt(btn.getAttribute('data-add-after-step'), 10);
+            editSteps.splice(idx + 1, 0, '');
+            renderStepRows();
+            refocus(idx + 1);
+          };
+        });
+        Array.prototype.forEach.call(container.querySelectorAll('[data-up-step]'), function (btn) {
+          btn.onclick = function () {
+            var idx = parseInt(btn.getAttribute('data-up-step'), 10);
+            if (idx <= 0) return;
+            var tmp = editSteps[idx - 1];
+            editSteps[idx - 1] = editSteps[idx];
+            editSteps[idx] = tmp;
+            renderStepRows();
+            refocus(idx - 1);
+          };
+        });
+        Array.prototype.forEach.call(container.querySelectorAll('[data-down-step]'), function (btn) {
+          btn.onclick = function () {
+            var idx = parseInt(btn.getAttribute('data-down-step'), 10);
+            if (idx >= editSteps.length - 1) return;
+            var tmp = editSteps[idx + 1];
+            editSteps[idx + 1] = editSteps[idx];
+            editSteps[idx] = tmp;
+            renderStepRows();
+            refocus(idx + 1);
           };
         });
       }
