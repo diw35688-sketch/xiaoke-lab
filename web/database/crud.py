@@ -118,6 +118,17 @@ def create_conversation(title="新会话", conversation_id=None):
     return conversation_id
 
 
+def conversation_exists(conversation_id):
+    """判断一个会话是否已存在。"""
+    initialize_database()
+    with get_connection() as connection:
+        row = connection.execute(
+            "SELECT 1 FROM conversations WHERE id=?",
+            (conversation_id,),
+        ).fetchone()
+    return bool(row)
+
+
 def ensure_conversation(conversation_id=None):
     if conversation_id is None:
         return create_conversation()

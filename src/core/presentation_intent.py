@@ -22,6 +22,7 @@ class MessageKind(str, Enum):
     CLARIFICATION_REVIEW = "clarification_review"
     SAFETY_ALERT = "safety_alert"
     SYSTEM_ISSUE = "system_issue"
+    ASSISTANT_REPLY = "assistant_reply"
     STAGE_SUMMARY = "stage_summary"
     SESSION_CLOSING_SUMMARY = "session_closing_summary"
     ANSWER_HINT = "answer_hint"
