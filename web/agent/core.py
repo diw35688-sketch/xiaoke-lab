@@ -34,6 +34,8 @@ INSTRUCTIONS = """你是实验室实验规划辅助助手。结合近期对话�
 
 CHAT_POLICY = """当前请求是自由聊天。请直接给出自然、完整且可以独立理解的简短回答，正文最多50个中文字符（含标点），不要使用Markdown、标题、列表、链接、表情或“小科：”等称呼前缀。不要先写长回答再附摘要。即使用户提到刚做的实验、温度、剂量或现象，也只能自然讨论，不能调用 record_observation，不能声称已经保存。若用户确实想记录，请提醒其切换到自由实验记录或方案实验记录模式。"""
 
+CHAT_POLICY_FULL = """当前请求是自由聊天。请给出自然、完整且可以独立理解的回答，允许使用必要列表或分句，但不要刻意用Markdown大段排版。即使用户提到刚做的实验、温度、剂量或现象，也只能自然讨论，不能调用 record_observation，不能声称已经保存。若用户确实想记录，请提醒其切换到自由实验记录或方案实验记录模式。"""
+
 CHAT_REFINEMENT_POLICY = """把下面的助手回答重新生成成一句自然、完整、可独立理解的中文短回复。最多{max_chars}个字符（标点也计数），不得使用Markdown、标题、列表、链接、表情或称呼前缀；保留原意和关键结论，不得只截取前半句，不得解释你的改写过程。只输出改写后的正文：\n\n{answer}"""
 
 EXPERIMENT_RECORD_POLICY = """当前请求属于实验记录。用户描述刚完成的操作或实测事实时，必须调用 record_observation 并传递原始 transcript；只有工具返回成功后才能声称已记录，失败必须如实说明未保存。"""
@@ -98,6 +100,13 @@ def _client():
     return OpenAI(api_key=s.api_key, base_url=s.base_url, timeout=httpx.Timeout(60, connect=10), max_retries=1)
 
 
+def _extra_body():
+    """语音场景禁用思考时，显式关闭 DeepSeek thinking；否则不强制。"""
+    if settings_store.current().voice_disable_thinking:
+        return {"thinking": {"type": "disabled"}}
+    return {}
+
+
 def refine_chat_answer(answer: str, max_chars: int = 50) -> str:
     """Ask the model to regenerate an over-budget Chat answer; never slice it."""
 
@@ -117,7 +126,7 @@ def refine_chat_answer(answer: str, max_chars: int = 50) -> str:
                         answer=candidate,
                     ),
                 }],
-                extra_body={"thinking": {"type": "disabled"}},
+                extra_body=_extra_body(),
             )
             candidate = (response.choices[0].message.content or "").strip()
             if candidate and len(candidate) <= max_chars:
@@ -136,11 +145,10 @@ def refine_chat_answer(answer: str, max_chars: int = 50) -> str:
 
 
 def _messages(history, interaction_mode=None):
-    policy = (
-        CHAT_POLICY
-        if interaction_mode == InteractionMode.CHAT
-        else EXPERIMENT_RECORD_POLICY
-    )
+    if interaction_mode == InteractionMode.CHAT:
+        policy = CHAT_POLICY if settings_store.current().voice_short_reply else CHAT_POLICY_FULL
+    else:
+        policy = EXPERIMENT_RECORD_POLICY
     return [{"role":"system","content":INSTRUCTIONS + "\n\n" + policy + "\n\n" + _memory_context()}, *history]
 
 
@@ -165,7 +173,7 @@ def run_agent(history, conversation_id, interaction_mode=None):
     messages = _messages(history, interaction_mode)
     try:
         for _ in range(6):
-            response = client.chat.completions.create(model=settings_store.current().model_name, messages=messages, tools=_tools_for_mode(interaction_mode), extra_body={"thinking": {"type": "disabled"}})
+            response = client.chat.completions.create(model=settings_store.current().model_name, messages=messages, tools=_tools_for_mode(interaction_mode), extra_body=_extra_body())
             assistant = response.choices[0].message
             calls = assistant.tool_calls or []
             if not calls:
@@ -204,7 +212,7 @@ def stream_agent(history, conversation_id, interaction_mode=None):
         for _ in range(6):
             text_parts = []
             calls_by_index = {}
-            stream = client.chat.completions.create(model=settings_store.current().model_name, messages=messages, tools=_tools_for_mode(interaction_mode), stream=True, extra_body={"thinking": {"type": "disabled"}})
+            stream = client.chat.completions.create(model=settings_store.current().model_name, messages=messages, tools=_tools_for_mode(interaction_mode), stream=True, extra_body=_extra_body())
             for chunk in stream:
                 if not chunk.choices:
                     continue
