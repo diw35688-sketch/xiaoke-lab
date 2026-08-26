@@ -35,7 +35,7 @@
         + '<div class="com-card-desc">' + esc(desc) + '</div>'
         + '<div class="com-card-tags">' + (item.tags ? esc(item.tags) : esc(item.author ? '作者：' + item.author : '')) + '</div>'
         + '<div class="com-card-actions"><button class="sh-btn primary" data-import="' + item.id + '">导入</button>'
-        + (item.author === '__me__' ? '<button class="sh-btn" data-del="' + item.id + '" style="color:#b91c1c">删除</button>' : '')
+        + '<button class="sh-btn" data-del="' + item.id + '" style="color:#b91c1c">删除</button>'
         + '</div>'
         + '</div>';
     }).join('') + '</div>';
