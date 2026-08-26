@@ -409,6 +409,20 @@ def add_reagent_prep(raw_prep: dict) -> dict:
     return reagent_prep_view(prep)
 
 
+def update_reagent_prep(reagent_prep_id: str, raw_prep: dict) -> dict:
+    """校验并更新一条试剂配置；不通过绝不落盘。"""
+    prep = reagent_preps().update(reagent_prep_id, raw_prep)
+    return reagent_prep_view(prep)
+
+
+def delete_reagent_prep(reagent_prep_id: str) -> dict:
+    """删除一条试剂配置。"""
+    ok = reagent_preps().delete(reagent_prep_id)
+    if not ok:
+        raise ValueError(f"找不到试剂配置：{reagent_prep_id}")
+    return {"ok": True, "reagent_prep_id": reagent_prep_id}
+
+
 def add_reagent_preps(raw_preps: list) -> dict:
     """批量校验并新增；全部通过才写库。"""
 

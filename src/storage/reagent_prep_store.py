@@ -91,6 +91,51 @@ class ReagentPrepStore:
         self._preps = tuple(self._preps + (prep,))
         self._by_id[prep.reagent_prep_id] = prep
 
+    def update(self, reagent_prep_id: str, raw: dict) -> ReagentPrep:
+        """按 id 严格更新一条配方；不存在或 id 不匹配则拒绝。"""
+        if self._by_id.get(reagent_prep_id) is None:
+            raise ReagentPrepError(f"找不到试剂配置：{reagent_prep_id}")
+        if raw.get("reagent_prep_id") not in (None, reagent_prep_id):
+            raise ReagentPrepError("更新时不允许修改 reagent_prep_id。")
+        raw["reagent_prep_id"] = reagent_prep_id
+        prep = ReagentPrep.from_dict(raw)
+        library = json.loads(self._path.read_text(encoding="utf-8"))
+        found = False
+        for index, item in enumerate(library["reagent_preps"]):
+            if item.get("reagent_prep_id") == reagent_prep_id:
+                library["reagent_preps"][index] = prep.to_dict()
+                found = True
+                break
+        if not found:
+            raise ReagentPrepError(f"找不到试剂配置：{reagent_prep_id}")
+        self._path.write_text(
+            json.dumps(library, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        self._preps = tuple(
+            prep if p.reagent_prep_id != reagent_prep_id else p
+            for p in self._preps
+        )
+        self._by_id = {p.reagent_prep_id: p for p in self._preps}
+        return prep
+
+    def delete(self, reagent_prep_id: str) -> bool:
+        """按 id 删除一条配方；存在并删除返回 True。"""
+        if self._by_id.get(reagent_prep_id) is None:
+            return False
+        library = json.loads(self._path.read_text(encoding="utf-8"))
+        library["reagent_preps"] = [
+            item for item in library["reagent_preps"]
+            if item.get("reagent_prep_id") != reagent_prep_id
+        ]
+        self._path.write_text(
+            json.dumps(library, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        self._preps = tuple(p for p in self._preps if p.reagent_prep_id != reagent_prep_id)
+        self._by_id = {p.reagent_prep_id: p for p in self._preps}
+        return True
+
     def add_many(self, preps: list[ReagentPrep]) -> None:
         """批量写入；任一 id 重复则全部拒绝，不写半成品。"""
 

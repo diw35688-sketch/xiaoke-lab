@@ -245,6 +245,45 @@ def _get_reagent_prep(reagent_prep_id):
 
 
 @tool(
+    "update_reagent_prep",
+    "按ID更新一条试剂配置。用户明确要求“改一下配方/修正某某配法”时调用。",
+    {
+        "type": "object",
+        "properties": {
+            "reagent_prep_id": {"type": "string", "description": "试剂配置ID"},
+            "reagent_prep": {"type": "object", "description": "完整的新配方 JSON，字段与 create_reagent_prep_from_text 生成的草稿一致"}
+        },
+        "required": ["reagent_prep_id", "reagent_prep"],
+        "additionalProperties": False,
+    },
+    kind="execute", title="更新试剂配置：{reagent_prep_id}",
+    present=lambda a, r: [f"已更新：{r['name_zh']}", f"共 {len(r['steps'])} 个配制步骤"],
+)
+def _update_reagent_prep(reagent_prep_id, reagent_prep):
+    saved = domain.update_reagent_prep(reagent_prep_id, reagent_prep)
+    saved["ui_action"] = {"type": "refresh"}
+    return saved
+
+
+@tool(
+    "delete_reagent_prep",
+    "按ID删除一条试剂配置。用户明确要求“删掉这个配方”时调用。",
+    {
+        "type": "object",
+        "properties": {"reagent_prep_id": {"type": "string", "description": "试剂配置ID"}},
+        "required": ["reagent_prep_id"],
+        "additionalProperties": False,
+    },
+    kind="execute", title="删除试剂配置：{reagent_prep_id}",
+    present=lambda a, r: [f"已删除：{r['reagent_prep_id']}"],
+)
+def _delete_reagent_prep(reagent_prep_id):
+    result = domain.delete_reagent_prep(reagent_prep_id)
+    result["ui_action"] = {"type": "navigate", "view": "reagent_prep"}
+    return result
+
+
+@tool(
     "get_protocol_prep_requirements",
     "查看当前所选实验方案在开始前需要准备哪些试剂/缓冲液。"
     "用户问“做这个实验前要先配什么”时调用。",
@@ -765,6 +804,15 @@ def _parse_formula(formula: str):
     return _parse_formula_custom(formula)
 
 
+_REAGENT_ALIASES = {
+    "丙酮酸": {"name": "丙酮酸", "formula": "C3H4O3", "molecular_weight": "88.062", "name_en": "pyruvic acid"},
+    "pyruvic acid": {"name": "丙酮酸", "formula": "C3H4O3", "molecular_weight": "88.062", "name_en": "pyruvic acid"},
+    "丙酮酸钠": {"name": "丙酮酸钠", "formula": "C3H3NaO3", "molecular_weight": "110.04", "name_en": "sodium pyruvate"},
+    "sodium pyruvate": {"name": "丙酮酸钠", "formula": "C3H3NaO3", "molecular_weight": "110.04", "name_en": "sodium pyruvate"},
+    "乙酸钠": {"name": "乙酸钠", "formula": "C2H3NaO2", "molecular_weight": "82.03", "name_en": "sodium acetate"},
+    "sodium acetate": {"name": "乙酸钠", "formula": "C2H3NaO2", "molecular_weight": "82.03", "name_en": "sodium acetate"},
+}
+
 @tool(
     "calculate_molecular_weight",
     "计算分子量或摩尔质量。用户问某试剂的分子量、摩尔质量、Mw、相对分子质量，"
@@ -788,6 +836,16 @@ def _calculate_molecular_weight(reagent):
     reagent = str(reagent or "").strip()
     if not reagent:
         raise ValueError("请输入试剂名称或化学式")
+    alias = _REAGENT_ALIASES.get(reagent.strip().lower()) or _REAGENT_ALIASES.get(reagent.strip())
+    if alias is not None:
+        return {
+            "found": True,
+            "name": alias["name"],
+            "formula": alias["formula"],
+            "molecular_weight": float(alias["molecular_weight"]),
+            "unit": "g/mol",
+            "source": "内置试剂别名表（经 PubChem 分子量复核）",
+        }
     store = domain.hazmat()
     found = store.find(reagent) or (store.find_in_text(reagent) or [None])[0]
     if found is not None and found.molecular_weight:
