@@ -631,3 +631,59 @@ def delete_notification_todo(todo_id):
     with get_connection() as connection:
         cursor = connection.execute("DELETE FROM notification_todos WHERE id=?", (todo_id,))
     return bool(cursor.rowcount)
+
+
+# ---------- 社区 ----------
+
+def list_community_entries(q="", kind="", limit=200):
+    initialize_database()
+    where = []
+    params = []
+    if q:
+        where.append("(title LIKE ? OR tags LIKE ? OR author LIKE ?)")
+        like = f"%{q}%"
+        params.extend([like, like, like])
+    if kind:
+        where.append("kind=?")
+        params.append(kind)
+    where_sql = ("WHERE " + " AND ".join(where)) if where else ""
+    params.append(limit)
+    with get_connection() as connection:
+        rows = connection.execute(
+            f"SELECT id,kind,title,author,tags,downloads,status,created_at,updated_at FROM community_entries {where_sql} ORDER BY id DESC LIMIT ?",
+            params,
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_community_entry(entry_id):
+    initialize_database()
+    with get_connection() as connection:
+        row = connection.execute("SELECT * FROM community_entries WHERE id=?", (entry_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def create_community_entry(kind, title, content_json, author="", tags=""):
+    initialize_database()
+    with get_connection() as connection:
+        cursor = connection.execute(
+            "INSERT INTO community_entries (kind,title,author,tags,content_json) VALUES (?,?,?,?,?)",
+            (kind, title, author, tags, content_json),
+        )
+        row = connection.execute("SELECT * FROM community_entries WHERE id=?", (cursor.lastrowid,)).fetchone()
+    return dict(row)
+
+
+def increment_community_downloads(entry_id):
+    initialize_database()
+    with get_connection() as connection:
+        connection.execute("UPDATE community_entries SET downloads=downloads+1 WHERE id=?", (entry_id,))
+        row = connection.execute("SELECT * FROM community_entries WHERE id=?", (entry_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def delete_community_entry(entry_id):
+    initialize_database()
+    with get_connection() as connection:
+        cursor = connection.execute("DELETE FROM community_entries WHERE id=?", (entry_id,))
+    return bool(cursor.rowcount)

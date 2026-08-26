@@ -126,3 +126,16 @@ def initialize_database():
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(notification_id) REFERENCES notifications(id))""")
         connection.execute("CREATE INDEX IF NOT EXISTS idx_notification_todos_notification ON notification_todos(notification_id,id)")
+        # 社区：用户发布/导入试剂配方与实验方案
+        connection.execute("""CREATE TABLE IF NOT EXISTS community_entries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            kind TEXT NOT NULL,
+            title TEXT NOT NULL,
+            author TEXT NOT NULL DEFAULT '',
+            tags TEXT NOT NULL DEFAULT '',
+            content_json TEXT NOT NULL,
+            downloads INTEGER NOT NULL DEFAULT 0,
+            status TEXT NOT NULL DEFAULT 'published',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
+        connection.execute("CREATE INDEX IF NOT EXISTS idx_community_kind ON community_entries(kind)")
