@@ -37,6 +37,12 @@
     '    <label class="settings-field settings-inline">',
     '      <input id="settings-tts" type="checkbox" />',
     '      <span>启用语音播报（需本机 TTS 服务在 8001 端口运行）</span></label>',
+    '    <label class="settings-field settings-inline">',
+    '      <input id="settings-voice-short" type="checkbox" />',
+    '      <span>语音场景强制短回复（把回复控制在 50 字内）</span></label>',
+    '    <label class="settings-field settings-inline">',
+    '      <input id="settings-voice-no-think" type="checkbox" />',
+    '      <span>语音场景禁用思考（降低延迟，不显示推理链）</span></label>',
     '    <div class="settings-actions">',
     '      <button id="settings-test" class="ghost">测试连接</button>',
     '      <button id="settings-save" class="primary">保存并生效</button></div>',
@@ -125,6 +131,8 @@
         : '留空则使用科大 LLM 密钥';
       el('settings-ocr-url').value = data.settings.ocr_base_url || '';
       el('settings-ocr-model').value = data.settings.ocr_model || 'unlimited-ocr';
+      el('settings-voice-short').checked = data.settings.voice_short_reply !== false;
+      el('settings-voice-no-think').checked = data.settings.voice_disable_thinking !== false;
       el('settings-ocr-key').placeholder = data.settings.ocr_api_key_set
         ? ('已保存 ' + data.settings.ocr_api_key + '，留空表示不修改')
         : '留空则使用科大 LLM 密钥';
@@ -153,6 +161,8 @@
       base_url: el('settings-base-url').value.trim(),
       model_name: el('settings-model').value.trim(),
       tts_enabled: el('settings-tts').checked,
+      voice_short_reply: el('settings-voice-short').checked,
+      voice_disable_thinking: el('settings-voice-no-think').checked,
       provider_id: selectedProviderId,
       provider_label: selectedProvider.label || selectedProviderId,
       mineru_file_parse_url: el('settings-mineru-url').value.trim(),

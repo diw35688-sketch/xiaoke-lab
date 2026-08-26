@@ -88,6 +88,8 @@ class ModelSettings:
     tts_model: str = ""
     tts_voice: str = ""
     tts_speed: float = 1.0
+    voice_short_reply: bool = True
+    voice_disable_thinking: bool = True
     api_keys: dict = field(default_factory=dict)
     provider_profiles: dict = field(default_factory=dict)
     mineru_file_parse_url: str = "https://api.llm.ustc.edu.cn/mineru/file_parse"
@@ -192,6 +194,8 @@ def current() -> ModelSettings:
                     tts_enabled=bool(raw.get("tts_enabled", False)),
                     speak_record_ack=bool(raw.get("speak_record_ack", True)),
                     tts_url=raw.get("tts_url", "http://127.0.0.1:8001/tts"),
+                    voice_short_reply=bool(raw.get("voice_short_reply", True)),
+                    voice_disable_thinking=bool(raw.get("voice_disable_thinking", True)),
                     api_keys=raw.get("api_keys", {}) or {},
                     provider_profiles=raw.get("provider_profiles", {}) or {},
                     mineru_file_parse_url=raw.get("mineru_file_parse_url", "https://api.llm.ustc.edu.cn/mineru/file_parse"),
@@ -221,6 +225,10 @@ def update(**changes) -> ModelSettings:
             settings.tts_enabled = bool(changes["tts_enabled"])
         if "speak_record_ack" in changes and changes["speak_record_ack"] is not None:
             settings.speak_record_ack = bool(changes["speak_record_ack"])
+        if "voice_short_reply" in changes and changes["voice_short_reply"] is not None:
+            settings.voice_short_reply = bool(changes["voice_short_reply"])
+        if "voice_disable_thinking" in changes and changes["voice_disable_thinking"] is not None:
+            settings.voice_disable_thinking = bool(changes["voice_disable_thinking"])
         if "tts_speed" in changes and changes["tts_speed"] is not None:
             try:
                 settings.tts_speed = max(0.5, min(2.0, float(changes["tts_speed"])))
