@@ -23,30 +23,83 @@
   }
 
   function showPrepDetail(host, prep) {
-    var steps = (prep.steps || []).map(function (s, i) {
-      return '<div class="prep-step">' + (i + 1) + '. ' + esc(s) + '</div>';
-    }).join('');
-    var safety = (prep.safety || []).map(function (s) {
-      return '<div class="prep-safety">⚠ ' + esc(s.name) + '：' + esc((s.statements || []).join('；')) + '</div>';
-    }).join('');
-    var badge = badgeHtml(prep.review_status);
-    host.innerHTML = '<div class="prep-detail">'
-      + '<button class="sh-btn" id="prep-back">← 返回配置列表</button>'
-      + '<div class="prep-detail-title">' + esc(prep.name_zh) + '</div>'
-      + '<div class="prep-detail-sub">' + esc(prep.purpose) + ' · ' + badge + '</div>'
-      + '<div class="prep-detail-box">'
-      + '<div>目标：' + esc(prep.target_concentration || '未指定') + '</div>'
-      + '<div>体积：' + esc(prep.target_volume || '按需') + '</div>'
-      + '<div>溶剂：' + esc(prep.solvent || '未指定') + '</div>'
-      + '<div>保存：' + esc(prep.storage_condition || '未指定') + '</div>'
-      + '<div>有效期：' + esc(prep.expiry || '未指定') + '</div>'
-      + '</div>'
-      + '<div class="prep-section-title">配制步骤</div>'
-      + '<div class="prep-detail-box">' + steps + '</div>'
-      + (safety ? '<div class="prep-section-title">安全提示</div><div class="prep-detail-box prep-safety-box">' + safety + '</div>' : '')
-      + '<div class="prep-source">来源：' + esc(prep.source || '未注明') + (prep.source_url ? ' · <a href="' + esc(prep.source_url) + '" target="_blank">查看来源</a>' : '') + '</div>'
-      + '</div>';
-    host.querySelector('#prep-back').onclick = function () { window.shellShow('reagent_prep'); };
+    function render() {
+      var steps = (prep.steps || []).map(function (s, i) {
+        return '<div class="prep-step">' + (i + 1) + '. ' + esc(s) + '</div>';
+      }).join('');
+      var safety = (prep.safety || []).map(function (s) {
+        return '<div class="prep-safety">⚠ ' + esc(s.name) + '：' + esc((s.statements || []).join('；')) + '</div>';
+      }).join('');
+      var badge = badgeHtml(prep.review_status);
+      host.innerHTML = '<div class="prep-detail">'
+        + '<div style="display:flex;gap:8px;justify-content:space-between;align-items:center"><button class="sh-btn" id="prep-back">← 返回配置列表</button>'
+        + '<div><button class="sh-btn" id="prep-edit">编辑此配方</button><button class="sh-btn" id="prep-del" style="color:#b91c1c;margin-left:6px">删除配方</button></div></div>'
+        + '<div class="prep-detail-title">' + esc(prep.name_zh) + '</div>'
+        + '<div class="prep-detail-sub">' + esc(prep.purpose) + ' · ' + badge + '</div>'
+        + '<div class="prep-detail-box">'
+        + '<div>目标：' + esc(prep.target_concentration || '未指定') + '</div>'
+        + '<div>体积：' + esc(prep.target_volume || '按需') + '</div>'
+        + '<div>溶剂：' + esc(prep.solvent || '未指定') + '</div>'
+        + '<div>保存：' + esc(prep.storage_condition || '未指定') + '</div>'
+        + '<div>有效期：' + esc(prep.expiry || '未指定') + '</div>'
+        + '</div>'
+        + '<div class="prep-section-title">配制步骤</div>'
+        + '<div class="prep-detail-box">' + (steps || '<div style="color:#94a3b8">暂无步骤</div>') + '</div>'
+        + (safety ? '<div class="prep-section-title">安全提示</div><div class="prep-detail-box prep-safety-box">' + safety + '</div>' : '')
+        + '<div class="prep-source">来源：' + esc(prep.source || '未注明') + (prep.source_url ? ' · <a href="' + esc(prep.source_url) + '" target="_blank">查看来源</a>' : '') + '</div>'
+        + '</div>';
+      host.querySelector('#prep-back').onclick = function () { window.shellShow('reagent_prep'); };
+      host.querySelector('#prep-edit').onclick = function () { showEdit(); };
+      host.querySelector('#prep-del').onclick = function () {
+        if (!confirm('确定删除这个配方？')) return;
+        fetch('/reagent-prep/' + encodeURIComponent(prep.reagent_prep_id), { method: 'DELETE' }).then(function () {
+          window.shellShow('reagent_prep');
+        });
+      };
+    }
+
+    function showEdit() {
+      host.innerHTML = '<div class="prep-detail" style="max-width:900px">'
+        + '<button class="sh-btn" id="prep-edit-back">← 返回详情</button>'
+        + '<div class="prep-detail-title">编辑配方</div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+        + '<div><label style="font-size:12px;color:#475569">名称</label><input id="pe-name" value="' + esc(prep.name_zh || '') + '" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:9px"></div>'
+        + '<div><label style="font-size:12px;color:#475569">用途</label><input id="pe-purpose" value="' + esc(prep.purpose || '') + '" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:9px"></div>'
+        + '<div><label style="font-size:12px;color:#475569">目标浓度</label><input id="pe-conc" value="' + esc(prep.target_concentration || '') + '" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:9px"></div>'
+        + '<div><label style="font-size:12px;color:#475569">目标体积</label><input id="pe-vol" value="' + esc(prep.target_volume || '') + '" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:9px"></div>'
+        + '<div><label style="font-size:12px;color:#475569">溶剂</label><input id="pe-solvent" value="' + esc(prep.solvent || '') + '" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:9px"></div>'
+        + '<div><label style="font-size:12px;color:#475569">保存条件</label><input id="pe-storage" value="' + esc(prep.storage_condition || '') + '" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:9px"></div>'
+        + '<div><label style="font-size:12px;color:#475569">有效期</label><input id="pe-expiry" value="' + esc(prep.expiry || '') + '" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:9px"></div>'
+        + '</div>'
+        + '<div style="margin-top:12px"><label style="font-size:12px;color:#475569">配制步骤（每行一步）</label><textarea id="pe-steps" rows="8" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:9px;font-family:inherit">' + esc((prep.steps || []).join('\n')) + '</textarea></div>'
+        + '<div style="margin-top:12px;display:flex;gap:8px"><button class="sh-btn primary" id="pe-save">保存</button><button class="sh-btn" id="pe-cancel">取消</button><span id="pe-msg" style="font-size:12px;color:#64748b"></span></div>'
+        + '</div>';
+      host.querySelector('#prep-edit-back').onclick = render;
+      host.querySelector('#pe-cancel').onclick = render;
+      host.querySelector('#pe-save').onclick = function () {
+        var updated = {
+          reagent_prep_id: prep.reagent_prep_id,
+          name_zh: host.querySelector('#pe-name').value.trim(),
+          purpose: host.querySelector('#pe-purpose').value.trim(),
+          target_concentration: host.querySelector('#pe-conc').value.trim(),
+          target_volume: host.querySelector('#pe-vol').value.trim(),
+          solvent: host.querySelector('#pe-solvent').value.trim(),
+          storage_condition: host.querySelector('#pe-storage').value.trim(),
+          expiry: host.querySelector('#pe-expiry').value.trim(),
+          steps: host.querySelector('#pe-steps').value.split('\n').map(function (x) { return x.trim(); }).filter(Boolean)
+        };
+        fetch('/reagent-prep/' + encodeURIComponent(prep.reagent_prep_id), {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reagent_prep: updated })
+        }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); }).then(function (res) {
+          if (!res.ok) { host.querySelector('#pe-msg').textContent = res.d.detail || '保存失败'; return; }
+          prep = res.d;
+          render();
+        }).catch(function (e) { host.querySelector('#pe-msg').textContent = e.message; });
+      };
+    }
+
+    render();
   }
 
   function ensureStyles(host) {

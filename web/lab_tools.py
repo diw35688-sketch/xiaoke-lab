@@ -836,6 +836,21 @@ def _calculate_molecular_weight(reagent):
     reagent = str(reagent or "").strip()
     if not reagent:
         raise ValueError("请输入试剂名称或化学式")
+    from tools.reagent_catalog import find_reagent
+    cat = find_reagent(reagent)
+    if cat is not None and cat.get("molecular_weight"):
+        return {
+            "found": True,
+            "name": cat.get("name_zh") or cat.get("name_en"),
+            "formula": cat.get("formula"),
+            "molecular_weight": float(cat["molecular_weight"]),
+            "unit": "g/mol",
+            "source": "通用试剂目录",
+            "state": cat.get("state"),
+            "density": cat.get("density"),
+            "acidic": cat.get("acidic"),
+            "pKa": cat.get("pKa"),
+        }
     alias = _REAGENT_ALIASES.get(reagent.strip().lower()) or _REAGENT_ALIASES.get(reagent.strip())
     if alias is not None:
         return {

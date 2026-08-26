@@ -22,6 +22,10 @@ class SaveDraftPayload(BaseModel):
     reagent_prep: dict
 
 
+class UpdatePrepPayload(BaseModel):
+    reagent_prep: dict
+
+
 @router.get("")
 def list_reagent_preps():
     """全部试剂配置方案。"""
@@ -56,6 +60,24 @@ def save_draft(payload: SaveDraftPayload):
     """确认保存 AI 生成的试剂配置草稿。"""
     try:
         return domain.add_reagent_prep(payload.reagent_prep)
+    except Exception as error:
+        raise HTTPException(status_code=400, detail=str(error))
+
+
+@router.patch("/{reagent_prep_id}")
+def update_reagent_prep(reagent_prep_id: str, payload: UpdatePrepPayload):
+    """按ID更新一条试剂配置，严格校验。"""
+    try:
+        return domain.update_reagent_prep(reagent_prep_id, payload.reagent_prep)
+    except Exception as error:
+        raise HTTPException(status_code=400, detail=str(error))
+
+
+@router.delete("/{reagent_prep_id}")
+def delete_reagent_prep(reagent_prep_id: str):
+    """删除一条试剂配置。"""
+    try:
+        return domain.delete_reagent_prep(reagent_prep_id)
     except Exception as error:
         raise HTTPException(status_code=400, detail=str(error))
 
