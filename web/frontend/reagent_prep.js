@@ -182,6 +182,7 @@
       + '<button class="sh-btn" id="prep-file-btn">选择文件</button>'
       + '<button class="sh-btn" id="prep-upload">上传 JSON</button>'
       + '<button class="sh-btn primary" id="prep-chat-create">AI 生成</button>'
+      + '<button class="sh-btn" id="prep-safety-btn" title="安全信息来自 PubChem / GB 30000，仅作引用展示">安全参考</button>'
       + '<span id="prep-upload-msg" style="font-size:12px;color:#64748b"></span>'
       + '</div>'
       + '<div style="color:#64748b;font-size:12px;margin:-4px 0 8px">JSON 格式：{"reagent_preps":[{...}]}，字段见契约说明。上传会严格校验，不通过不落盘。</div>'
@@ -202,8 +203,50 @@
       + '<span id="pf-msg" style="font-size:12px;color:#64748b"></span>'
       + '</div>'
       + '</div>'
+      + '<div id="prep-safety-box" style="display:none"></div>'
       + '<div id="prep-list" class="prep-list">加载中…</div>'
       + '</div>';
+
+    function showSafety() {
+      var box = host.querySelector('#prep-safety-box');
+      var list = host.querySelector('#prep-list');
+      box.style.display = '';
+      list.style.display = 'none';
+      box.innerHTML = '加载安全参考…';
+      fetch('/protocols/reagents').then(function (r) { return r.json(); }).then(function (d) {
+        var items = d.reagents || [];
+        box.innerHTML = '<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;margin-bottom:10px">'
+          + '<div><b style="color:#0f172a">安全参考</b> <span style="color:#64748b;font-size:12px">共 ' + d.count + ' 种 · 数据来自 PubChem / GB 30000，仅引用展示</span></div>'
+          + '<button class="sh-btn" id="prep-safety-back">返回配置库</button></div>'
+          + '<div style="color:#94a3b8;font-size:12px;margin-bottom:8px">' + esc(d.note || '') + '</div>'
+          + '<input type="search" id="prep-safety-search" placeholder="搜索试剂名称 / CAS / 分子式…" autocomplete="off" style="width:100%;box-sizing:border-box;padding:8px 11px;border:1px solid #cbd5e1;border-radius:10px;font-size:13px;font-family:inherit;margin-bottom:12px">'
+          + '<div id="prep-safety-grid" class="prep-list" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr))"></div>';
+        function render(items) {
+          var grid = host.querySelector('#prep-safety-grid');
+          grid.innerHTML = items.map(function (r) {
+            return '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px 14px">'
+              + '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>' + esc(r.name) + '</b>'
+              + (r.critical ? '<span style="background:#fee2e2;color:#b91c1c;border-radius:999px;padding:2px 9px;font-size:11px;white-space:nowrap;max-width:170px;overflow:hidden;text-overflow:ellipsis">高危</span>' : '<span style="color:#94a3b8;font-size:12px">无高危项</span>')
+              + '</div>'
+              + '<div style="color:#64748b;font-size:12px;margin-top:5px">CAS ' + esc(r.cas || '—') + ' · ' + esc(r.formula || '') + '</div>'
+              + '<div style="margin-top:6px">' + (r.statements || []).slice(0, 2).map(function (s) { return '<div style="color:#475569;font-size:11px">' + esc(s) + '</div>'; }).join('') + '</div>'
+              + '</div>';
+          }).join('') || '<div style="color:#94a3b8">没有匹配的试剂。</div>';
+        }
+        render(items);
+        var s = host.querySelector('#prep-safety-search');
+        s.addEventListener('input', function () {
+          var q = s.value.trim().toLowerCase();
+          render(items.filter(function (r) {
+            return !q || (r.name || '').toLowerCase().indexOf(q) >= 0 || (r.cas || '').toLowerCase().indexOf(q) >= 0 || (r.formula || '').toLowerCase().indexOf(q) >= 0;
+          }));
+        });
+        host.querySelector('#prep-safety-back').onclick = function () {
+          box.style.display = 'none';
+          list.style.display = '';
+        };
+      });
+    }
 
     function load(filterText) {
       fetch('/reagent-prep').then(function (r) { return r.json(); }).then(function (d) {
@@ -242,6 +285,8 @@
       var nameInput = host.querySelector('#pf-name');
       if (nameInput) nameInput.focus();
     };
+
+    host.querySelector('#prep-safety-btn').onclick = showSafety;
 
     host.querySelector('#pf-send').onclick = function () {
       var parts = [];

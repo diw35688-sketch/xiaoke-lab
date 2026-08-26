@@ -95,7 +95,6 @@
     '    <div class="sh-item" data-view="calculator"><span class="sh-ico">∑</span><span class="sh-label">分子量计算</span></div>',
     '    <div class="sh-item" data-view="protocols"><span class="sh-ico">☰</span><span class="sh-label">实验方案</span></div>',
     '    <div class="sh-item" data-view="reagent_prep"><span class="sh-ico">🧪</span><span class="sh-label">试剂配置库</span></div>',
-    '    <div class="sh-item" data-view="reagents"><span class="sh-ico">⚗</span><span class="sh-label">试剂安全库</span></div>',
     '    <div class="sh-item" data-view="storage"><span class="sh-ico">▣</span><span class="sh-label">储存库</span></div>',
     '    <div class="sh-item" data-view="community"><span class="sh-ico">🌐</span><span class="sh-label">社区</span></div>',
     '    <div class="sh-item" data-view="records"><span class="sh-ico">▤</span><span class="sh-label">本次记录</span></div>',
