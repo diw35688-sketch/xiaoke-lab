@@ -163,17 +163,24 @@ def _select_protocol(protocol_id=None):
 
 @tool(
     "get_current_step",
-    "查看当前实验进行到第几步、这一步方案规定了什么参数、现场必须记录什么、"
-    "以及涉及试剂的安全提示。用户问“现在做到哪了”“这步要注意什么”时调用。",
+    "查看当前实验进行到第几步、这一步必须现场记录什么、已经记录了什么、还缺什么、"
+    "当前状态如何，以及涉及试剂的安全提示。用户问“现在做到哪了”“这步还差什么”，"
+    "或用户说“完成了/好了/做完了”时调用——用本工具核对确定性进度，不要自己猜。",
     {"type": "object", "properties": {}, "additionalProperties": False},
     kind="read", title="查看当前步骤",
     present=lambda a, r: ([f"当前为自由记录模式"] if r.get("mode") == "free" else
                           [f"第 {r['step']['number']}/{r['protocol']['total_steps']} 步：{r['step']['title']}",
                            f"现场必测：{'、'.join(r['step']['must_record']) or '无'}"]
+                          + (lambda p: ([f"状态：{p['status']}",
+                                         f"已记录：{'、'.join(p['recorded']) or '无'}",
+                                         f"还缺：{'、'.join(p['missing']) or '无'}"]
+                                        if p else []))(r.get("progress"))
                           + [f"⚠ {s['name']}：{'；'.join(s['statements'][:1])}" for s in r.get("safety", []) if s.get("critical")]),
 )
 def _get_current_step():
-    return domain.step_view(domain.session())
+    view = domain.step_view(domain.session())
+    view["progress"] = domain.step_progress_view(domain.session())
+    return view
 
 
 @tool(
@@ -221,6 +228,10 @@ def _record_observation(transcript):
     entities = extract_entities(transcript, terms)
     fields = {k: v for k, v in vars(entities).items() if v}
     evaluation = domain.evaluate(fields)
+    # 把本段口述登记进步骤进度：字段累积 + 偏差标记。
+    # 状态（打勾/待办/需处理）由 step_progress 的确定性规则计算，大模型不直接改。
+    if step is not None:
+        domain.record_step_fields(step.step_number, fields, bool(evaluation.get("deviations")))
     session_id = current_session_id()
     segment_id = next_segment_id(session_id)
     saved = save_record({
