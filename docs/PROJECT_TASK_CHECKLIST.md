@@ -1036,3 +1036,146 @@ matched_term 以后存知识库匹配到的标准术语（如 ASR 的"一液枪"
 - 设计边界：取消检查放在每个音频块进入sink之前；单写者+多读者前提下不加锁；有意不实现真实播放接入所需的过时输出丢弃队列。
 - 验收边界：本轮不修改`src/main.py`、`InteractionCommandType`、`AssistantState`接线，不引入sounddevice输出流或任何真实TTS依赖，不接模型、不碰声卡；因此状态为`AUTO_OK`，不是`REAL_OK`。
 - 下一步：`PROTOCOL-INTEGRATION-01`仍是项目主线；TTS方向下一步再评估真实后端和播放设备接入，必须先补半双工状态、输出协调和真实设备验收方案。
+## 2026-08-16 本轮维护记录：手机端 Card Flow 骨架（MOBILE-CARDFLOW-01，MOCK 原型）
+- 任务：新建移动端"流程卡片式 UI"最小原型：竖屏、一屏一张主 Card，为后续"语音为主、视觉为辅"的手机端做准备。
+- 新增（仅前端静态文件，零后端、零 PC 改动）：`web/frontend/mobile.html`、`web/frontend/mobile.css`、`web/frontend/mobile_cards.js`。
+- 关键设计：`applyState(card, direction)` 是统一状态入口；将来把 mock 数据替换为 `/protocols/session/steps` 的结构化数据时，Card UI 与动画无需重写。
+- 明确 MOCK 边界：5 步卡片数据、状态、步骤推进、语音提示均为本地 mock；上滑/下滑/上下一步/「模拟 AI 判定完成」按钮均为 DEV 调试能力，不构成"用户可自由跳过步骤"的正式逻辑。
+- 验证：`/static/mobile.html`、`/static/mobile.css`、`/static/mobile_cards.js` 均 HTTP 200；`node --check` 语法通过；PC 首页 `/` 返回 200 且字节数与改动前一致（17453）。
+- 状态：`CODED` + 体验 `UX_PENDING`（裁决权在用户）；未提交、未推送、未部署。
+- 下一步（等用户 UI 确认后）：后端完成判定设计（required_fields / completion_condition 确定性规则）+ Card 数据接口；前端把 mock 替换为真实数据。
+## 2026-08-16 本轮维护记录：手机端接入真实浏览器语音识别（MOBILE-CARDFLOW-02）
+- 任务：给 mobile.html 接入真实语音识别（Web Speech API，zh-CN），替换原假"正在聆听"占位。
+- 新增：`web/frontend/mobile_voice.js`（识别生命周期、中间结果实时显示、错误码中文映射、iOS 不支持提示）；小改 `mobile.html`（转写行 + 脚本）、`mobile.css`（转写行样式）、`mobile_cards.js`（移除假占位、导出 setVoice）。
+- 明确边界：识别文本只显示在状态行下方，**不推进步骤、不调后端**——防止"前端听到'好了'就跳步"成为产品逻辑；步骤完成判定仍待后端确定性规则。
+- 验证：两个 JS `node --check` 通过；`/static/mobile_voice.js` 200；PC 首页 `/` 仍 17453 字节零改动。
+- 状态：`CODED` + 体验 `UX_PENDING`（真实麦克风识别需用户在 Chrome 实测，agent 无法代测）。
+- 已知限制：iPhone Safari 不支持该 API；真机非 localhost 需 HTTPS 才允许麦克风；Chrome 浏览器识别依赖网络。
+- 下一步：真机语音验收（HTTPS）；随后是后端完成判定 + Card 数据接口。
+## 2026-08-16 本轮维护记录：移动端卡面视觉改版（MOBILE-CARDFLOW-03）
+- 任务：按用户反馈重做卡面视觉（去掉"块中块"、收紧配色、突出核心操作）。
+- 改动：`mobile_cards.js`（cardHtml：进度条→分段条、参数包 span、步骤号加粗）；`mobile.css`（卡片渐变底、核心操作改左色条深蓝大字、状态徽章改圆点+文字、参数改两列浅底小卡、警告改左琥珀色条、底部分段进度、页面背景微渐变）。
+- 验证：`node --check` 通过；`/static/mobile.css`、`/static/mobile_cards.js` 200；PC 首页 `/` 仍 17453 字节零改动。
+- 状态：`CODED` + 体验 `UX_PENDING`（视觉裁决权在用户，用户验收后改 `UX_CONFIRMED`）。
+## 2026-08-16 本轮维护记录：卡面主题自定义（MOBILE-CARDFLOW-04）
+- 任务：按用户要求支持自定义卡面背景。方案：4 套预设主题（晨雾蓝/午夜深蓝/极简白/暖沙），选择存 localStorage 刷新不丢。
+- 改动：`mobile.css` 把卡面颜色全部改为 CSS 变量（--card-bg 等 15 个），主题类只覆盖变量；`mobile_cards.js` 增加主题渲染/切换/持久化并导出 setTheme；`mobile.html` DEV 面板加主题选择行。
+- 设计点：主题类挂在 `.m-shell` 上而非卡片上——卡片每次切换都会重建 DOM，挂外层才能让主题在卡片重建后仍生效。
+- 验证：`node --check` 通过；三文件均 200；PC 首页 `/` 仍 17453 字节零改动。
+- 状态：`CODED` + `UX_PENDING`（主题观感由用户裁决）。
+## 2026-08-16 本轮维护记录：新增「怪盗扑克」卡面主题（MOBILE-CARDFLOW-05）
+- 任务：按用户要求做"怪盗基德风"扑克牌卡面：象牙白卡纸 + 藏青墨色 + 基德红 + 黑桃元素。
+- 改动：`mobile.css` 新增 `.theme-kid` 变量与牌面细节（内侧描边双层边框、中心淡黑桃水印、右下角 180° 镜像牌角、左上竖排牌角、衬线标题、油墨印章状态徽章）；`mobile_cards.js` 步骤角改为 `<b>步数</b><i>/总数</i>` 结构并注册主题。
+- 技术点：牌角镜像用 `.m-card::after { content: attr(data-step); transform: rotate(180deg); }` 纯 CSS 实现，无需改渲染逻辑；水印黑桃透明度 4% 保证文字可读。
+- 验证：`node --check` 通过；CSS/JS 均 200；PC 首页 `/` 仍 17453 字节零改动。
+- 状态：`CODED` + `UX_PENDING`（观感由用户裁决）。
+## 2026-08-16 本轮维护记录：卡面背景图上传（MOBILE-CARDFLOW-06）
+- 任务：DEV 面板支持选择本地图片作卡面背景；Canvas 压缩（最长边 1200px、JPEG 0.82）后存 localStorage；同主题薄纱遮罩保证文字可读；可一键清除。
+- 改动：`mobile.html` 加选择/清除按钮与隐藏 file input；`mobile_cards.js` 加 loadBgImage/clearBgImage/restoreBgImage/bindBgControls；`mobile.css` 加 --img-scrim 变量（每主题不同纱色）与 .has-bgimg 规则。
+- 验证：`node --check` 通过；三文件均 200；PC 首页 `/` 仍 17453 字节零改动。
+- 状态：`CODED` + `UX_PENDING`。
+## 2026-08-17 本轮维护记录：确定性步骤状态机 + 勾/亮/暗卡片视觉（MOBILE-CARDFLOW-07）
+- 任务：把"步骤完成判定"落到代码状态机——大模型只输出事实，状态由确定性规则计算；前端按 status 渲染勾/亮/暗。用户拍板方案 B：完成打勾后**不自动翻页**，翻页靠用户明确指示。
+- 新增 `web/step_progress.py`（纯逻辑 StepProgress：must_record 记齐→completed、有偏差→error、否则 waiting_user；空 must_record 视为天然完成；换方案 reset）。
+- 修改 `web/domain.py`（全局追踪器 + record_step_fields/step_status + step_view/all_steps_view 输出 status）、`web/lab_tools.py`（record_observation 登记字段与偏差）。
+- 前端：`mobile_cards.js`（分段状态由"各步状态+游标"决定、✓徽标、st-* 卡片类、DEV 按钮改"模拟记录完成/偏差"且完成不翻页）；`mobile.html`（DEV 文案）；`mobile.css`（✓、绿/红卡片强调、五主题完成段改绿）。
+- 测试：新增 `tests/test_step_progress.py` 8 项全过；接口真实验收：选中方案后 5 步 `status=waiting_user` 输出正确并已恢复自由模式；PC 首页 `/` 仍 17453 字节零改动。
+- 环境注记：沙箱临时目录 PermissionError 使 test_protocol_store 等 23 项在 setUp 建临时文件处报错（与本轮改动无关，已定位证据）；全量基线待沙箱权限升级后重跑。
+- 状态：`CODED` + 体验 `UX_CONFIRMED`（用户 2026-08-17 实测视觉呈现并确认验收：勾/亮/暗、方案 B 打勾不翻页、DEV 按钮交互均符合预期）。
+## 2026-08-17 本轮维护记录：移动端接入真实链路（MOBILE-CARDFLOW-08）
+- 任务：移动端从 MOCK 切到真实接口，闭环"语音 → 大模型工具调用 → 状态机判定 → 卡片打勾/翻页"。
+- 改动：`mobile_cards.js` 重写为双数据源（默认真实接口：轮询 /protocols/session/steps、手势/按钮走 /session/move、语音文本走 /chat、方案下拉走 /protocols）；`mobile.html` DEV 面板加数据源切换与方案选择；`mobile_voice.js` 转写后调 submitTranscript（仅真实源）；`mobile.css` 补 select/禁用态样式。
+- 后端：`agent/core.py` INSTRUCTIONS 增加实验步骤与记录规则（口述→record_observation、明确说下一步→move_step、不得自行宣布完成）。
+- 验证：接口验收（自由模式 steps/move 不报错、6 方案列表、页面全 200、PC 首页 17453 字节不变）；JS/Python 语法检查通过；全量测试基线重跑。
+- 状态：`CODED` + 体验 `UX_PENDING`（真实语音+LLM 闭环需用户实测：说"加入…"→打勾；说"下一步"→翻页）。
+## 2026-08-17 本轮维护记录：修复语音对话"失忆"与"完成了"处理（MOBILE-CARDFLOW-09）
+- 用户反馈：说"完成了"仍被反复追问，体验"笨"。
+- 根因 1（失忆）：手机端 /chat 不带 conversation_id，`ensure_conversation(None)` 每次生成新对话，大模型不记得上文。
+- 根因 2（"完成了"没接对工具）：大模型把"完成了"当口述去 record_observation，抽不到字段就机械追问。
+- 修复：`mobile_cards.js` 用 localStorage 持久化 conversation_id 随每次 /chat 发送，DEV 面板加"重置对话记忆"；`step_progress` 增加 recorded_fields/missing_fields；`domain` 增加 step_progress_view；`get_current_step` 工具返回进度（状态/已记录/还缺）并更新描述；Agent 指令规定"完成了→先 get_current_step 核对进度→如实回答，一次只问一个；不得把'完成了'当口述记录"。
+- 测试：test_step_progress 增至 11 项全过；全量 719/719 OK（6.8s）；PC 首页 17453 字节不变。
+- 状态：`CODED` + 体验 `UX_PENDING`（需用户复测：说"称了X克"→追问变少；说"完成了"→明确告诉还缺什么或确认完成）。
+## 2026-08-17 本轮维护记录：横竖屏自由切换适配（MOBILE-CARDFLOW-10）
+- 任务：手机页支持横竖屏自由切换（用户选"横竖屏都能用"方案）。
+- 改动：`mobile.css` 增加 `@media (max-height: 520px)` 紧凑模式（字号留白降档、卡片可滚动兜底、控件缩小、怪盗扑克牌角缩小）；`mobile_cards.js` 手势在矮屏模式下让位给滚动（matchMedia 判断），翻页用 ‹ › 按钮；`mobile.html` 提示文案更新。
+- 设计点：用"视口高度≤520px"而非 orientation 判断——覆盖手机横屏与窄高桌面窗口；竖屏行为完全不变。
+- 验证：`node --check` 通过；页面全 200；PC 首页 17453 字节零改动；本轮零 Python 改动，719 项测试基线不受影响（未重跑，避免无谓的权限审批）。
+- 状态：`CODED` + 体验 `UX_PENDING`（用户旋转屏幕验收）。
+## 2026-08-17 本轮维护记录：卡片级交互按钮（MOBILE-CARDFLOW-11）
+- 任务：用户要求卡片上直接有交互按钮。新增「完成本步 ✓」「下一步 ›」两个卡片大按钮。
+- 设计：完成按钮=**查账不跳步**——调用新接口 `/protocols/session/progress`（返回 status/recorded/missing），完成→确认；未记齐→卡片内显示"还缺 X、Y"；自由模式→提示选方案；**没有任何手点改状态的入口**。下一步按钮走既有 move 链路（真实=后端游标，演示=本地）。
+- 改动：`web/api/protocols.py` 新增 `/session/progress` 路由（薄封装 domain.step_progress_view）；`mobile_cards.js` 卡片加按钮行与反馈条、applyState 重建后重新绑定、completeCheck/showCardFeedback；`mobile.css` 按钮/反馈样式 + 紧凑模式降档。
+- 验证：新接口实测（自由模式 waiting_user/空进度）；`node --check`、py_compile 通过；页面全 200；PC 首页 17453 字节不变；全量 719/719 OK。
+- 状态：`CODED` + 体验 `UX_PENDING`（用户点按钮验收）。
+## 2026-08-17 本轮维护记录：移动端接入 AI 形象"小科"（MOBILE-CARDFLOW-12，产品化第 1/4 轮）
+- 任务：产品化改造第 1 轮——把 PC 端 AI 形象接进手机页（用户蓝图"动用电脑端那个 ai 形象"）。
+- 改动：`mobile.html` 语音状态行升级为形象栏（小科立绘 + 名字 + 状态文字 + 语音状态，保留原 ID 零破坏）；`mobile.css` 形象样式与 4 套状态动画（呼吸/说话/思考/聆听光环/完成弹跳）+ 横屏紧凑降档（96px→52px）；`mobile_cards.js` 增加 AVATAR 状态映射表、setVoice 联动换立绘/状态文字/动画类、预加载 5 张立绘、完成场景切"开心脸"。
+- 复用资产：`web/frontend/assets/assistant_{portrait,listening,thinking,speaking,happy}.png`（PC 端同款，未复制未改）。
+- 验证：5 张立绘 + 页面全 200；`node --check` 通过；PC 首页 17453 字节零改动；静态资源版本号升到 v=20260817d（防缓存）。
+- 状态：`CODED` + 体验 `UX_PENDING`（用户看形象状态联动验收）。
+## 2026-08-17 本轮维护记录：任务会话持久化（MOBILE-CARDFLOW-13，产品化第 2/4 轮）
+- 任务：SQLite 持久化当前方案/当前步/各步记录进度——刷新、旋转、重启服务器都不丢进度。
+- 新增 `web/database/session_store.py`：三张表（session_snapshot 单行快照 / step_progress_rows 字段行 / step_deviation_flags 偏差行），全部函数显式 close 连接（sqlite 的 with 只提交不关闭，句柄泄漏会导致文件锁死）。
+- 修改 `web/domain.py`：session() 首次访问自动恢复（方案+步号+各步进度，数据不符时回退第 1 步不崩溃）；start_session/move/record_step_fields 自动落盘；update_step 清空进度行。`web/api/record.py` 同步登记进度（与 lab_tools 一致）。`web/step_progress.py` 增加 restore()。
+- 测试：新增 test_session_store.py 6 项 + restore 4 项；全量 729/729 OK。
+- 真实验证：选方案→推进到第 2 步→**杀光全部 python 进程→重启**→第 2 步原样恢复；随后已清理回自由模式。
+- 沙箱注记：沙箱禁止在"运行时新建子目录"里建 sqlite 文件，测试库改为仓库根目录固定文件；sqlite 连接必须显式 close。
+- 状态：`CODED` + 体验 `UX_PENDING`（用户刷新/重启验收）。
+## 2026-08-17 本轮维护记录：卡片类型化 + 显式完成接口（MOBILE-CARDFLOW-14，产品化第 3/4 轮）
+- 任务：给 Card 体系加确定性 `card_type`（error/result/confirm/action，processing 为前端瞬时态）+ 每步 recorded/missing 字段清单；新增显式完成接口，校验不齐就拒绝。
+- 后端：`step_progress.card_type_for()` 纯函数；`domain.step_view/all_steps_view` 输出 card_type/recorded/missing；`POST /protocols/session/steps/{n}/complete`（只能完成当前步、有偏差拒绝、缺字段拒绝并列出）。
+- 前端：`mobile_cards.js` 卡片映射新字段、`ty-*` 类型类、必测字段清单（✓/○ 真实数据驱动）、「完成本步」按钮改走 complete 接口（拒绝时卡片内显示缺什么）；`mobile.css` 清单与类型样式 + 紧凑降档；版本号 v=20260817e。
+- 测试：card_type_for 映射 4 项新增；全量 733/733 OK。
+- 接口真实验收：选方案后 card_type=action、missing=[amount_value]；未记录即点完成 → 后端 400 拒绝"还缺：amount_value"；已清理回自由模式。
+- 状态：`CODED` + 体验 `UX_PENDING`（用户点按钮验收）。
+## 2026-08-17 本轮维护记录：横屏两栏布局（MOBILE-CARDFLOW-15，产品化第 4/4 轮）
+- 任务：横屏（高≤520px）切两栏网格：左栏小科立绘+语音状态+任务进度清单（✓完成/→当前/○未到），右栏大卡片；同一份数据、纯 CSS 响应式、进度不重置（状态本就在后端）。
+- 改动：`mobile.html` 形象栏内加 `#progress-panel`；`mobile.css` 紧凑媒体查询内追加 grid 覆盖（两列布局 + 各元素网格定位 + 进度清单样式与滚动）；`mobile_cards.js` 增加 renderProgressPanel（真实/演示两个数据源都接入）；版本号 v=20260817f。
+- 验证：`node --check` 通过；页面全 200；PC 首页 17453 字节零改动；本轮零 Python 改动（733 基线不受影响，未重跑）。
+- 状态：`CODED` + 体验 `UX_PENDING`（用户旋转屏幕验收）。
+- 产品化 4 轮全部完成：形象 → 持久化 → 卡片类型化+完成接口 → 横屏两栏，形成"任务跟进式 Agent"完整形态。
+## 2026-08-17 本轮维护记录：横屏卡片加宽加大（MOBILE-CARDFLOW-16）
+- 用户反馈：横屏卡片太小。修复：左栏 30%→24% 给卡片让宽；顶栏/控制条压矮（mic 52px、圆钮 38px）给卡片让高；字号微涨（标题 22px、操作 16px）、卡片内边距与块间距收紧；版本 v=20260817g。
+- 验证：CSS 200、PC 17453 不变；纯 CSS，零 Python（733 基线不受影响）。
+- 状态：`CODED` + 体验 `UX_PENDING`（用户旋转验收）。
+## 2026-08-17 本轮维护记录：横屏卡片内部改横排布局（MOBILE-CARDFLOW-17）
+- 用户定调：横屏不必保持竖屏构图，可改变布局。实现：横屏卡片内部改用 CSS Grid 左右两栏——左=标题/核心操作/说明/字段清单，右=参数/警告，进度段与按钮通栏贴底；怪盗主题横屏隐藏镜像牌角防重叠。版本 v=20260817h。
+- 验证：CSS 200、PC 17453 不变；纯 CSS，零 Python（733 基线不受影响）。
+- 状态：`CODED` + 体验 `UX_PENDING`（用户旋转验收）。
+## 2026-08-17 本轮维护记录：竖屏适配 + 横屏断点修正（MOBILE-CARDFLOW-18）
+- 用户反馈：竖屏塞不下、横屏看不到。修复：① 竖屏整体降字号收间距（标题 26、操作 18、形象 84、按钮 76/48、卡片内边距收紧）；② 卡片从"溢出裁切"改为"内容超屏自动可滚动"，JS 检测 scrollHeight>clientHeight 时把滑动手势让位给滚动、翻页用按钮；③ 横屏两栏断点从"仅 max-height"改为"max-height 且 min-width"（真横屏才启用，窄矮窗口不乱套）。
+- 验证：`node --check` 通过；HTTPS 下 4 个静态文件全 200；PC 17453 不变；零 Python（733 基线不受影响）。版本 v=20260817i。
+- 状态：`CODED` + 体验 `UX_PENDING`（用户手机验收：竖屏可滚动、横屏需手机开自动旋转）。
+## 2026-08-17 本轮维护记录：横屏"一目了然"空间重分配（MOBILE-CARDFLOW-19）
+- 用户反馈：横屏只是加了滚动，没有充分利用空间。修复：横屏空间重分配——顶栏极简（徽标隐藏）、DEV 面板隐藏、底部只留"语音+上一步"（下一步卡片已有）、形象缩小、卡片内再紧凑一档，目标内容全部平铺无需滚动。版本 v=20260817j。
+- 验证：HTTPS 健康与静态文件 200；纯前端零 Python（733 基线不受影响）。
+- 状态：`CODED` + 体验 `UX_PENDING`（用户手机横屏验收）。
+## 2026-08-17 本轮维护记录：横屏铺满全宽（MOBILE-CARDFLOW-20）
+- 用户反馈：横屏左右两侧大量空白。根因：外壳 max-width:460px（竖屏居中手机条）在横屏未解除。修复：横屏媒体查询内 max-width:none + 去边框阴影，布局铺满整屏宽度；左栏改为 minmax(120px,20%)。版本 v=20260817k。
+- 验证：HTTPS 健康与静态文件 200；纯前端零 Python。
+- 状态：`CODED` + 体验 `UX_PENDING`（用户手机横屏验收）。
+## 2026-08-17 本轮维护记录：语音改自动聆听模式（MOBILE-CARDFLOW-21）
+- 用户要求：删掉底部大麦克风按钮，改为自动检测说话。实现：`mobile_voice.js` 重写为 continuous 连续聆听（页面加载即开始、onspeechstart 换聆听脸、说完自动转写并送 /chat、onend 自动重启）；删除 mic-big 按钮，状态行加"语音已开/已关"小开关（暂停/恢复/权限重试）；idle 文案改为"自动聆听中"。版本 v=20260817l。
+- 验证：JS 语法双绿；HTTPS 5 项全 200；纯前端零 Python。
+- 状态：`CODED` + 体验 `UX_PENDING`（用户手机验收自动聆听）。
+## 2026-08-17 本轮维护记录：DEV 面板竖屏可滚动（MOBILE-CARDFLOW-22）
+- 用户反馈：手机端调试面板划不动。根因：展开面板在竖屏无限高无滚动，超出部分被外壳裁掉。修复：`.m-dev[open]` 基础样式加 max-height:40vh + overflow-y:auto（横屏紧凑规则之外也生效）。版本 v=20260817m。
+- 验证：HTTPS 健康与文件 200；纯前端零 Python。
+- 状态：`CODED` + 体验 `UX_PENDING`（用户手机划动验收）。
+## 2026-08-17 本轮维护记录：AI 回复气泡 + 完成仪式感动效（MOBILE-CARDFLOW-23）
+- 任务：① AI 回复不再截断——卡片上方"小科气泡"显示完整回复，8 秒自动淡出、点按关闭；② 完成瞬间仪式感——状态转为 completed 的那一次渲染触发 ✓ 弹入 + 卡片绿光扫过 + Android 震动（轮询刷新不重播）。
+- 改动：`mobile.html` stage 内加 #ai-bubble；`mobile.css` 气泡样式与 cardGlow/checkPop 动画；`mobile_cards.js` showAiBubble/hideAiBubble、submitTranscript 走气泡、insert() 里 lastShownStatus 转变检测与 navigator.vibrate。版本 v=20260817n。
+- 验证：JS 语法通过；HTTPS 4 项 200；纯前端零 Python。
+- 状态：`CODED` + 体验 `UX_PENDING`（用户手机验收气泡与动效）。
+## 2026-08-17 本轮维护记录：实验完成结束卡 + 演示模式（MOBILE-CARDFLOW-24）
+- 任务：③ 全部步骤完成后展示"实验完成 🎉"结束卡（含本次记录段数）；⑥ 演示模式一键隐藏 DEV 面板，右上角小齿轮退出。
+- 后端：`domain.all_steps_view` 新增 `all_completed`（判定归后端，前端只渲染）。
+- 前端：`mobile_cards.js` endCard/演示模式（localStorage 记忆）、loadReal 结束卡分支（取 /record/history 记录数回填）、renderMock 演示数据同款结束卡、cardHtml 结束卡隐藏动作按钮；`mobile.html` 顶栏齿轮 + DEV 面板演示按钮；`mobile.css` 🎉弹跳动画与齿轮样式。版本 v=20260817o。
+- 验证：JS/Python 语法通过；接口实测 all_completed=False（未完成时）；HTTPS 服务正常。全量测试本轮权限审批被取消未跑（后端改动为纯加法字段，风险低；可随时补跑）。
+- 状态：`CODED` + 体验 `UX_PENDING`（用户手机验收结束卡与演示模式）。
+## 2026-08-17 本轮维护记录：手动确认直接完成（MOBILE-CARDFLOW-25）
+- 用户产品决策：点「完成本步」按钮 = 手动确认完成 → 直接打勾，不再要求补口述数据。完成条件更新为"必测字段记齐 或 用户手动确认（人类责任确认）"。
+- 后端：`step_progress` 增加 confirmed 集合与 confirm()（清除偏差）；`session_store` 新增 step_confirmation_flags 表与存取；`domain.complete_step(manual)`；`POST /session/steps/{n}/complete` 接受 `{manual:true}`（严格路径保留，manual 缺省 False）。
+- 前端：「完成本步」发送 manual:true；完成步的字段清单全勾（与 ✓ 徽标一致）；成功文案"（手动确认）"。版本 v=20260817p。
+- 测试：新增 6 项（confirm 语义 + 持久化）；全量 739/739 OK；接口真实验收：无任何记录 → manual 完成 → 状态 completed、missing 清空。
+- 状态：`CODED` + 体验 `UX_PENDING`（用户手机验收手动完成）。
