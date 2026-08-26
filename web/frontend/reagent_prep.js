@@ -59,6 +59,7 @@
     }
 
     function showEdit() {
+      var editSteps = (prep.steps || []).slice();
       host.innerHTML = '<div class="prep-detail" style="max-width:900px">'
         + '<button class="sh-btn" id="prep-edit-back">← 返回详情</button>'
         + '<div class="prep-detail-title">编辑配方</div>'
@@ -71,11 +72,42 @@
         + '<div><label style="font-size:12px;color:#475569">保存条件</label><input id="pe-storage" value="' + esc(prep.storage_condition || '') + '" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:9px"></div>'
         + '<div><label style="font-size:12px;color:#475569">有效期</label><input id="pe-expiry" value="' + esc(prep.expiry || '') + '" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:9px"></div>'
         + '</div>'
-        + '<div style="margin-top:12px"><label style="font-size:12px;color:#475569">配制步骤（每行一步）</label><textarea id="pe-steps" rows="8" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:9px;font-family:inherit">' + esc((prep.steps || []).join('\n')) + '</textarea></div>'
+        + '<div style="margin-top:12px"><label style="font-size:12px;color:#475569">配制步骤（每行一步，可用加号连接）</label><div id="pe-steps-list"></div><button class="sh-btn" id="pe-add-step" type="button" style="margin-top:6px">＋ 添加步骤</button></div>'
+        + '<div style="margin-top:12px"><label style="font-size:12px;color:#475569;background:#f0f9ff;padding:4px 8px;border-radius:6px">保存后会自动识别步骤中的试剂名称并关联安全提示</label></div>'
         + '<div style="margin-top:12px;display:flex;gap:8px"><button class="sh-btn primary" id="pe-save">保存</button><button class="sh-btn" id="pe-cancel">取消</button><span id="pe-msg" style="font-size:12px;color:#64748b"></span></div>'
         + '</div>';
+      function renderStepRows() {
+        var container = host.querySelector('#pe-steps-list');
+        container.innerHTML = editSteps.map(function (s, i) {
+          return '<div class="pe-step-row" style="display:flex;gap:6px;margin-top:6px;align-items:center">'
+            + '<span style="width:24px;text-align:right;color:#94a3b8;font-size:12px;flex:0 0 auto">' + (i + 1) + '.</span>'
+            + '<input class="pe-step-input" data-idx="' + i + '" value="' + esc(s) + '" placeholder="如：加入 1 mL 盐酸 + 2 mL 水" style="flex:1;padding:8px 10px;border:1px solid #cbd5e1;border-radius:9px;font-family:inherit">'
+            + '<button class="sh-btn" data-del-step="' + i + '" type="button" style="color:#b91c1c;padding:4px 8px;font-size:11px">删除</button>'
+            + '</div>';
+        }).join('') || '<div style="color:#94a3b8;font-size:12px;margin-top:6px">暂无步骤，点“添加步骤”</div>';
+        Array.prototype.forEach.call(container.querySelectorAll('.pe-step-input'), function (input) {
+          input.oninput = function () {
+            var idx = parseInt(input.getAttribute('data-idx'), 10);
+            editSteps[idx] = input.value;
+          };
+        });
+        Array.prototype.forEach.call(container.querySelectorAll('[data-del-step]'), function (btn) {
+          btn.onclick = function () {
+            var idx = parseInt(btn.getAttribute('data-del-step'), 10);
+            editSteps.splice(idx, 1);
+            renderStepRows();
+          };
+        });
+      }
+      renderStepRows();
       host.querySelector('#prep-edit-back').onclick = render;
       host.querySelector('#pe-cancel').onclick = render;
+      host.querySelector('#pe-add-step').onclick = function () {
+        editSteps.push('');
+        renderStepRows();
+        var inputs = host.querySelectorAll('.pe-step-input');
+        if (inputs.length) inputs[inputs.length - 1].focus();
+      };
       host.querySelector('#pe-save').onclick = function () {
         var updated = {
           reagent_prep_id: prep.reagent_prep_id,
@@ -86,7 +118,7 @@
           solvent: host.querySelector('#pe-solvent').value.trim(),
           storage_condition: host.querySelector('#pe-storage').value.trim(),
           expiry: host.querySelector('#pe-expiry').value.trim(),
-          steps: host.querySelector('#pe-steps').value.split('\n').map(function (x) { return x.trim(); }).filter(Boolean)
+          steps: editSteps.map(function (x) { return x.trim(); }).filter(Boolean)
         };
         fetch('/reagent-prep/' + encodeURIComponent(prep.reagent_prep_id), {
           method: 'PATCH', headers: { 'Content-Type': 'application/json' },

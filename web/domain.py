@@ -368,6 +368,8 @@ def update_step(payload: dict) -> dict:
 def reagent_prep_view(prep: ReagentPrep) -> dict:
     """把一条试剂配置方案转成前端可渲染结构，并附带危险提示。"""
 
+    from tools.reagent_catalog import find_reagent
+
     store = hazmat()
     safety = []
     for name in prep.hazard_reagents:
@@ -380,6 +382,23 @@ def reagent_prep_view(prep: ReagentPrep) -> dict:
                 "codes": list(found.critical_codes),
                 "statements": [s.text for s in found.critical_statements()],
                 "source_url": found.source_url,
+            })
+            continue
+        cat = find_reagent(name)
+        if cat is not None:
+            state = "液体" if cat.get("state") == "liquid" else ("固体" if cat.get("state") == "solid" else "未知")
+            extra = f"通用试剂目录：{state}"
+            if cat.get("density"):
+                extra += f"，密度约 {cat['density']} g/mL"
+            if cat.get("acidic"):
+                extra += "，酸性试剂，配液后需注意调pH"
+            safety.append({
+                "name": cat.get("name_zh") or name,
+                "cas": cat.get("cas"),
+                "critical": False,
+                "codes": [],
+                "statements": [extra],
+                "source_url": None,
             })
     return {
         "reagent_prep_id": prep.reagent_prep_id,
@@ -401,16 +420,63 @@ def reagent_prep_view(prep: ReagentPrep) -> dict:
 
 
 def add_reagent_prep(raw_prep: dict) -> dict:
-    """校验并新增一条试剂配置；不通过绝不落盘。"""
+    """校验并新增一条试剂配置；不通过绝不落盘。新增时自动识别步骤里的试剂名称。"""
 
+    raw_prep["hazard_reagents"] = _auto_hazard_reagents(raw_prep)
     prep = ReagentPrep.from_dict(raw_prep)
     store = reagent_preps()
     store.add(prep)
     return reagent_prep_view(prep)
 
 
+def _detect_reagent_names(texts: list[str]) -> list[str]:
+    """从文本中识别试剂名称（试剂目录 + 危化品库），避免短名误命中。"""
+    from tools.reagent_catalog import load_catalog
+
+    blob = " ".join(texts)
+    catalog_map = {}
+    for item in load_catalog().values():
+        catalog_map.setdefault(item.get("name_zh") or item.get("name_en"), item)
+    # 试剂目录别名优先（最长名优先）
+    names = []
+    for alias, item in load_catalog().items():
+        name = item.get("name_zh") or item.get("name_en")
+        if name and alias and alias in blob:
+            names.append(name)
+    names = sorted(set(names), key=lambda x: -len(x))
+    # 危化品库文本匹配
+    store = hazmat()
+    hazmat_found = list(store.find_in_text(*texts))
+    for r in hazmat_found:
+        if not any(r.name_zh in existing for existing in names):
+            names.append(r.name_zh)
+    # 去重并保持顺序
+    seen = set()
+    result = []
+    for name in names:
+        if name not in seen:
+            seen.add(name)
+            result.append(name)
+    return result
+
+
+def _auto_hazard_reagents(raw_prep: dict) -> list[str]:
+    """从步骤文本中自动识别危险试剂名称，用于保存后安全提示。"""
+    texts = []
+    for value in [raw_prep.get("name_zh"), raw_prep.get("purpose")]:
+        if isinstance(value, str) and value:
+            texts.append(value)
+    steps = raw_prep.get("steps")
+    if isinstance(steps, list):
+        for step in steps:
+            if isinstance(step, str) and step:
+                texts.append(step)
+    return _detect_reagent_names(texts)
+
+
 def update_reagent_prep(reagent_prep_id: str, raw_prep: dict) -> dict:
-    """校验并更新一条试剂配置；不通过绝不落盘。"""
+    """校验并更新一条试剂配置；不通过绝不落盘。更新时自动识别步骤里的试剂名称。"""
+    raw_prep["hazard_reagents"] = _auto_hazard_reagents(raw_prep)
     prep = reagent_preps().update(reagent_prep_id, raw_prep)
     return reagent_prep_view(prep)
 

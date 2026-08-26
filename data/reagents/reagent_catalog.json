@@ -5,7 +5,11 @@
       "id": "pyruvic_acid",
       "name_zh": "丙酮酸",
       "name_en": "pyruvic acid",
-      "synonyms": ["丙酮酸", "pyruvic acid", "α-酮丙酸"],
+      "synonyms": [
+        "丙酮酸",
+        "pyruvic acid",
+        "α-酮丙酸"
+      ],
       "cas": "127-17-3",
       "formula": "C3H4O3",
       "molecular_weight": 88.062,
@@ -18,7 +22,10 @@
       "id": "sodium_pyruvate",
       "name_zh": "丙酮酸钠",
       "name_en": "sodium pyruvate",
-      "synonyms": ["丙酮酸钠", "sodium pyruvate"],
+      "synonyms": [
+        "丙酮酸钠",
+        "sodium pyruvate"
+      ],
       "cas": "113-24-6",
       "formula": "C3H3NaO3",
       "molecular_weight": 110.04,
@@ -31,7 +38,11 @@
       "id": "sodium_acetate",
       "name_zh": "乙酸钠",
       "name_en": "sodium acetate",
-      "synonyms": ["乙酸钠", "醋酸钠", "sodium acetate"],
+      "synonyms": [
+        "乙酸钠",
+        "醋酸钠",
+        "sodium acetate"
+      ],
       "cas": "127-09-3",
       "formula": "C2H3NaO2",
       "molecular_weight": 82.03,
@@ -44,7 +55,12 @@
       "id": "acetic_acid",
       "name_zh": "乙酸",
       "name_en": "acetic acid",
-      "synonyms": ["乙酸", "醋酸", "acetic acid", "glacial acetic acid"],
+      "synonyms": [
+        "乙酸",
+        "醋酸",
+        "acetic acid",
+        "glacial acetic acid"
+      ],
       "cas": "64-19-7",
       "formula": "C2H4O2",
       "molecular_weight": 60.05,
@@ -57,7 +73,12 @@
       "id": "hydrochloric_acid",
       "name_zh": "盐酸",
       "name_en": "hydrochloric acid",
-      "synonyms": ["盐酸", "氢氯酸", "hydrochloric acid", "HCl"],
+      "synonyms": [
+        "盐酸",
+        "氢氯酸",
+        "hydrochloric acid",
+        "HCl"
+      ],
       "cas": "7647-01-0",
       "formula": "HCl",
       "molecular_weight": 36.46,
@@ -70,7 +91,12 @@
       "id": "sodium_hydroxide",
       "name_zh": "氢氧化钠",
       "name_en": "sodium hydroxide",
-      "synonyms": ["氢氧化钠", "烧碱", "sodium hydroxide", "NaOH"],
+      "synonyms": [
+        "氢氧化钠",
+        "烧碱",
+        "sodium hydroxide",
+        "NaOH"
+      ],
       "cas": "1310-73-2",
       "formula": "NaOH",
       "molecular_weight": 40.0,
@@ -83,7 +109,12 @@
       "id": "tris",
       "name_zh": "Tris",
       "name_en": "tris(hydroxymethyl)aminomethane",
-      "synonyms": ["Tris", "Tris碱", "tris base", "TRIS"],
+      "synonyms": [
+        "Tris",
+        "Tris碱",
+        "tris base",
+        "TRIS"
+      ],
       "cas": "77-86-1",
       "formula": "C4H11NO3",
       "molecular_weight": 121.14,
@@ -96,7 +127,11 @@
       "id": "sds",
       "name_zh": "SDS",
       "name_en": "sodium dodecyl sulfate",
-      "synonyms": ["SDS", "十二烷基硫酸钠", "sodium dodecyl sulfate"],
+      "synonyms": [
+        "SDS",
+        "十二烷基硫酸钠",
+        "sodium dodecyl sulfate"
+      ],
       "cas": "151-21-3",
       "formula": "C12H25NaO4S",
       "molecular_weight": 288.38,
@@ -109,7 +144,11 @@
       "id": "edta",
       "name_zh": "EDTA",
       "name_en": "ethylenediaminetetraacetic acid",
-      "synonyms": ["EDTA", "乙二胺四乙酸", "EDTA酸"],
+      "synonyms": [
+        "EDTA",
+        "乙二胺四乙酸",
+        "EDTA酸"
+      ],
       "cas": "60-00-4",
       "formula": "C10H16N2O8",
       "molecular_weight": 292.24,
@@ -122,7 +161,12 @@
       "id": "sodium_chloride",
       "name_zh": "氯化钠",
       "name_en": "sodium chloride",
-      "synonyms": ["氯化钠", "食盐", "sodium chloride", "NaCl"],
+      "synonyms": [
+        "氯化钠",
+        "食盐",
+        "sodium chloride",
+        "NaCl"
+      ],
       "cas": "7647-14-5",
       "formula": "NaCl",
       "molecular_weight": 58.44,
@@ -135,7 +179,11 @@
       "id": "potassium_chloride",
       "name_zh": "氯化钾",
       "name_en": "potassium chloride",
-      "synonyms": ["氯化钾", "potassium chloride", "KCl"],
+      "synonyms": [
+        "氯化钾",
+        "potassium chloride",
+        "KCl"
+      ],
       "cas": "7447-40-7",
       "formula": "KCl",
       "molecular_weight": 74.55,
@@ -148,7 +196,12 @@
       "id": "ethanol",
       "name_zh": "乙醇",
       "name_en": "ethanol",
-      "synonyms": ["乙醇", "酒精", "ethanol", "ethyl alcohol"],
+      "synonyms": [
+        "乙醇",
+        "酒精",
+        "ethanol",
+        "ethyl alcohol"
+      ],
       "cas": "64-17-5",
       "formula": "C2H6O",
       "molecular_weight": 46.07,
@@ -161,7 +214,11 @@
       "id": "methanol",
       "name_zh": "甲醇",
       "name_en": "methanol",
-      "synonyms": ["甲醇", "methanol", "methyl alcohol"],
+      "synonyms": [
+        "甲醇",
+        "methanol",
+        "methyl alcohol"
+      ],
       "cas": "67-56-1",
       "formula": "CH4O",
       "molecular_weight": 32.04,
@@ -174,7 +231,11 @@
       "id": "acetic_acid_glacial",
       "name_zh": "冰醋酸",
       "name_en": "glacial acetic acid",
-      "synonyms": ["冰醋酸", "冰乙酸", "glacial acetic acid"],
+      "synonyms": [
+        "冰醋酸",
+        "冰乙酸",
+        "glacial acetic acid"
+      ],
       "cas": "64-19-7",
       "formula": "C2H4O2",
       "molecular_weight": 60.05,
@@ -187,7 +248,10 @@
       "id": "glycine",
       "name_zh": "甘氨酸",
       "name_en": "glycine",
-      "synonyms": ["甘氨酸", "glycine"],
+      "synonyms": [
+        "甘氨酸",
+        "glycine"
+      ],
       "cas": "56-40-6",
       "formula": "C2H5NO2",
       "molecular_weight": 75.07,
@@ -200,7 +264,10 @@
       "id": "agarose",
       "name_zh": "琼脂糖",
       "name_en": "agarose",
-      "synonyms": ["琼脂糖", "agarose"],
+      "synonyms": [
+        "琼脂糖",
+        "agarose"
+      ],
       "cas": "9012-36-6",
       "formula": null,
       "molecular_weight": null,
@@ -213,7 +280,11 @@
       "id": "dMSO",
       "name_zh": "DMSO",
       "name_en": "dimethyl sulfoxide",
-      "synonyms": ["DMSO", "二甲基亚砜", "dimethyl sulfoxide"],
+      "synonyms": [
+        "DMSO",
+        "二甲基亚砜",
+        "dimethyl sulfoxide"
+      ],
       "cas": "67-68-5",
       "formula": "C2H6OS",
       "molecular_weight": 78.13,
@@ -226,12 +297,34 @@
       "id": "glycerol",
       "name_zh": "甘油",
       "name_en": "glycerol",
-      "synonyms": ["甘油", "丙三醇", "glycerol"],
+      "synonyms": [
+        "甘油",
+        "丙三醇",
+        "glycerol"
+      ],
       "cas": "56-81-5",
       "formula": "C3H8O3",
       "molecular_weight": 92.09,
       "state": "liquid",
       "density": 1.26,
+      "acidic": false,
+      "pKa": null
+    },
+    {
+      "id": "potassium_hydroxide",
+      "name_zh": "氢氧化钾",
+      "name_en": "potassium hydroxide",
+      "synonyms": [
+        "氢氧化钾",
+        "苛性钾",
+        "potassium hydroxide",
+        "KOH"
+      ],
+      "cas": "1310-58-3",
+      "formula": "KOH",
+      "molecular_weight": 56.11,
+      "state": "solid",
+      "density": null,
       "acidic": false,
       "pKa": null
     }
