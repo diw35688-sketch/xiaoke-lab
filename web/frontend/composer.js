@@ -25,6 +25,11 @@
     '.cp-chip:hover{background:var(--n-60)}',
     '.cp-chip .v{color:var(--n-500)}',
     '.cp-chip.plain{border:0;background:transparent;padding:0 4px;cursor:default}',
+    '#cp-continuous-label{display:inline-flex;align-items:center;gap:5px;color:var(--n-700);font-size:var(--fs-xs);white-space:nowrap;cursor:pointer}',
+    '#cp-continuous{margin:0;accent-color:var(--brand)}',
+    '#cp-modes{display:flex;align-items:center;gap:3px;padding:3px;border-radius:16px;background:var(--n-60)}',
+    '.cp-mode{border:0;border-radius:13px;padding:5px 9px;background:transparent;color:var(--n-600);cursor:pointer;font:inherit;font-size:var(--fs-xs)}',
+    '.cp-mode.active{background:var(--n-00);color:var(--brand);box-shadow:0 1px 3px rgba(0,0,0,.10)}',
     '#cp-send{width:32px;height:32px;border-radius:50%;border:0;background:var(--brand);color:#fff;',
     '  cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:15px;flex:0 0 auto}',
     '#cp-send:hover{background:var(--brand-strong)}',
@@ -47,8 +52,14 @@
     '  <textarea id="cp-text" rows="1" placeholder="给实验助手发消息，或按住麦克风口述"></textarea>',
     '  <div id="cp-row">',
     '    <div class="cp-left">',
-    '      <button class="cp-icon" id="cp-mic" title="语音输入">◉</button>',
-    '      <span class="cp-chip plain" id="cp-hint">本地识别 SenseVoice</span>',
+    '      <button class="cp-icon" id="cp-mic" title="单次录音：是否保存由当前模式决定">◉</button>',
+    '      <span class="cp-chip plain" id="cp-hint">单次录音</span>',
+    '      <label id="cp-continuous-label"><input id="cp-continuous" type="checkbox">连续通话</label>',
+    '      <div id="cp-modes" aria-label="交互模式">',
+    '        <button class="cp-mode active" type="button" data-mode="chat">自由聊天</button>',
+    '        <button class="cp-mode" type="button" data-mode="free">自由实验记录</button>',
+    '        <button class="cp-mode" type="button" data-mode="protocol">方案实验记录</button>',
+    '      </div>',
     '    </div>',
     '    <div class="cp-right">',
     '      <button class="cp-chip" id="cp-model"><span id="cp-model-name">未配置模型</span><span class="v">⌄</span></button>',
@@ -87,13 +98,16 @@
     box.style.height = Math.min(168, box.scrollHeight) + 'px';
   }
 
-  function send() {
+  function send(options) {
     var box = el('cp-text');
     var text = box.value.trim();
     if (!text) return;
     var input = document.querySelector('#message');
     var form = document.querySelector('#form');
     if (!input || !form) return;
+    window.captureComposerModeSnapshot(
+      form, (options && options.inputSource) || 'text', options && options.modeSnapshot
+    );
     input.value = text;
     box.value = '';
     autoGrow();
@@ -102,9 +116,9 @@
     if (typeof form.requestSubmit === 'function') form.requestSubmit();
     else form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
   }
-  window.composerSend = function (text) {
+  window.composerSend = function (text, options) {
     el('cp-text').value = text;
-    send();
+    send(options);
   };
 
   function refresh() {
@@ -124,6 +138,47 @@
     }).catch(function () {});
   }
   window.composerRefresh = refresh;
+
+  function selectComposerMode(mode) {
+    if (mode === 'free') {
+      return fetch('/protocols/session', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({protocol_id: null})
+      }).then(function (response) {
+        if (!response.ok) throw new Error('退出方案模式失败');
+        return response.json();
+      }).then(function (session) {
+        if (session.mode !== 'free') throw new Error('服务端没有进入自由记录模式');
+        window.interactionModeState.select('free');
+        refresh();
+        return true;
+      }).catch(function (error) {
+        var hint = el('cp-hint');
+        if (hint) hint.textContent = error.message;
+        return false;
+      });
+    }
+    if (mode !== 'protocol') {
+      window.interactionModeState.select(mode);
+      return Promise.resolve(true);
+    }
+    return fetch('/protocols/session').then(function (response) {
+      if (!response.ok) throw new Error('方案会话读取失败');
+      return response.json();
+    }).then(function (session) {
+      if (session.mode !== 'protocol' || !session.protocol) {
+        if (window.shellShow) window.shellShow('protocols');
+        return false;
+      }
+      window.interactionModeState.select('protocol');
+      return true;
+    }).catch(function () {
+      if (window.shellShow) window.shellShow('protocols');
+      return false;
+    });
+  }
+  window.selectComposerMode = selectComposerMode;
 
   function init() {
     var host = document.getElementById('sh-chat-main') || document.getElementById('sh-chat');
@@ -147,6 +202,15 @@
     if (asrBar) asrBar.style.display = 'none';
 
     var box = el('cp-text');
+    Array.prototype.forEach.call(el('cp-modes').querySelectorAll('.cp-mode'), function (button) {
+      button.onclick = function () { selectComposerMode(button.dataset.mode); };
+    });
+    window.interactionModeState.subscribe(function (snapshot) {
+      var selected = snapshot.interaction_mode === 'chat' ? 'chat' : snapshot.experiment_context;
+      Array.prototype.forEach.call(el('cp-modes').querySelectorAll('.cp-mode'), function (button) {
+        button.classList.toggle('active', button.dataset.mode === selected);
+      });
+    });
     box.addEventListener('input', autoGrow);
     box.addEventListener('focus', function () { el('cp-card').classList.add('focus'); });
     box.addEventListener('blur', function () { el('cp-card').classList.remove('focus'); });
@@ -155,15 +219,39 @@
     });
     el('cp-send').onclick = send;
 
-    // 麦克风：复用已有的录音实现
+    // 麦克风只决定 input_source；Chat 转回聊天，实验模式才进入 /record。
+    var continuousActive = false;
+    function showRecordingState(active) {
+      if (continuousActive) return;
+      el('cp-mic').classList.toggle('rec', active);
+      el('cp-mic').textContent = active ? '■' : '◉';
+      el('cp-hint').textContent = active ? '正在录音，再点一次结束' : '单次录音';
+    }
+    document.addEventListener('lab:recording-state', function (event) {
+      showRecordingState(Boolean(event.detail && event.detail.recording));
+    });
+    document.addEventListener('lab:continuous-call-state', function (event) {
+      continuousActive = Boolean(event.detail && event.detail.active);
+      el('cp-mic').classList.toggle('rec', continuousActive);
+      el('cp-mic').textContent = continuousActive ? '■' : '◉';
+      el('cp-hint').textContent = continuousActive ? '连续通话中，正在聆听' :
+        (el('cp-continuous').checked ? '连续通话，点麦克风开始' : '单次录音');
+    });
+    el('cp-continuous').onchange = function () {
+      if (!this.checked && window.phoneCallIsActive?.()) window.phoneCallToggle?.();
+      if (!continuousActive) {
+        el('cp-hint').textContent = this.checked ? '连续通话，点麦克风开始' : '单次录音';
+        el('cp-mic').title = this.checked ? '开始或结束连续通话' : '开始或结束单次录音';
+      }
+    };
     el('cp-mic').onclick = function () {
-        if (window.phoneCallToggle) { window.phoneCallToggle(); return; }
+      if (el('cp-continuous').checked) {
+        window.phoneCallToggle?.();
+        return;
+      }
       var real = document.getElementById('asr-btn');
-      if (!real) return;
+      if (!real || real.disabled) return;
       real.click();
-      var on = el('cp-mic').classList.toggle('rec');
-      el('cp-mic').textContent = on ? '■' : '◉';
-      el('cp-hint').textContent = on ? '正在录音，再点一次结束' : '本地识别 SenseVoice';
     };
 
     // 模型/语音/方案 快捷面板

@@ -1,4 +1,5 @@
 import json
+import uuid
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -16,12 +17,24 @@ from database.crud import (
     rename_conversation,
 )
 from realtime.routing import acknowledgement, requires_background_task
+from stream_contract import agent_output_event, screen_delta_event
+from tool_presentation import ToolVoiceDeliveryBatch
+from src.core.conversation_turn import ExperimentContext, InteractionMode
+from src.core.presentation_delivery import VoiceDeliveryItem, bind_voice_items
+from src.core.presentation_intent import (
+    MessageKind,
+    MessagePriority,
+)
+from playback_runtime import web_playback_service
+from mode_snapshot import ModeSnapshotFields
+from output_policy import OutputStrategy, select_output_policy
+from src.core.spoken_output import build_spoken_block_plan, select_spoken_output_policy
 from tasks.task_manager import task_manager
 
 router = APIRouter(prefix="/chat", tags=["聊天"])
 
 
-class ChatRequest(BaseModel):
+class ChatRequest(ModeSnapshotFields):
     message: str = Field(min_length=1, max_length=4000)
     conversation_id: str | None = Field(default=None, max_length=64)
 
@@ -84,6 +97,7 @@ def chat_history(conversation_id: str | None = None):
 
 @router.post("")
 def chat(request: ChatRequest):
+    _require_chat_policy(request)
     conversation_id = ensure_conversation(request.conversation_id)
     add_message(conversation_id, "user", request.message)
     queued = _queue_if_needed(request, conversation_id)
@@ -91,7 +105,10 @@ def chat(request: ChatRequest):
         task, answer = queued
         return {"answer": answer, "conversation_id": conversation_id, "background_task": task}
     try:
-        answer = run_agent(get_recent_messages(conversation_id), conversation_id)
+        answer = run_agent(
+            get_recent_messages(conversation_id), conversation_id,
+            request.interaction_mode,
+        )
         add_message(conversation_id, "assistant", answer)
         return {"answer": answer, "conversation_id": conversation_id}
     except ModelServiceError as error:
@@ -107,9 +124,12 @@ def _clean_stream_text(text: str) -> str:
 
 @router.post("/stream")
 def chat_stream(request: ChatRequest):
+    _require_chat_policy(request)
     conversation_id = ensure_conversation(request.conversation_id)
     add_message(conversation_id, "user", request.message)
     queued = _queue_if_needed(request, conversation_id)
+    spoken_turn_id = request.turn_id or f"conversation:{conversation_id}"
+    assistant_block_id = f"{spoken_turn_id}:spoken"
 
     def events():
         if queued:
@@ -123,17 +143,48 @@ def chat_stream(request: ChatRequest):
             yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
             return
         answer_parts = []
+        tool_voice_items = []
         try:
-            for text in stream_agent(get_recent_messages(conversation_id), conversation_id):
+            for output in stream_agent(
+                get_recent_messages(conversation_id), conversation_id,
+                request.interaction_mode,
+            ):
+                payload = agent_output_event(output)
+                if isinstance(output, ToolVoiceDeliveryBatch):
+                    tool_voice_items.extend(output.items)
+                    continue
+                text = output
                 clean_text = _clean_stream_text(text)
                 if clean_text:
                     answer_parts.append(clean_text)
-                yield f"data: {json.dumps({'type': 'delta', 'text': text}, ensure_ascii=False)}\n\n"
+                else:
+                    yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
             answer = "".join(answer_parts) or "模型没有返回文字内容。"
+            # 普通 Chat 先完整验证可见正文，再发布唯一 screen Block；语音只从
+            # 同一正文派生。这样模型超预算时不会先显示长文再偷偷少读。
+            reply_item = None
+            if not tool_voice_items and answer_parts:
+                answer, reply_item = _prepare_chat_spoken_delivery(
+                    answer, spoken_turn_id
+                )
+            yield f"data: {json.dumps(screen_delta_event(answer), ensure_ascii=False)}\n\n"
+            if tool_voice_items:
+                for authorized in web_playback_service.authorize(
+                    bind_voice_items(tool_voice_items, assistant_block_id),
+                    conversation_id=conversation_id,
+                ):
+                    yield f"data: {json.dumps(authorized, ensure_ascii=False)}\n\n"
+            elif reply_item is not None:
+                for authorized in web_playback_service.authorize(
+                    (reply_item,), conversation_id=conversation_id
+                ):
+                    yield f"data: {json.dumps(authorized, ensure_ascii=False)}\n\n"
             add_message(conversation_id, "assistant", answer)
             yield f"data: {json.dumps({'type': 'done', 'answer': answer, 'conversation_id': conversation_id}, ensure_ascii=False)}\n\n"
         except ModelServiceError as error:
             yield f"data: {json.dumps({'type': 'error', 'detail': error.detail}, ensure_ascii=False)}\n\n"
+        except ValueError as error:
+            yield f"data: {json.dumps({'type': 'error', 'detail': str(error)}, ensure_ascii=False)}\n\n"
         except Exception:
             yield f"data: {json.dumps({'type': 'error', 'detail': '流式回复中断，请重试。'}, ensure_ascii=False)}\n\n"
 

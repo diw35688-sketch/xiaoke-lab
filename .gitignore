@@ -5,6 +5,8 @@
 # Python environments and caches
 .venv/
 .venv-*/
+.runtime-python*/
+.runtime-python*.zip
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -30,6 +32,8 @@ models/**
 *.tar.gz
 *.tar.bz2
 *.onnx
+# 前端本地 VAD 依赖（call_silero_vad.js 的固定副本，允许提交模型）
+!web/frontend/vendor/voice/*.onnx
 
 # Editor and operating-system files
 .vscode/
@@ -66,3 +70,7 @@ web/.codebuddy/
 # 环境变量文件（保留 .env.example）
 *.env
 !.env.example
+
+# 网页端运行时残留（不提交）
+web/.edge-startup-*/
+web/*.log

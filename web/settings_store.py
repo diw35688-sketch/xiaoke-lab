@@ -80,6 +80,7 @@ class ModelSettings:
     base_url: str = "https://api.llm.ustc.edu.cn/v1"
     model_name: str = "deepseek-v4-pro"
     tts_enabled: bool = False
+    speak_record_ack: bool = True
     tts_url: str = "http://127.0.0.1:8001/tts"
     tts_provider: str = "browser"
     tts_api_key: str = ""
@@ -169,6 +170,8 @@ def _from_env() -> ModelSettings:
         or "deepseek-v4-pro",
         tts_enabled=os.getenv("TTS_ENABLED", "false").strip().lower()
         in {"1", "true", "yes", "on"},
+        speak_record_ack=os.getenv("SPEAK_RECORD_ACK", "true").strip().lower()
+        in {"1", "true", "yes", "on"},
         tts_url=os.getenv("LOCAL_QWEN_TTS_URL", "http://127.0.0.1:8001/tts"),
     )
 
@@ -187,6 +190,7 @@ def current() -> ModelSettings:
                     base_url=raw.get("base_url", ""),
                     model_name=raw.get("model_name", ""),
                     tts_enabled=bool(raw.get("tts_enabled", False)),
+                    speak_record_ack=bool(raw.get("speak_record_ack", True)),
                     tts_url=raw.get("tts_url", "http://127.0.0.1:8001/tts"),
                     api_keys=raw.get("api_keys", {}) or {},
                     provider_profiles=raw.get("provider_profiles", {}) or {},
@@ -215,6 +219,8 @@ def update(**changes) -> ModelSettings:
                 setattr(settings, name, str(changes[name]).strip())
         if "tts_enabled" in changes and changes["tts_enabled"] is not None:
             settings.tts_enabled = bool(changes["tts_enabled"])
+        if "speak_record_ack" in changes and changes["speak_record_ack"] is not None:
+            settings.speak_record_ack = bool(changes["speak_record_ack"])
         if "tts_speed" in changes and changes["tts_speed"] is not None:
             try:
                 settings.tts_speed = max(0.5, min(2.0, float(changes["tts_speed"])))

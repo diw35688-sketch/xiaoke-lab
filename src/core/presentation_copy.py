@@ -8,9 +8,14 @@ from src.core.presentation_intent import MessageKind, PresentationIntent
 
 
 class RecordAckResult(str, Enum):
-    """实验记录回执的三种真实结果。"""
+    """实验记录回执的四种真实结果。
+
+    RECORDED_NO_STEP 是 web 降级生产者的"记录成功"：结构化成功但无实验步骤号，
+    话术为"已记录"（不带步骤号），区别于 DEGRADED（结构化不可用）与 RECORDED（带步骤号）。
+    """
 
     RECORDED = "recorded"
+    RECORDED_NO_STEP = "recorded_no_step"
     DEGRADED = "degraded"
     FAILED = "failed"
 
@@ -83,6 +88,7 @@ _PASSTHROUGH_KINDS = frozenset({
     MessageKind.TRANSCRIPT,
     MessageKind.STAGE_SUMMARY,
     MessageKind.SYSTEM_ISSUE,
+    MessageKind.ASSISTANT_REPLY,
 })
 
 
@@ -90,8 +96,14 @@ def copy_for_intent(
     intent: PresentationIntent,
     *,
     ui_mode: str,
+    voice: bool = False,
 ) -> str:
-    """生成最终文案；支持记录回执、追问、回答/确认回执、暂缓、查看列表与固定提示。"""
+    """生成最终文案；支持记录回执、追问、回答/确认回执、暂缓、查看列表与固定提示。
+
+    voice=True 时产出"语音渠道"文案：去掉仅用于屏幕显示的称呼前缀（如"小科："）
+    与管理端来源标注（"（来源口述 N）"），适合直接交给 TTS 朗读。
+    当前仅 CLARIFICATION 有此差异，其余 kind 的显示文案与语音文案相同。
+    """
 
     _validate_ui_mode(ui_mode)
     if intent.kind == MessageKind.PROGRAM_STATUS:
@@ -103,7 +115,7 @@ def copy_for_intent(
     if intent.kind == MessageKind.RECORD_ACK:
         return _copy_record_ack(intent, ui_mode)
     if intent.kind == MessageKind.CLARIFICATION:
-        return _copy_clarification(intent, ui_mode)
+        return _copy_clarification(intent, ui_mode, voice=voice)
     if intent.kind == MessageKind.CONFIRMATION_ACK:
         return _copy_confirmation_ack(intent, ui_mode)
     if intent.kind == MessageKind.NO_ACTION_FEEDBACK:
@@ -210,10 +222,16 @@ def _copy_record_ack(intent: PresentationIntent, ui_mode: str) -> str:
     return _with_source(base, intent, ui_mode)
 
 
-def _copy_clarification(intent: PresentationIntent, ui_mode: str) -> str:
+def _copy_clarification(
+    intent: PresentationIntent, ui_mode: str, *, voice: bool = False
+) -> str:
     question = intent.args.get("question")
     if not isinstance(question, str) or not question.strip():
         raise ValueError("CLARIFICATION 必须包含非空 question。")
+
+    if voice:
+        # 语音渠道：只念问题本身，不带"小科："称呼前缀，也不带管理端来源标注。
+        return question
 
     base = f"小科：{question}"
     if ui_mode == "admin" and intent.source_segment_id is not None:

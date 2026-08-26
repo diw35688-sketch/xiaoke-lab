@@ -14,7 +14,7 @@ class ASRBackend(Protocol):
         self,
         audio_path: Path,
         *,
-        language: str = "auto",
+        language: str = "zh",
     ) -> ASRResult:
-        """识别一个音频文件并返回项目统一结果。"""
+        """识别一个音频文件并返回项目统一结果；默认中文，评测可显式传 auto。"""
 

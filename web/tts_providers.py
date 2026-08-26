@@ -66,6 +66,38 @@ PROVIDERS = [
         "note": "音色可克隆，但需要 NVIDIA 显卡并单独启动 tts_server。无显卡时不要选。",
         "voices": [],
     },
+    {
+        "id": "volcano", "label": "火山引擎豆包语音",
+        "needs_key": True, "server_side": True,
+        "default_base_url": "https://openspeech.bytedance.com/api/v1/tts",
+        "default_model": "volcano_tts",
+        "note": "密钥填 appid:access_token（冒号分隔）。「合成模型」框填控制台 cluster（默认 volcano_tts）。音色为火山官方中文女声/童声（免费21款内为主），可自由切换试听。",
+        "voices": [
+            {"id": "BV001_streaming", "label": "通用女声（亲切，12种情感）"},
+            {"id": "BV001_V2_streaming", "label": "通用女声 2.0"},
+            {"id": "BV700_streaming", "label": "灿灿（22种情感）"},
+            {"id": "BV700_V2_streaming", "label": "灿灿 2.0（22种情感）"},
+            {"id": "BV705_streaming", "label": "炀炀"},
+            {"id": "BV405_streaming", "label": "甜美小源（智能助手）"},
+            {"id": "BV007_streaming", "label": "亲切女声"},
+            {"id": "BV009_streaming", "label": "知性女声"},
+            {"id": "BV005_streaming", "label": "活泼女声"},
+            {"id": "BV406_streaming", "label": "超自然音色-梓梓"},
+            {"id": "BV406_V2_streaming", "label": "超自然音色-梓梓 2.0"},
+            {"id": "BV428_streaming", "label": "清新文艺女声"},
+            {"id": "BV104_streaming", "label": "温柔淑女"},
+            {"id": "BV113_streaming", "label": "甜宠少御"},
+            {"id": "BV115_streaming", "label": "古风少御"},
+            {"id": "BV011_streaming", "label": "新闻女声"},
+            {"id": "BV402_streaming", "label": "促销女声"},
+            {"id": "BV403_streaming", "label": "鸡汤女声"},
+            {"id": "BV412_streaming", "label": "影视解说小美"},
+            {"id": "BV418_streaming", "label": "直播一姐"},
+            {"id": "BV034_streaming", "label": "知性姐姐-双语"},
+            {"id": "BV064_streaming", "label": "小萝莉"},
+            {"id": "BV061_streaming", "label": "天才童声"},
+        ],
+    },
 ]
 
 
@@ -212,6 +244,78 @@ def _local_qwen(text: str, settings) -> bytes:
     return response.content
 
 
+def _volcano(text: str, settings) -> bytes:
+    """火山引擎豆包语音（小模型 HTTP 非流式接口）。
+
+    密钥格式：appid:access_token（填在 tts_api_key，冒号分隔）。
+    参考：https://docs.volcengine.com/docs/6561/79820（请求参数）
+         https://docs.volcengine.com/docs/6561/1105162（鉴权方法）
+    """
+    import base64
+    import uuid
+
+    raw_key = settings.tts_api_key or ""
+    if ":" not in raw_key:
+        raise RuntimeError("火山引擎密钥格式应为 appid:access_token（中间用冒号）")
+    appid, token = raw_key.split(":", 1)
+    appid = appid.strip()
+    token = token.strip()
+    if not appid or not token:
+        raise RuntimeError("火山引擎 appid 或 access_token 为空")
+
+    base = (settings.tts_base_url or "https://openspeech.bytedance.com/api/v1/tts").rstrip("/")
+    # cluster 是控制台申请分配的（官方 FAQ Q1 可查），不是写死的；
+    # 用 tts_model 字段承载（火山接口没有 model 概念），默认 volcano_tts。
+    cluster = (settings.tts_model or "volcano_tts").strip() or "volcano_tts"
+    payload = {
+        "app": {"appid": appid, "token": token, "cluster": cluster},
+        "user": {"uid": "web_lab_assistant"},
+        "audio": {
+            "voice_type": settings.tts_voice or "BV001_streaming",
+            "encoding": "mp3",
+            "speed_ratio": float(settings.tts_speed or 1.0),
+            "volume_ratio": 1.0,
+            "pitch_ratio": 1.0,
+        },
+        "request": {
+            "reqid": uuid.uuid4().hex,
+            "text": text,
+            "text_type": "plain",
+            "operation": "query",
+            "with_frontend": 1,
+            "frontend_type": "unitTson",
+        },
+    }
+    response = httpx.post(
+        base,
+        headers={"Authorization": f"Bearer;{token}"},
+        json=payload,
+        timeout=httpx.Timeout(60, connect=10),
+    )
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError as error:
+        # 透传火山响应体（code/message），失败要能定位而不是只看到 401
+        body_text = ""
+        try:
+            body_text = response.text[:200]
+        except Exception:
+            pass
+        raise RuntimeError(
+            f"火山引擎 HTTP {response.status_code}：{body_text}"
+        ) from error
+    data = response.json()
+    code = data.get("code", -1)
+    if code != 3000:
+        raise RuntimeError(
+            "火山引擎返回错误：code=" + str(code) + " " + str(data.get("message", ""))[:120]
+        )
+    audio_b64 = data.get("data", "")
+    if not audio_b64:
+        raise RuntimeError("火山引擎响应中没有音频数据：" + str(data)[:200])
+    return base64.b64decode(audio_b64)
+
+
 def synthesize(text: str, settings) -> tuple[bytes, str]:
     """按当前配置合成语音，返回 (音频字节, MIME)。"""
     provider = settings.tts_provider or "browser"
@@ -225,4 +329,6 @@ def synthesize(text: str, settings) -> tuple[bytes, str]:
         return _dashscope(text, settings), "audio/mpeg"
     if provider == "local_qwen":
         return _local_qwen(text, settings), "audio/wav"
+    if provider == "volcano":
+        return _volcano(text, settings), "audio/mpeg"
     raise RuntimeError("未知的语音合成供应商：" + str(provider))

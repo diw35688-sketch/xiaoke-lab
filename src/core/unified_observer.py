@@ -33,6 +33,11 @@ class UnifiedObservation:
     accepted_analysis 是可选的完整分析快照，
     供主流程在统一链路活跃时直接用于事件落盘，
     避免旧链路再次调用 LLM 产生重复分析。
+
+    partial / partial_question 是"部分观察"通道（web 降级生产者使用）：
+    partial=True 时放宽 OBSERVED 校验（不再强制 destination /
+    clarification_action），追问文本走 partial_question 直接透传；
+    CLI 完整路径不传 partial（默认 False），校验与行为零变化。
     """
 
     request_id: str
@@ -58,6 +63,19 @@ class UnifiedObservation:
     answer_hint: bool = False
 
     def __post_init__(self) -> None:
+        if self.partial:
+            if self.status != UnifiedObservationStatus.OBSERVED:
+                raise ValueError("部分观察只能是成功观察。")
+            if self.error_type is not None:
+                raise ValueError("部分成功观察不能携带错误。")
+            if (
+                self.partial_question is not None
+                and not self.partial_question.strip()
+            ):
+                raise ValueError("部分观察的追问文本不能是空白。")
+            return
+        if self.partial_question is not None:
+            raise ValueError("追问文本仅允许部分观察携带。")
         if self.status == UnifiedObservationStatus.OBSERVED:
             if self.destination is None or self.clarification_action is None:
                 raise ValueError("成功观察必须包含目标和澄清动作。")

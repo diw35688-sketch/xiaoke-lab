@@ -22,8 +22,8 @@
     '.sh-sec{font-size:var(--fs-xs);color:var(--n-500);padding:12px 10px 4px;white-space:nowrap;overflow:hidden}',
     '#shell.side-collapsed .sh-label,#shell.side-collapsed .sh-sec,#shell.side-collapsed #sh-brand b{display:none}',
     '#sh-foot{padding:8px;border-top:1px solid var(--bd-1)}',
-    // 中间画布
-    '#sh-center{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--n-60)}',
+    // 管理画布与聊天互斥显示，不再左右并排。
+    '#sh-center{flex:1;min-width:320px;display:flex;flex-direction:column;background:var(--n-60)}',
     '#sh-top{height:44px;flex:0 0 44px;background:var(--n-00);border-bottom:1px solid var(--bd-2);display:flex;align-items:center;padding:0 14px;gap:10px}',
     '#sh-title{font-size:var(--fs-md);font-weight:600;color:var(--n-900)}',
     '#sh-status{font-size:var(--fs-sm);color:var(--n-600);margin-left:auto;display:flex;align-items:center;gap:6px}',
@@ -107,7 +107,7 @@
     '  <div id="sh-top"><span id="sh-title">实验进行中</span>',
     '    <button class="sh-btn" id="sh-notify" type="button" title="消息通知">🔔<span id="sh-notify-badge">0</span></button>',
     '    <div id="sh-status"></div>',
-    '    <button class="sh-btn" id="sh-toggle-chat">隐藏对话</button></div>',
+    '  </div>',
     '  <div id="sh-canvas"></div>',
     '</div>',
     '<div id="sh-chat-resizer"></div>',
@@ -131,10 +131,18 @@
   window.shellRegisterView = function (name, render) { VIEWS[name] = render; };
   window.shellCanvas = function () { return el('sh-canvas'); };
 
-  var current = 'run';
+  var current = 'chat';
   function show(view) {
     var previous = current;
     current = view;
+    var shell = el('shell');
+    var isChat = view === 'chat';
+    shell.classList.toggle('chat-view', isChat);
+    // 切走设置视图时关闭设置弹窗，避免遮罩挡着其他页面
+    if (view !== 'settings') {
+      var settingsModal = document.getElementById('settings-modal');
+      if (settingsModal) settingsModal.classList.remove('show');
+    }
     Array.prototype.forEach.call(document.querySelectorAll('.sh-item'), function (n) {
       n.classList.toggle('active', n.dataset.view === view);
     });
@@ -208,9 +216,19 @@
       var on = shell.classList.toggle('side-collapsed');
       el('sh-collapse').textContent = on ? '展开' : '收起侧栏';
     };
-    el('sh-toggle-chat').onclick = function () {
-      var closed = shell.classList.toggle('chat-closed');
-      el('sh-toggle-chat').textContent = closed ? '显示对话' : '隐藏对话';
+    var ttsButton = el('sh-tts');
+    function syncTtsButton(detail) {
+      var muted = window.ttsMuted === true;
+      ttsButton.textContent = muted ? '语音关闭' : '语音开启';
+      ttsButton.classList.toggle('active', !muted);
+      ttsButton.title = detail || (muted ? '回复语音已关闭，点击开启' : '回复语音已开启，点击关闭');
+    }
+    syncTtsButton();
+    ttsButton.onclick = function () {
+      window.ttsMuted = !(window.ttsMuted === true);
+      try { localStorage.setItem('tts-muted', window.ttsMuted ? '1' : '0'); } catch (_) {}
+      if (window.ttsMuted) window.stopSpeech?.();
+      syncTtsButton();
     };
     var convoBtn = el('sh-toggle-conversation');
     if (convoBtn) {
@@ -279,7 +297,7 @@
     window.addEventListener('resize', responsive);
 
     document.dispatchEvent(new CustomEvent('shell-ready'));
-    show('run');
+    show('chat');
   }
 
   if (document.readyState === 'loading') {

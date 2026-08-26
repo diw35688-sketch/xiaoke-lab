@@ -123,6 +123,20 @@ class ProgramProjectionTests(unittest.TestCase):
 
 
 class ObservationProjectionTests(unittest.TestCase):
+    def test_abstention_no_action_projects_retry_feedback(self):
+        observation = _observation(
+            destination="abstention",
+            permission="no_action",
+            clarification_action="no_action",
+        )
+
+        messages = messages_for_observation(observation)
+
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(messages[0].kind, MessageKind.SYSTEM_ISSUE)
+        self.assertEqual(messages[0].args["text"], "没听清，请再说。")
+        self.assertEqual(messages[0].priority, MessagePriority.DIRECT_ACK)
+
     def test_failed_projects_record_ack_failed(self):
         observation = _observation(
             status=UnifiedObservationStatus.FAILED,

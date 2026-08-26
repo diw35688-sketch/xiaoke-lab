@@ -4,3 +4,4 @@ sounddevice
 soundfile
 python-dotenv
 sherpa-onnx
+numpy

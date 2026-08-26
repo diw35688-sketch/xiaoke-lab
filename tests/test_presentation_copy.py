@@ -116,6 +116,17 @@ class RecordAckCopyTests(unittest.TestCase):
 
         self.assertEqual(text, "原始记录已保存，结构化处理暂时不可用。")
 
+    def test_recorded_no_step_copy_uses_plain_ack(self):
+        """RECORDED_NO_STEP：结构化成功但无步骤号 → 话术"已记录"。"""
+        intent = _make_intent(
+            MessageKind.RECORD_ACK,
+            args={"result": RecordAckResult.RECORDED_NO_STEP},
+        )
+
+        text = copy_for_intent(intent, ui_mode="user")
+
+        self.assertEqual(text, "已记录。")
+
     def test_failed_copy_confirms_that_raw_record_was_saved(self):
         intent = _make_intent(
             MessageKind.RECORD_ACK,
@@ -289,6 +300,40 @@ class ClarificationCopyTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             copy_for_intent(intent, ui_mode="user")
+
+
+class ClarificationVoiceCopyTests(unittest.TestCase):
+    def test_voice_drops_dev_prefix(self):
+        intent = _make_intent(
+            MessageKind.CLARIFICATION,
+            args={"question": "第2步需要离心多长时间？"},
+            screen_target=ScreenTarget.CURRENT_QUESTION,
+        )
+
+        text = copy_for_intent(intent, ui_mode="user", voice=True)
+
+        self.assertEqual(text, "第2步需要离心多长时间？")
+
+    def test_voice_admin_drops_prefix_and_source(self):
+        intent = _make_intent(
+            MessageKind.CLARIFICATION,
+            args={"question": "第2步需要离心多长时间？"},
+            screen_target=ScreenTarget.CURRENT_QUESTION,
+        )
+
+        text = copy_for_intent(intent, ui_mode="admin", voice=True)
+
+        self.assertEqual(text, "第2步需要离心多长时间？")
+
+    def test_voice_record_ack_equals_text(self):
+        intent = _make_intent(
+            MessageKind.RECORD_ACK,
+            args={"result": RecordAckResult.DEGRADED},
+        )
+
+        text = copy_for_intent(intent, ui_mode="user", voice=True)
+
+        self.assertEqual(text, "原始记录已保存，结构化处理暂时不可用。")
 
 
 class ConfirmationAckCopyTests(unittest.TestCase):

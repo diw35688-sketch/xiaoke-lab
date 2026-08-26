@@ -11,13 +11,29 @@ import soundfile as sf
 from src.asr.languages import SUPPORTED_SENSEVOICE_LANGUAGES
 from src.asr.schemas import ASRResult
 from src.config import (
+    ASR_LANGUAGE,
     ASR_SENSEVOICE_MODEL,
     DEVICE,
-    VAD_MODEL,
+    PROJECT_DIR,
 )
 
 
 logger = logging.getLogger(__name__)
+
+
+def _local_sensevoice_path(model_name: str) -> str:
+    """Prefer the bundled cache and avoid ModelScope resolution on every boot."""
+
+    supplied = Path(model_name)
+    if supplied.is_dir():
+        return str(supplied.resolve())
+    cache_root = Path(os.getenv(
+        "MODELSCOPE_CACHE", str(PROJECT_DIR / "models" / "modelscope_cache")
+    ))
+    candidate = (
+        cache_root / "models" / "iic--SenseVoiceSmall" / "snapshots" / "master"
+    )
+    return str(candidate.resolve()) if candidate.is_dir() else model_name
 
 
 class SenseVoiceBackend:
@@ -27,13 +43,11 @@ class SenseVoiceBackend:
         self,
         *,
         model_name: str = ASR_SENSEVOICE_MODEL,
-        vad_model: str = VAD_MODEL,
         device: str = DEVICE,
         model_engine: Any | None = None,
         postprocess: Callable[[str], str] | None = None,
     ) -> None:
         self.model_name = model_name
-        self.vad_model = vad_model
         self.device = device
 
         if model_engine is None:
@@ -53,17 +67,15 @@ class SenseVoiceBackend:
             version_checker.check_for_update = lambda disable=False: None
 
             logger.info("正在加载SenseVoice ASR模型……")
+            resolved_model = _local_sensevoice_path(model_name)
             model_engine = AutoModel(
-                model=model_name,
-                vad_model=vad_model,
-                vad_kwargs={
-                    "max_single_segment_time": 30_000,
-                },
+                model=resolved_model,
                 device=device,
                 disable_update=True,
                 disable_pbar=True,
                 disable_log=True,
             )
+            logger.info("SenseVoice使用本地模型目录：%s", resolved_model)
             logger.info("SenseVoice ASR模型加载完成")
 
         if postprocess is None:
@@ -80,7 +92,7 @@ class SenseVoiceBackend:
         self,
         audio_path: Path,
         *,
-        language: str = "auto",
+        language: str = ASR_LANGUAGE,
     ) -> ASRResult:
         audio_path = Path(audio_path)
 

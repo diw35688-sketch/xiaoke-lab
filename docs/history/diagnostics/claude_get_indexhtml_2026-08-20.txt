@@ -1,0 +1,1040 @@
+ ▐▛███▜▌   Claude Code v2.1.148
+[历史诊断记录：2026-08-20 页面抓取会话，非项目启动文件]
+▝▜█████▛▘  deepseek-v4-pro · API Usage Billing
+  ▘▘ ▝▝    ~\Documents\107
+
+❯ 查清了，**乱的根源确认**：桌面页（GET /）= 老版 `index.html` + 7              
+  个语音相关脚本**堆在一起**。你的页面里其实有 **4                              
+  个语音入口**，各干各的、样式不一、没人告诉你哪个是哪个：                      
+                                                                                
+  | 你看到的 | 来自 | 识别后去哪 | 真实用途 |                                   
+  |---|---|---|---|                                                             
+  | **灰色圈圈"◉"** | index.html 老代码 | 填聊天框 → /chat |                    
+  浏览器原生语音（**老版第 1 版**，识别中文实验术语弱） |                       
+  | **"🎤 自动语音"** | vad_mode.js | 塞聊天框 → /chat | 免按键连续**对话** |   
+  | **底部"开始录音"**（你没看到） | voice_asr.js | **直连 /record** |          
+  语音**记录**（我们改的，B4 主战场） |                                         
+  | **"电话"** | phone_call.js | /chat/stream | 打电话式**对话** |              
+                                                                                
+  蓝色按钮你没看到，很可能因为它挂在页面底部、被聊天区盖住或太不显眼——4         
+  个入口挤在一页，确实该治。                                                    
+                                                                                
+  ## 治理方案（请你拍板）                                                       
+                                                                                
+  **主线**：4 个入口其实只有**两种职责**——**记录**（单发口述→落库）和**对话**（ 
+  多轮聊天）。治乱的关键不是合并，是**让每个入口说得清自己是干什么的**。        
+                                                                                
+  | 方案 | 做法 | 代价 |                                                        
+  |---|---|---|                                                                 
+  | **A. 收敛职责 + 明确标注（推荐）** | ①                                      
+  退役灰色圈圈"◉"（浏览器原生，被服务端 SenseVoice 完全替代，走 /chat 还绕）；② 
+   "🎤 自动语音"改名"语音对话"（保留，它是对话入口）；③                         
+  底部"开始录音"改名"语音记录"、样式强化成显眼蓝色条；④ "电话"改名"电话模式" |  
+  改 index.html + 3 个 JS 的文案/样式，动前端需真实验收 |                       
+  | B. 单一语音按钮 + 弹菜单 | 一个按钮，点开选"记录 / 对话" |                  
+  改动最大，容易碰坏现有聊天流 |                                                
+  | C. 最小：只强化蓝色按钮 | 只把"开始录音"做显眼，其余不动 |                  
+  最稳，但灰色圈圈还留着，容易再点错 |                                          
+                                                                                
+  **我推荐 A**：职责分离是架构决定的（记录走 /record、对话走                    
+  /chat，各有各的链路），治乱就是**把入口的职责标清楚 +                         
+  退役没人要的老入口**，而不是强行合并。                                        
+                                                                                
+  **确认点**：选哪个方案？（A/B/C）另外确认一下——你现在看到"灰色圈圈"和"自动语  
+  音"，它们是不是都**在聊天输入框附近**（不是页面底部）？这决定退役灰色圈圈时要 
+  不要动聊天框布局。                                                            
+
+● 我先核实一下你这段分析里对代码的断言（4
+  个入口、各自路由、按钮位置），再给结论——不凭记忆直接改前端。
+
+  let me check memory context and verify the actual files.
+
+  Searched for 4 patterns, read 1 file, recalled 1 memory (ctrl+o to expand)
+
+● 核实到关键点了，index.html 本身其实只引用了 1 个脚本
+  /static/inworld_tts.js（第 31 行），其余语音脚本是被别的地方动态加载的。我再看
+   app.py 的路由和 shell/composer 怎么把页面组装起来的，确认"7
+  个脚本堆在一起"的真实来源。
+
+  Read 2 files (ctrl+o to expand)
+
+● 路由机制确认了：app.py 的 home() 把 index.html 读进来后，动态注入了约 20 
+  个脚本（settings.js、voice_asr.js、vad_mode.js、composer.js、phone_call.js、sh
+  ell.js…），再由 shell.js 把页面重排成三栏外壳。这跟"堆在一起"的判断一致，但有
+  个关键细节需要进一步核对：index.html 里的灰色圈圈 #mic（浏览器原生）其实被
+  shell.js 和 composer.js 藏掉了。我读一下
+  composer/voice_asr/vad_mode/phone_call 四个文件，把 4
+  个入口的真实对应关系钉死，避免方案 A 退役错对象。
+
+  Read 4 files (ctrl+o to expand)
+
+● 核实完了。你"4 个入口、乱"的判断成立，但表格里有一条映射错了，会直接带偏方案 A
+   的步骤①——我读了 app.py 的脚本注入逻辑，加上 shell / composer / vad_mode /
+  voice_asr / phone_call 五个文件，把真实对应关系钉死了。
+
+  修正后的真实对应
+
+  ┌──────────────┬──────────────────────┬─────────────────────┬────────────┐
+  │ 你在页面上看 │       真实来源       │        职责         │ 识别后去哪 │
+  │     到的     │                      │                     │            │
+  ├──────────────┼──────────────────────┼─────────────────────┼────────────┤
+  │ 灰色圈圈 ◉   │ composer.js 的       │ 语音记录（单发口述→ │ /record    │
+  │              │ #cp-mic              │ 落库）              │            │
+  ├──────────────┼──────────────────────┼─────────────────────┼────────────┤
+  │ 🎤 语音对话  │ vad_mode.js          │ 对话（VAD 免按键）  │ /chat      │
+  ├──────────────┼──────────────────────┼─────────────────────┼────────────┤
+  │ 通话         │ phone_call.js        │ 对话（连续电话式）  │ /chat      │
+  ├──────────────┼──────────────────────┼─────────────────────┼────────────┤
+  │              │                      │                     │ 已被 shell │
+  │ （看不到）   │ index.html 的        │ 对话（老第1版）     │ /composer  │
+  │              │ #mic（浏览器原生）   │                     │ 藏掉，死代 │
+  │              │                      │                     │ 码         │
+  ├──────────────┼──────────────────────┼─────────────────────┼────────────┤
+  │              │ voice_asr.js 的      │                     │ 被         │
+  │ （看不到）   │ #asr-btn（蓝色"开始  │ 记录                │ composer   │
+  │              │ 录音"）              │                     │ 藏掉，逻辑 │
+  │              │                      │                     │ 被 ◉ 复用  │
+  └──────────────┴──────────────────────┴─────────────────────┴────────────┘
+
+  两个关键纠正
+
+  1. 你看到的灰色圈圈 ◉，不是"浏览器原生、走 /chat"那个。 浏览器原生那个 #mic
+  早被 shell.js（.chat-form{display:none!important}）加 composer.js
+  一起藏成死代码了。你看到的 ◉ 是 composer.js 的 #cp-mic——它是记录入口（B4
+  主战场），标题写着"语音记录：说实验操作，自动保存并追问"，复用 voice_asr.js
+  的录音逻辑直连 /record。
+  2. 所以方案 A 步骤①"退役灰色圈圈"是错的——退役它等于把记录功能删了。
+
+  真正的"乱"源是两个重复的对话入口：🎤语音对话 和 通话
+  都是"连续免按键对话"，只是两套不同实现（通话带打断/噪音校准，体验更完整但更重
+  ；语音对话轻量）。同一职责占两个按钮，这才是该收敛的地方。
+
+  回答你的位置确认
+
+  灰色圈圈和"🎤语音对话"确实都在聊天输入框附近——在右侧对话框底部的 composer
+  输入卡片同一行（#cp-row 控制行，◉
+  在左、语音对话紧跟其后），不是页面底部。蓝色"开始录音"才在 #sh-chat
+  底部，且已被藏。
+
+  修正后的治理方向
+
+  - 记录入口：保留 ◉，给它加清晰文字标注（现在只有一个符号，看不出是"记录"）。
+  - 对话入口：🎤语音对话 和 通话 二选一或合并（真正该收敛的地方）。
+  - 死代码：浏览器原生 #mic 可退役；蓝色 #asr-btn 只清展示层、逻辑保留（被 ◉
+  复用）。
+
+  一个核心问题请你定： 两个对话入口怎么处理？
+
+  1. 保留「通话」、退役「🎤语音对话」（通话体验更完整）
+  2. 保留「🎤语音对话」、退役「通话」（语音对话更轻量）
+  3. 先不合并，只把两个都标注清楚各自区别
+
+  你选哪个？（选完我再动手改前端，动前端前会按约定说明改哪几行、怎么真实验收。）
+
+✻ Cogitated for 3m 46s
+
+※ recap: We're cleaning up the desktop page's confusing voice buttons. I verified the real mapping and found two redundant "对话" entries ("语音对话" vs "通话"). Next: tell me which one to keep so I can start editing. (disable recaps in /config)
+
+❯ "C:\Users\dahli\Documents\107\docs\VOICE_WEB_MIGRATION_PLAN.md"执行计划phaseC 
+  。好好治理治理前端的语音                                                      
+
+● 先读计划文档，看清 phase C 到底包含哪些步骤，再动手。
+
+  Read 1 file (ctrl+o to expand)
+
+● Phase C 有三个子任务：C1（三张嘴收敛成单一 window.speak）、C2（TTS 改读后端
+  copy 层语音文案）、C3（真机验证
+  barge-in）。这是多步任务，我先建任务清单，再把当前三张嘴和后端 copy
+  层的真实代码摸清。
+
+❯ 或者你有什么补充也加上 
+
+● 收到你的补充授权。我先说明我的**"补充"**范围，再动手摸代码：
+
+  - 主线 = Phase C：C1 三张嘴收敛、C2 TTS 读后端 copy 文案、C3 真机 barge-in
+  验证。
+  - 我的补充：上一轮已经定位的4 语音入口混乱（记录 vs 对话职责混杂 + 死代码 +
+  两个重复的对话入口），这属于"前端语音治理"的一部分，我会一并纳入——但"保留哪个
+  对话入口"这个二选一，到那一步仍需你拍板，我不会擅自删。
+
+  现在先摸清三张嘴（local_tts.js/speak.js/mobile.js）和后端 copy 层的真实代码。
+
+  Read 3 files (ctrl+o to expand)
+
+● 三张嘴的真相已经清楚。我再确认两件事：所有 TTS 全局名（window.speak/stopSpeech
+  /labSpeak/labSpeakMessages）都有谁在调用，以及后端 copy
+  层（生成"小科：…"这类中文文案的地方）在哪、C2 要读的是什么。
+
+  Searched for 2 patterns (ctrl+o to expand)
+
+● 后端 copy 层定位到了：src/core/presentation_copy.py（copy_for_intent
+  生成中文文案，含"小科："前缀）。C2 的关键在"词在后端"，我读一下 copy
+  层、投影层、WebRenderer 和 /record，以及 /chat
+  的语音路径（streaming_chat_v2），把 C2 要改的链路完整看清。
+
+  Read 4 files (ctrl+o to expand)
+● 三张嘴和 copy 层已经看清。最后补两处：手机页 mobile.html 加载了哪些脚本（决定
+  mobile.js 那张嘴怎么收敛），以及 presentation_intent.py 的字段结构（决定 C2
+  要不要加 voice_text 字段）。
+
+  Read 2 files (ctrl+o to expand)
+
+❯ 记得给我讲清楚，谢谢。我也要培养自己处理这种混乱局面的能力 
+
+● 收到你这条最重要的要求——"讲清楚"和"培养你自己处理混乱的能力"。我把这次用的方法
+  总结成一套可复用的步骤，再用真实代码走一遍，然后动手 C1（只推进 C1
+  这一个环节，做完停下让你确认）。
+
+  一、处理"混乱局面"的四步法（先学这个，比改代码更重要）
+
+  混乱的本质，几乎都是同一个词被好几个地方各自定义、各自干活，彼此不知道对方存在
+  。所以第一步永远不是"改"，而是"数清楚有几方在抢同一个名字"。
+
+  1. 画清单（找重复）：抓一个关键名字（这里是 speak /
+  stopSpeech），全局搜它被定义了几次、被谁调用。一次 grep
+  就能把"几张嘴"全揪出来。
+  2. 贴标签（源头 / 重复 / 死代码）：源头=最完整、真正该留的；重复=也干活但和源
+  头重叠、容易打架；死代码=还挂着但被藏/被覆盖、实际不生效。
+  3. 查调用链（谁依赖谁）：删之前逐个确认"每个调用点删了之后有没有人接管"。
+  4. 收敛而不是硬删：把"重复"改成"委托给源头"，外部调用名不变（labSpeak
+  还在），这样外面调用方一行不用改，只换内部实现。
+
+  二、套四步法看这次的三张嘴
+
+  ┌─────┬─────────────┬───────────────────────────────┬────────────────────┐
+  │ 张  │    文件     │          定义了什么           │        标签        │
+  │ 嘴  │             │                               │                    │
+  ├─────┼─────────────┼───────────────────────────────┼────────────────────┤
+  │     │ local_tts.j │ window.speak / stopSpeech /   │                    │
+  │ 嘴① │ s           │ enqueueSpeech（队列+打断+头像 │ 源头（最完整）     │
+  │     │             │ ）                            │                    │
+  ├─────┼─────────────┼───────────────────────────────┼────────────────────┤
+  │     │             │ window.labSpeak /             │                    │
+  │ 嘴② │ speak.js    │ labSpeakStop（另一套 /tts +   │ 重复               │
+  │     │             │ 浏览器兜底）                  │                    │
+  ├─────┼─────────────┼───────────────────────────────┼────────────────────┤
+  │ 嘴③ │ mobile.js   │ 局部 speak（手机页专用）      │ 重复（独立页）     │
+  ├─────┼─────────────┼───────────────────────────────┼────────────────────┤
+  │ 嘴④ │ index.html  │ function speak（浏览器原生）  │ 死代码（被嘴①覆盖  │
+  │     │ 内联        │                               │ ）                 │
+  └─────┴─────────────┴───────────────────────────────┴────────────────────┘
+
+  风险 B 就出在嘴②：它自己 new Audio() 播放，不在嘴① stopSpeech 的管辖内 →
+  用户开口打断时停不掉它正在念的追问。
+
+  三、C1 的 4 处改动 + 2 个我替你做的取舍
+
+  两个取舍先讲（你可否）：
+  - 嘴① local_tts.js 没有浏览器兜底，而嘴②③有。若只删嘴②③，等于把"TTS
+  挂了还能用浏览器发声"的能力丢了，违背"外部服务失败不破坏核心能力"。所以我顺手
+  把浏览器兜底并进嘴①。
+  - 计划把 mobile.js 也列为三张嘴之一，所以手机页也统一到嘴①（加载
+  local_tts.js），否则手机页仍留一张独立嘴。
+
+  现在动手。
+
+● Write(web\frontend\speak.js)
+  ⎿  Added 13 lines, removed 52 lines
+       1 -// 语音播报：优先用本机 Qwen3-TTS（音色好），不可用时自动回退浏
+         -览器内置合成。                                                 
+       2 -// 产品要求：追问和安全提示必须能"说出来"，因为学生双手在忙、看
+         -不见屏幕。                                                     
+       1 +// 语音播报的"薄适配层"：三张嘴已收敛为单一 window.speak（见 lo
+         +cal_tts.js）。                                                 
+       2 +// 本文件只保留 labSpeak / labSpeakStop / labSpeakMessages 这三
+         +个外部名字的兼容，                                             
+       3 +// 实际发声一律委托给 local_tts.js 的 window.speak / window.sto
+         +pSpeech，                                                      
+       4 +// 保证打断（stopSpeech）能停住同一张嘴，不再有第二套 Audio 停 
+         +不到。                                                         
+       5  (function () {
+       4 -  var localAvailable = null;   // null=未知, true/false=已探测 
+       5 -  var audio = null;                                            
+       6 +  window.labSpeak = function (text) {                          
+       7 +    return window.speak ? window.speak(text) : false;          
+       8 +  };                                                           
+       9 +  window.labSpeakStop = function () {                          
+      10 +    if (window.stopSpeech) window.stopSpeech();                
+      11 +  };                                                           
+      12  
+       7 -  function browserSpeak(text) {                                
+       8 -    if (!window.speechSynthesis) return false;                 
+       9 -    try {                                                      
+      10 -      window.speechSynthesis.cancel();                         
+      11 -      var utterance = new SpeechSynthesisUtterance(text);      
+      12 -      utterance.lang = 'zh-CN';                                
+      13 -      utterance.rate = 1.05;                                   
+      14 -      window.speechSynthesis.speak(utterance);                 
+      15 -      return true;                                             
+      16 -    } catch (e) { return false; }                              
+      17 -  }                                                            
+      18 -                                                               
+      19 -  function stop() {                                            
+      20 -    if (audio) { try { audio.pause(); } catch (e) {} audio = nu
+         -ll; }                                                          
+      21 -    if (window.speechSynthesis) { try { window.speechSynthesis.
+         -cancel(); } catch (e) {} }                                     
+      22 -  }                                                            
+      23 -                                                               
+      24 -  function speak(text) {                                       
+      25 -    if (!text) return Promise.resolve(false);                  
+      26 -    if (window.ttsMuted === true) return Promise.resolve(false)
+         -; // 头像开关已关闭语音播报                                    
+      27 -    stop();                                                    
+      28 -    if (localAvailable === false) return Promise.resolve(browse
+         -rSpeak(text));                                                 
+      29 -                                                               
+      30 -    return fetch('/tts', {                                     
+      31 -      method: 'POST',                                          
+      32 -      headers: { 'Content-Type': 'application/json' },         
+      33 -      body: JSON.stringify({ text: text })                     
+      34 -    }).then(function (r) {                                     
+      35 -      if (!r.ok) throw new Error('local tts unavailable');     
+      36 -      return r.blob();                                         
+      37 -    }).then(function (blob) {                                  
+      38 -      localAvailable = true;                                   
+      39 -      audio = new Audio(URL.createObjectURL(blob));            
+      40 -      audio.play();                                            
+      41 -      return true;                                             
+      42 -    }).catch(function () {                                     
+      43 -      localAvailable = false;                                  
+      44 -      return browserSpeak(text);                               
+      45 -    });                                                        
+      46 -  }                                                            
+      47 -                                                               
+      48 -  window.labSpeak = speak;                                     
+      49 -  window.labSpeakStop = stop;                                  
+      50 -                                                               
+      51 -  // 朗读 messages 中需要播报的（追问优先，一次一条，避免多条抢
+         -播）。                                                         
+      52 -  // 前端不判断"要不要问"——这个判断在后端（降级生产者+投影层） 
+         -，                                                             
+      53 -  // 前端只认 screen_target/kind 这两个呈现位。                
+      13 +  // 朗读 messages 中需要播报的（追问优先，一次一条）。判断逻辑
+         +保留在此，                                                     
+      14 +  // 但发声委托 window.speak——前端仍不判"要不要问"，只认 screen
+         +_target/kind。                                                 
+      15    window.labSpeakMessages = function (msgs) {
+      55 -    if (!msgs || !msgs.length || !window.labSpeak) return;     
+      16 +    if (!msgs || !msgs.length) return;                         
+      17      var speakable = msgs.filter(function (m) {
+      18        return m.screen_target === 'current_question' || m.kind =
+          == 'clarification';
+      19      });
+
+● Write(web\frontend\local_tts.js)
+  ⎿  Added 28 lines, removed 7 lines
+      1  (() => {
+      2    let currentAudio = null, requestController = null, queue = [],
+          running = false, jobId = 0;
+      3    const status = document.querySelector('#voice-status');
+      4 +  const setStatus = text => { if (status) status.textContent = t
+        +ext; };                                                         
+      5    const avatar = state => window.dispatchAvatarState?.(state);
+      6    // 通话模式进行中：回答播完应回到"正在聆听"，而不是归位"准备就
+         绪"。
+      7    function isCallActive() {
+     ...
+      29      return new Promise((resolve, reject) => {
+      30        if (expectedJob !== jobId) return resolve();
+      31        const url = URL.createObjectURL(blob); currentAudio = new
+           Audio(url);
+      31 -      currentAudio.onplay = () => { status.textContent = '正在 
+         -朗读回复…'; avatar('speaking'); };                             
+      32 +      currentAudio.onplay = () => { setStatus('正在朗读回复…');
+         + avatar('speaking'); };                                        
+      33        currentAudio.onended = () => { URL.revokeObjectURL(url); 
+          currentAudio = null; resolve(); };
+      34        currentAudio.onerror = () => { URL.revokeObjectURL(url); 
+          currentAudio = null; reject(new Error('浏览器播放音频失败')); }
+          ;
+      35        currentAudio.play().catch(reject);
+      36      });
+      37    }
+      38 +  // 浏览器内置合成兜底：/tts 不可用时仍能出声，保证"说出来"这 
+         +个能力不丢。                                                   
+      39 +  function browserFallback(text) {                             
+      40 +    if (!window.speechSynthesis) return false;                 
+      41 +    try {                                                      
+      42 +      const utterance = new SpeechSynthesisUtterance(text);    
+      43 +      utterance.lang = 'zh-CN'; utterance.rate = 1.05;         
+      44 +      window.speechSynthesis.speak(utterance);                 
+      45 +      return true;                                             
+      46 +    } catch (e) { return false; }                              
+      47 +  }                                                            
+      48    async function processQueue(expectedJob) {
+      49      if (running) return; running = true;
+      50      try {
+      51        while (queue.length && expectedJob === jobId) {
+      41 -        const text = queue.shift(); requestController = new Abo
+         -rtController(); status.textContent = '正在生成下一句语音…';    
+      42 -        const response = await fetch('/tts', { method: 'POST', 
+         -headers: { 'Content-Type': 'application/json' }, body: JSON.str
+         -ingify({ text }), signal: requestController.signal });         
+      43 -        const error = response.ok ? null : await response.json(
+         -); if (!response.ok) throw new Error(error.detail || '语音生成 
+         -失败');                                                        
+      44 -        await play(await response.blob(), expectedJob);        
+      52 +        const text = queue.shift();                            
+      53 +        try {                                                  
+      54 +          requestController = new AbortController(); setStatus(
+         +'正在生成下一句语音…');                                        
+      55 +          const response = await fetch('/tts', { method: 'POST'
+         +, headers: { 'Content-Type': 'application/json' }, body: JSON.s
+         +tringify({ text }), signal: requestController.signal });       
+      56 +          if (!response.ok) {                                  
+      57 +            let detail = '语音生成失败';                       
+      58 +            try { const err = await response.json(); if (err &&
+         + err.detail) detail = err.detail; } catch (e) { /* 非 JSON 错误
+         +体 */ }                                                        
+      59 +            throw new Error(detail);                           
+      60 +          }                                                    
+      61 +          await play(await response.blob(), expectedJob);      
+      62 +        } catch (error) {                                      
+      63 +          if (error.name === 'AbortError' || expectedJob !== jo
+         +bId) break;                                                    
+      64 +          if (!browserFallback(text)) setStatus('本地语音失败：
+         +' + error.message);                                            
+      65 +        }                                                      
+      66        }
+      46 -      if (expectedJob === jobId) { status.textContent = '朗读完
+         -成'; settleAvatar(); }                                         
+      47 -    } catch (error) { if (error.name !== 'AbortError' && expect
+         -edJob === jobId) { status.textContent = `本地语音失败：${error.
+         -message}`; settleAvatar(); } }                                 
+      67 +      if (expectedJob === jobId) { setStatus('朗读完成'); settl
+         +eAvatar(); }                                                   
+      68 +    } catch (error) { if (error.name !== 'AbortError' && expect
+         +edJob === jobId) { setStatus(`本地语音失败：${error.message}`);
+         + settleAvatar(); } }                                           
+      69      finally { running = false; if (queue.length && expectedJob 
+          === jobId) processQueue(expectedJob); }
+      70    }
+      71    function addToQueue(text, replace) {
+
+● Update(web\frontend\mobile.html)
+  ⎿  Added 1 line
+      40      <div id="m-hint">点击开始录音，说完再点一次</div>
+      41      <button id="m-record-btn" type="button" aria-label="录音">
+          🎤</button>
+      42    </footer>
+      43 +  <script src="/static/local_tts.js?v=20260820"></script>      
+      44    <script src="/static/mobile.js?v=20260820"></script>
+      45  </body>
+      46  </html>
+
+● Update(web\frontend\mobile.js)
+  ⎿  Added 1 line, removed 26 lines
+      47      return row;
+      48    }
+      49  
+      50 -  // 播报：优先服务端火山 TTS（女声），失败回退浏览器系统语音。
+      51 -  function speak(text) {                                       
+      52 -    if (!text) return;                                         
+      53 -    if (window.ttsMuted === true) return; // 头像语音开关（全局
+         -）                                                             
+      54 -    fetch("/tts", {                                            
+      55 -      method: "POST",                                          
+      56 -      headers: { "Content-Type": "application/json" },         
+      57 -      body: JSON.stringify({ text: text })                     
+      58 -    }).then(function (r) {                                     
+      59 -      if (!r.ok) throw new Error("tts unavailable");           
+      60 -      return r.blob();                                         
+      61 -    }).then(function (blob) {                                  
+      62 -      var url = URL.createObjectURL(blob);                     
+      63 -      var audio = new Audio(url);                              
+      64 -      audio.play();                                            
+      65 -    }).catch(function () {                                     
+      66 -      if (!window.speechSynthesis) return;                     
+      67 -      try {                                                    
+      68 -        window.speechSynthesis.cancel();                       
+      69 -        var utterance = new SpeechSynthesisUtterance(text);    
+      70 -        utterance.lang = "zh-CN";                              
+      71 -        utterance.rate = 1.05;                                 
+      72 -        window.speechSynthesis.speak(utterance);               
+      73 -      } catch (e) { /* 播报失败不影响记录 */ }                 
+      74 -    });                                                        
+      75 -  }                                                            
+      50 +  // 播报已收敛到 local_tts.js 的 window.speak（单一发声源，含 
+         +队列 + 打断 + 浏览器兜底）。                                   
+      51  
+      52    // Float32 → 16kHz 单声道 PCM WAV（与 voice_asr.js 相同的零依
+          赖编码）。
+      53    function encodeWav(samples, inputRate) {
+
+● Update(web\frontend\mobile.js)
+  ⎿  Added 4 lines, removed 1 line
+      150      msgs.forEach(function (m) {
+      151        var isAsk = m.kind === "clarification" || m.screen_targe
+           t === "current_question";
+      152        addBubble(m.text, isAsk ? null : "warn", isAsk ? "小科追
+           问" : "系统");
+      153 -      if (isAsk) speak(String(m.text || "").replace(/^小科：/,
+          - ""));                                                        
+      153 +      if (isAsk) {                                            
+      154 +        var sayText = String(m.text || "").replace(/^小科：/, 
+          +"");                                                          
+      155 +        if (window.speak) window.speak(sayText);              
+      156 +      }                                                       
+      157      });
+      158    }
+      159  
+
+● 4 处改动已落地。现在做两件验证：① 确认 mobile.js 里没有残留对已删 speak
+  的调用；② 定位 .venv 解释器路径，准备跑全量测试。
+
+  Searched for 3 patterns (ctrl+o to expand)
+
+● .venv 在项目根目录（Documents\107\.venv），mobile.js 已无残留的局部 speak
+  调用（只剩注释和 window.speak）。
+
+  现在跑全量测试（C1 是纯前端改动，Python
+  测试应该不受影响，但按项目约定每轮必须跑）。
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● C1 完成。按"推进闸门"汇报，然后停下等你确认再进 C2。
+
+  一、详细交付（改了 4 个文件）
+
+  ┌───────────┬────────────────────────────┬───────────────────────────────┐
+  │   文件    │            改动            │             效果              │
+  ├───────────┼────────────────────────────┼───────────────────────────────┤
+  │ speak.js  │ 整段重写成"薄适配层"，删掉 │ 嘴②不再自己发声，labSpeak→win │
+  │           │ 自己那套 /tts+Audio        │ dow.speak                     │
+  ├───────────┼────────────────────────────┼───────────────────────────────┤
+  │ local_tts │ status 空安全 +            │ 嘴①变成"唯一且最完整"的发声源 │
+  │ .js       │ 补浏览器兜底               │                               │
+  ├───────────┼────────────────────────────┼───────────────────────────────┤
+  │ mobile.ht │ 多加载 local_tts.js        │ 手机页也用嘴①                 │
+  │ ml        │                            │                               │
+  ├───────────┼────────────────────────────┼───────────────────────────────┤
+  │ mobile.js │ 删局部 speak，追问改调     │ 嘴③收敛                       │
+  │           │ window.speak               │                               │
+  └───────────┴────────────────────────────┴───────────────────────────────┘
+
+  核心效果：现在全站只有一个 window.speak / 
+  window.stopSpeech。打断（barge-in）时 stopSpeech
+  停的是这唯一一张嘴，不再有"停错对象"。
+
+  二、测试证据 + 证据边界
+
+  能证明：全量 800 tests OK（7.3s），证明后端零回归（C1 是纯前端，没碰
+  Python）。
+
+  不能证明：JS 在浏览器里的真实行为——TTS 还能不能出声、打断能不能停住、手机页兜
+  底正不正常。这些只有真机/浏览器才能验证，正是 C3
+  要做的，我没法在这个环境里替你确认。
+
+  三、本轮知识（一段，三段式）
+
+  - 白话：三张嘴里嘴②最危险——它自己造了个"小喇叭"，别人喊"停"它听不到。治理不是
+  删掉它，而是让它"别自己发声了，改成转发给嘴①"。这样喊停的人还喊同一个名字，但
+  停得住了。
+  - 术语：适配器/委托模式（Adapter /
+  Delegation）——保留对外的名字和形状（labSpeak
+  还在），内部转发给另一个实现（window.speak）。
+  - 项目体现：speak.js 现在就是适配层；voice_asr.js 调 labSpeakMessages
+  的地方一行没改，内部却已经换成嘴①。反面例子：如果不这么做、直接删嘴②，那
+  voice_asr.js
+  的调用就断了；如果留着嘴②不动，打断还是停不掉它——两种都错，唯独"委托"两全。
+
+  这里有没有不清楚的？
+
+  四、唯一下一步（暂停，等你拍板）
+
+  下一步是 C2（TTS 改读后端 copy 层语音文案）。但 C2
+  有个范围需要你先定，因为它有两种做法：
+
+  - C2a（小改，后端加一个字段）：在 copy 层给每条意图加一个
+  voice_text（去"小科："前缀、更短、适合念），前端 TTS 读它，不再自己
+  replace(/^小科：/,'') 剥前缀。
+  - C2b（大改，动 /chat 链路）：把"对话流念 /chat 整段 agent
+  回答"这个行为停掉，改成只念后端统一理解链产出的短语音文案。
+
+  我倾向 C2a（改动小、边界清晰、真正落实"词在后端"）；C2b 牵扯 /chat agent 与
+  Phase D 真观察器的关系，风险大、容易范围蔓延。
+
+  请你定两件事：① C2 走 a 还是 b？② 允许我先把三份文档 + PROJECT_ARCHITECTURE.md
+   5.3 迁移对照表更新了（登记"三张嘴收敛"），还是等 C2 一起收尾再写？
+
+✻ Cooked for 10m 41s
+
+❯ 什么意思，那它C2a的消息来源是什么                                             
+
+● 好问题，这正是关键。我先直接回答，再纠正我自己上一轮一个没讲清楚的地方。
+
+  直接回答：C2a 的消息来源
+
+  C2a 的消息来源是后端 /record 链路里那套 copy 
+  层已经生成好的中文文案，具体文件是 src/core/presentation_copy.py 的
+  copy_for_intent()。
+
+  它现在的完整来源链（这就是"词在后端"）：
+
+  你按灰色圈圈说话 → 录音 → /asr/transcribe 转文字
+    → POST /record（web/api/record.py）
+    → degraded_producer 降级生产者 → 产出"部分观察"
+    → messages_for_observation()（投影成意图，不含中文）
+    → WebRenderer.render() → 调 copy_for_intent() 生成中文"小科：请补充用量"
+    → 返回 messages[]（每条含 text / kind / screen_target / priority）
+    → 前端 speak.js 的 labSpeakMessages 挑出要念的，剥掉"小科："念出来
+
+  C2a 要做的，就是在这条链里多产出一个 voice_text 
+  字段（去掉"小科："前缀、适合朗读的短版本），让前端不再自己
+  replace(/^小科：/,'') 剥前缀。所以它的消息来源不是 /chat，而是 copy 层。
+
+  但我要纠正自己上一轮的一个错误表述
+
+  计划里 C2 写的"替换现状'念 /chat agent
+  回答'"，指向的是另一条链路（对话链路），跟 C2a
+  不是一回事。我上一轮把两条混在一起，是我不清楚。现在分开讲：
+
+  ┌────────────────────┬───────────────────────────┬────────────────────────┐
+  │                    │       链路 A：记录        │      链路 B：对话      │
+  ├────────────────────┼───────────────────────────┼────────────────────────┤
+  │ 入口               │ 灰色圈圈（voice_asr.js）  │ 语音对话 / 通话 /      │
+  │                    │                           │ 文字聊天               │
+  ├────────────────────┼───────────────────────────┼────────────────────────┤
+  │ 后端               │ /record → copy 层         │ /chat → agent 自由生成 │
+  ├────────────────────┼───────────────────────────┼────────────────────────┤
+  │                    │ copy                      │ agent                  │
+  │ 前端念什么         │ 层文案（已是"词在后端"）  │ 整段回答（还是"念      │
+  │                    │                           │ /chat"）               │
+  ├────────────────────┼───────────────────────────┼────────────────────────┤
+  │                    │ ✅                        │ ❌ 没有（agent         │
+  │ 是否已有短语音文案 │ 有（"小科：请补充用量"）  │ 是自由文本，无 copy    │
+  │                    │                           │ 短文案）               │
+  └────────────────────┴───────────────────────────┴────────────────────────┘
+
+  所以真相是：
+  - C2a 只治理链路 A（记录），让它更干净——但链路 A 本来就"词在后端"了，C2a
+  只是把"剥前缀"从前端搬到后端，是个小优化。
+  - 计划里真正的 C2（替换念 /chat agent 回答）＝ 治链路 B，这才是"念 agent
+  回答"的来源。但链路 B 要能念 copy 层短文案，得先让对话也走统一理解链——这要等 
+  Phase D（真观察器），现在做不了干净的。
+
+  所以我上一轮 C2a/C2b 的问法，修正成这个
+
+  请你定 C2 到底做哪个：
+
+  1. 做 C2a：给链路 A 加 voice_text 字段（小改、干净、现在就做）；同时把"链路 B
+  念 /chat 回答"明确登记为暂缓到 Phase D。
+  2. C2 整个暂缓：Phase C 只做 C1（已完成）+ C3（真机 barge-in），C2 全部留到
+  Phase D 一起做。
+
+  我倾向 1——它把现在能干净做的那部分先落地，把做不了的诚实标出来，不硬凑。
+
+  你选哪个？
+
+✻ Brewed for 1m 40s
+
+❯ 1                                                                             
+
+● 明白，走 C2a + 把"链路 B 念 /chat 回答"登记为暂缓到 Phase D。
+
+  先摸清现状：copy_for_intent 和 WebRenderer 现在有没有测试锁定了输出字段（加
+  voice_text 字段会不会打破旧断言）。
+
+  Searched for 3 patterns (ctrl+o to expand)
+
+● 两个测试文件锁定了输出：test_web_renderer.py 检查 WebRenderer
+  的字段，test_presentation_copy.py 检查 copy 文案。我读一下它们，确认加
+  voice_text 要动哪些断言、要补哪些新测试。
+
+  Read 2 files (ctrl+o to expand)
+● 测试结构清楚了：现有断言都是查单个字段（payload["text"]），不是断言整字典相等
+  ，所以加 voice_text 字段不会打破旧测试。现在动手 C2a 的代码改动。
+
+● Update(src\core\presentation_copy.py)
+  ⎿  Added 7 lines, removed 1 line
+      82      intent: PresentationIntent,
+      83      *,
+      84      ui_mode: str,
+      85 +    voice: bool = False,                                       
+      86  ) -> str:
+      86 -    """生成最终文案；支持记录回执、追问、回答/确认回执、暂缓、 
+         -查看列表与固定提示。"""                                        
+      87 +    """生成最终文案；支持记录回执、追问、回答/确认回执、暂缓、 
+         +查看列表与固定提示。                                           
+      88  
+      89 +    voice=True 时产出"语音渠道"文案：去掉仅用于屏幕显示的称呼前
+         +缀（如"小科："）                                               
+      90 +    与管理端来源标注（"（来源口述 N）"），适合直接交给 TTS 朗读
+         +。                                                             
+      91 +    当前仅 CLARIFICATION 有此差异，其余 kind 的显示文案与语音文
+         +案相同。                                                       
+      92 +    """                                                        
+      93 +                                                               
+      94      _validate_ui_mode(ui_mode)
+      95      if intent.kind == MessageKind.PROGRAM_STATUS:
+      96          return _copy_program_status(intent)
+
+● Update(src\core\presentation_copy.py)
+  ⎿  Added 1 line, removed 1 line
+      101      if intent.kind == MessageKind.RECORD_ACK:
+      102          return _copy_record_ack(intent, ui_mode)
+      103      if intent.kind == MessageKind.CLARIFICATION:
+      104 -        return _copy_clarification(intent, ui_mode)           
+      104 +        return _copy_clarification(intent, ui_mode, voice=voic
+          +e)                                                            
+      105      if intent.kind == MessageKind.CONFIRMATION_ACK:
+      106          return _copy_confirmation_ack(intent, ui_mode)
+      107      if intent.kind == MessageKind.CLARIFICATION_DEFERRED:
+
+● Update(src\core\presentation_copy.py)
+  ⎿  Added 7 lines, removed 1 line
+      185      return _with_source(base, intent, ui_mode)
+      186  
+      187  
+      188 -def _copy_clarification(intent: PresentationIntent, ui_mode: s
+          -tr) -> str:                                                   
+      188 +def _copy_clarification(                                      
+      189 +    intent: PresentationIntent, ui_mode: str, *, voice: bool =
+          + False                                                        
+      190 +) -> str:                                                     
+      191      question = intent.args.get("question")
+      192      if not isinstance(question, str) or not question.strip():
+      193          raise ValueError("CLARIFICATION 必须包含非空 question
+           。")
+      194  
+      195 +    if voice:                                                 
+      196 +        # 语音渠道：只念问题本身，不带"小科："称呼前缀，也不带
+          +管理端来源标注。                                              
+      197 +        return question                                       
+      198 +                                                              
+      199      base = f"小科：{question}"
+      200      if ui_mode == "admin" and intent.source_segment_id is not 
+           None:
+      201          return f"{base}（来源口述 {intent.source_segment_id}）
+           "
+
+● Update(web\web_renderer.py)
+  ⎿  Added 3 lines, removed 1 line
+      34  
+      35          字段：intent_id（追踪）、kind/screen_target（上样式）、
+      36          priority（排序，转 int 保证 JSON 可序列化）、
+      37 -        source_segment_id（来源口述，可空）、text（copy 层最终 
+         -话）。                                                         
+      37 +        source_segment_id（来源口述，可空）、text（copy 层显示 
+         +话）、                                                         
+      38 +        voice_text（copy 层语音渠道话，去称呼前缀，供 TTS 直接 
+         +朗读）。                                                       
+      39          args 不透传：前端不应拿意图参数做二次判断。
+      40          """
+      41          return {
+     ...
+      45              "priority": int(intent.priority),
+      46              "source_segment_id": intent.source_segment_id,
+      47              "text": copy_for_intent(intent, ui_mode=self._ui_mo
+          de),
+      48 +            "voice_text": copy_for_intent(intent, ui_mode=self.
+         +_ui_mode, voice=True),                                         
+      49          }
+
+● Update(web\frontend\speak.js)
+  ⎿  Added 2 lines, removed 2 lines
+      18        return m.screen_target === 'current_question' || m.kind =
+          == 'clarification';
+      19      });
+      20      if (speakable.length) {
+      21 -      // 朗读只念问题本身，去掉 copy 层的"小科："称呼前缀      
+      22 -      window.labSpeak(String(speakable[0].text || '').replace(/
+         -^小科：/, ''));                                                
+      21 +      // 词在后端：直接念 copy 层给的 voice_text（已去"小科：" 
+         +前缀），前端不再剥。                                           
+      22 +      window.labSpeak(String(speakable[0].voice_text || speakab
+         +le[0].text || ''));                                            
+      23      }
+      24    };
+      25  })();
+
+● Update(web\frontend\mobile.js)
+  ⎿  Added 2 lines, removed 1 line
+      151        var isAsk = m.kind === "clarification" || m.screen_targe
+           t === "current_question";
+      152        addBubble(m.text, isAsk ? null : "warn", isAsk ? "小科追
+           问" : "系统");
+      153        if (isAsk) {
+      154 -        var sayText = String(m.text || "").replace(/^小科：/, 
+          -"");                                                          
+      154 +        // 词在后端：直接念 voice_text（已去"小科："前缀），前
+          +端不再剥。                                                    
+      155 +        var sayText = String(m.voice_text || m.text || "");   
+      156          if (window.speak) window.speak(sayText);
+      157        }
+      158      });
+
+● 代码改动完成。现在补测试：test_presentation_copy.py 加 voice
+  分支测试，test_web_renderer.py 加 voice_text 字段断言。
+
+● Update(tests\test_presentation_copy.py)
+  ⎿  Added 34 lines
+      226              copy_for_intent(intent, ui_mode="user")
+      227  
+      228  
+      229 +class ClarificationVoiceCopyTests(unittest.TestCase):         
+      230 +    def test_voice_drops_dev_prefix(self):                    
+      231 +        intent = _make_intent(                                
+      232 +            MessageKind.CLARIFICATION,                        
+      233 +            args={"question": "第2步需要离心多长时间？"},     
+      234 +            screen_target=ScreenTarget.CURRENT_QUESTION,      
+      235 +        )                                                     
+      236 +                                                              
+      237 +        text = copy_for_intent(intent, ui_mode="user", voice=T
+          +rue)                                                          
+      238 +                                                              
+      239 +        self.assertEqual(text, "第2步需要离心多长时间？")     
+      240 +                                                              
+      241 +    def test_voice_admin_drops_prefix_and_source(self):       
+      242 +        intent = _make_intent(                                
+      243 +            MessageKind.CLARIFICATION,                        
+      244 +            args={"question": "第2步需要离心多长时间？"},     
+      245 +            screen_target=ScreenTarget.CURRENT_QUESTION,      
+      246 +        )                                                     
+      247 +                                                              
+      248 +        text = copy_for_intent(intent, ui_mode="admin", voice=
+          +True)                                                         
+      249 +                                                              
+      250 +        self.assertEqual(text, "第2步需要离心多长时间？")     
+      251 +                                                              
+      252 +    def test_voice_record_ack_equals_text(self):              
+      253 +        intent = _make_intent(                                
+      254 +            MessageKind.RECORD_ACK,                           
+      255 +            args={"result": RecordAckResult.DEGRADED},        
+      256 +        )                                                     
+      257 +                                                              
+      258 +        text = copy_for_intent(intent, ui_mode="user", voice=T
+          +rue)                                                          
+      259 +                                                              
+      260 +        self.assertEqual(text, "原始记录已保存，结构化处理暂时
+          +不可用。")                                                    
+      261 +                                                              
+      262 +                                                              
+      263  class ConfirmationAckCopyTests(unittest.TestCase):
+      264      def test_answered_with_remaining_fields_translates_field_n
+           ames(self):
+      265          intent = _make_intent(
+
+● Update(tests\test_web_renderer.py)
+  ⎿  Added 1 line
+      57          self.assertEqual(payload["priority"], 20)  # ACTIVE_QUE
+          STION
+      58          self.assertEqual(payload["source_segment_id"], 3)
+      59          self.assertEqual(payload["text"], "小科：缺时长，请补充
+          ")
+      60 +        self.assertEqual(payload["voice_text"], "缺时长，请补充
+         +")                                                             
+      61  
+      62      def test_record_ack_degraded_renders_text(self):
+      63          intent = _intent(
+
+● Update(tests\test_web_renderer.py)
+  ⎿  Added 12 lines
+      67          payload = web_renderer.WebRenderer().render(intent)
+      68          self.assertEqual(payload["kind"], "record_ack")
+      69          self.assertEqual(payload["text"], "原始记录已保存，结构
+          化处理暂时不可用。")
+      70 +        self.assertEqual(payload["voice_text"], "原始记录已保存
+         +，结构化处理暂时不可用。")                                     
+      71  
+      72 +    def test_clarification_voice_text_drops_prefix(self):      
+      73 +        intent = _intent(                                      
+      74 +            MessageKind.CLARIFICATION,                         
+      75 +            args={"question": "缺时长，请补充"},               
+      76 +            priority=MessagePriority.ACTIVE_QUESTION,          
+      77 +            screen_target=ScreenTarget.CURRENT_QUESTION,       
+      78 +        )                                                      
+      79 +        payload = web_renderer.WebRenderer().render(intent)    
+      80 +        self.assertEqual(payload["text"], "小科：缺时长，请补充
+         +")                                                             
+      81 +        self.assertEqual(payload["voice_text"], "缺时长，请补充
+         +")                                                             
+      82 +                                                               
+      83      def test_record_ack_recorded_renders_step_text(self):
+      84          intent = _intent(
+      85              MessageKind.RECORD_ACK,
+
+● Update(tests\test_web_renderer.py)
+  ⎿  Added 1 line
+      146          self.assertEqual(payloads[0]["kind"], "clarification")
+      147          self.assertEqual(payloads[0]["screen_target"], "curren
+           t_question")
+      148          self.assertEqual(payloads[0]["text"], "小科：缺时长，
+           请补充")
+      149 +        self.assertEqual(payloads[0]["voice_text"], "缺时长， 
+          +请补充")                                                      
+      150  
+      151      def test_record_chain_produces_degraded_json(self):
+      152          observation = degraded_producer.produce_partial_observ
+           ation(
+
+● Update(tests\test_web_renderer.py)
+  ⎿  Added 1 line, removed 1 line
+      1  # -*- coding: utf-8 -*-
+      2  """web/web_renderer.py 渲染器单测：不依赖网络与真实服务。
+      3  
+      4 -覆盖：意图 → JSON 的字段映射（kind/screen_target/priority/text/s
+        -ource_segment_id）、                                            
+      4 +覆盖：意图 → JSON 的字段映射（kind/screen_target/priority/text/v
+        +oice_text/source_segment_id）、                                 
+      5  priority 转 int 保证 JSON 可序列化、admin 模式追加来源、copy 不
+         支持的 kind 明确抛错、
+      6  以及"降级生产者 → 投影 → WebRenderer"全链路。
+      7  """
+
+● C2a 代码 + 测试都改好了。跑全量测试验证。
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● 804 tests OK（800 → 804，新增 4 个 voice 测试全过），后端 + 前端改动一致通过。
+
+  现在做你选的第二件事——登记"链路 B 念 /chat agent 回答"为暂缓到 Phase 
+  D，并写迁移对照表。先看 PROJECT_ARCHITECTURE.md 的 5.3/5.4 现有内容。
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+● 5.3 表结构清楚了。我加两条迁移对照（C1 三张嘴收敛、C2a
+  voice_text），并在迁移计划里把 C2 拆成 C2a（已完成）+ C2b（暂缓到 Phase D）。
+
+● Update(docs\PROJECT_ARCHITECTURE.md)
+  ⎿  Added 2 lines
+      354  | WEB-BRIDGE-01 | `web/llm_bridge.py` 桥接的旧 `ExperimentLLMP
+           rocessor`（`analyze_segment`） | 网页端 LLM 只做实体抽取（even
+           ts + entities），不分辨意图 | `UnifiedUnderstandingProcessor.u
+           nderstand` 一次调用完成 input_kind（experiment/control/uncerta
+           in）分辨 + 结构化；web 只消费 experiment 分支的实体卡片，contr
+           ol/uncertain 只带回标签不执行动作（见 5.6） |
+      355  | WEB-RENDER-01（B4，2026-08-18） | 前端 `voice_asr.js`/`mobil
+           e.js`/`lab_panel.js(labRender)` 读 `evaluation.follow_up_requi
+           red/follow_up_question/deviations` 自行判断"要不要问"并**拼话
+           播报**（薄字典平行投影） | `/record` 返回 `messages`（B3），前
+           端只按 `kind`/`screen_target` 上样式、显示/朗读 `messages` 的 
+           `text`（话术来自后端 copy 层）；"要不要问"的判断权收归后端（降
+           级生产者+投影层） | **保留点（明确标注）**：`views.js` 历史视
+           图仍读 evaluation（messages 不入库，历史无 messages；属存储数
+           据展示非实时判断）；`labEvaluate` 面板走 `/protocols/evaluate`
+           （非 /record 语音链），不在本迁移范围。质量状态见 5.4 表"web 
+           侧"行 |
+      356  | WEB-RENDER-02（2026-08-18 真实验收后补） | 桌面语音链 `voice
+           _asr.js` 识别后 `if (input && form) { requestSubmit() }` 填聊
+           天框送 `/chat`——**B4 改的 /record 直连分支因 `return` 在前从未
+           执行（死代码）**，界面追问/回执话术实为 agent 生成（"好的，请
+           问…"） | 删除聊天框分支，桌面语音口述一律直连 `/record`：判断
+           在后端（降级生产者+投影层）、话术走 messages text（copy 层"小
+           科：…"）、前端只画只念 | **等价提升**：桌面与 `/m` 手机页统一
+           走 messages 渲染；文字聊天（composer→/chat）保留 agent 链不动
+           。真实验收证据：改前语音说"称量磷酸盐"返回 agent 话术；改后返
+           回 copy 层话术 |
+      357 +| VOICE-MOUTH-01（C1，2026-08-20） | `speak.js` 自带 `/tts`+`A
+          +udio` 发声的 `labSpeak`、`mobile.js` 局部 `speak`（两张独立"嘴
+          +"） | 各自 fetch `/tts` 独立发声；打断时 `window.stopSpeech`  
+          +只能停 `local_tts.js` 自己那张，停不到 `speak.js`/`mobile.js` 
+          +正在念的音频（barge-in 失灵，风险 B） | 三张嘴收敛为单一 `wind
+          +ow.speak`（保留 `local_tts.js`）：`speak.js` 改薄适配层 `labSp
+          +eak`→`window.speak`；`mobile.html` 加载 `local_tts.js`、`mobil
+          +e.js` 追问改调 `window.speak`；`local_tts.js` 补浏览器兜底 + s
+          +tatus 空安全。打断现停得住唯一那张嘴 |                        
+      358 +| VOICE-TEXT-01（C2a，2026-08-20） | 前端 `speak.js`/`mobile.j
+          +s` 朗读时 `.replace(/^小科：/, '')` 自己剥称呼前缀 | 从 `messa
+          +ges[].text` 里剥"小科："再念——"词"的一部分（剥前缀）落在前端 |
+          + 后端 copy 层新增 `voice` 通道：`copy_for_intent(..., voice=Tr
+          +ue)` 对 CLARIFICATION 返回纯问题（无"小科："、无来源标注），`W
+          +ebRenderer.render` 多产出 `voice_text`；前端直接念 `voice_text
+          +` 不再剥前缀（词全在后端） |                                  
+      359  
+      360  ### 5.4 用户可见输出质量对照表（2026-08-14 建立，回应"没感觉新
+           链路改善/功能丢了"）
+      361  
+
+● Update(docs\VOICE_WEB_MIGRATION_PLAN.md)  ⎿  Added 8 lines, removed 2 lines
+      104  >   前端只按 `screen_target`/`kind` 上样式、按 `priority` 排序
+           ，**不产话、不判意图**。
+      105  
+      106  ### Phase C · 语音收敛与加固（不阻塞 B，可穿插）
+      107 -- [ ] C1 三张嘴收敛为单一 `window.speak`（保留 `local_tts.js` 
+          -，删另两份）—— 解决风险 B。                                   
+      108 -- [ ] C2 TTS 改读后端 copy 层语音文案（嘴在前端、词在后端）； 
+          -替换现状"念 /chat agent 回答"。                               
+      107 +- [x] C1 三张嘴收敛为单一 `window.speak`（保留 `local_tts.js` 
+          +，删另两份）—— 解决风险 B。                                   
+      108 +      （2026-08-20 完成：speak.js 改薄适配层、mobile.html 加载
+          + local_tts.js、mobile.js 委托 window.speak、                  
+      109 +      local_tts.js 补浏览器兜底 + status 空安全；全量 804 测试
+          +通过）                                                        
+      110 +- [x] C2a 后端 copy 层新增 `voice` 通道 + `voice_text` 字段（ 
+          +词在后端）；前端不再剥"小科："前缀。                          
+      111 +      （2026-08-20 完成：copy_for_intent(voice=True) + WebRend
+          +erer.voice_text + 前端 labSpeakMessages/mobile.js 改读 voice_t
+          +ext；                                                         
+      112 +      新增 4 项 voice 测试，全量 804 通过）                   
+      113 +- [ ] C2b 替换现状"念 /chat agent 回答"（对话链路 TTS 改读 cop
+          +y 层语音文案）—— **暂缓到 Phase D**：                         
+      114 +      对话链路的 agent 回答是自由文本、无 copy 层短文案，需 D 
+          +阶段真观察器接管对话后才能干净替换。                          
+      115  - [ ] C3 真机验证 barge-in：外放 + 耳机分别测漏检/自激 —— 解决
+           风险 A，留证据。
+      116  
+      117  ### Phase D · 升级到真·统一理解（drop-in 抽换生产者）
+
+● C2a 完成，按闸门汇报并停下。
+
+  一、C2a 交付（代码 + 测试 + 登记）
+
+  ┌───────────┬─────────────────────────────────────────────────────────────┐
+  │    层     │                            改动                             │
+  ├───────────┼─────────────────────────────────────────────────────────────┤
+  │ 后端 copy │ copy_for_intent 加 voice 参数；_copy_clarification 在       │
+  │  层       │ voice=True 时返回纯问题（去"小科："前缀、去来源标注）       │
+  ├───────────┼─────────────────────────────────────────────────────────────┤
+  │ 后端渲染  │ WebRenderer.render() 多产出 voice_text 字段（和 text 并存） │
+  ├───────────┼─────────────────────────────────────────────────────────────┤
+  │ 前端      │ speak.js/mobile.js 直接念 voice_text，删掉                  │
+  │           │ replace(/^小科：/,'')                                       │
+  └───────────┴─────────────────────────────────────────────────────────────┘
+
+  证据：全量 804 tests OK（新增 4 项 voice
+  测试）。不能证明：浏览器里念出来的确实是纯问题、没念"小科："——这个要真机听，归
+   C3。
+
+  登记：已写入 PROJECT_ARCHITECTURE.md 5.3（VOICE-MOUTH-01 三张嘴收敛 +
+  VOICE-TEXT-01 voice_text）+ VOICE_WEB_MIGRATION_PLAN.md（C2 拆成 C2a✅ / C2b
+  暂缓到 Phase D）。
+
+  二、本轮知识（三段式，一段）
+
+  - 白话：同一个意思，屏幕要写"小科：请补充用量"（带个名字，让人知道是谁在问），
+  但念出来不能念"小科："（TTS
+  会把"小科"两个字也念出来，很怪）。所以要备两份话：一份给屏幕看，一份给嘴念。
+  - 术语：渠道分离 / 多模态呈现文案（channel
+  separation）——同一语义，不同呈现渠道（屏幕 vs 语音）用不同文案。
+  - 项目体现：copy_for_intent(voice=True) 产 voice_text，WebRenderer 同时给
+  text+voice_text；前端屏幕用 text、朗读用
+  voice_text。反面例子：如果前端自己剥"小科："，那"词"的一部分落在前端——后端换个
+  前缀（比如改成"助手："）前端就得跟着改，等于前端又"懂"了 copy
+  层规则，违背"前端只画不判"。
+
+  这里清楚吗？
+
+  三、唯一下一步：C3 真机验证 barge-in（需要你的设备）
+
+  我没法在这环境里替你做，给你一份验证协议，你照着做、把结果贴给我：
+
+  1. 起服务，电脑浏览器开桌面页（手机另开 /m 也行）。
+  2. 点**「通话」**（电话式，因为 barge-in 主要在这条链）。
+  3. 分两轮测，每轮记"有没有出现这四种现象"：
+    - 外放：手机/电脑外放，看会不会"听见自己 TTS 就把自己打断了"（自激）；
+    - 耳机：戴耳机，看你说"停/打断"时，它能不能停住正在念的话（漏检）。
+  4. 同时验 C1/C2a：追问念出来是纯问题（没有"小科"两个字），打断能停住。
+
+  四、还有两件事待办（等你定）
+
+  1. 补充（4 语音入口治理）：我上一轮定位的"两个重复对话入口（语音对话 vs
+  通话）"还没处理，需要一个二选一决策。
+  2. 完整收尾：三份必维文档 + PROJECT_TASK_CHECKLIST 测试基线（800→804）+ 7
+  段教学总结，我打算在 C3 真机通过后一起做。
+
+  你想先做哪个——C3 
+  你去真机测，还是先处理补充（入口治理），还是现在就做完整收尾？
+
+✻ Churned for 5m 43s

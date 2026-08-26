@@ -1,13 +1,68 @@
 # asr_demo 当前工作区交接说明
 
-最后整理：2026-08-15
+最后整理：2026-08-25
 
 > 本文件是下一会话的短入口，不保存完整历史。任务状态以
 > `PROJECT_TASK_CHECKLIST.md` 为准，架构原因见 `PROJECT_ARCHITECTURE.md`，
 > 文档关系见 `docs/README.md`。
 
+## 0. 工作区与启动路径
+
+- **正式工作区 = `C:\Users\dahli\Documents\107`**（本会话沙箱；最新代码 + .git + 未提交改动都在这里）。
+- 曾计划迁移到 `D:\me\ai107`（4 个 .bat 写死该路径），但 D 盘根目录 ACL 为"仅管理员可写"（`Everyone:(RX)`），
+  普通账户无法写；授权 dahli 后本会话受限 token 仍拒写，最终用户决定**放弃迁移、留在 C 盘**。
+- `D:\me\ai107` 已有一份 robocopy 副本（无 .venv，61MB，ACL 已授权 dahli 完全控制），**保留不动**；
+  若将来要迁，按"管理员建目录/复制 + icacls 授权 + 新会话工作区指向 D 盘"三步走，勿再重复踩权限坑。
+- 2026-08-26 起，根目录只保留普通用户入口 `start.bat`；开发者批处理移至 `scripts/windows/`，旧入口移至 `scripts/legacy_launchers/`。所有有效入口继续用 `%~dp0` 定位仓库，不依赖当前用户名、盘符或个人绝对路径。
+- 新用户统一入口为根目录 `start.bat`，详细步骤见 `docs/ONE_CLICK_START_GUIDE.md`；目标电脑的网络、浏览器、麦克风和真实 API 仍需单独验收。
+
 ## 1. 当前结论
 
+- **`VOICE-WEB-MIGRATION-01`（语音接入 Web 迁移）= REAL_OK，Phase B（B1-B4）完成并真实验收通过（2026-08-18/19）**：
+  用户指定按 `docs/VOICE_WEB_MIGRATION_PLAN.md` 推进（该文件是唯一简明落点）。
+  **产品形态（用户 2026-08-18 定）：最终产品 = web（桌面）+ 手机（/m），以 web 优先**——
+  验收/体验/后续 Phase 均以 web 为主路径，手机页为同构辅助。
+  B1 设计（容忍部分观察分支）→ B2 三模块（partial 字段 13 项 / 降级生产者 12 项 / WebRenderer 10 项）
+  → B3 `/record` 影子 messages（6 项）→ B4 前端切渲染 messages + 迁移对照 §5.3 WEB-RENDER-01/02 + §5.4。
+  **真实验收通过（REAL_OK）**：语音记录闭环（灰色圈圈→录音→/record→面板回执"已记录"）
+  + 选方案缺字段→"小科追问"+ TTS 朗读纯问题。验收修复：WEB-RENDER-02 桌面语音死代码、
+  话术撒谎硬问题（拆 RECORDED_NO_STEP/DEGRADED）、lab_panel.js 未注入、语音入口治理
+  （cp-mic 语音记录 / vad 语音对话 / 通话独立）、文案"小科追问"+TTS 不念前缀。
+  基线：**全量 800 tests OK**。**关键定位纠正（用户）**：统一理解链核心是处理命令（control 分支），
+  B 降级生产者只有记录+方案追问，**命令处理待 Phase D**（见第 2 节）。
+  UX 走查证据已收集（反应慢/称呼重复/前端乱/undefined 段口述等），体验最终裁决权在用户。
+- **`VOICE-WEB-MIGRATION-01` Phase C1/C2a（语音收敛）完成 = AUTO_OK（2026-08-20，功能待 C3 真机 REAL_OK）**：
+  C1 三张嘴收敛为单一 `window.speak`（`speak.js` 改薄适配层、`mobile.html` 加载 local_tts.js、
+  `mobile.js` 委托 window.speak、`local_tts.js` 补浏览器兜底 + status 空安全）——解决风险 B（打断停错对象）。
+  C2a 词在后端：copy 层 `copy_for_intent(voice=True)` + `WebRenderer.voice_text`，前端不再剥"小科："前缀。
+  基线：**全量 804 tests OK**（800→804，+4 项 voice 测试）。C2b（对话链路念 /chat agent 回答）暂缓到 Phase D；
+  C3 真机 barge-in 验证待用户设备（外放测自激、耳机测漏检）。
+- **`CLARIFICATION-COMPOUND-CONFIRM-ANSWER-01`（P0 复合确认+实体）= REAL_OK（2026-08-20，会话 20260820_122234）**：
+  "是的，是X"确认+实体丢字段的根因修复。集合方案（回答类命令/动作集合放行实体，`unified_understanding.py`
+  `_ENTITY_CARRYING_COMMAND_TYPES` + `clarification_acceptance.py` `_ENTITY_CARRYING_ACTION_TYPES`）
+  + B 混合方案（确定性判"确认/否定"、LLM 抽实体）：`interaction_command.py` AFFIRM_PREFIXES 恢复
+  ("是的","没错","确认")、DENY_PREFIXES ("不是","不对","错误")、`confirm_clarification` 加可选
+  `supplied_fields`（先填再确认）、执行器从 answer_text 抽实体。真实验收："是的，50微升" → 已确认问题 2，
+  填入实体 ['amount_unit','amount_value']，问题已解决。基线：**全量 808 tests OK**（804→808，+4 项 P0 测试）。
+  遗留：ASR"是的"→"日的"误识别（ASR-CMD-02 线）；LLM 弃权时 no_action 沉默（PRESENT-NOACTION-FEEDBACK-01）。
+- **`WEB-BRIDGE-01`（web 统一链桥迁移）= REAL_OK（2026-08-16）**：`web/llm_bridge.py`
+  从旧链 `ExperimentLLMProcessor` 迁到统一链 `UnifiedUnderstandingProcessor`，
+  `extract()` 加 `recent_context` + `input_kind`；`web/api/record.py` 补
+  `_recent_context()`（最近 5 条口述）。前端零改动（输出合同未变）。新增
+  `tests/test_web_llm_bridge.py` 7 项；**全量 715 tests OK**。真实验收会话
+  `20260816_200646`（deepseek-v4-pro）：5 条口述无降级、实体准确，口述 3
+  「帮我看看待确认的问题」`input_kind=control`（旧链做不到）。迁移对照登记
+  `PROJECT_ARCHITECTURE.md` §5.3 WEB-BRIDGE-01 + §5.6。**环境修复**：`.venv`
+  补 numpy/sounddevice/soundfile/sherpa-onnx（此前 15 errors 全系缺依赖），
+  requirements.txt 补 numpy；funasr/torch 无需装。功能 REAL_OK，UX 待用户走查。
+  **顺序锁死**：web 已迁完，src 侧 VERIFY-01 删旧链现在才可安全执行。
+- **`WEB-AGENT-FAKE-RECORD-01`（聊天 agent 假记录）= REAL_OK（2026-08-16）**：用户实测发现
+  聊天区输入实验口述，agent 口头"已记录"但 lab_records 无记录。根因 = `agent/core.py`
+  INSTRUCTIONS 未引导 `record_observation` 工具。修复 = 提示词强制"必须调工具、成功才能
+  确认已记录"；新增 `tests/test_web_agent_prompts.py` 5 项合同测试；真实验收 task
+  77ce319c 回复"已记录"且 lab_records 新增 id=10。**全量 739 tests OK**。注意：
+  **页面有两条输入路**——实验记录区（/record，统一链强制落盘）与聊天区（/chat，agent 自由发挥）；
+  聊天区历史 4 条假记录（加热/离心机/溶液/查看）未落盘，用户可重输补录。
 - 正式解释器：Python 3.11.9，项目 `.venv` 可用。2026-08-15 曾因受限执行权限
   无法启动而被误判为环境损坏；正常权限复核全量 497 项通过，环境无问题。
 - **PRESENT 子步 A 全部完成（A-1/A-2a/A-2b/A-3/A-4）= AUTO_OK**：A-1 不可变 `PresentationIntent`；A-2a 记录回执文案目录；A-2b 追问/回答/确认/暂缓文案 + 字段名中文化（temperature→温度）；A-3 `TerminalRenderer`（封装 ui_mode + review 多行文案）；A-4 投影层（业务事实→Intent，补 answer 结构化字段）。专项 57/57、正式全量 544/544 通过。未接 main，用户输出零变化，均跳过 UX 走查。
@@ -29,6 +84,17 @@
 - 工作区存在用户累计未提交修改；不得覆盖、回退或混入无关变更。
 
 ## 2. 当前唯一下一项
+
+> **2026-08-20：Phase B REAL_OK（800）+ Phase C1/C2a（804）+ P0 复合确认 REAL_OK（808）+ 入口治理完成。**
+> **当前唯一下一项（方向待用户定）**：
+> - **C3 真机 barge-in 验证（需用户设备，agent 无法代做）**：外放测自激（听到自己 TTS 就打断自己）、
+>   耳机测漏检（说"停/打断"能否停住正在念的话）；同时验 C1/C2a——追问念纯问题（无"小科"）、打断能停住。
+> - **Phase D（用户强调的核心缺口）**：统一理解链核心是**处理命令**（control 分支：查看待确认/暂缓/确认/
+>   否定/编号回答/结束），B 降级生产者没有命令处理，需接 `UnifiedObserver`（含 LLM）+ 服务端托管会话
+>   （reply_coordinator）才能迁入 web。**注意**：迁入时保留 chat agent 的"执行工具"（list/check/propose/
+>   confirm/calculate/time/memory/move_step），只把 `record_observation` 里的规则抽取收敛进统一链。
+> 详见 `docs/VOICE_WEB_MIGRATION_PLAN.md` 路线图。
+> 全量 808 项通过；入口治理已收（保留「语音记录」+「通话」，删「语音对话」+「头像点击通话」）。
 
 **明天开工清单（2026-08-14 夜定）**：按"硬问题清零即进 PRESENT"的闸门，先做硬问题：
 

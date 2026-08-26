@@ -247,8 +247,12 @@ class ReplyCoordinator:
         clarification_id: str,
         expected_revision: int,
         segment_id: int,
+        supplied_fields: set[str] | None = None,
     ) -> PendingClarification:
-        """按 clarification_id 确认一个需要确认的问题；版本不匹配则拒绝。"""
+        """按 clarification_id 确认一个需要确认的问题；版本不匹配则拒绝。
+
+        supplied_fields 非空时先填缺失字段再清除确认标志（确认+补充实体）。
+        """
 
         target = self._find_clarification(clarification_id)
         if target is None:
@@ -263,7 +267,12 @@ class ReplyCoordinator:
         if not target.requires_confirmation:
             raise ValueError("待确认项不需要确认。")
 
-        updated = target.confirm(segment_id=segment_id)
+        updated = target
+        if supplied_fields:
+            updated = updated.supply_fields(
+                supplied_fields, segment_id=segment_id
+            )
+        updated = updated.confirm(segment_id=segment_id)
         index = self._clarifications.index(target)
         self._clarifications[index] = updated
         return updated

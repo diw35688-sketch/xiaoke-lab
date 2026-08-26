@@ -21,6 +21,7 @@ from api.community import router as community_router
 from api.tasks import router as tasks_router
 from api.templates import router as templates_router
 from api.tts import router as tts_router
+from api.voice_runtime import router as voice_runtime_router
 from config import BASE_DIR
 from database.db import initialize_database
 from scheduler import start_daily_scheduler
@@ -37,17 +38,29 @@ def startup():
     task_manager.start()
 
 
+
+
+def _is_mobile(user_agent: str) -> bool:
+    """粗略判断是否为手机/平板浏览器：根路径自动进手机专用页。"""
+    ua = (user_agent or "").lower()
+    markers = ("mobile", "android", "iphone", "ipad", "windows phone")
+    return any(marker in ua for marker in markers)
+
+
 @app.get("/", include_in_schema=False)
-def home():
+def home(request: Request):
+    if _is_mobile(request.headers.get("user-agent", "")):
+        return HTMLResponse((BASE_DIR / "frontend" / "mobile.html").read_text(encoding="utf-8"))
     page = (BASE_DIR / "frontend" / "index.html").read_text(encoding="utf-8")
-    page = page.replace('/static/inworld_tts.js', '/static/local_tts.js')
+    page = page.replace('/static/inworld_tts.js', '/static/local_tts.js?v=20260826-shared-warmup')
     page = page.replace('</head>', '<link rel="stylesheet" href="/static/theme.css"></head>')
     # 注入模型设置面板（任何人都能在网页里配置模型）
     page = page.replace('</body>', ('<script src="/static/settings.js"></script>'
                                    '<script src="/static/tts_settings.js"></script>'
-                                   '<script src="/static/tool_cards.js"></script>'
-                                   '<script src="/static/speak.js"></script>'
-                                   '<script src="/static/voice_asr.js"></script></body>'))
+                                   '<script src="/static/speak.js?v=20260820"></script>'
+                                   '<script src="/static/interaction_mode_state.js?v=20260825"></script>'
+                                   '<script src="/static/voice_asr.js?v=20260824-stream"></script>'
+                                   '</body>'))
     scripts = (
         '<script src="/static/experiment_confirmation.js"></script>'
         '<script src="/static/experiment_status.js"></script>'
@@ -55,7 +68,11 @@ def home():
         '<script src="/static/memory_panel.js"></script>'
         '<script src="/static/conversation.js"></script>'
         '<script src="/static/avatar.js"></script>'
-        '<script src="/static/streaming_chat_v2.js"></script>'
+        '<script src="/static/voice_delivery_client.js?v=20260825-voice-timing"></script>'
+        '<script src="/static/conversation_turn_store.js?v=20260825"></script>'
+        '<script src="/static/conversation_block_view.js?v=20260826-startup-progress"></script>'
+        '<script src="/static/conversation_context_blocks.js?v=20260825"></script>'
+        '<script src="/static/streaming_chat_v2.js?v=20260825-record-turn-id"></script>'
         '<script src="/static/template_planner.js"></script>'
         '<script src="/static/task_panel.js"></script>'
         '<script src="/static/shell.js?v=20260818"></script>'
@@ -76,6 +93,13 @@ def home():
     )
 
 
+@app.get("/m", include_in_schema=False)
+def mobile_page():
+    """手机专用演示页：大录音按钮 + 转写/追问展示，独立于桌面版布局。"""
+    page = (BASE_DIR / "frontend" / "mobile.html").read_text(encoding="utf-8")
+    return HTMLResponse(page)
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -84,6 +108,8 @@ def phone_access_page(request: Request):
     """手机访问入口页：桌面端打开本页，手机扫二维码即可访问。"""
     status = network_mode.status()
     url = status.get("public_url") or status.get("lan_url") or phone_access.phone_url(request)
+    # 二维码固定指向手机专用页，扫码直接进大按钮版本
+    url = url.rstrip("/") + "/m"
     svg = phone_access.qr_svg(url)
     qr_block = svg if svg else f"<pre>{url}</pre>"
     mode_label = "公网隧道" if status.get("mode") == "tunnel" else "局域网"
@@ -151,3 +177,4 @@ app.include_router(community_router)
 app.include_router(asr_router)
 app.include_router(record_router)
 app.include_router(tts_router)
+app.include_router(voice_runtime_router)
