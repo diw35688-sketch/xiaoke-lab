@@ -1,0 +1,746 @@
+/* 移动端流程卡片原型样式（mobile.html 专用，不影响 PC 页面）
+   设计原则：竖屏优先、一屏一张主 Card、大字号、留白充足、语音为主视觉为辅。 */
+
+:root {
+  --bg: #f4f6fb;
+  --card: #ffffff;
+  --ink: #0f172a;            /* 主文字：近黑 */
+  --muted: #64748b;          /* 次要文字：灰 */
+  --line: #e2e8f0;
+  --brand: #2563eb;          /* 主色：蓝 */
+  --brand-weak: #eff6ff;
+  --ok: #16a34a;             /* 完成：绿 */
+  --ok-weak: #f0fdf4;
+  --warn: #b45309;           /* 警告：琥珀 */
+  --warn-weak: #fffbeb;
+  --err: #dc2626;            /* 错误：红 */
+  --err-weak: #fef2f2;
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; height: 100%; }
+
+body {
+  background: linear-gradient(180deg, #f7f9ff 0%, #f3f5fa 100%);
+  color: var(--ink);
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  -webkit-tap-highlight-color: transparent;   /* 去掉手机点击的灰色闪块 */
+  overscroll-behavior: none;                  /* 防止下拉刷新干扰滑动手势 */
+}
+
+/* 外壳：整屏一列（顶栏/语音状态/卡片/控制/调试），宽度上限 = 手机宽度 */
+.m-shell {
+  height: 100dvh;                       /* dvh：跟随手机浏览器地址栏收放 */
+  max-width: 460px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;                     /* 整页不滚动：一屏一张卡 */
+  padding: calc(env(safe-area-inset-top) + 10px)
+           14px
+           calc(env(safe-area-inset-bottom) + 12px);
+  /* 卡面主题变量（默认=晨雾蓝）。主题类只需覆盖这些变量，卡片样式不用改。 */
+  --card-bg: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+  --card-ink: #0f172a;
+  --card-muted: #64748b;
+  --card-line: #eceff5;
+  --card-panel-bg: #f6f8fc;
+  --card-panel-line: #eef1f7;
+  --card-instruction: #1d4ed8;
+  --card-bar: #2563eb;
+  --card-step-track: #e9edf3;
+  --card-step-done: #16a34a;
+  --card-warn-bg: #fffaeb;
+  --card-warn-ink: #b54708;
+  --card-warn-bar: #f59e0b;
+  --card-shadow: 0 10px 34px rgba(16, 24, 40, .07);
+  --img-scrim: rgba(253, 252, 247, .8);   /* 背景图薄纱（浅色主题用白纱） */
+}
+
+/* 桌面浏览器打开时，让窄列看起来像一台手机 */
+@media (min-width: 520px) {
+  .m-shell {
+    border-left: 1px solid var(--line);
+    border-right: 1px solid var(--line);
+    background: var(--bg);
+    box-shadow: 0 0 40px rgba(15, 23, 42, .08);
+  }
+}
+
+/* ---------- 卡面主题（只换变量，不改结构） ---------- */
+.m-shell.theme-mist { /* 晨雾蓝 = 默认，无需覆盖 */ }
+.m-shell.theme-night {
+  --card-bg: linear-gradient(180deg, #141a2e 0%, #1b2340 100%);
+  --card-ink: #e8edf7;
+  --card-muted: #9aa7c2;
+  --card-line: #2a3454;
+  --card-panel-bg: rgba(255, 255, 255, .05);
+  --card-panel-line: rgba(255, 255, 255, .09);
+  --card-instruction: #93c5fd;
+  --card-bar: #60a5fa;
+  --card-step-track: #2a3454;
+  --card-step-done: #34d399;
+  --card-warn-bg: rgba(245, 158, 11, .10);
+  --card-warn-ink: #fbbf24;
+  --card-warn-bar: #f59e0b;
+  --card-shadow: 0 12px 36px rgba(4, 8, 24, .45);
+  --img-scrim: rgba(10, 14, 28, .84);     /* 深色主题用暗纱 */
+}
+.m-shell.theme-flat {
+  --card-bg: #ffffff;
+  --card-line: #e5e9f0;
+  --card-shadow: 0 6px 24px rgba(16, 24, 40, .06);
+}
+.m-shell.theme-warm {
+  --card-bg: linear-gradient(180deg, #fffdf7 0%, #fdf6ec 100%);
+  --card-ink: #2b2118;
+  --card-muted: #8a7f70;
+  --card-line: #f0e6d8;
+  --card-panel-bg: #faf3e8;
+  --card-panel-line: #f1e7d7;
+  --card-instruction: #b45309;
+  --card-bar: #d97706;
+  --card-step-track: #eee4d3;
+  --card-step-done: #3f9d5b;
+  --card-warn-bg: #fff3e0;
+  --card-warn-ink: #c2410c;
+  --card-warn-bar: #ea580c;
+  --card-shadow: 0 10px 30px rgba(80, 55, 20, .08);
+  --img-scrim: rgba(253, 246, 236, .8);
+}
+/* 怪盗扑克：象牙白卡纸 + 藏青墨色 + 基德红 + 黑桃牌面元素 */
+.m-shell.theme-kid {
+  --card-bg: linear-gradient(180deg, #fdfcf7 0%, #f6f1e4 100%);
+  --card-ink: #1a2340;
+  --card-muted: #6b7280;
+  --card-line: #b8b3a4;
+  --card-panel-bg: #fbf8f0;
+  --card-panel-line: rgba(26, 35, 64, .14);
+  --card-instruction: #1a2340;
+  --card-bar: #c62828;
+  --card-step-track: rgba(26, 35, 64, .12);
+  --card-step-done: #2e7d5b;
+  --card-warn-bg: #fbf0f0;
+  --card-warn-ink: #b91c1c;
+  --card-warn-bar: #c62828;
+  --card-shadow: 0 14px 40px rgba(20, 24, 40, .18);
+  --kid-frame: rgba(26, 35, 64, .55);
+  --img-scrim: rgba(246, 241, 228, .78);
+}
+/* 扑克牌双层边框：内侧细描边 */
+.m-shell.theme-kid .m-card {
+  outline: 1px solid var(--kid-frame);
+  outline-offset: -9px;
+}
+/* 牌面中心：极淡的大黑桃水印（不挡文字） */
+.m-shell.theme-kid .m-card::before {
+  content: '♠';
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%) rotate(-14deg);
+  font-size: 170px; line-height: 1;
+  color: rgba(26, 35, 64, .04);
+  pointer-events: none;
+}
+/* 右下角：旋转 180° 的镜像牌角索引 */
+.m-shell.theme-kid .m-card::after {
+  content: attr(data-step);
+  position: absolute; bottom: 32px; right: 18px;
+  transform: rotate(180deg);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 24px; font-weight: 700; color: var(--card-bar);
+  pointer-events: none;
+}
+.m-shell.theme-kid .m-card-steps { padding-right: 42px; }
+/* 左上牌角：大号衬线体步骤数 + 黑桃 + 总数，竖排 */
+.m-shell.theme-kid .m-step-chip {
+  display: flex; flex-direction: column; align-items: flex-start;
+  font-size: 12px; letter-spacing: .1em;
+}
+.m-shell.theme-kid .m-step-chip b {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 32px; line-height: 1.05; font-weight: 700;
+  color: var(--card-bar); margin-right: 0;
+}
+.m-shell.theme-kid .m-step-chip i { font-size: 12px; margin-left: 0; }
+.m-shell.theme-kid .m-step-chip::after {
+  content: '♠'; font-size: 12px; color: var(--card-ink); margin-top: 2px;
+}
+/* 标题用衬线体，像魔术预告函；前加黑桃标记 */
+.m-shell.theme-kid .m-card-title {
+  font-family: Georgia, "Times New Roman", "STSong", "SimSun", serif;
+  letter-spacing: .02em;
+}
+.m-shell.theme-kid .m-card-title::before { content: '♠ '; color: var(--card-bar); }
+/* 状态徽章改成"油墨印章"描边风 */
+.m-shell.theme-kid .m-status {
+  background: transparent; border: 1px solid currentColor;
+}
+.m-shell.theme-kid .m-param { border-radius: 6px; }
+
+/* 自定义卡面背景图：图片上叠一层同主题薄纱，保证文字可读 */
+.m-shell.has-bgimg .m-card {
+  background-image: linear-gradient(var(--img-scrim), var(--img-scrim)), var(--card-bg-img);
+  background-size: auto, cover;
+  background-position: center, center;
+  background-repeat: no-repeat, no-repeat;
+}
+
+/* ---------- 横屏/矮屏紧凑模式：横竖屏自由切换 ----------
+   触发条件：视口高度 ≤ 520px（手机横过来、或窄高的桌面窗口）。
+   策略：字号留白整体降档让卡片装得下；装不下时卡片内部滚动兜底；
+   竖滑手势让位给滚动，翻页用 ‹ › 按钮（竖屏不受影响）。 */
+@media (max-height: 520px) {
+  .m-shell { padding: 6px 12px calc(env(safe-area-inset-bottom) + 6px); }
+  .m-top { padding: 0 4px 6px; }
+  .m-brand { font-size: 15px; }
+  .m-mock-badge { font-size: 10px; padding: 2px 8px; }
+  .m-voice-status { font-size: 12px; padding: 0 4px 6px; }
+  .m-transcript { font-size: 12px; padding: 0 4px 6px; }
+  .m-avatar-row { gap: 8px; padding: 0 4px 6px; }
+  .m-avatar { flex: 0 0 52px; width: 52px; height: 60px; border-radius: 12px; }
+  .m-avatar-name { font-size: 13px; }
+  .m-avatar-state { font-size: 11px; }
+  .m-stage { touch-action: auto; }        /* 让位给卡片内部滚动 */
+  .m-card {
+    padding: 14px 18px 10px;
+    border-radius: 18px;
+    overflow-y: auto;                     /* 兜底：内容放不下时滚动而非裁切 */
+    scrollbar-width: none;
+  }
+  .m-card::-webkit-scrollbar { display: none; }
+  .m-step-chip { font-size: 12px; }
+  .m-step-chip b { font-size: 14px; }
+  .m-status { font-size: 11px; padding: 3px 9px; }
+  .m-card-title { font-size: 20px; margin-top: 10px; }
+  .m-check { width: 20px; height: 20px; font-size: 12px; margin-left: 7px; vertical-align: 3px; }
+  .m-card-instruction { font-size: 15px; margin-top: 10px; padding-left: 10px; border-left-width: 2px; }
+  .m-card-description { font-size: 13px; margin-top: 8px; }
+  .m-card-params { gap: 6px; margin-top: 10px; }
+  .m-card-params::before { font-size: 11px; }
+  .m-param { padding: 6px 10px; border-radius: 9px; gap: 2px; }
+  .m-param b { font-size: 11px; }
+  .m-param span { font-size: 13px; }
+  .m-card-warning { font-size: 12px; margin-top: 10px; padding: 8px 10px; border-left-width: 2px; }
+  .m-checklist { gap: 6px; margin-top: 10px; }
+  .m-check-item { font-size: 12px; padding: 4px 9px; }
+  .m-card-steps { padding-top: 10px; gap: 5px; }
+  .m-card-steps i { height: 3px; }
+  .m-act-feedback { font-size: 12px; padding: 8px 10px; margin-top: 8px; }
+  .m-card-actions { padding-top: 10px; gap: 8px; }
+  .m-act { font-size: 14px; padding: 9px 8px; min-height: 38px; border-radius: 11px; }
+  .m-controls { padding: 8px 0 0; gap: 18px; }
+  .m-btn.round { width: 42px; height: 42px; font-size: 20px; }
+  .m-btn.mic-big { width: 60px; height: 60px; }
+  .mic-icon { font-size: 17px; }
+  .mic-label { font-size: 11px; }
+  .m-dev { margin-top: 6px; }
+  .m-dev[open] { max-height: 40vh; overflow: auto; }
+  .m-dev summary { font-size: 11px; padding: 6px 0; }
+  .m-dev-note, .m-dev-hint { font-size: 11px; }
+  .m-select { font-size: 12px; padding: 5px 8px; }
+  /* 怪盗扑克在矮屏下缩小牌角，避免挤压正文 */
+  .m-shell.theme-kid .m-step-chip b { font-size: 22px; }
+}
+
+/* 横屏两栏布局：只在"矮且宽"（真横屏）时启用；窄矮窗口保持单列紧凑。
+   左（小科+进度清单）右（大卡片），同一份数据，进度不重置。 */
+@media (max-height: 520px) and (min-width: 520px) {
+  .m-shell {
+    display: grid;
+    grid-template-columns: minmax(104px, 24%) 1fr;
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    column-gap: 10px;
+  }
+  .m-top { grid-column: 1 / -1; grid-row: 1; }
+  .m-avatar-row {
+    grid-column: 1; grid-row: 2;
+    flex-direction: column; align-items: center; gap: 2px;
+    padding: 4px 0; min-height: 0; overflow: hidden;
+  }
+  .m-avatar { flex: 0 0 auto; width: 64px; height: 74px; }
+  .m-avatar-side {
+    display: flex; flex-direction: column; align-items: center;
+    width: 100%; min-height: 0; overflow: hidden;
+  }
+  .m-avatar-info { justify-content: center; margin-bottom: 2px; }
+  .m-voice-status { justify-content: center; font-size: 11px; }
+  .m-progress-panel {
+    display: block; width: 100%; flex: 1; min-height: 0;
+    overflow-y: auto; margin-top: 6px;
+  }
+  .m-transcript { grid-column: 1 / -1; grid-row: 3; }
+  .m-stage { grid-column: 2; grid-row: 2; }
+  .m-controls { grid-column: 1 / -1; grid-row: 4; }
+  .m-dev { grid-column: 1 / -1; }
+
+  /* 顶栏/控制条压矮，空间让给卡片 */
+  .m-brand { font-size: 13px; }
+  .m-mock-badge { font-size: 9px; padding: 1px 6px; }
+  .m-controls { padding: 4px 0 0; gap: 12px; }
+  .m-btn.round { width: 38px; height: 38px; font-size: 18px; }
+  .m-btn.mic-big { width: 52px; height: 52px; }
+  .mic-icon { font-size: 15px; }
+  .m-card { padding: 12px 16px 8px; }
+  .m-card-title { font-size: 22px; margin-top: 8px; }
+  .m-card-instruction { font-size: 16px; margin-top: 8px; }
+  .m-card-description { font-size: 13px; margin-top: 6px; }
+  .m-card-params { margin-top: 8px; }
+  .m-card-warning { margin-top: 8px; }
+  .m-checklist { margin-top: 8px; }
+  .m-card-steps { padding-top: 8px; }
+  .m-card-actions { padding-top: 8px; }
+  .m-act { min-height: 36px; padding: 7px 8px; }
+
+  /* 卡片内部改横排：左=核心操作内容，右=参数/警告，按钮通栏 */
+  .m-card {
+    display: grid;
+    grid-template-columns: 1.15fr 1fr;
+    grid-template-rows: auto auto auto auto auto auto 1fr auto;
+    grid-template-areas:
+      "top   top"
+      "title title"
+      "inst  side1"
+      "desc  side2"
+      "check side3"
+      "steps steps"
+      "fb    fb"
+      "act   act";
+    column-gap: 14px; row-gap: 6px;
+    align-content: start;
+  }
+  .m-card-top { grid-area: top; }
+  .m-card-title { grid-area: title; margin-top: 0; }
+  .m-card-instruction { grid-area: inst; margin-top: 0; }
+  .m-card-description { grid-area: desc; margin-top: 0; }
+  .m-checklist { grid-area: check; margin-top: 0; }
+  .m-card-params { grid-area: side1; margin-top: 0; grid-template-columns: 1fr; }
+  .m-card-warning { grid-area: side2; margin-top: 0; }
+  .m-card-image { grid-area: side3; margin-top: 0; }
+  .m-card-steps { grid-area: steps; padding-top: 6px; }
+  .m-act-feedback { grid-area: fb; margin-top: 4px; }
+  .m-card-actions { grid-area: act; padding-top: 6px; }
+  /* 怪盗主题：横屏隐藏镜像牌角（避免与按钮重叠），保留水印 */
+  .m-shell.theme-kid .m-card::after { display: none; }
+
+  /* ---- 横屏"一目了然"：空间重分配，内容平铺不滚动 ---- */
+  /* 取消竖屏的"居中手机条"限制，横屏铺满整屏宽度 */
+  .m-shell {
+    max-width: none;
+    border-left: 0; border-right: 0; box-shadow: none;
+    grid-template-columns: minmax(120px, 20%) 1fr;
+  }
+  .m-top { grid-column: 1 / -1; grid-row: 1; padding: 0 4px 2px; }
+  .m-brand { font-size: 12px; }
+  .m-mock-badge { display: none; }            /* 调试徽标横屏让位 */
+  .m-dev { display: none; }                   /* DEV 面板横屏隐藏（竖屏仍在） */
+  .m-controls { grid-column: 1 / -1; grid-row: 3; padding: 2px 0 0; gap: 10px; }
+  #btn-next { display: none; }                /* 卡片上已有"下一步" */
+  #btn-prev { width: 36px; height: 36px; font-size: 16px; }
+  .m-btn.mic-big { width: 44px; height: 44px; }
+  .mic-icon { font-size: 14px; }
+  .mic-label { font-size: 10px; }
+  .m-transcript { grid-column: 1 / -1; grid-row: 4; }
+  .m-avatar { width: 56px; height: 64px; }
+  .m-avatar-name { font-size: 12px; }
+  .m-avatar-state { font-size: 10px; }
+  .m-voice-status { font-size: 10px; }
+  .m-voice-toggle { font-size: 9px; padding: 1px 6px; }
+  .m-gear { font-size: 14px; }
+  .m-end-emoji { font-size: 30px; margin-top: 4px; }
+  .m-progress-panel { margin-top: 4px; }
+  .pp-item { font-size: 11px; padding: 3px 6px; }
+
+  /* 卡片内容再紧凑一档：目标是全部平铺、无需滚动 */
+  .m-card { padding: 10px 14px 8px; row-gap: 4px; column-gap: 12px; }
+  .m-step-chip { font-size: 11px; }
+  .m-step-chip b { font-size: 13px; }
+  .m-status { font-size: 10px; padding: 2px 8px; }
+  .m-card-title { font-size: 20px; margin-top: 0; }
+  .m-check { width: 18px; height: 18px; font-size: 11px; vertical-align: 2px; }
+  .m-card-instruction { font-size: 15px; }
+  .m-card-description { font-size: 12px; }
+  .m-check-item { font-size: 11px; padding: 3px 8px; }
+  .m-card-params { gap: 4px; }
+  .m-param { padding: 5px 9px; gap: 1px; }
+  .m-param b { font-size: 10px; }
+  .m-param span { font-size: 13px; }
+  .m-card-warning { font-size: 11px; padding: 6px 8px; }
+  .m-card-steps { padding-top: 4px; }
+  .m-act-feedback { font-size: 11px; padding: 6px 8px; }
+  .m-act { min-height: 32px; font-size: 13px; padding: 5px 8px; }
+}
+
+/* ---------- 顶栏 ---------- */
+.m-top {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 2px 4px 10px;
+}
+.m-brand { font-size: 17px; font-weight: 700; letter-spacing: .02em; }
+.m-gear {
+  background: transparent; border: 0; cursor: pointer;
+  font-size: 18px; color: var(--muted); padding: 2px 4px; line-height: 1;
+}
+.m-gear:active { color: var(--ink); }
+.m-mock-badge {
+  font-size: 11px; font-weight: 600; color: #92400e;
+  background: var(--warn-weak); border: 1px solid #fde68a;
+  border-radius: 999px; padding: 3px 10px; white-space: nowrap;
+}
+
+/* ---------- AI 形象（小科）+ 弱化语音状态 ---------- */
+.m-avatar-row {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 4px 8px;
+}
+.m-avatar {
+  flex: 0 0 84px; width: 84px; height: 96px;
+  border-radius: 18px; overflow: hidden;
+  background: linear-gradient(180deg, #eef4ff 0%, #f7faff 100%);
+  border: 1px solid var(--line);
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.m-avatar img {
+  width: 100%; height: 100%; object-fit: contain; object-position: center bottom;
+  transform-origin: 50% 88%;
+  animation: avBreathe 3.2s ease-in-out infinite;
+}
+.m-avatar-side { flex: 1; min-width: 0; }
+.m-avatar-info { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.m-avatar-name { font-size: 15px; font-weight: 800; color: #193d78; }
+.m-avatar-state { font-size: 12px; color: var(--muted); }
+/* 状态动画：说话/思考/聆听/完成 */
+.m-avatar-row.av-speaking img { animation: avTalk .34s ease-in-out infinite alternate; }
+.m-avatar-row.av-thinking img { animation: avBlink .75s ease-in-out infinite; }
+.m-avatar-row.av-listening .m-avatar { box-shadow: 0 0 0 3px rgba(64, 165, 118, .35); }
+.m-avatar-row.av-happy img { animation: avBounce .8s ease-in-out 3; }
+@keyframes avBreathe { 50% { transform: translateY(-3px) scale(1.02); } }
+@keyframes avTalk { to { transform: translateY(-4px) scale(1.03); } }
+@keyframes avBlink { 50% { opacity: .55; } }
+@keyframes avBounce { 50% { transform: translateY(-6px) scale(1.05); } }
+
+.m-voice-status {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--muted);
+}
+.m-voice-toggle {
+  font-family: inherit; font-size: 11px; font-weight: 600;
+  color: #067647; background: #ecfdf3;
+  border: 1px solid rgba(22, 163, 74, .35); border-radius: 999px;
+  padding: 2px 9px; cursor: pointer; white-space: nowrap;
+}
+.m-voice-toggle.off { color: #b91c1c; background: #fef3f2; border-color: rgba(220, 38, 38, .35); }
+.vs-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #cbd5e1; flex: 0 0 8px;
+}
+.vs-dot.listening { background: var(--ok); animation: vspulse 1.1s ease-in-out infinite; }
+.vs-dot.thinking  { background: var(--brand); animation: vspulse 1.1s ease-in-out infinite; }
+.vs-dot.speaking  { background: #d97706; animation: vspulse 1.1s ease-in-out infinite; }
+.vs-dot.happy     { background: #16a34a; }
+@keyframes vspulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: .35; transform: scale(.75); }
+}
+
+/* ---------- 任务进度清单（横屏左栏显示；竖屏隐藏，卡片分段已够用） ---------- */
+.m-progress-panel { display: none; }
+.pp-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 6px; border-radius: 8px;
+  font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden;
+}
+.pp-item.cur { color: var(--card-ink); font-weight: 700; background: var(--card-panel-bg); }
+.pp-item.done { color: #067647; }
+.pp-mark { width: 16px; text-align: center; font-weight: 700; flex: 0 0 16px; }
+.pp-title { overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- 卡片舞台 ---------- */
+.m-stage {
+  flex: 1 1 auto;          /* 占满中间剩余空间 */
+  min-height: 0;
+  position: relative;
+  touch-action: none;      /* 竖向滑动交给 JS 手势，不让浏览器抢 */
+  user-select: none;
+  -webkit-user-select: none;
+}
+.m-loading {
+  color: var(--muted); font-size: 15px; text-align: center;
+  padding-top: 40px; margin: 0;
+}
+
+/* 主卡片：一屏一张；内容放不下时自动变可滚动（配合 JS 手势让位） */
+.m-card {
+  position: absolute; inset: 0;
+  background: var(--card-bg);
+  border: 1px solid var(--card-line);
+  border-radius: 24px;
+  box-shadow: var(--card-shadow);
+  padding: 20px 22px 14px;
+  display: flex; flex-direction: column;
+  overflow-y: auto;
+  scrollbar-width: none;
+  transition: transform .16s ease, opacity .16s ease;
+  will-change: transform, opacity;
+}
+.m-card::-webkit-scrollbar { display: none; }
+/* 旧卡离场：下一步 → 向上滑出；上一步 → 向下滑出 */
+.m-card.out-up   { transform: translateY(-26px); opacity: 0; }
+.m-card.out-down { transform: translateY(26px);  opacity: 0; }
+/* 新卡入场：从滑入方向自然落位 */
+.m-card.in-from-down { transition: none; transform: translateY(44px); opacity: 0; }
+.m-card.in-from-up   { transition: none; transform: translateY(-44px); opacity: 0; }
+
+/* 步骤编号 + 状态徽章 */
+.m-card-top {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px;
+}
+.m-step-chip {
+  font-size: 13px; font-weight: 500; color: var(--card-muted);
+  letter-spacing: .06em;
+}
+.m-step-chip b {
+  color: var(--card-bar); font-weight: 700; font-size: 15px; margin-right: 1px;
+}
+.m-step-chip i {
+  font-style: normal; font-size: 13px; color: var(--card-muted); margin-left: 2px;
+}
+.m-status {
+  display: inline-flex; align-items: center;
+  font-size: 12px; font-weight: 600; border-radius: 999px; padding: 5px 11px;
+}
+.m-status::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%;
+  background: currentColor; margin-right: 6px; flex: 0 0 6px;
+}
+.m-status.waiting_user { color: #1d4ed8; background: #eef4ff; }
+.m-status.running      { color: #067647; background: #ecfdf3; }
+.m-status.running::before { animation: vspulse 1.4s ease-in-out infinite; }
+.m-status.completed    { color: #067647; background: #ecfdf3; }
+.m-status.error        { color: #b42318; background: #fef3f2; }
+
+/* 标题：当前主任务是什么 */
+.m-card-title {
+  font-size: 26px; font-weight: 700; line-height: 1.3;
+  margin: 16px 0 0; letter-spacing: .01em;
+  color: var(--card-ink);
+}
+
+/* 完成勾徽标：标题右侧绿色圆勾（由后端 status=completed 驱动） */
+.m-check {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; margin-left: 10px;
+  border-radius: 50%; background: #16a34a; color: #fff;
+  font-size: 15px; font-weight: 700; vertical-align: 6px;
+  box-shadow: 0 3px 8px rgba(22, 163, 74, .35);
+}
+
+/* 实验完成结束卡：庆祝 emoji 上下弹跳 */
+.m-end-emoji {
+  font-size: 46px; text-align: center; margin-top: 10px; line-height: 1;
+  animation: endBounce 1.2s ease-in-out infinite;
+}
+@keyframes endBounce {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-8px); }
+}
+
+/* 卡片级状态强调：完成=绿色调，错误=红色调 */
+.m-card.st-completed .m-card-instruction { color: #067647; border-left-color: #16a34a; }
+.m-card.st-error { border-color: rgba(220, 38, 38, .4); }
+.m-card.st-error .m-card-instruction { color: #b91c1c; border-left-color: #dc2626; }
+
+/* 卡片类型微调（ty-*）：info=信息、processing=处理中，其余由状态样式覆盖 */
+.m-card.ty-info .m-card-instruction { color: var(--card-ink); border-left-color: var(--card-muted); }
+.m-card.ty-processing .m-status { animation: vspulse 1.2s ease-in-out infinite; }
+
+/* 必测字段清单：✓=已记录（绿）○=待记录（灰） */
+.m-checklist { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.m-check-item {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13px; font-weight: 600; color: var(--card-muted);
+  background: var(--card-panel-bg); border: 1px solid var(--card-panel-line);
+  border-radius: 999px; padding: 5px 10px;
+}
+.m-check-item.ok {
+  color: #067647; background: #ecfdf3; border-color: rgba(22, 163, 74, .35);
+}
+
+/* 核心操作：全卡最重要的信息，左侧细色条 + 深蓝大字（无整块底色） */
+.m-card-instruction {
+  font-size: 18px; font-weight: 600; line-height: 1.55;
+  color: var(--card-instruction); margin-top: 12px;
+  padding-left: 12px;
+  border-left: 3px solid var(--card-bar);
+}
+
+/* 补充说明 */
+.m-card-description {
+  font-size: 15px; color: var(--card-muted); line-height: 1.7; margin-top: 12px;
+}
+
+/* 关键参数：两列浅底小卡，键小值大 */
+.m-card-params {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px;
+}
+.m-card-params::before {
+  content: '关键参数'; grid-column: 1 / -1;
+  font-size: 12px; color: var(--card-muted); letter-spacing: .08em; font-weight: 600;
+}
+.m-param {
+  background: var(--card-panel-bg); border: 1px solid var(--card-panel-line);
+  border-radius: 12px; padding: 8px 12px;
+  display: flex; flex-direction: column; gap: 3px;
+}
+.m-param b {
+  font-weight: 500; color: var(--card-muted); font-size: 12px;
+}
+.m-param span {
+  color: var(--card-ink); font-size: 15px; font-weight: 600;
+}
+
+/* 警告：左侧琥珀色条 + 淡底，醒目但不抢戏 */
+.m-card-warning {
+  margin-top: 16px;
+  font-size: 13px; font-weight: 500; color: var(--card-warn-ink);
+  background: var(--card-warn-bg); border-left: 3px solid var(--card-warn-bar);
+  border-radius: 10px; padding: 10px 12px; line-height: 1.6;
+}
+
+/* 底部流程分段：像引导页小圆点，一眼看到当前进度 */
+.m-card-steps {
+  margin-top: auto; padding-top: 16px;
+  display: flex; gap: 6px;
+}
+.m-card-steps i {
+  flex: 1; height: 4px; border-radius: 99px; background: var(--card-step-track);
+}
+.m-card-steps i.done { background: var(--card-step-done); }
+.m-card-steps i.cur  { background: var(--card-bar); }
+
+/* 卡片上的交互按钮：完成本步（查账）+ 下一步 */
+.m-act-feedback {
+  margin-top: 10px; font-size: 14px; font-weight: 600;
+  color: var(--card-warn-ink); background: var(--card-warn-bg);
+  border-left: 3px solid var(--card-warn-bar); border-radius: 10px;
+  padding: 10px 12px; line-height: 1.5;
+}
+.m-act-feedback[hidden] { display: none; }
+.m-card-actions { display: flex; gap: 10px; padding-top: 12px; }
+.m-act {
+  flex: 1; border: 1px solid var(--card-line); background: var(--card-panel-bg);
+  color: var(--card-ink); font-family: inherit; font-size: 15px; font-weight: 600;
+  border-radius: 14px; padding: 11px 10px; cursor: pointer; min-height: 44px;
+}
+.m-act.primary { background: var(--card-bar); border-color: var(--card-bar); color: #fff; }
+.m-act:active { transform: scale(.97); }
+.m-act:disabled { opacity: .5; cursor: not-allowed; }
+
+/* 图片占位：mock 数据 image=null 时不渲染；接口保留 */
+.m-card-image { margin-top: 16px; border-radius: 14px; max-width: 100%; }
+
+/* ---------- 底部控制区 ---------- */
+.m-controls {
+  flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center; gap: 22px;
+  padding: 12px 0 2px;
+}
+.m-btn {
+  border: 1px solid var(--line); background: var(--card); color: var(--ink);
+  font-family: inherit; font-size: 15px; cursor: pointer;
+  border-radius: 12px; padding: 10px 16px;
+}
+.m-btn:active { background: #f1f5f9; }
+.m-btn.round { width: 48px; height: 48px; border-radius: 50%; font-size: 22px; padding: 0; }
+.m-btn.small { font-size: 13px; padding: 8px 13px; }
+.m-btn.small:disabled { opacity: .45; cursor: not-allowed; }
+.m-select {
+  font: inherit; font-size: 13px; color: var(--ink);
+  padding: 7px 10px; border: 1px solid var(--line); border-radius: 10px;
+  background: #fff; max-width: 100%;
+}
+.m-theme-btn { font-size: 12px; padding: 6px 12px; border-radius: 999px; }
+.m-theme-btn.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+#theme-row { display: inline-flex; gap: 6px; margin-left: 6px; }
+.m-btn.mic-big {
+  width: 76px; height: 76px; border-radius: 50%;
+  background: var(--brand); border-color: var(--brand); color: #fff;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px; box-shadow: 0 10px 26px rgba(37, 99, 235, .35);
+}
+.m-btn.mic-big:active { background: #1d4ed8; }
+.mic-icon { font-size: 22px; line-height: 1; }
+.mic-label { font-size: 12px; font-weight: 600; }
+.m-btn.mic-big.rec { animation: vspulse 1.1s ease-in-out infinite; }
+
+/* ---------- DEV / MOCK 调试面板 ---------- */
+.m-dev {
+  flex: 0 0 auto;
+  margin-top: 8px;
+  border: 1px dashed #fbbf24; border-radius: 12px;
+  background: #fffdf5; padding: 0 12px;
+}
+.m-dev summary {
+  cursor: pointer; font-size: 12px; color: #92400e; padding: 8px 0;
+  list-style: none;
+}
+.m-dev summary::-webkit-details-marker { display: none; }
+.m-dev[open] summary { border-bottom: 1px dashed #fde68a; margin-bottom: 8px; }
+/* 展开的面板限高 + 内部滚动：竖屏也能划动看全部调试项 */
+.m-dev[open] {
+  max-height: 40vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 8px;
+}
+.m-dev-note, .m-dev-hint {
+  font-size: 12px; color: #78716c; line-height: 1.7; margin: 0 0 8px;
+}
+.m-dev-row { display: flex; gap: 8px; margin-bottom: 10px; }
+
+/* 识别转写行：真实语音识别结果，弱存在感、只留最近一句 */
+.m-transcript {
+  flex: 0 0 auto;
+  font-size: 13px; color: var(--muted);
+  padding: 0 4px 10px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.m-transcript[hidden] { display: none; }
+.m-transcript b { color: var(--ink); font-weight: 600; }
+
+/* 小科回复气泡：AI 完整回复显示于此 */
+.m-ai-bubble {
+  position: absolute; top: 8px; left: 12px; right: 12px; z-index: 6;
+  background: #ffffff; border: 1px solid var(--line); border-radius: 14px;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, .14);
+  padding: 10px 12px; font-size: 14px; line-height: 1.65; color: var(--ink);
+  opacity: 0; transform: translateY(-8px);
+  transition: opacity .25s ease, transform .25s ease;
+  cursor: pointer; max-height: 42%; overflow-y: auto;
+}
+.m-ai-bubble.show { opacity: 1; transform: translateY(0); }
+.m-ai-bubble .ab-name {
+  display: inline-block; font-size: 11px; font-weight: 800; color: #193d78;
+  background: #eef4ff; border-radius: 999px; padding: 1px 8px; margin-right: 8px;
+  vertical-align: 2px;
+}
+
+/* 完成瞬间的仪式感：绿光扫过 + 勾弹入（仅在状态转变瞬间触发） */
+.m-card.just-completed { animation: cardGlow .9s ease; }
+.m-card.just-completed .m-check { animation: checkPop .45s ease; }
+@keyframes cardGlow {
+  0%   { box-shadow: 0 0 0 0 rgba(22, 163, 74, .55); }
+  60%  { box-shadow: 0 0 0 6px rgba(22, 163, 74, .28); }
+  100% { box-shadow: var(--card-shadow); }
+}
+@keyframes checkPop {
+  0%   { transform: scale(0); }
+  60%  { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
