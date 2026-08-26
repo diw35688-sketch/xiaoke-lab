@@ -22,12 +22,24 @@ from src.llm.schemas import ExperimentEntities  # noqa: E402
 from src.storage.hazmat_store import HazmatStore  # noqa: E402
 from src.storage.protocol_store import ProtocolStore  # noqa: E402
 
+from step_progress import StepProgress, card_type_for  # noqa: E402
+from database.session_store import (  # noqa: E402
+    clear_progress_rows,
+    load_session_snapshot,
+    load_step_confirmations,
+    load_step_progress,
+    save_session_snapshot,
+    save_step_confirmation,
+    save_step_progress,
+)
+
 PROTOCOL_FILE = REPO_ROOT / "data" / "protocols" / "undergraduate_basic_protocols.json"
 
 _lock = threading.RLock()
 _protocol_store = None
 _hazmat_store = None
 _session: ProtocolSessionState | None = None
+_progress = StepProgress()
 
 
 def protocols() -> ProtocolStore:
@@ -47,20 +59,121 @@ def hazmat() -> HazmatStore:
 
 
 def session() -> ProtocolSessionState:
-    """当前会话状态；未选择方案时为自由记录模式。"""
+    """当前会话状态；首次访问时尝试从持久层恢复（刷新/重启不丢进度）。"""
     global _session
     with _lock:
         if _session is None:
-            _session = ProtocolSessionState.start(select_protocol(protocols(), None))
+            _session = _restore_session()
         return _session
+
+
+def _restore_session() -> ProtocolSessionState:
+    """从 SQLite 恢复：方案选择 + 当前步 + 各步记录进度。"""
+    snapshot = load_session_snapshot()
+    protocol_id = snapshot.get("protocol_id") if snapshot else None
+    state = ProtocolSessionState.start(select_protocol(protocols(), protocol_id))
+    _progress.reset()
+    saved_step = snapshot.get("step_number") if snapshot else None
+    if saved_step and state.selection.has_protocol:
+        try:
+            state = state.jump_to(int(saved_step))
+        except Exception:
+            pass  # 持久数据与方案不匹配时回退到第 1 步，不崩溃
+    for step_number, info in load_step_progress().items():
+        _progress.restore(step_number, info["recorded"], info["deviation"])
+    for step_number in load_step_confirmations():
+        _progress.confirm(step_number)
+    return state
+
+
+def _persist_snapshot() -> None:
+    """把当前方案与步骤号写进 SQLite 快照。"""
+    protocol_id = None
+    step_number = None
+    if _session is not None and _session.selection.has_protocol:
+        protocol_id = _session.selection.protocol.protocol_id
+        step_number = _session.step_number
+    save_session_snapshot(protocol_id, step_number)
 
 
 def start_session(selection) -> ProtocolSessionState:
-    """selection 为 None 表示自由记录模式。"""
+    """selection 为 None 表示自由记录模式。换方案时进度清零并持久化。"""
     global _session
     with _lock:
         _session = ProtocolSessionState.start(select_protocol(protocols(), selection))
+        _progress.reset()
+        _persist_snapshot()
+        clear_progress_rows()
         return _session
+
+
+def record_step_fields(step_number: int, fields: dict, has_deviation: bool) -> None:
+    """把一段口述的实体字段与偏差登记进当前步骤并落盘。"""
+    with _lock:
+        _progress.record(step_number, fields, has_deviation)
+        if step_number is not None:
+            save_step_progress(
+                step_number,
+                {k for k, v in (fields or {}).items() if v},
+                bool(has_deviation),
+            )
+
+
+def step_status(step) -> str:
+    """当前步骤的确定性状态：completed / error / waiting_user。"""
+    with _lock:
+        return _progress.status_for(step)
+
+
+def _step_recorded_missing(step):
+    """某一步的已记录字段与还缺字段（同一把锁内读取，保证一致性）。"""
+    with _lock:
+        return (
+            _progress.recorded_fields(step.step_number),
+            _progress.missing_fields(step),
+        )
+
+
+def step_progress_view(state) -> dict:
+    """当前步骤的进度事实：状态 + 已记录字段 + 还缺的必测字段。
+
+    供大模型在用户说"完成了"时核对真相用——模型只读事实，不自己猜。
+    """
+    step = state.current_step()
+    if step is None:
+        return {"status": "waiting_user", "recorded": [], "missing": []}
+    with _lock:
+        return {
+            "status": _progress.status_for(step),
+            "recorded": _progress.recorded_fields(step.step_number),
+            "missing": _progress.missing_fields(step),
+        }
+
+
+def complete_step(step_number: int, manual: bool) -> dict:
+    """完成当前步。
+
+    - manual=True：用户手动确认（点"完成本步"按钮）→ 直接打勾并落盘，
+      视为人类责任确认，不要求补齐口述数据；
+    - manual=False：严格校验（必测字段记齐且无偏差才通过，否则拒绝）。
+    两种路径都只能完成"当前步"，且状态变更都发生在后端状态机。
+    """
+    with _lock:
+        state = session()
+        if not state.selection.has_protocol:
+            raise ValueError("尚未选择实验方案")
+        if state.step_number != step_number:
+            raise ValueError(f"只能完成当前步（第 {state.step_number} 步）")
+        if manual:
+            _progress.confirm(step_number)
+            save_step_confirmation(step_number)
+            return step_progress_view(state)
+        progress = step_progress_view(state)
+        if progress["status"] == "error":
+            raise ValueError("本步存在偏差，需要先处理")
+        if progress["status"] != "completed":
+            raise ValueError("本步还没记齐，还缺：" + "、".join(progress["missing"]))
+        return progress
 
 
 def move(action: str, step_number: int | None = None) -> ProtocolSessionState:
@@ -75,6 +188,7 @@ def move(action: str, step_number: int | None = None) -> ProtocolSessionState:
             _session = state.jump_to(int(step_number))
         else:
             raise ValueError("不支持的步骤操作：" + str(action))
+        _persist_snapshot()
         return _session
 
 
@@ -109,6 +223,7 @@ def step_view(state: ProtocolSessionState) -> dict:
             "safety": [],
             "safety_note": hazmat().authority_note,
         }
+    recorded, missing = _step_recorded_missing(step)
     return {
         "mode": "protocol",
         "protocol": {
@@ -126,6 +241,10 @@ def step_view(state: ProtocolSessionState) -> dict:
             "must_record": list(step.must_record),
             "hazard_note": step.hazard_note,
             "terms": list(step.terms),
+            "status": step_status(step),
+            "card_type": card_type_for(step_status(step), step.must_record),
+            "recorded": recorded,
+            "missing": missing,
             "substeps": [
                 {"order": x.order, "text": x.text, "note": x.note}
                 for x in step.substeps
@@ -166,6 +285,7 @@ def all_steps_view(state) -> dict:
     protocol = state.selection.protocol
     if protocol is None:
         view["all_steps"] = []
+        view["all_completed"] = False
         return view
     view["all_steps"] = [
         {
@@ -176,9 +296,17 @@ def all_steps_view(state) -> dict:
             "must_record": list(s.must_record),
             "has_hazard": bool(s.hazard_note) or bool(safety_for(s)),
             "substep_count": len(s.substeps),
+            "status": step_status(s),
+            "card_type": card_type_for(step_status(s), s.must_record),
+            "recorded": _step_recorded_missing(s)[0],
+            "missing": _step_recorded_missing(s)[1],
         }
         for s in protocol.steps
     ]
+    # "全部完成"由后端判定（前端只渲染）：所有步骤均为 completed。
+    view["all_completed"] = bool(view["all_steps"]) and all(
+        s["status"] == "completed" for s in view["all_steps"]
+    )
     return view
 
 def entity_field_names() -> list:
@@ -295,6 +423,8 @@ def update_step(payload: dict) -> dict:
                 _session = ProtocolSessionState.start(
                     select_protocol(protocols(), protocol_id)
                 )
+                _progress.reset()     # 方案步骤被编辑，进度按新方案重新计
+                clear_progress_rows() # 落盘进度同步清零
                 if current:
                     _session = _session.jump_to(current)
     return step_view(session())
