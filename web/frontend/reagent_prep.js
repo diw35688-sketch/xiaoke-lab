@@ -207,9 +207,22 @@
       + '<div id="prep-list" class="prep-list">加载中…</div>'
       + '</div>';
 
+    var safetyOpen = false;
+    function closeSafety() {
+      var box = host.querySelector('#prep-safety-box');
+      var list = host.querySelector('#prep-list');
+      safetyOpen = false;
+      box.style.display = 'none';
+      list.style.display = '';
+      var btn = host.querySelector('#prep-safety-btn');
+      if (btn) btn.classList.remove('primary');
+    }
     function showSafety() {
       var box = host.querySelector('#prep-safety-box');
       var list = host.querySelector('#prep-list');
+      safetyOpen = true;
+      var btn = host.querySelector('#prep-safety-btn');
+      if (btn) btn.classList.add('primary');
       box.style.display = '';
       list.style.display = 'none';
       box.innerHTML = '加载安全参考…';
@@ -241,10 +254,7 @@
             return !q || (r.name || '').toLowerCase().indexOf(q) >= 0 || (r.cas || '').toLowerCase().indexOf(q) >= 0 || (r.formula || '').toLowerCase().indexOf(q) >= 0;
           }));
         });
-        host.querySelector('#prep-safety-back').onclick = function () {
-          box.style.display = 'none';
-          list.style.display = '';
-        };
+        host.querySelector('#prep-safety-back').onclick = closeSafety;
       });
     }
 
@@ -286,7 +296,7 @@
       if (nameInput) nameInput.focus();
     };
 
-    host.querySelector('#prep-safety-btn').onclick = showSafety;
+    host.querySelector('#prep-safety-btn').onclick = function () { if (safetyOpen) { closeSafety(); } else { showSafety(); } };
 
     host.querySelector('#pf-send').onclick = function () {
       var parts = [];
