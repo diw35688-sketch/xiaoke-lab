@@ -100,7 +100,7 @@
         var box = el('lab-result');
         var html = '';
         if (d.follow_up_required) {
-          html += '<div class="lab-ask">助手追问：' + esc(d.follow_up_question) + '</div>';
+          html += '<div class="lab-ask">小科追问：' + esc(d.follow_up_question) + '</div>';
         } else if (state && state.mode === 'protocol') {
           html += '<div class="lab-ok">本步现场记录已完整</div>';
         }
@@ -170,8 +170,8 @@
     };
   }
 
-  // 面板已由应用外壳的右侧详情区取代，不再注入悬浮层。
-  void init;
+  // 面板默认收起、labRender 时才展开；lab-result 是记录回执的渲染目标，必须存在。
+  init();
 })();
 
 // 渲染一次完整记录结果：转写、抽取的实体、确定性判断
@@ -190,19 +190,19 @@
         return '<span class="lab-tag">' + esc2(k) + '=' + esc2(ents[k]) + '</span>';
       }).join('') + '</div>';
     }
-    if (d.extraction && d.extraction.degraded) {
-      html += '<div style="color:#c2410c;margin-top:6px;font-size:12px">模型未配置或调用失败，已按原文保真记录</div>';
-    }
     html += '</div>';
-    var ev = d.evaluation || {};
-    if (ev.follow_up_required) {
-      html += '<div class="lab-ask">助手追问：' + esc2(ev.follow_up_question) + '</div>';
-    } else if (d.step && d.step.mode === 'protocol') {
-      html += '<div class="lab-ok">本步现场记录已完整</div>';
-    }
-    (ev.deviations || []).forEach(function (x) {
-      html += '<div class="lab-dev">偏差：' + esc2(x.field) + ' 实际为 ' + esc2(x.actual_value)
-        + '，方案规定为 ' + esc2(x.protocol_value) + ' —— 请确认是否有意调整</div>';
+    // B4：渲染 messages（前端只按 kind 上样式，不判断内容；话术来自后端 copy 层）
+    var msgs = d.messages || [];
+    msgs.forEach(function (m) {
+      if (m.kind === 'clarification') {
+        // 去 copy 层的"小科："前缀，面板标签已用"小科追问"表达称呼，避免重复
+        var q = String(m.text || '').replace(/^小科：/, '');
+        html += '<div class="lab-ask">小科追问：' + esc2(q) + '</div>';
+      } else if (m.kind === 'record_ack') {
+        html += '<div class="lab-ok">' + esc2(m.text) + '</div>';
+      } else {
+        html += '<div>' + esc2(m.text) + '</div>';
+      }
     });
     box.innerHTML = html;
   };

@@ -61,6 +61,9 @@
     if (document.querySelector('#assistant-avatar')) return;
     const style = document.createElement('style'); style.textContent = `
       #assistant-avatar{position:fixed;right:18px;bottom:72px;z-index:25;width:225px;background:transparent;user-select:none;touch-action:none;cursor:grab;filter:drop-shadow(0 12px 14px rgba(32,58,107,.22));transition:filter .2s ease}
+      #avatar-tts-btn{position:absolute;left:2px;top:4px;z-index:3;width:32px;height:32px;border-radius:50%;border:1px solid rgba(88,128,204,.35);background:rgba(255,253,248,.92);font-size:15px;line-height:1;cursor:pointer;display:grid;place-items:center;box-shadow:0 2px 8px rgba(37,66,122,.15);font-family:inherit}
+      #avatar-tts-btn:hover{background:#fff}
+      #avatar-tts-btn.muted{background:#fef2f2;border-color:#fecaca}
       #assistant-avatar.is-dragging{cursor:grabbing;filter:drop-shadow(0 17px 20px rgba(32,58,107,.3))}#assistant-avatar .portrait{position:relative;width:100%;height:278px;overflow:visible;pointer-events:none}
       #assistant-avatar .portrait img{display:block;width:100%;height:100%;object-fit:contain;object-position:center bottom;transform-origin:50% 88%;animation:avatarBreathe 3.2s ease-in-out infinite;transition:opacity .12s ease}
       #assistant-avatar .avatar-info{display:flex;align-items:center;justify-content:center;gap:7px;width:max-content;min-height:29px;margin:-4px auto 0;padding:5px 11px;border:1px solid rgba(88,128,204,.3);border-radius:999px;background:rgba(255,253,248,.88);box-shadow:0 4px 15px rgba(37,66,122,.14);color:#25477e;font-size:12px;backdrop-filter:blur(6px);pointer-events:none}

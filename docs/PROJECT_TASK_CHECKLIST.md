@@ -1,12 +1,12 @@
 # asr_demo 项目任务清单
 
-最后更新：2026-08-16（PRESENT 程序级必要反馈 AUTO_OK）
+最后更新：2026-08-25（可搬家的一键启动与新手交付指南，见维护日志）
 
 > 本文件是当前任务、优先级和验收状态的唯一来源。架构说明、环境命令和下一会话摘要
 > 分别见 `PROJECT_ARCHITECTURE.md`、`ENVIRONMENT_SETUP.md` 和
 > `NEXT_SESSION_HANDOFF_2026-08-09.md`；第 6 节维护日志只作证据追溯，不决定当前下一项。
 
-真实项目：`C:\Users\dahli\Desktop\asr_demo`
+项目根目录：以仓库实际存放位置为准；启动器不得依赖个人绝对路径。
 
 ## 1. 使用规则
 
@@ -80,7 +80,7 @@ TODO → DESIGN → CODED → AUTO_OK → REAL_OK
 恢复工作时先运行：
 
 ```powershell
-cd C:\Users\dahli\Desktop\asr_demo
+Set-Location <项目目录>
 
 .\.venv\Scripts\python.exe -B -m unittest discover `
     -s tests `
@@ -101,16 +101,81 @@ cd C:\Users\dahli\Desktop\asr_demo
 
 `UX-MODE-01` 已完成 AUTO_OK：`UI_MODE=user|admin` 配置与渲染器校验已存在；生产模块意外异常从 print 迁到 logging；user 模式会话级 DEBUG 写入 `results/debug_<session>.log`，新会话自动替换旧会话日志。新增 4 项测试；全量 728 项通过。真实 user/admin 对照验收随最终 UX 走查执行。
 
-`PRESENT-NOACTION-FEEDBACK-01` 已完成 AUTO_OK：控制类 no_action 现在会投递一条 `NO_ACTION_FEEDBACK` 语义消息，用户文案按原因分别引导（编号不存在/缺答案/无当前目标/弃权/兜底）。 新增测试覆盖执行器原因透传、投影去重和文案映射；全量 724 项通过。
+33b 已完成自动软件闭环：新增唯一前端 `ConversationTurnStore`，当前 Chat 的用户文字、服务端助手正文、think 状态和 Tool 卡片只写 Store，再由聊天时间线订阅渲染；运行画布删除 `stream/pendingIndex` 与 `runPushThink/runPushTool/runClearStream`，旧 `tool_cards.js` 转发器不再加载。Tool 事件由服务端补稳定 `tool_call_id`，同一调用的 pending/result 更新同一 Block。Store 以 `(conversation_id, request_id)` 处理完全相同重放并拒绝内容/模式版本冲突，但不保存数据库、不执行 Tool、不播放。专项组合 `27/27`、4 个 Node 行为测试、JS/Python 语法、`git diff --check` 和项目全量 `1083/1083` 通过，因此仅标 `AUTO_OK`；尚未做真实浏览器走查。
 
-`CLARIFICATION-COMPOUND-CONFIRM-ANSWER-01` 已完成 AUTO_OK：CONFIRM 动作现在可携带/提取实体字段，并在同一原子操作中先填字段再清确认标志；PRESENT 回执按最终 `remaining_fields` 显示“问题已解决”或“仍需补充”。新增测试覆盖完全解决、仍缺字段、纯确认、LLM/规则提取四类合同；全量 715 项通过。
+第 32 阶段剩余生产链已完成自动闭环：
 
-本项固定范围：
+- `segment_finalized` 与 ASR 开始/成功/失败进入同一 conversation 状态；
+- 每个 conversation 拥有共享同一 `VoiceStateCoordinator` 的 Scheduler 与延后队列，A 讲话只延后 A，B 不受影响；
+- ASR/TTS 状态变空闲时重评延后项，未过期返回 `READY`，过期返回 `DROP/expired`；
+- 浏览器播放单元携带 `intent_id/priority`，回报 `tts_started/finished/stopped/failed`；
+- 专项 `48/48`、全部 3 个 Node 行为测试、JS 语法与全量 `1060/1060` 通过。未做真实设备验收，因此仅为 `AUTO_OK`。
 
-1. 区分“纯确认”和“确认 + 附加实体回答”，不能再因句首“是的”直接吞掉后续字段；
-2. 同一句中的确认与实体补充必须形成一个原子结果：既清确认标志，也填入实际提供的字段；
-3. 覆盖完全解决、仍有缺字段、纯确认、指定编号复合回答四类合同；
-4. PRESENT 回执必须依据动作后的 `remaining_fields` 如实说明“已解决”或“仍需补充”。
+纠偏子项 `VOICE-C4-3C-SPEECH-RESUMED-BRIDGE` 已完成自动验收：
+
+- Silero `speech_resumed` 携带现有 `conversation_id` 发送 `user_speech_resumed`；
+- 服务端将其映射到 `USER_SPEECH_RESUMED`，同一片段内只使 `user_speaking=false -> true`，`segment_capturing` 继续为 `true`；
+- 重复继续请求幂等，不串改其他会话；会话/路由专项 `8/8`、纯合同 `24/24` 和 Node 行为测试通过。
+- 未接断句、ASR、按会话 Scheduler 或 TTS 反馈，不产生真机结论。
+
+纠偏子项 `VOICE-C4-3B-SPEECH-PAUSED-BRIDGE` 已完成自动验收：
+
+- Silero `speech_paused` 携带浏览器现有 `conversation_id` 请求 `/voice/runtime/event`；
+- 服务端映射为 `USER_SPEECH_PAUSED`，仅使同一会话 `user_speaking=false`，保留 `segment_capturing=true`；
+- 重复停顿请求幂等，不串改其他会话，也不伪造断句；
+- Python 会话/路由专项 `6/6`、相关组合 `43/43`、Node 行为测试和项目全量 `1053/1053` 通过。
+- 未接恢复、断句、ASR/TTS 事件或 Scheduler，未做真实浏览器/麦克风验收。
+
+纠偏子项 `VOICE-C4-3A-SPEECH-STARTED-BRIDGE` 已完成自动验收：
+
+- Silero `speech_started` 携带浏览器现有 `conversation_id` 请求 `/voice/runtime/event`；
+- 服务端查库确认会话已存在，不存在返回 404，不偷偷新建会话；
+- 每个会话使用独立 `VoiceStateCoordinator`，开始事件使 `user_speaking=true` 且 `segment_capturing=true`；
+- Python 会话/路由专项 `4/4` 与 Node 浏览器行为测试通过；未接停顿、恢复、断句，未让 Scheduler 消费该状态，未做真机验收。
+- 相关组合回归 `20/20`，项目原 `.venv` 全量 `1051/1051` 通过。
+
+上一项 `VOICE-C4-3-VAD-REGRESSION` 已完成自动验收：
+
+- 红灯测试复现真实 sherpa `front` 在 `pop()` 后底层 samples 失效、随后被误判为空段的问题；修复为先复制/组装 `VoiceSegment`，成功后再出队；
+- 使用 Git 已跟踪的 `web/voice/reference.wav`，确定性重采样至 16 kHz 并补 3 秒尾静音，本地真实 Silero 产出 1 个非空语音段；
+- 同一真实模型对固定 2 秒静音和固定种子、固定幅度的 3 秒低水平宽带噪音均产出 0 个语音段；
+- 浏览器概率状态机覆盖短暂停顿/继续/断句/misfire，Node 行为测试覆盖初始化失败、运行期失败、单一麦克风路径及挂断后重启；
+- VAD 单元测试 `20/20`、真实模型固定样例 `3/3`、相关组合回归 `69/69`、项目正式全量 `1047/1047` 通过。
+
+上一项 `VOICE-C4-2-SILERO-INTEGRATION` 已完成自动验收：
+
+- 新增浏览器 `call_silero_vad.js`，按固定版本动态加载 ONNX Runtime 与 `vad-web`，把模型回调转换为第 30 项四类语义事件；
+- `phone_call.js` 以 Silero 为正常主路径，直接接收其 16 kHz 音频段并进入原 WAV/ASR 队列，不再同时启动 RMS 麦克风链；
+- Silero 初始化或运行失败时先停用适配器，再回退原 RMS 采集；两条路径不会同时持有麦克风；
+- 固定概率样例证明低人声概率不建段，并覆盖开始、停顿、继续、断句顺序；这是适配状态机证据，不是实际模型音频准确率证据；
+- Silero/状态/页面/C5 组合回归 `46/46`，新增 Node 行为测试均通过，项目正式全量 `1043/1043` 通过。
+
+上一项 `VOICE-C4-1-SILERO-CONTRACT` 已完成自动验收：
+
+- 固定适配器输入为 16 kHz、单声道、每帧 512 个归一化浮点采样，并校验序号与单调时间；
+- 定义讲话开始、短暂停顿、继续和断句四类语义事件，纯映射到现有 `VoiceRuntimeEventType`；
+- 模型运行时不可用、加载失败、推理失败或输出非法时，合同明确回退现有 RMS；失败结果不得同时伪造状态事件；
+- 合同不加载模型、不访问麦克风、不修改 Coordinator，也不替换 `phone_call.js` 的 RMS；
+- 合同与相邻状态链回归 `30/30`，项目正式全量 `1040/1040` 通过。
+
+上一项 `VOICE-C5-E1-AUTO-ACCEPTANCE` 已完成自动验收：
+
+- 新增 7 条 C5 架构冻结测试，锁定 DeliveryPlan、Gate、Scheduler、Web producer 与前端执行边界；
+- 删除活动版和遗留版流式客户端中不可达的 `done → speechBuffer → enqueueSpeech` 死代码，防止旁路被未来赋值复活；
+- C5 请求、状态、Gate、Queue、抢占、失败边界、记录/tool/chat 和前端专项 `190/190`；Node 行为与两份流式客户端语法检查通过；
+- 项目级 discover 执行 898 项，17 个模块加载错误、0 个业务断言失败；错误均来自现有 cp311 NumPy/Pydantic 二进制与当前 Python 3.12 不兼容，不能宣称项目全量通过。
+
+第 28 项已自动闭环：统一理解追问合同在自由模式被保留并随有效 evaluation 落盘；方案模式仍以
+确定性评估为权威，保存失败仍不会生成成功回执或追问。专项 `17/17`、相邻回归 `59/59`、项目正式
+全量 `1012/1012` 通过；尚未完成本轮真实模型和浏览器录音复验，因此只标 `AUTO_OK`。
+
+第 29 项已自动闭环：新增 `/record/stream` NDJSON 流，立即发送理解状态，保存成功后才发送最终
+结果；保存失败只发错误事件。桌面和手机均增量消费，旧 `/record` 保持兼容。专项 `44/44`、相关
+合同 `40/40`、项目全量 `1017/1017` 通过；真实浏览器体感尚待用户裁决。
+
+第 33 项是真机验收：在真实浏览器和麦克风条件下，分别用外放与耳机观察用户讲话期间不抢播、
+讲话结束后延后项恢复、过期追问不补播，并留下设备、浏览器、输入、终端和观察记录。该项需要用户
+参与真实环境裁决；不把第 32 项的本地模型或模拟回归替代为真机结论。
 
 `END_ONLY` 第四刀已完成自动闭环：结束时只交付一个结构化摘要，合并实验步骤数与待确认明细；
 零待确认也明确说明，旧“提交 M 段实验口述”内部术语已删除。专项 41/41、全量 571/571 通过。
@@ -149,6 +214,73 @@ PRESENT 之外的 Query/Safety/RAG 真实接入、ASR 路演稳定性和 LLM 格
 
 > 本看板只放近期事项；完整任务库与历史证据见第 4 节和维护日志。
 
+### 3.1-VOICE 语音 Web 当前唯一施工清单（2026-08-26 更新，41 个主项 + 已登记子项）
+
+> 本表取代此前对话中临时列出的 27 项；旧表遗漏了播放许可层，不能继续作为执行依据。
+> 一次只推进一项，顺序以本表为准；完整设计说明见
+> `docs/VOICE_WEB_MIGRATION_PLAN_2026-08-20.md` 第 4 节。
+
+| # | 任务 ID | 工作项 | 状态 | 独立验收边界 |
+|---:|---|---|---|---|
+| 1 | `VOICE-C5-B1-PLAYBACK-REQUEST-CONTRACT` | 定义带 `priority`、创建时间、有效期和替代键的播放请求 | `AUTO_OK` | 合同正常/边界/失败测试；DeliveryPlan 职责不扩张 |
+| 2 | `VOICE-C5-B2-PLAYBACK-CONTEXT-CONTRACT` | 定义用户讲话、ASR 收音、TTS 播放和会话阶段快照 | `AUTO_OK` | 上下文为不可变快照，不直接控制设备 |
+| 3 | `VOICE-C5-B3-PLAYBACK-DECISION-CONTRACT` | 定义 `READY / DEFERRED / DROP / PREEMPT` 互斥结果 | `AUTO_OK` | 四种结果及原因码合同测试 |
+| 4 | `VOICE-C5-B4-PRIORITY-TIMING-RULES` | 建立 `MessagePriority` 到播放时机的纯规则 | `AUTO_OK` | 覆盖讲话中、收音中、播放中和空闲状态 |
+| 5 | `VOICE-C5-C1-PLAYBACK-GATE` | 实现无副作用的播放门控函数 | `AUTO_OK` | 相同请求和上下文得到确定性决定 |
+| 6 | `VOICE-C5-C2-DEFERRED-QUEUE` | 建立延后语音队列 | `AUTO_OK` | DEFERRED 项不丢失、不立即播放 |
+| 7 | `VOICE-C5-C3-REEVALUATION-TRIGGERS` | 在停止讲话、ASR/TTS 结束时重新判断 | `AUTO_OK` | Fake 状态转换验证恢复时机 |
+| 8 | `VOICE-C5-C4-EXPIRY-DROP` | 实现超期语音丢弃 | `AUTO_OK` | Fake 时钟证明过期项不补播 |
+| 9 | `VOICE-C5-C5-SUPERSEDE` | 新追问替代旧追问 | `AUTO_OK` | 旧上下文问题被 DROP，只保留新问题 |
+| 10 | `VOICE-C5-C6-SESSION-CANCEL` | 会话结束时取消剩余语音 | `AUTO_OK` | 结束后队列清空且不再恢复 |
+| 11 | `VOICE-C5-C7-RUNTIME-STATE-COORDINATOR` | VoiceRuntimeState 与唯一状态写入者 | `AUTO_OK` | 事件归约确定性；短暂停顿不等于断句 |
+| 12 | `VOICE-C5-C8-PLAYBACK-CONTEXT-FACTORY` | 运行状态复制为不可变播放快照 | `AUTO_OK` | 注入时钟；工厂不改状态、不做决定 |
+| 13 | `VOICE-C5-C9-PLAYBACK-SCHEDULER` | Gate、Queue、TTS 的唯一编排者 | `AUTO_OK` | READY/DEFERRED/DROP/PREEMPT 各有单一路径 |
+| 14 | `VOICE-C5-C10-TTS-ADAPTER-EVENTS` | TTS play/stop 与四类执行事件合同 | `AUTO_OK` | STARTED/FINISHED/STOPPED/FAILED 互斥且可追踪 |
+| 15 | `VOICE-C5-C11-PREEMPTION` | 限定 CRITICAL 抢占低优先级播放 | `AUTO_OK` | 等 STOPPED 后复核有效性；普通消息不能抢占 |
+| 16 | `VOICE-C5-C12-TTS-FAILURE-BOUNDARY` | 隔离 TTS 失败和重试 | `AUTO_OK` | 屏幕输出不丢、失败项不循环播放 |
+| 17 | `VOICE-C5-D1-SHARED-RECORD-SERVICE` | 抽取共享记录应用服务 | `AUTO_OK` | 统一组装、保存、成功结果生成顺序 |
+| 18 | `VOICE-C5-D2-RECORD-USE-SERVICE` | `/record` 使用共享服务 | `AUTO_OK` | HTTP JSON 兼容，保存失败无成功回执 |
+| 19 | `VOICE-C5-D3-TOOL-USE-SERVICE` | `record_observation` tool 使用共享服务 | `AUTO_OK` | 删除重复评估/保存路径，工具合同兼容 |
+| 20 | `VOICE-C5-D4-TOOL-PRESENTATION` | tool 结构化结果进入 Intent/copy/DeliveryPlan | `AUTO_OK` | 模型不重新决定记录回执话术 |
+| 21 | `VOICE-C5-D5-CHAT-SCREEN-ONLY-DELTA` | chat `delta` 降为纯屏幕事件 | `AUTO_OK` | delta 不携带、不暗含播放权限 |
+| 22 | `VOICE-C5-D6-VOICE-EVENT-BACKEND` | 后端发送显式 `voice_delivery` 事件 | `AUTO_OK` | 仅传稳定 intent 与语音候选/许可数据 |
+| 23 | `VOICE-C5-D7-REMOVE-DELTA-TTS` | 删除前端 `delta → enqueueSpeech` | `AUTO_OK` | 流式文本继续显示但不直接发声 |
+| 24 | `VOICE-C5-D8-REMOVE-TASK-QUEUED-TTS` | 删除前端 `task_queued → enqueueSpeech` | `AUTO_OK` | 排队结果不绕过统一门控 |
+| 25 | `VOICE-C5-D9-FRONTEND-PLAYBACK-EVENT` | 前端只消费获准播放事件 | `AUTO_OK` | 未获 READY/PREEMPT 的项不能调用 TTS |
+| 26 | `VOICE-C5-D10-VOICE-CANDIDATE-INTEGRATION` | `/record` 与 chat tool 已有语音候选经过同一 PlaybackScheduler | `AUTO_OK` | 只证明已有候选共用播放执行入口；不代表普通 chat 或前端回合已统一 |
+| 27 | `VOICE-C5-E1-AUTO-ACCEPTANCE` | C5 全量自动回归与职责冻结 | `AUTO_OK` | 内容、资格、状态、时机、调度、执行边界齐全 |
+| 28 | `VOICE-C5-E2-FREE-FOLLOWUP-PRESERVATION` | 恢复自由实验统一语义追问并保持保存后呈现 | `AUTO_OK` | 语义追问不被空方案评估覆盖；保存成功后才生成 clarification；新增红灯测试转绿 |
+| 29 | `VOICE-C5-E3-RECORD-STREAMING-FEEDBACK` | `/record` 流式首反馈与提交后最终结果 | `AUTO_OK` | status 必须先到；保存成功后才有 result；保存失败无结果/回执/播放 |
+| 30 | `VOICE-C4-1-SILERO-CONTRACT` | 定义通话模式 Silero VAD 适配合同 | `AUTO_OK` | 与音频帧及 Coordinator 事件兼容 |
+| 31 | `VOICE-C4-2-SILERO-INTEGRATION` | 通话模式由 RMS 判断切换到 Silero | `AUTO_OK` | 噪音与人声固定样例自动验证 |
+| 32 | `VOICE-C4-3-VAD-REGRESSION` | VAD 边界、失败回退和前端回归 | `AUTO_OK` | 短暂停顿/继续/断句边界稳定 |
+| 32a | `VOICE-C4-3A-SPEECH-STARTED-BRIDGE` | 讲话开始事件进入按会话隔离的服务端状态 | `AUTO_OK` | 现有会话才可写；A/B 状态不串；重试幂等 |
+| 32b | `VOICE-C4-3B-SPEECH-PAUSED-BRIDGE` | 短暂停顿事件进入同一会话状态 | `AUTO_OK` | 只改 `user_speaking`，不把停顿误当断句 |
+| 32c | `VOICE-C4-3C-SPEECH-RESUMED-BRIDGE` | 停顿后继续讲话进入同一会话状态 | `AUTO_OK` | 恢复 `user_speaking`，保留同一采集片段 |
+| 32d | `VOICE-C4-3D-SEGMENT-FINALIZED-ASR-BRIDGE` | 断句与 ASR 处理事件进入同一会话 | `AUTO_OK` | 断句后关闭采集；ASR 成功/失败都清理忙状态 |
+| 32e | `VOICE-C4-3E-SESSION-PLAYBACK-STATE` | PlaybackScheduler 读取同一 conversation 的语音状态 | `AUTO_OK` | A 讲话只延后 A；B 不受影响 |
+| 32f | `VOICE-C4-3F-TTS-FEEDBACK-REEVALUATION` | 浏览器 TTS 事实反馈与延后项重评 | `AUTO_OK` | STARTED/FINISHED/STOPPED/FAILED 闭环；延后项可恢复或过期丢弃 |
+| 33 | `VOICE-C6-UNIFIED-CONVERSATION-SURFACE` | 单聊天时间线、显式模式、分策略输出与真实播放收口 | **NEXT** | 真实验收已暴露普通 chat 无语音、双前端状态和隐式模式缺口 |
+| 33a | `VOICE-C6-A1-TURN-BLOCK-CONTRACT` | 定义统一 Turn/Block 输出合同 | `AUTO_OK` | request/turn/block/voice 身份、mode_version 与纯幂等冲突判断；无副作用；专项 14/14、全量 1076/1076 |
+| 33b | `VOICE-C6-A2-SINGLE-CONVERSATION-STORE` | 前端建立唯一 ConversationTurnStore | `AUTO_OK` | 正文/think/tool 只写 Store；删除 run 双状态；稳定 tool_call_id；专项 27/27、全量 1083/1083 |
+| 33c | `VOICE-C6-A3-CHAT-FIRST-SURFACE` | 方案、步骤、安全、记录和 tool 收敛为聊天消息块 | `AUTO_OK` | 统一卡片骨架+BlockView；管理页保留，run 画布退役；专项 30/30、全量 1091/1091 |
+| 33d | `VOICE-C6-A4-EXPLICIT-MODE-SWITCH` | 显式切换自由聊天、自由实验记录、方案实验记录 | `AUTO_OK` | 唯一模式状态；提交快照；输入来源解耦；专项 22/22、全量 1098/1098，未做真实浏览器 |
+| 33e | `VOICE-C6-A5-MODE-OUTPUT-POLICIES` | 分离 chat、实验记录和 tool 输出策略 | `AUTO_OK` | Chat 禁止记录；free/protocol 显式保存策略；专项 46/46、全量 1105/1105 |
+| 33f | `VOICE-C6-A6-THREE-PRODUCER-AUTO-MATRIX` | chat、记录、tool 接同一输出外壳并完成交叉自动回归 | `AUTO_OK` | source_block_id 贯通；三生产者调度矩阵；专项 54/54、全量 1110/1110 |
+| 33g | `VOICE-C3-1-PLAYBACK-TIMING-REAL` | 三种模式真机验证不抢话、延后恢复和过期不补播 | `TODO` | 普通 chat、自由/方案记录、tool 分别留外放/耳机证据 |
+| 33h | `VOICE-C6-A7-REMOVE-TASK-RESULT-TTS-BYPASS` | 删除后台任务结果对播放器的直接调用 | `TODO` | 2026-08-25 计时样本出现 null intent；先仅显示，需播报时必须走正式 voice_delivery |
+| 34 | `VOICE-C3-2-BARGE-IN-REAL` | 真机验证自激、漏检和打断停止 | `TODO` | C1/C2a/C4/C5 联合 REAL_OK 证据 |
+| 35a | `VOICE-D0-INPUT-EVIDENCE-CONTRACT` | 定义文字/单次录音/连续通话进入实验统一链的来源可信输入合同 | `AUTO_OK` | 文字不得伪装 ASR；语音必须携带匹配的最终 ASRResult；专项 9/9、相邻 35/35、全量 1162/1162 |
+| 35 | `VOICE-D1-SESSION-OWNERSHIP` | 服务端按对话与实验会话托管有状态会话 | `AUTO_OK` | 并发对话不共享 reply/voice 状态 |
+| 36 | `VOICE-D2-REAL-OBSERVER` | `/record` 原始 ASRResult 接 UnifiedObserver | `TODO` | LLM 失败可降级，原始 ASR 不丢 |
+| 37 | `VOICE-D3-DROP-IN-SWAP` | 降级生产者切换为真实观察器 | `TODO` | 输出层不改且全量回归通过 |
+| 38 | `VOICE-D4-FIVE-BRANCH-CONTRACT` | 设计 `experiment/control/tool/chat/uncertain` 五分支 | `TODO` | 五分支互斥；理解层不执行工具 |
+| 39 | `VOICE-D5-TOOL-PERMISSION-ROUTING` | 工具参数校验、风险权限和安全分派 | `TODO` | 不确定输入不产生工具副作用 |
+| 40 | `VOICE-E1-FUNCTIONAL-REAL` | 真实录音到记录、追问、确认的功能验收 | `TODO` | 自由/方案模式分别留 session、终端和持久化证据 |
+| 41 | `VOICE-E2E3-UX-AND-CLOSEOUT` | 九维体验验收与明确不做清单收尾 | `TODO` | UX 由用户裁决，三份维护文档同步 |
+
+依赖关系调整为：`1–16 播放许可与执行架构 → 17–27 已有语音候选融合 → 28 自由实验追问回归修复 → 29 流式首反馈 → 30–32f VAD 与会话播放状态 → 33a–33f 单聊天时间线/显式模式/分策略输出 → 35a–37 原始三分支统一链接入 → 33g–34 在最终实验链上做真机播放/打断 → 38–39 另行设计五分支与工具权限 → 40–41 收尾`。2026-08-26 用户将统一链接入与识别能力检验提到当前主线；33g–34 保留 `TODO`，不是取消。
+
 ### 3.1A 近期任务登记（兼含关联完成项）
 
 > 本表保留跨模块任务与历史关联，行号不代表当前执行顺序。
@@ -178,8 +310,8 @@ PRESENT 之外的 Query/Safety/RAG 真实接入、ASR 路演稳定性和 LLM 格
 | 19 | `P1` | `PRESENT-FIX-LEAK-01` 开发输出泄漏收尾（B-4 真实验收发现） | `REAL_OK` | 141745发现完整第三方噪声；142352清到仅剩版本行；定位并精确禁用FunASR 1.4.1版本检查入口。会话142945确认启动/整轮零FunASR/ModelScope/路径/进度/RTF/耗时/token泄漏，READY含Ctrl+C、WAITING含再次唤醒指引 | 专项63/63、全量576/576通过；第二次实际唤醒留到最终双会话UX验收，不阻塞泄漏任务 |
 | 20 | `P1` | `PRESENT-NOACTION-FEEDBACK-01` 投影层 no_action 容错反馈（B-4 真实验收发现） | `AUTO_OK` | 新增 `NO_ACTION_FEEDBACK` 语义意图，控制类 no_action 不再沉默；文案按 reason 映射为“没有找到编号/请说明回答内容/当前没有可操作问题/没把握安全执行”等。执行器 NO_ACTION 透传 planner reason。新增 9 项测试；全量 724 项通过 | 待真实会话验证“制业枪”等 no_action 场景有可见回应；通过后升 REAL_OK |
 | 33 | `P0` | `CLARIFICATION-COMPOUND-CONFIRM-ANSWER-01` 同句确认+实体回答不能丢字段 | `AUTO_OK` | CONFIRM 执行器支持 supplied_entity_fields 或实体提取器，确认与填字段原子完成；PRESENT 确认回执携带 remaining_fields/resolved 并如实显示。新增 7 项测试：完全解决、仍缺字段、纯确认、提取器填充；全量 715 项通过 | 待真实会话验证“是的，体积为50毫升”确认记录不再残留 amount_value/amount_unit；通过后升 REAL_OK |
-| 21 | `P1` | `LLM-FOLLOWUP-STRICT-01` 缺字段追问复核（B-4 二次真实验收修正） | `TODO` | 二次真实验收（会话 213926）证实"将溶液加热"仍稳定追问 {temperature,duration}——**撤回"模型漂移"结论**；之前"加热到60摄氏度APP"不追问 duration，是口述场景不同（温度已明确 + APP 尾音干扰），非漂移。待干净复验：不带尾音的"加热到60摄氏度"缺时长是否应追问 | 确认"加热到60摄氏度"缺时长是否应追问（产品预期 vs LLM 行为） |
-| 22 | `P0` | `ASR-DEMO-NOISE-01` 路演前 ASR 噪音/误识别必修（用户 2026-08-16 明确"路演必须解决"） | `TODO` | 两次真实验收暴露的误识别：①"加热到60摄氏度"→"加热到60摄氏度APP"（尾音）；②"结束实验记录"→"要车翻圈啦"（language=auto 误判粤语 yue）；③"将溶液加热"→"标溶液加热"（首字误听）。**解决方向**：a) language 参数 auto→固定 zh（治粤语误判）；b) 热词/后处理（`ASR-CMD-02-POSTPROCESS-01` 已 REAL_OK，等组长定演示领域后接入）；c) 截音（AUDIO-PREROLL 尾音截断）；d) 噪声样例入语料（`ASR-NOISE-SAMPLES-01`） | **路演环境下核心口述/结束命令识别稳定、不乱识别**（路演硬门槛，不达不演） |
+| 21 | `P1` | `LLM-FOLLOWUP-STRICT-01` 缺字段追问复核（B-4 二次真实验收修正） | `MERGED` | 历史样本曾被当成提示词严格度争议；2026-08-24 重新审计确认更直接的集成缺陷：统一理解已有追问字段，但 Web 桥和共享记录服务未完整保留，自由模式空方案评估会覆盖语义追问 | 已正式吸收到唯一施工清单第 28 项 `VOICE-C5-E2-FREE-FOLLOWUP-PRESERVATION`，不再作为无人负责的旁支 TODO |
+| 22 | `P0` | `ASR-DEMO-NOISE-01` 路演前 ASR 噪音/误识别必修（用户 2026-08-16 明确"路演必须解决"） | `TODO` | 两次真实验收暴露的误识别：①"加热到60摄氏度"→"加热到60摄氏度APP"（尾音）；②"结束实验记录"→"要车翻圈啦"（language=auto 误判粤语 yue）；③"将溶液加热"→"标溶液加热"（首字误听）；④"是的"→"日的"（确认词首字误听，导致确定性 AFFIRM 前缀没命中、掉给 LLM 弃权，2026-08-20 P0 真实验收发现）。**解决方向**：a) language 参数 auto→固定 zh（治粤语误判）；b) 热词/后处理（`ASR-CMD-02-POSTPROCESS-01` 已 REAL_OK，等组长定演示领域后接入）；c) 截音（AUDIO-PREROLL 尾音截断）；d) 噪声样例入语料（`ASR-NOISE-SAMPLES-01`） | **路演环境下核心口述/结束命令识别稳定、不乱识别**（路演硬门槛，不达不演） |
 | 23 | `P2` | LLM 返回格式错误导致降级（B-4 二次真实验收发现） | `TODO` | 段1"标溶液加热" llm_error="顶层字段不匹配；缺少=[control,experiment,uncertain]，额外=[reason]"——LLM 对误识别文本返回了 uncertain 分支格式但缺顶层字段，触发降级（数据未丢，原始记录已保存，优雅降级生效） | 观察 LLM 返回格式稳定性；必要时加格式修复/重试 |
 | 24 | `P1` | `PRESENT-ADMISSION-01` 用户呈现准入与去重复 | `AUTO_OK` | 四刀完成：会话提示去重复、基础设施转 logging、`IdleNoticeTracker`、`END_ONLY` 单一结束摘要。结束摘要合并实验步骤数与待确认明细，零待确认也明确显示。专项41/41、全量571/571通过 | 自动闭环；真实会话九维走查统一并入 `PRESENT-FINAL-UX-VERIFY-01` |
 | 25 | `P1` | `PRESENT-FEEDBACK-REGRESSION-01` 程序级与零待确认反馈补回 | `AUTO_OK` | 新增结构化 `PROGRAM_STATUS`（starting/ready/exited）和 keyword 合同化 `WAKE_ACK`；程序级 Coordinator/Pump 在初始化前启动，会话复用同一链路；启动期间和待机期间 Ctrl+C 都交付退出反馈；零待确认已由 END_ONLY 明确显示；程序状态与唤醒事实均经 projection→Intent。专项56/56、全量578/578通过 | 自动闭环；真实 user 模式可见性与去重复并入 `PRESENT-FINAL-UX-VERIFY-01` |
@@ -274,6 +406,9 @@ PRESENT 之外的 Query/Safety/RAG 真实接入、ASR 路演稳定性和 LLM 格
 | 30 | `P1` | `UNIFIED-PROMPT-ASR-ERROR-CONFIRM-01` 统一Prompt补疑似ASR错词确认规则 | `REAL_OK` | 实体疑似同音错词/识别错误时 needs_confirmation=true + confirmation_reason + 确认追问 | 统一提示词实验规则新增"实体疑似同音错词或ASR识别错误时设置needs_confirmation"；合同测试断言；全量 433 项通过。真实会话 `20260814_110116` 段 11："使用一夜枪取50微升缓冲液" → 事件 `needs_confirmation=True, reason="疑似ASR识别错误：'一夜枪'可能应为'移液枪'"` + 确认问题"您说的'一夜枪'是指移液枪吗？"；段 12"问题三，是的，是一夜枪。" → confirm 执行 → **确认记录首次真实落盘**（experiment_confirmations.jsonl 第 1 行） |
 | 31 | `P1` | `INTENT-02-ANSWER-UX-01` 回答体验：反馈补缺 + 无编号回答识别 | `REAL_OK` | ①answer 部分完成后明确提示"仍缺字段"；②仅一个待确认问题时无编号事实性短句判为对该问题的回答（多个时不得自动归属） | ①执行器 reason 含"仍需补充"（会话 110116 验证）；②无编号回答纯函数兜底 `src/core/answer_fallback.py`（单问题+短句+提取字段⊆缺失字段；夹带无关字段的实验记录绝不路由成回答）+ 提示词收紧 + 合同测试；467 项通过。真实会话 `20260814_113237` 验证：段 3"时间为10分钟"→ abstention 被兜底接住为 answer，反馈"已将对问题 1 的答复的实体字段 ['duration'] 填入。仍需补充：temperature"；段 4"60摄氏度"→ 补 temperature"问题已解决"；段 2"分中"听岔碎片不误判；无编号回答不产生实验事件（事件仅段 1）；计数"提交 1 段"、上下文 1、无剩余确认项 |
 | 32 | `P1` | `INTENT-02-QUESTION-AUTO-OUTPUT-01` 追问/回答结果自动输出 | `REAL_OK` | create 后自动显示追问文本；answer 后自动显示"已填 X 仍缺 Y"；不依赖用户手动"查看待确认问题" | ①执行器 create reason 含问题文本；②`display_shadow_observation` executed 时显示 reason；真实会话 `20260814_110116`：段 1/5/11 create 后直接显示"已创建待确认问题 N：…"、段 10 answer 完整反馈、段 12 confirm 反馈——均自动输出，无需手动查看 |
+| 33 | `P1` | `WEB-BRIDGE-01` web 统一链桥迁移（llm_bridge 旧链→统一链） | `REAL_OK` | 网页记录识别接入 `UnifiedUnderstandingProcessor`，不再依赖 src 已标待删的旧 `ExperimentLLMProcessor` | `web/llm_bridge.py` 换处理器 + `extract()` 加 `recent_context` + `input_kind` 标签；`web/api/record.py` 补 `_recent_context()`（最近 5 条口述）；新增 `tests/test_web_llm_bridge.py` 7 项（experiment/control/uncertain/降级/上下文过滤透传）；**环境修复**：`.venv` 补 numpy/sounddevice/soundfile/sherpa-onnx（funasr/torch 无需装，测试未直接 import），requirements.txt 补 numpy；迁移对照登记 `PROJECT_ARCHITECTURE.md` §5.3 WEB-BRIDGE-01 + §5.6；全量 715 项通过。**真实验收**（会话 `20260816_200646`，deepseek-v4-pro）：5 条口述无降级、实体抽取准确，口述 3「帮我看看待确认的问题」`input_kind=control`（旧链做不到）；缺时长未追问对应已登记争议 `LLM-FOLLOWUP-STRICT-01`，非迁移退化 | 功能 REAL_OK；体验验收（UX）待用户走查确认 |
+| 34 | `P1` | `WEB-AGENT-FAKE-RECORD-01` 聊天 agent 假记录修复（用户 2026-08-16 在聊天区实测发现） | `REAL_OK` | 聊天 agent 对实验口述口头回复"已记录"却未调 record_observation 工具 → lab_records 无记录（数据丢失隐患） | 根因：`web/agent/core.py` INSTRUCTIONS 未引导模型使用 `record_observation` 工具（工具栏有但提示词没教）。修复：INSTRUCTIONS 新增"实验记录规则"——描述实验操作/数据必须调用 record_observation 并传原文，禁止不调工具就回复"已记录"，仅工具成功才可确认，失败须如实说明。新增 `tests/test_web_agent_prompts.py` 5 项提示词合同测试（防规则被误删 + 工具注册/schema 断言）。**真实验收**（重启 web 后 `/chat` 实测）：修复前 task 6830ffe4"已记录"但 lab_records 无新增；修复后 task 77ce319c"已记录"且 lab_records 新增 id=10「离心机八百转运行十分钟」（extraction_source=rule） | 全量 739 项通过；体验：话术未变但"已记录"变为真话（维 6 改善） |
+| 35 | `P0` | `VOICE-WEB-MIGRATION-01` 语音接入 Web 迁移 Phase B（输出层接线） | `REAL_OK` | 把 CLI 统一理解输出层（UnifiedObservation→投影→文案）接入 web：过渡期用**降级生产者**产出**部分** UnifiedObservation，前端退役薄字典平行投影；B 阶段完成后写 5.3/5.4 迁移对照（标等价/降级/丢失） | 计划落点 `docs/VOICE_WEB_MIGRATION_PLAN.md`。**B1 定稿**（容忍部分观察分支）；**B2** partial 字段 13 项 + 降级生产者 12 项 + WebRenderer 10 项；**B3** /record 影子 messages 6 项；**B4** 前端 4 文件切渲染 messages + 迁移对照 §5.3 WEB-RENDER-01/02 + §5.4 web 侧行。**真实验收通过（2026-08-18/19，REAL_OK）**：用户实测语音记录闭环（灰色圈圈→录音→/record→面板回执"已记录"）+ 选方案缺字段→"小科追问"+ TTS 朗读。验收修复：WEB-RENDER-02 桌面语音死代码、话术撒谎硬问题（拆 RECORDED_NO_STEP/DEGRADED）、lab_panel.js 未注入、语音入口混乱治理（cp-mic 改语音记录、vad 改语音对话）、文案"小科追问"+TTS 不念前缀。**关键定位纠正（用户）**：统一理解链核心是处理命令（control 分支），B 降级生产者只有记录+方案追问，命令处理待 Phase D | **Phase B 全部完成 + 真实验收 REAL_OK**：全量 **800 项通过**；UX 走查证据已收集（反应慢/称呼重复/前端乱/undefined 段口述等），体验最终裁决权在用户 |
 
 ### 当前路线为什么这样排
 
@@ -363,6 +498,7 @@ TTS-01 接口和假客户端
 | `P3` | TTS（含全双工）、GPT-SoVITS、Live2D | 会把当前输出时序问题放大，且难以判断故障来源 | 阶段三和阶段四达到验收条件 |
 | `P3` | Word/PDF报告美化 | 当前还没有完整SessionRecord可供可靠导出 | Markdown/JSON第一版真实导出通过 |
 | `P3` | 多工具Agent | 外部写入和高风险动作尚未建立统一确认边界 | 安全等级、白名单和确认流程完成 |
+| `P3` | 模型微调（LoRA）与本地推理（见第 4 节 K 组） | 数据量与质量未评估；当前问题可由提示词 + RAG 覆盖；需数据清洗与 GPU 投入；微调只解决"知道但做不对"，不解决"不知道" | RAG Phase 2（QUERY-ANSWER-01 等）落地且有足够真实确认样本后评估 |
 
 > **注意**：RAG/用户画像和实验风险知识库已从"暂缓"移入正式任务总表第 I 节。
 > 其中类型定义（QUERY-TYPES-01、SAFETY-TYPES-01、KNOWLEDGE-PROTOCOLS-01）为 P1 准备阶段；
@@ -764,6 +900,7 @@ P1 (下一批):
   Phase 1b: UNIFIED-QUERY-01 → DISPATCH-QUERY-01 → BYPASS-QUERY-01 → CONFIG + ENRICHED-CONTEXT合同
 P2 (远期): SAFETY-INTEGRATE → RAG-CONTEXT → RAG-RETRIEVE → QUERY-ANSWER → E2E
 P3 (TTS后): AGENT-01 多工具Agent
+P3 (远期): FINE-TUNE-* 微调（LoRA）与本地推理（在 RAG Phase 2 与 TTS 之后，见第 4 节 K 组）
 ```
 
 ### J. TTS 与后续阶段
@@ -777,6 +914,7 @@ P3 (TTS后): AGENT-01 多工具Agent
 | `TTS-04` | `P3` | 分句播放、失败降级 | `TODO` | TTS 失败回退终端文本 |
 | `TTS-05` | `P3` | 用户打断策略 | `TODO` | 需要状态机和音频资源管理 |
 | `TTS-06` | `P3` | 唤醒提示替换为“我在，请说” | `TODO` | 系统 TTS 稳定后 |
+| `TTS-07` | `P3` | web `local_tts.js` 打断后 blob URL 未回收 | `TODO` | 软问题（不影响功能，仅内存回收）：`play()` 被 `stopSpeech()` 的 `currentAudio.pause()` 打断时 `onended` 不触发，`URL.revokeObjectURL(url)`（`local_tts.js` 第34行）不执行，长会话连续 barge-in 会累积 blob 内存到页面刷新才释放；修法=在 stopSpeech 或 play 的 onpause 补 revoke |
 
 > **全双工（full-duplex）增强组**：`FULL-DUPLEX-01` 已把“播放+监听”抽象为统一接口，
 > 半双工（`TTS-03`）是全双工的第一个实现，全双工只是给同一接口加回声消除后
@@ -793,6 +931,30 @@ P3 (TTS后): AGENT-01 多工具Agent
 | `SOVITS-02` | `P3` | 超时、缓存、系统 TTS 回退 | `TODO` | 外部服务失败不影响主流程 |
 | `LIVE2D-01` | `P3` | Live2D 表现层接入 | `TODO` | TTS 稳定后；口型/表情依赖 `TTS-01` 的播放生命周期回调，不在表现层另做 TTS 驱动 |
 | `AGENT-01` | `P3` | 白名单计时器/提醒/查询/导出 | `TODO` | TTS 与记录闭环后 |
+
+### K. 微调（LoRA）与本地推理（远期规划）
+
+> **登记背景（2026-08-16，用户提出"项目成熟后如何加入模型微调"）**：定位澄清——三条路线
+> 解决不同问题，是接力不是替代：**提示词工程**（教模型"怎么答"，零成本）→ **RAG**
+> （给模型"喂资料"，管"不知道"，任务库第 I 节已规划）→ **微调/LoRA**（给模型"练肌肉"，
+> 管"知道但做不对"，如输出格式不稳、术语常错）。判断口诀：模型不知道→RAG；知道但做不对
+> →微调；偶尔错→继续提示词工程。
+>
+> **本组是路线登记，不在 PRESENT 收口清单内，不改变当前执行顺序**。最稀缺资源不是 GPU
+> 而是数据：`results/` 三份 JSONL（asr_segments / experiment_events / experiment_confirmations）
+> 与 `evaluation/narration_robustness/narration_plan.json`（28 段带期望标注）是现成 SFT 样本来源
+> ——"ASR 转写 → 期望结构化 JSON"即为标准有监督微调样本。目标场景：统一理解输出格式稳定性
+> （对应任务库 LLM 格式降级类问题，如 3.1A 看板第 23 项）。接入口已由 `LLMClient` Protocol +
+> `create_llm_client` 工厂预留（见 `PROJECT_ARCHITECTURE.md` 4.2 节）。
+
+| ID | 优先级 | 任务 | 状态 | 验收证据/备注 |
+|---|---|---|---|---|
+| `FINE-TUNE-DECISION-01` | `P3` | 微调适用边界与场景确认 | `TODO` | 判定"哪些问题归 RAG、哪些归微调"：输出格式不稳定/术语常错→微调；知识缺失→RAG。用现有鲁棒性旁路报告（ASR-ROBUSTNESS 缺口分布）和 LLM 格式错误记录做证据，不拍脑袋定 |
+| `FINE-TUNE-DATA-AUDIT-01` | `P3` | 现有会话数据量与质量评估 | `TODO` | 统计三份 JSONL 可清洗出多少对"ASR转写→期望结构化JSON"样本；只计用户确认过/最终采纳的记录，降级 NOTE、误识别段剔除或标注；产出数量与占比结论，决定是否值得做微调 |
+| `FINE-TUNE-DATA-CONTRACT-01` | `P3` | 微调数据集清洗合同 | `TODO` | 定义清洗规则与 alpaca 格式输出（instruction 复用 `unified_prompts.py`；input=ASR 转写；output=期望结构化 JSON）；严格 schema + 测试拒绝脏样本；不覆盖、不回写原始 JSONL（沿用"先存原始数据，后推断"原则） |
+| `FINE-TUNE-TRAIN-01` | `P3` | LoRA 训练闭环 | `TODO` | 选开源可下载权重模型（候选 Qwen2.5-7B-Instruct）+ LLaMA-Factory/Unsloth；LoRA 低秩适配器（r/alpha/epoch 默认参数起步），产物是几十 MB adapter 而非整个模型；训练/数据文件不入仓库 |
+| `FINE-TUNE-EVAL-01` | `P3` | 微调前后对照评估 | `TODO` | 复用 `narration_plan.json` 28 段语料跑"微调前 vs 微调后"报告 + 现有合同测试；标准=意图准确率/格式合规率提升且不破坏原有能力（与 `ASR-CMD-02-POSTPROCESS-01` 同一方法论：单变量对照、保留原文、量化回退） |
+| `FINE-TUNE-INTEGRATE-01` | `P3` | vLLM 本地推理接入 | `TODO` | vLLM 起 OpenAI 兼容服务（/v1/chat/completions）；`create_llm_client` 工厂 + `LLMClient` Protocol 增加配置项指向本地地址，下游零改动；失败降级沿用现有 `UnavailableLLMClient` 策略，不得破坏主流程 |
 
 ## 5. TTS 开始条件
 
@@ -960,6 +1122,18 @@ Word/PDF 属于表现层增强，可以在系统 TTS 之后完成。
 | 2026-08-16 | PRESENT 子步 B-3b：DEBUG 分流（基础设施 + main 开发语言迁 logging） | 全量 559 项通过（无新增测试） | `llm/client.py`（[LLM请求]/[LLM响应]）、`asr/sensevoice_backend.py`（加载/识别）、`core/state_manager.py`（状态变化）print → logger；`main.py` 的"统一理解链已启用"/"处理失败"/"最终上下文"迁 logging；`main()` 加 `configure_logging`（user 写 `results/debug.log`，admin 输出屏幕）。屏幕不再有 token/路径/状态变化/[LLM请求] 开发语言 | 下一小步 B-3c（主循环用户消息 print → pump，达成单一输出入口） |
 | 2026-08-16 | PRESENT 子步 B-3c：主循环用户消息 → pump（单一输出入口） | 全量 562 项通过（+3 透传测试） | 文案目录加透传 kind（TRANSCRIPT/WAKE_ACK/STAGE_SUMMARY/SESSION_SUMMARY/SYSTEM_ISSUE，args text 透传）；main.py 加 `emit` 闭包，主循环/结束汇总/待确认列表 print → emit；`recognize_one_segment` 提示移到主循环；`display_unresolved_clarifications` 改为投递 CLARIFICATION_REVIEW（去掉"来源第N段"开发语言，修 UX-08）；main() 启动/唤醒/异常/退出 print → logging。**main.py 零 print 残留，达成"单一输出入口 + 旧 print 已删"** | 下一小步 B-4（真实验收 + 九维走查，需授权数据外发） |
 | 2026-08-16 | PRESENT 子步 B-4：真实验收（会话 20260815_212615，用户自启） | 全量 562 项通过（真实验收未加测试） | 用户自启真实会话 6 段口述（缓冲液/加热60度/问题一/查看/离心/结束）。**发现 4 个软问题**（按硬软判据归类，均不阻塞主流程、数据未丢）：①开发输出泄漏——`vad_recorder.py`/`recorder.py`/`wakeword/detector.py` print + FunASR 进度条未迁 logging，屏幕有路径/rtf/音频时长，维1/7 失败；②投影层 no_action 无容错反馈——段3"问题一"因问题1不存在→no_action→屏幕沉默，维6 失败；③**LLM 缺字段追问漂移**——`加热到60摄氏度` duration=null 但 missing_fields=[]，历史 08-11/12 同类"将溶液加热"稳定追问 {temperature,duration}；`git log -S` 证实追问规则（unified_prompts.py 第64-65行）自 08-11 引入后未改，故是 DeepSeek 模型服务端行为漂移，暴露"缺字段追问 100% 靠 LLM、无确定性兜底"；④ASR 误识别——"加热到60摄氏度APP"尾音、"结束实验记录"被 language=auto 误判粤语(yue)"要车翻圈啦"。**通过项**：编号分离（实验步骤1/2/3）、结束汇总用户语言、回执及时（维4/5/9 通过）、DEBUG 落 debug.log | 先修①②（PRESENT 收尾），③加确定性兜底，④走 ASR 线 |
+| 2026-08-16 | WEB-BRIDGE-01：web 统一链桥迁移（REAL_OK） | 全量 715 项通过（+7 web 桥接测试；此前 15 errors 系 `.venv` 缺依赖，非代码问题） | **环境修复**：`.venv` 缺 numpy/sounddevice/soundfile/sherpa-onnx 致 15 errors，逐包补齐（清华镜像），requirements.txt 补 numpy 显式声明；funasr/torch 无需装（测试未直接 import）。**迁移**：`web/llm_bridge.py` 换 `UnifiedUnderstandingProcessor`、`extract()` 加 `recent_context` 与 `input_kind`；`web/api/record.py` 补 `_recent_context()`。**真实验收**（会话 `20260816_200646`，deepseek-v4-pro @ api.deepseek.com/v1）：5 条口述（加热60度/加5毫升盐酸/帮我看看待确认的问题/离心机800转10分钟/溶液变蓝）全部无降级、实体抽取准确，口述 3 识别为 `input_kind=control` 零错误卡片（旧链做不到）；缺时长未追问对应当前未定案争议 `LLM-FOLLOWUP-STRICT-01`。前端零改动（消费的 entities/degraded/evaluation 字段格式不变）。迁移对照：`PROJECT_ARCHITECTURE.md` §5.3 WEB-BRIDGE-01 + §5.6 | 功能 REAL_OK；体验验收（UX 九维走查）待用户确认；下一步按用户路线决策：web 纯规则业务下沉（planner/tools 两步确认等）或先收团队标准 §2/§3 例外条款 |
+| 2026-08-16 | WEB-AGENT-FAKE-RECORD-01：聊天 agent 假记录修复（REAL_OK） | 全量 739 项通过（+5 提示词合同测试） | 用户实测发现：聊天区输入「离心机八百转运行十分钟」，agent 回复"已记录"但 lab_records 无记录（task 6830ffe4，数据丢失隐患）。根因：`agent/core.py` INSTRUCTIONS 未引导 record_observation 工具。修复：提示词强制"描述实验操作必须调工具、工具成功才可确认已记录、失败须如实说明"。真实验收（重启 web 后 `/chat` 实测）：task 77ce319c 回复"已记录"且 lab_records 新增 id=10（rule 抽取），话术未变但行为变真；对话历史 4 条历史假记录（加热/离心机/溶液/查看）未落盘的事实已留存，用户可重输补录 | 聊天区实验记录已真实落盘；提醒用户历史 4 条假记录需重输；下一步同 WEB-BRIDGE-01 待办 |
+| 2026-08-17 | 登记微调（LoRA）与本地推理远期路线：新增第 4 节 K 组 6 项任务（边界确认/数据审计/清洗合同/训练/评估/接入）+ 3.3 暂缓表与优先级总览各补一笔；任务 ID 与桌面真实项目 2026-08-16 既有登记对齐 | 未改代码；沿用全量 739 项基线 | 文档登记，无用户输出变化 | 当前唯一下一项不变：`CLARIFICATION-COMPOUND-CONFIRM-ANSWER-01` |
+| 2026-08-18 | VOICE-WEB-MIGRATION-01 B1 敲钉子定稿（DESIGN，纯设计不写码） | 全量 755 项通过（基线复验，零代码改动） | 用户指示按 `docs/VOICE_WEB_MIGRATION_PLAN.md` 推进。**B1 决策**：选"容忍部分观察的分支"，否掉拼富字段方案——①"记录成功"路径需 step_number（CLI 由会话级计数器提供），web 降级生产者契约禁止托管有状态会话，语义缺口无法诚实补齐；②拼 `ClarificationAction` 需伪造 asr_transcript/reason/mutation_permission 等样板值，违反"模型推断不覆盖原始事实"。降级生产者填 10 字段（身份 3 + status/partial/destination/acceptance_kind/missing_fields/follow_up_required/partial_question）；`UnifiedObservation` 加 `partial: bool=False` + `partial_question: str\|None=None`（partial=True 放宽 OBSERVED 校验，CLI 完整路径不变）；投影层 OBSERVED 内加 partial 分支（有追问→CLARIFICATION / 无→RECORD_ACK）；真观察器 drop-in（D3）时分支自然闲置、调用点零改动。现状确认：web `/record` 的 `evaluation`（`domain.evaluate`→`evaluate_segment` 薄字典）即计划要消灭的平行投影，前端 voice_asr/mobile/views/lab_panel 四处直接读它——B2 起替换。顺带修正 checklist"恢复工作时先运行"仍写桌面路径（改 107） | 下一步 B2：实现降级生产者 + `WebRenderer`（意图→结构化 JSON）+ 全单元测试，零真实服务 |
+| 2026-08-18 | VOICE-WEB-MIGRATION-01 B2-1：输出层支持"部分观察"（DESIGN 内闭环） | 专项 37 项通过（13 新 + 24 回归）；**全量 768 项通过（+13）** | **改动**：① `src/core/unified_observer.py` `UnifiedObservation` 加 `partial: bool=False` + `partial_question: str\|None=None`；`__post_init__` 分叉——partial=True 放宽 OBSERVED 校验（不强制 destination/clarification_action），且四道反向校验：部分只能是成功观察 / 成功不能带错误 / 追问文本非空白 / 追问文本仅 partial 允许（防完整路径夹带）；CLI 完整路径（partial 默认 False）校验原样。② `src/core/presentation_projection.py` `messages_for_observation` 在 FAILED 检查后加 partial 分支：有追问文本→CLARIFICATION（screen_target=CURRENT_QUESTION）/ 无→RECORD_ACK 降级（复用现成 `_clarification`/`_record_ack`，零新增辅助函数）。③ 新增 `tests/test_observation_partial.py` 13 项（8 构造 + 5 投影，含 3 个 CLI 完整路径回归：老校验不放宽、完整路径不能带追问、CLI 投影不变）。**层边界确认（用户纠正）**：投影只产意图（不含中文），话由 copy 层 + 渲染器生成——已固化进迁移计划 B1 结论块与学习日志知识 4。**当场完整展开 + 学习日志唯一存档**（用户要求"当场记录与写入日志同样重要"；2026-08-18 用户定不另建卡片文件）：六要素当场在对话完整展开，归档只进正式学习日志 | 下一步 B2-2：降级生产者（`evaluation` → 部分 `UnifiedObservation`，web 侧模块 + 单测，零真实服务） |
+| 2026-08-18 | VOICE-WEB-MIGRATION-01 B2-2：降级生产者（DESIGN 内闭环） | 专项 12 项通过；**全量 780 项通过（+12）** | **改动**：① 新增 `web/degraded_producer.py`——`produce_partial_observation(*, request_id, session_id, segment_id, evaluation) -> UnifiedObservation` 纯函数，把 web 现有 `evaluation`（`domain.evaluate` 薄字典产物）按 B1 的 10 字段清单翻译成部分观察：有非空追问文本→追问观察（destination=clarification_context / acceptance_kind=None）；无→记录观察（destination=experiment_pipeline / acceptance_kind=degraded_evidence_note）；`missing_fields` list→tuple；`follow_up_required` 如实抄录但不参与判定。**判定以追问文本非空为准（与投影层消费同源）**，避免"标志为真、文本为空"的矛盾状态；**畸形输入（evaluation 非 dict）降级为 FAILED 观察，永不抛异常**。② 新增 `tests/test_degraded_producer.py` 12 项（追问/记录映射、身份透传、tuple 转换、标志-文本矛盾、空 evaluation、None/非 dict 畸形输入、与投影层联动 3 项）。**设计决策**：fail-fast（创建点严格校验）与 fail-safe（转换点容错）分属两层；纯函数生产者保证可测试、可 drop-in 抽换。教学硬规则生效：六要素当场对话完整展开，归档只进正式学习日志（2026-08-18 用户定不另建卡片文件） | 下一步 B2-3：WebRenderer（意图→结构化 JSON，web 侧模块 + 单测，零真实服务） |
+| 2026-08-18 | VOICE-WEB-MIGRATION-01 B2-3：WebRenderer（B2 收官） | 专项 10 项通过；**全量 790 项通过（+10）** | **改动**：① 新增 `web/web_renderer.py`——`WebRenderer` 类（ui_mode 默认 user），`render(intent) -> dict` 把意图渲染成前端可消费 JSON：intent_id/kind/screen_target/priority（转 int 保证可序列化）/source_segment_id/text（`copy_for_intent(intent, ui_mode)` 生成，词在后端）；**不透传 args**（防前端拿参数二次判断，契约 4"前端只画不判"）；不实现 CLI pump 的 Renderer 协议（产出 dict 而非 str，web 无 stdout pump，角色一致、形态不同）。② 新增 `tests/test_web_renderer.py` 10 项（字段映射 6、JSON 可序列化、admin 来源追加、copy 不支持 kind 明确抛错、降级生产者→投影→渲染全链路 2 项）。**知识存档形态修订（用户 2026-08-18 定）**：撤销 `docs/learning_notes/` 卡片目录（删除 3 张卡片，内容已并入学习日志 B1/B2-1/B2-2 条目），改为"当场对话完整展开 + 学习日志唯一存档"，CLAUDE.md 教学硬规则第 2 条同步修订 | 下一步 B3：`/record` 影子式新增 `messages` 字段（降级生产者→投影→WebRenderer 全链在 `/record` 内联，**保留原始 evaluation**；肉眼核对顺序 + 单问题闸门生效） |
+| 2026-08-18 | VOICE-WEB-MIGRATION-01 B3：/record 影子 messages（DESIGN 内闭环） | 专项 6 项通过；**全量 796 项通过（+6）** | **改动**：`web/api/record.py`——① import 增 `uuid`/`degraded_producer`/`web_renderer`/`messages_for_observation`；② `record()` 在 `domain.evaluate(entities)` 后内联影子接线：`produce_partial_observation(request_id=f"web-{uuid.uuid4().hex[:12]}", ...)` → `messages_for_observation` → `WebRenderer().render` 列表；③ `saved = save_record(item)` 后 `saved["messages"] = messages` 再返回——**evaluation 及其余字段零改动**；messages **不入库**（save_record 九列白名单之外，派生数据随用随算）；畸形 evaluation（None）由降级生产者兜底为失败消息，接口不崩。**设计决策**：影子模式（新输出旁观、旧输出照旧、可回退）；request_id 用 uuid4（全局唯一、不依赖 session/segment 内容）；messages 挂接口返回而非落库（消费者是本轮交互的前端，不是历史存档）。**测试**：`tests/test_web_record_messages.py` 6 项（追问→clarification 影子字段结构、原始字段保留、无追问→record_ack、落库 item 不含 messages、None→失败消息、JSON 可序列化），mock 掉 llm_bridge/数据库/domain.evaluate。**下一步需要真实验收**：肉眼核对 /record 返回 messages 顺序 + 单问题闸门（每请求一条） | 下一步 B4：前端切渲染 messages（退役正则分类）+ 写 5.3/5.4 迁移对照 |
+| 2026-08-18 | VOICE-WEB-MIGRATION-01 B4：前端切渲染 messages（Phase B 收官，AUTO_OK） | 全量 796 项通过（无新增测试；前端 JS 无单测框架，靠合同测试 + 语法检查 + 待真实验收） | **改动（4 个前端文件）**：① `speak.js` +`labSpeakMessages`（朗读 messages 中追问，一次一条避免抢播）；② `lab_panel.js` `labRender` 从读 evaluation 渲染追问/偏差改为按 messages kind 渲染（追问 lab-ask / 回执 lab-ok；保留实体标签；修掉替换时丢失的 lab-step 闭合 div）；③ `voice_asr.js` /record 响应改 `labRender(d)` + `labSpeakMessages(d.messages)`，删除 evaluation.follow_up_required/deviations 拼话播报；④ `mobile.js` `handleRecordResult` 改 messages 渲染（isAsk=kind=clarification 或 screen_target=current_question → 追问气泡+speak）。**保留点（标注）**：`views.js` 历史视图仍读 evaluation（messages 不入库，历史无 messages，属存储数据展示）；`labEvaluate` 面板走 /protocols/evaluate（非 /record 链）。**合同测试更新**：`test_web_mobile_page.py` 断言新合同（messages/screen_target/clarification）+ 旧字段退役（assertNotIn follow_up_question/deviations）。**迁移对照**：`PROJECT_ARCHITECTURE.md` §5.3 WEB-RENDER-01 + §5.4 web 侧 5 行——追问播报**等价**、偏差播报**丢失**（登记：降级生产者/投影层补 deviations 消息，随 D 阶段）、"本步现场记录已完整"**降级**（D 阶段 structured_experiment 恢复）、实体展示与历史视图**等价**。**JS 语法**：node --check 4 文件通过。**Phase B（B1-B4）全部完成** | 下一步：真实验收 + UX 走查——启动 web，/record 肉眼核对 messages 顺序/单问题闸门，B4 前端实际渲染与追问播报，按九维表走查（最终裁决权在用户）；通过后进 Phase C |
+| 2026-08-18 | 真实验收发现并修复 WEB-RENDER-02：桌面语音链死代码（用户实测"称量磷酸盐"返回 agent 话术） | 全量 796 项通过（零回归；JS 语法 node --check OK） | **真实验收暴露**：用户语音说"称量磷酸盐"，界面返回聊天 agent 话术（"好的，请问称量了多少克磷酸盐？"），非 B4 的 messages 话术（copy 层"小科：…"）——查证 `voice_asr.js`：`if (input && form) { requestSubmit(); return; }` 聊天框分支优先，B4 改的 `/record` 直连分支因 `return` 在前**从未执行（死代码）**；单测/语法/全量全绿但用户路径未走通——印证真实验收不可替代。**用户拍板**：桌面语音也直连 /record（"当然要改"）。**修复**：删除 voice_asr.js 聊天框分支，语音口述一律 `fetch('/record')` → labRender(messages) + labSpeakMessages；保留 `labStepsReload` 延迟刷新。**文字聊天（composer→/chat）不动**。**迁移对照**：`PROJECT_ARCHITECTURE.md` §5.3 增 WEB-RENDER-02（等价提升：桌面与 /m 统一 messages 渲染）。**知识**：死代码只有真实验收能暴露（学习日志 2026-08-18 条目）。**待用户刷新页面复验**（Ctrl+F5 → 录音说"加入五毫升缓冲液" → 预期面板回执、聊天区不再出现 agent"⚙记录实验口述"） | 下一步：用户复验桌面语音直连 + /m 页验证 + 九维走查 |
+| 2026-08-18/19 | Phase B 真实验收通过（REAL_OK）+ 一轮验收修复 | 全量 **800 项通过**（硬问题修复 +4） | **真实验收闭环**：用户实测语音记录链路（灰色圈圈→录音→/record→面板"第 N 段口述"+回执"已记录"）+ 选方案缺字段→"小科追问"+TTS 朗读纯问题。验收逐项修复：① **话术撒谎硬问题**——"结构化成功却说不可用"（`RecordAckResult` 增 `RECORDED_NO_STEP`"已记录"；降级生产者按"有没有抽到实体"填 `partial_recorded`/`degraded_evidence_note`；投影层据此出话术）；② **lab_panel.js 未注入**——app.py 注入脚本漏了它，labRender 不存在、结果无处渲染（补注入 + 恢复被 `void init` 禁用的面板 init）；③ **语音入口混乱治理**——4 入口职责混杂：cp-mic 误触发电话（删电话分支改"语音记录"）、vad"自动语音"改"语音对话"、通话保留独立；④ **文案**——"助手追问"→"小科追问"（统一称呼、去重复）、TTS 不念"小科："前缀（labRender/speak/mobile 三处去前缀）；⑤ 前端容错——空语音提示"没听清"、/record 400 显示错误（修"第 undefined 段口述"）；⑥ cache-busting——voice_asr/speak/mobile/lab_panel 加版本号防浏览器缓存。**关键定位纠正（用户）**：统一理解链核心是**处理命令（control 分支：查看/暂缓/确认/结束/回答）**，B 降级生产者只有"记录+方案追问"，命令处理待 **Phase D** 接真观察器（含 LLM）。**遗留软问题登记**：ASR 数字误识别（5→65，SenseVoice 层）；录音停止到反馈 3-5 秒无"处理中"提示（维 5/9） | 下一步：Phase C（语音收敛：三张嘴单一 window.speak、TTS 读 copy 文案、真机 barge-in）或 Phase D（命令处理迁入）；方向待用户定 |
+| 2026-08-18 | 教学硬规则增补（CLAUDE.md 第 5 条，用户 2026-08-18 定） | 未改代码；沿用全量 790 项基线 | CLAUDE.md"教学执行硬规则"新增第 5 条：**设计原因必须展开取舍过程**——候选对比（差异精确到代码形态"哪一行有/没有"）+ 事故推演（从一行代码推到用户面前的 bug：越权入口/双份逻辑/正则倒退）+ 未来影响（对后续 B4/C2 阶段）+ 能合并主线先讲主线。源于 B2-3 WebRenderer 讲解时用户要求"设计原因把取舍思考过程再展开、深度再深一点"；用户确认后固化进规则 | 下一步不变：B3 `/record` 影子 messages |
 
 ## 7. 每轮结束时必须更新
 

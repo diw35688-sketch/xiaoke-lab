@@ -4,19 +4,29 @@
 from __future__ import annotations
 
 import time
+from dataclasses import replace
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 import settings_store
 import tts_providers
+from volcano_streaming_tts import (
+    PCM_CHANNELS,
+    PCM_SAMPLE_RATE,
+    PCM_SAMPLE_WIDTH,
+    VolcanoStreamConfig,
+    VolcanoStreamingTTSError,
+    volcano_streaming_tts,
+)
 
 router = APIRouter(prefix="/tts", tags=["语音合成"])
 
 
 class TTSRequest(BaseModel):
     text: str = Field(min_length=1, max_length=2000)
+    speed: float | None = Field(default=None, ge=0.5, le=2.0)
 
 
 class TTSModelsPayload(BaseModel):
@@ -36,6 +46,7 @@ def providers():
             "voice": current.tts_voice,
             "speed": current.tts_speed,
             "enabled": current.tts_enabled,
+            "speak_record_ack": current.speak_record_ack,
             "base_url": current.tts_base_url,
             "model": current.tts_model,
             "api_key_set": bool(current.tts_api_key),
@@ -68,6 +79,54 @@ def synthesize(request: TTSRequest):
     except Exception as error:
         raise HTTPException(status_code=502, detail=f"{type(error).__name__}: {error}")
     return Response(content=audio, media_type=mime)
+
+
+@router.post("/stream")
+async def synthesize_stream(request: TTSRequest):
+    """Stream the configured Volcengine voice as raw PCM chunks."""
+    settings = settings_store.current()
+    if settings.tts_provider != "volcano":
+        raise HTTPException(
+            status_code=409,
+            detail="正式语音播放链路只支持已配置的火山流式 TTS",
+        )
+    try:
+        config = VolcanoStreamConfig.from_settings(settings)
+        if request.speed is not None:
+            config = replace(config, speed=request.speed)
+    except VolcanoStreamingTTSError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    print(f"[TTS-STREAM] request.speed={request.speed} config.speed={config.speed}", flush=True)
+
+    async def audio_chunks():
+        async for chunk in volcano_streaming_tts.stream(request.text, config):
+            yield chunk
+
+    return StreamingResponse(
+        audio_chunks(),
+        media_type="application/octet-stream",
+        headers={
+            "Cache-Control": "no-store",
+            "X-Audio-Format": "pcm_s16le",
+            "X-Audio-Sample-Rate": str(PCM_SAMPLE_RATE),
+            "X-Audio-Channels": str(PCM_CHANNELS),
+            "X-Audio-Sample-Width": str(PCM_SAMPLE_WIDTH),
+        },
+    )
+
+
+@router.post("/warmup")
+async def warmup_stream():
+    """Open the one production WebSocket before the first spoken turn."""
+    settings = settings_store.current()
+    if settings.tts_provider != "volcano":
+        raise HTTPException(status_code=409, detail="当前未启用火山流式 TTS")
+    try:
+        config = VolcanoStreamConfig.from_settings(settings)
+        await volcano_streaming_tts.warmup(config)
+    except VolcanoStreamingTTSError as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
+    return {"ok": True, "provider": "volcano", "transport": "websocket"}
 
 
 @router.post("/test")

@@ -7,6 +7,12 @@ from tools.calculator import calculate
 from tools.experiment_tools import check_experiment_conflicts, confirm_pending_experiment, list_current_experiments, propose_experiment
 from tools.memory_tools import confirm_pending_memory, propose_memory
 import lab_tools
+from src.core.conversation_turn import InteractionMode
+from tool_presentation import (
+    ToolVoiceDeliveryBatch,
+    merge_tool_plans,
+    tool_reply_text,
+)
 
 INSTRUCTIONS = """你是实验室实验规划辅助助手。结合近期对话理解“它”“改到周五”等指代。准确计算必须调用 calculate，查询已有实验时调用 list_experiments。用户问时间/日期时调用 get_current_time，需要计时/定时时调用 start_timer，之后查询剩余时间用 check_timer。
 
@@ -14,7 +20,7 @@ INSTRUCTIONS = """你是实验室实验规划辅助助手。结合近期对话�
 
 长期记忆规则：当用户说出明显长期稳定且对未来有帮助的信息（例如实验室设备数量、预约规则、用户偏好、固定流程）时，调用 propose_memory 暂存这条信息，然后明确询问“是否保存为长期记忆？请回复确认或取消”。不要把临时安排、一次性实验结果、敏感个人信息、未确认的推测自动提议为记忆。只有当用户最近一条消息明确确认保存长期记忆时，调用 confirm_save_memory。若实验创建和记忆确认同时可能发生，先请用户说明要确认哪一项，绝不擅自同时确认。
 
-当前没有 SOP 知识库，不要假装查询过 PDF、论文或实验记录。危险操作与关键参数只能作辅助建议，并提醒用户按本实验室 SOP 和负责人要求确认。
+当前没有 SOP 知识库，不要假装查询过 PDF、论文或实验记录。危险操作与关键参数只能作辅助建议，并提醒用户按本实验室 SOP 和负责人要求确认。"""
 
 储存库规则：用户说“储存一个种子/样品/试剂/溶液”“放到储存库”“入库”“存到冰箱/冰柜”时，调用 list_storage_items / add_storage_item / add_storage_location / update_storage_item / delete_storage_item / storage_stats 进行查询和登记。这是储存库操作，不是长期记忆；不要把库存/样品信息误当成 propose_memory，除非用户明确说“长期记住”或“以后都要用”。
 
@@ -44,6 +50,15 @@ class ModelServiceError(Exception):
 
 
 def run_tool(name, args, conversation_id):
+    result, _ = _run_tool_with_presentation(name, args, conversation_id)
+    return result
+
+
+def _run_tool_with_presentation(name, args, conversation_id, interaction_mode=None):
+    """Execute a tool and retain any backend-owned presentation plan."""
+
+    if interaction_mode == InteractionMode.CHAT and name == "record_observation":
+        raise PermissionError("自由聊天模式禁止写入实验记录，请切换到实验记录模式。")
     handlers = {
         "calculate": lambda: calculate(args["expression"]),
         "list_experiments": list_current_experiments,
@@ -54,12 +69,12 @@ def run_tool(name, args, conversation_id):
         "confirm_save_memory": lambda: confirm_pending_memory(conversation_id),
     }
     if name in handlers:
-        return handlers[name]()
+        return handlers[name](), None
     if name in lab_tools.names():
         outcome = lab_tools.call(name, args)
         if not outcome["ok"]:
-            return {"error": outcome["error"]}
-        return outcome["result"]
+            return {"error": outcome["error"]}, None
+        return outcome["result"], outcome.get("presentation_plan")
     raise ValueError(f"不支持的工具：{name}")
 
 
@@ -77,27 +92,95 @@ def _client():
     return OpenAI(api_key=s.api_key, base_url=s.base_url, timeout=httpx.Timeout(60, connect=10), max_retries=1)
 
 
-def _messages(history):
-    return [{"role":"system","content":INSTRUCTIONS + "\n\n" + _memory_context()}, *history]
+def refine_chat_answer(answer: str, max_chars: int = 50) -> str:
+    """Ask the model to regenerate an over-budget Chat answer; never slice it."""
 
-
-def run_agent(history, conversation_id):
+    original = str(answer or "").strip()
+    if not original:
+        raise ValueError("Chat 回复为空，无法建立可见语音正文。")
     client = _client()
-    messages = _messages(history)
+    try:
+        candidate = original
+        for _ in range(2):
+            response = client.chat.completions.create(
+                model=settings_store.current().model_name,
+                messages=[{
+                    "role": "user",
+                    "content": CHAT_REFINEMENT_POLICY.format(
+                        max_chars=max_chars,
+                        answer=candidate,
+                    ),
+                }],
+                extra_body={"thinking": {"type": "disabled"}},
+            )
+            candidate = (response.choices[0].message.content or "").strip()
+            if candidate and len(candidate) <= max_chars:
+                return candidate
+    except APITimeoutError as error:
+        raise ModelServiceError("DeepSeek 精炼回复超时，请重试。", 504) from error
+    except APIConnectionError as error:
+        raise ModelServiceError("无法连接 DeepSeek 精炼回复，请检查网络后重试。", 502) from error
+    except APIStatusError as error:
+        raise ModelServiceError(
+            f"DeepSeek 精炼回复返回异常（状态码 {error.status_code}）。", 502
+        ) from error
+    raise ValueError(
+        f"模型连续两次未能生成不超过 {max_chars} 字的完整回复，请重试。"
+    )
+
+
+def _messages(history, interaction_mode=None):
+    policy = (
+        CHAT_POLICY
+        if interaction_mode == InteractionMode.CHAT
+        else EXPERIMENT_RECORD_POLICY
+    )
+    return [{"role":"system","content":INSTRUCTIONS + "\n\n" + policy + "\n\n" + _memory_context()}, *history]
+
+
+def _tools_for_mode(interaction_mode=None):
+    if interaction_mode != InteractionMode.CHAT:
+        return TOOLS
+    return [tool for tool in TOOLS if tool["function"]["name"] != "record_observation"]
+
+
+def _execute_tool(name, args, conversation_id, interaction_mode=None):
+    """Keep legacy three-argument test/adaptor calls while enforcing new mode requests."""
+
+    if interaction_mode is None:
+        return _run_tool_with_presentation(name, args, conversation_id)
+    return _run_tool_with_presentation(
+        name, args, conversation_id, interaction_mode
+    )
+
+
+def run_agent(history, conversation_id, interaction_mode=None):
+    client = _client()
+    messages = _messages(history, interaction_mode)
     try:
         for _ in range(6):
-            response = client.chat.completions.create(model=settings_store.current().model_name, messages=messages, tools=TOOLS)
+            response = client.chat.completions.create(model=settings_store.current().model_name, messages=messages, tools=_tools_for_mode(interaction_mode), extra_body={"thinking": {"type": "disabled"}})
             assistant = response.choices[0].message
             calls = assistant.tool_calls or []
             if not calls:
                 return assistant.content or "模型没有返回文字内容。"
             messages.append(assistant)
+            presentation_plans = []
             for call in calls:
                 try:
-                    result = run_tool(call.function.name, json.loads(call.function.arguments), conversation_id)
+                    result, presentation_plan = _execute_tool(
+                        call.function.name,
+                        json.loads(call.function.arguments),
+                        conversation_id, interaction_mode,
+                    )
                 except Exception as error:
                     result = {"error": str(error)}
+                    presentation_plan = None
                 messages.append({"role":"tool","tool_call_id":call.id,"content":json.dumps(result, ensure_ascii=False)})
+                if presentation_plan is not None:
+                    presentation_plans.append(presentation_plan)
+            if presentation_plans:
+                return tool_reply_text(merge_tool_plans(presentation_plans))
     except APITimeoutError as error:
         raise ModelServiceError("学校大模型连接超时。请检查校园网或 VPN 后重试。", 504) from error
     except APIConnectionError as error:
@@ -107,15 +190,15 @@ def run_agent(history, conversation_id):
     return "工具调用次数过多，已停止本次请求。"
 
 
-def stream_agent(history, conversation_id):
+def stream_agent(history, conversation_id, interaction_mode=None):
     """逐段产出模型文字；遇到工具调用时先执行工具，再继续流式回答。"""
     client = _client()
-    messages = _messages(history)
+    messages = _messages(history, interaction_mode)
     try:
         for _ in range(6):
             text_parts = []
             calls_by_index = {}
-            stream = client.chat.completions.create(model=settings_store.current().model_name, messages=messages, tools=TOOLS, stream=True)
+            stream = client.chat.completions.create(model=settings_store.current().model_name, messages=messages, tools=_tools_for_mode(interaction_mode), stream=True, extra_body={"thinking": {"type": "disabled"}})
             for chunk in stream:
                 if not chunk.choices:
                     continue
@@ -143,6 +226,7 @@ def stream_agent(history, conversation_id):
             if not calls:
                 return
             messages.append({"role":"assistant", "content":"".join(text_parts) or None, "tool_calls":calls})
+            presentation_plans = []
             for call in calls:
                 name = call["function"]["name"]
                 try:
@@ -152,18 +236,33 @@ def stream_agent(history, conversation_id):
                 # 参考 deepseek-harness：执行前先推「待执行卡片」，
                 # 让用户看见系统正在做什么，而不是干等一段空白。
                 if name in lab_tools.names():
+                    call_view = dict(lab_tools.present_call(name, args))
+                    call_view["tool_call_id"] = call["id"]
                     yield "[[LABCARD]]" + json.dumps(
-                        lab_tools.present_call(name, args), ensure_ascii=False)
+                        call_view, ensure_ascii=False)
                 try:
-                    result = run_tool(name, args, conversation_id)
+                    result, presentation_plan = _execute_tool(
+                        name, args, conversation_id, interaction_mode
+                    )
                     outcome = {"ok": True, "result": result}
                 except Exception as error:
                     result = {"error": str(error)}
                     outcome = {"ok": False, "error": str(error)}
+                    presentation_plan = None
                 if name in lab_tools.names():
+                    result_view = dict(lab_tools.present_result(name, args, outcome))
+                    result_view["tool_call_id"] = call["id"]
                     yield "[[LABCARD]]" + json.dumps(
-                        lab_tools.present_result(name, args, outcome), ensure_ascii=False)
+                        result_view, ensure_ascii=False)
                 messages.append({"role":"tool", "tool_call_id":call["id"], "content":json.dumps(result, ensure_ascii=False)})
+                if presentation_plan is not None:
+                    presentation_plans.append(presentation_plan)
+            if presentation_plans:
+                plan = merge_tool_plans(presentation_plans)
+                yield tool_reply_text(plan)
+                if plan.voice_items:
+                    yield ToolVoiceDeliveryBatch(plan.voice_items)
+                return
     except APITimeoutError as error:
         raise ModelServiceError("学校大模型连接超时。请检查校园网或 VPN 后重试。", 504) from error
     except APIConnectionError as error:

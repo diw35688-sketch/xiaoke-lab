@@ -116,7 +116,6 @@
       }).join('');
       el('settings-base-url').value = data.settings.base_url || '';
       el('settings-model').value = data.settings.model_name || '';
-      el('settings-tts').checked = !!data.settings.tts_enabled;
       el('settings-key').placeholder = data.settings.api_key_set
         ? ('已保存 ' + data.settings.api_key + '，留空表示不修改')
         : '请填写 API 密钥';
@@ -269,7 +268,8 @@
     el('settings-save').onclick = function () {
       var button = el('settings-save');
       button.disabled = true;
-      fetch('/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body()) })
+      var formPayload = body();
+      fetch('/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formPayload) })
         .then(function (r) { return r.json(); })
         .then(function (d) {
           el('settings-key').value = '';

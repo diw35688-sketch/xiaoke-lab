@@ -1,6 +1,6 @@
 # asr_demo 本地运行环境
 
-最后验证：2026-08-12（Python 3.11.9 环境正常）
+最后整理：2026-08-25（路径无关的一键启动）
 
 > 当前状态：基础解释器和 `.venv` 均为 Python 3.11.9。2026-08-12 曾在受限
 > 沙箱内出现“拒绝访问/无法创建进程”，在允许执行项目解释器后验证正常，证明问题来自
@@ -13,7 +13,7 @@
 
 ```text
 Python 3.11.9 64-bit
-虚拟环境：C:\Users\dahli\Desktop\asr_demo\.venv
+虚拟环境：`<项目目录>\.venv`
 ```
 
 Python 3.14 环境仅保留在 `.venv-py314` 作为备用实验环境，不作为项目验收环境。
@@ -24,8 +24,7 @@ Python 3.14 环境仅保留在 `.venv-py314` 作为备用实验环境，不作�
 直接加载旧 `.venv\Lib\site-packages`，否则 `_cffi_backend` 等二进制扩展会不兼容。
 
 ```powershell
-C:\Users\dahli\AppData\Local\Programs\Python\Python311\python.exe `
-    -m venv --upgrade .venv
+py -3.11 -m venv --upgrade .venv
 
 .\.venv\Scripts\python.exe -m pip install --upgrade pip
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
@@ -39,6 +38,8 @@ C:\Users\dahli\AppData\Local\Programs\Python\Python311\python.exe `
 
 统一理解链是唯一默认路径（2026-08-14 起，shadow flag 已删除），非精确命令会调用一次统一理解模型；
 `.env` 中不再需要任何 `UNIFIED_SHADOW_*` 开关。
+
+面向新用户的一键启动、转交和排错入口统一见 `docs/ONE_CLICK_START_GUIDE.md`。本文件保留开发环境和正式测试说明。
 
 ## 4. 验证环境
 
@@ -80,3 +81,20 @@ Ran 422 tests in 1.562s — OK
 SenseVoice 和 FunASR VAD 模型缓存在用户目录的 ModelScope 缓存中，不保存在项目仓库。
 当前 `AutoModel` 使用模型名和 `master` 修订，启动时可能联网检查模型文件。
 后续任务将固定模型修订并关闭不必要的更新检查，以支持更快、更稳定的离线启动。
+
+## 6. 本机可用工具
+
+本机已安装 LibreOffice，可用其无头模式（headless）做文档格式转换（如
+docx/pptx → pdf），路径固定为：
+
+```text
+C:\Users\dahli\LibreOffice\program\soffice.exe
+```
+
+验证记录：2026-08-16 确认该文件存在（2026-07-23 安装）。
+命令行转换示例（PowerShell）：
+
+```powershell
+& 'C:\Users\dahli\LibreOffice\program\soffice.exe' `
+    --headless --convert-to pdf --outdir <输出目录> <输入文件>
+```

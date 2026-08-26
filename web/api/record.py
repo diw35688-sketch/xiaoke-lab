@@ -1,21 +1,29 @@
 # -*- coding: utf-8 -*-
-"""实验记录主链路：口述 → 结构化实体 → 按方案确定性判断 → 追问。
-
-分工严格：
-- LLM 只负责从口述里抽取实体（它擅长的）。
-- 缺什么字段、有没有偏离方案，由程序按方案算（确定性，不可漂移）。
-"""
+"""HTTP adapter for the shared experiment-record application service."""
 
 from __future__ import annotations
 
+import json
 import threading
+import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 import domain
 import llm_bridge
+import settings_store
+import web_renderer
+from playback_runtime import web_playback_service
+from src.core.presentation_delivery import build_delivery_plan
+from record_service import (
+    RecordCommand,
+    RecordModeConflictError,
+    RecordPersistenceError,
+    SharedRecordService,
+)
 from database.lab_record_store import (
     current_session_id,
     list_records,
@@ -24,6 +32,9 @@ from database.lab_record_store import (
     start_new_session,
 )
 from src.core.rule_entity_extraction import extract_entities
+from mode_snapshot import ModeSnapshotFields
+from src.core.conversation_turn import ExperimentContext, InteractionMode
+from output_policy import select_output_policy
 
 router = APIRouter(prefix="/record", tags=["实验记录"])
 
@@ -33,9 +44,22 @@ _lock = threading.Lock()
 
 
 
-class RecordPayload(BaseModel):
+class RecordPayload(ModeSnapshotFields):
+    interaction_mode: InteractionMode = InteractionMode.EXPERIMENT
+    experiment_context: ExperimentContext = ExperimentContext.FREE
     transcript: str
     extract: bool = True
+    conversation_id: str | None = None
+
+
+def _submitted_experiment_context(payload: RecordPayload):
+    """Legacy internal callers had no mode field; new browser requests always do."""
+
+    return (
+        payload.experiment_context
+        if "experiment_context" in payload.model_fields_set
+        else None
+    )
 
 
 def _next_segment() -> int:  # deprecated: 段号统一由 _next_record_segment 从 SQLite 推算
@@ -50,68 +74,154 @@ def _next_record_segment(session_id: str) -> int:
         return next_segment_id(session_id)
 
 
+def _current_terms() -> tuple[str, ...]:
+    step = domain.session().current_step()
+    return tuple(step.terms) if step is not None else ()
+
+
+def _save_record_locked(item: dict[str, object]):
+    with _lock:
+        return save_record(item)
+
+
+def _build_record_service() -> SharedRecordService:
+    """Bind Web/database dependencies without putting them in the service."""
+
+    return SharedRecordService(
+        current_session_id=current_session_id,
+        next_segment_id=_next_record_segment,
+        list_records=list_records,
+        extract_entities_llm=llm_bridge.extract,
+        extract_entities_rule=extract_entities,
+        current_terms=_current_terms,
+        evaluate=domain.evaluate,
+        step_view=lambda: domain.step_view(domain.session()),
+        save_record=_save_record_locked,
+        clock=datetime.now,
+        request_id_factory=lambda: f"web-{uuid.uuid4().hex[:12]}",
+    )
+
+
 @router.post("")
 def record(payload: RecordPayload):
     """处理一段口述，返回结构化结果与确定性追问。"""
     text = (payload.transcript or "").strip()
+    policy = select_output_policy(
+        payload.interaction_mode, payload.experiment_context
+    )
+    if not policy.save_observation:
+        raise HTTPException(status_code=409, detail="自由聊天模式禁止写入实验记录。")
     if not text:
         raise HTTPException(status_code=400, detail="口述内容为空")
+    try:
+        return _record_response(
+            text, extract=payload.extract, conversation_id=payload.conversation_id,
+            experiment_context=_submitted_experiment_context(payload),
+            turn_id=payload.turn_id,
+        )
+    except RecordModeConflictError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    except RecordPersistenceError as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
 
-    session_id = current_session_id()
-    segment_id = _next_record_segment(session_id)
-    entities: dict = {}
-    extraction = None
 
-    extraction_source = "none"
-    if payload.extract:
-        try:
-            extraction = llm_bridge.extract(text, session_id, segment_id)
-            for event in extraction["events"]:
-                for name, value in event["entities"].items():
-                    if value and not entities.get(name):
-                        entities[name] = value
-            extraction_source = "degraded" if extraction.get("degraded") else "llm"
-        except Exception as error:
-            extraction = {
-                "events": [],
-                "degraded": True,
-                "error": f"{type(error).__name__}: {error}",
-            }
-            extraction_source = "degraded"
+def _record_response(
+    text: str, *, extract: bool, conversation_id: str | None = None,
+    experiment_context=None, turn_id: str | None = None,
+) -> dict[str, object]:
+    """Run the shared transaction and build the post-commit HTTP payload."""
 
-    # 模型不可用或没抽到东西时，用规则抽取兜底：
-    # 数量、单位、浓度、温度、时长这些有明确书写形式的事实不需要大模型。
-    if not entities:
-        step = domain.session().current_step()
-        known_terms = tuple(step.terms) if step is not None else ()
-        rule_entities = extract_entities(text, known_terms)
-        rule_fields = {
-            name: value
-            for name, value in vars(rule_entities).items()
-            if value
-        }
-        if rule_fields:
-            entities.update(rule_fields)
-            extraction_source = "rule"
-
-    evaluation = domain.evaluate(entities)
-    item = {
-        "segment_id": segment_id,
-        "session_id": session_id,
-        "transcript": text,
-        "entities": entities,
-        "extraction": extraction,
-        "extraction_source": extraction_source,
-        "evaluation": evaluation,
-        "step": domain.step_view(domain.session()),
-        "at": datetime.now().isoformat(timespec="seconds"),
+    result = _build_record_service().record(
+        RecordCommand(
+            transcript=text, extract=extract,
+            experiment_context=experiment_context,
+        )
+    )
+    response = dict(result.saved_record)
+    record_block_id = (
+        f"{turn_id}:record:{result.saved_record['segment_id']}"
+        if turn_id else f"record:{result.saved_record['segment_id']}"
+    )
+    source_ids = {
+        intent.intent_id: (
+            f"{turn_id}:confirmation:{intent.intent_id}"
+            if turn_id and intent.kind.value in {"clarification", "confirmation_ack"}
+            else record_block_id
+        )
+        for intent in result.intents
     }
-    with _lock:
-        try:
-            saved = save_record(item)
-        except Exception as error:
-            raise HTTPException(status_code=500, detail=f"实验记录落盘失败：{error}") from error
-        return saved
+    settings = settings_store.current()
+    plan = build_delivery_plan(
+        result.intents,
+        ui_mode="user",
+        source_block_ids=source_ids,
+        speak_record_ack=settings.speak_record_ack,
+        speech_rate=settings.tts_speed,
+    )
+    response["messages"] = web_renderer.WebRenderer().render_plan(plan)
+    response["voice_delivery_events"] = list(
+        web_playback_service.authorize(
+            plan.voice_items,
+            conversation_id=conversation_id or f"record:{result.saved_record['session_id']}",
+        )
+    )
+    return response
+
+
+def _stream_event(payload: dict[str, object]) -> str:
+    return json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n"
+
+
+def _record_events(
+    text: str, *, extract: bool, conversation_id: str | None = None,
+    experiment_context=None, turn_id: str | None = None,
+):
+    """Yield immediate progress, then the same committed result as POST /record."""
+
+    yield _stream_event({
+        "type": "record_status",
+        "phase": "understanding",
+        "text": "正在理解实验内容…",
+    })
+    try:
+        response = _record_response(
+            text, extract=extract, conversation_id=conversation_id,
+            experiment_context=experiment_context,
+            turn_id=turn_id,
+        )
+    except (RecordPersistenceError, RecordModeConflictError) as error:
+        yield _stream_event({"type": "record_error", "detail": str(error)})
+        return
+    except Exception as error:
+        yield _stream_event({
+            "type": "record_error",
+            "detail": f"处理失败：{type(error).__name__}: {error}",
+        })
+        return
+    yield _stream_event({"type": "record_result", "data": response})
+
+
+@router.post("/stream")
+def record_stream(payload: RecordPayload):
+    """Stream progress while preserving the post-commit result boundary."""
+
+    text = (payload.transcript or "").strip()
+    policy = select_output_policy(
+        payload.interaction_mode, payload.experiment_context
+    )
+    if not policy.save_observation:
+        raise HTTPException(status_code=409, detail="自由聊天模式禁止写入实验记录。")
+    if not text:
+        raise HTTPException(status_code=400, detail="口述内容为空")
+    return StreamingResponse(
+        _record_events(
+            text, extract=payload.extract, conversation_id=payload.conversation_id
+            , experiment_context=_submitted_experiment_context(payload),
+            turn_id=payload.turn_id,
+        ),
+        media_type="application/x-ndjson",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 

@@ -58,6 +58,12 @@ _ACTION_PERMISSIONS = {
     ClarificationActionType.NO_ACTION: ClarificationMutationPermission.NONE,
 }
 
+_ENTITY_CARRYING_ACTION_TYPES = frozenset({
+    ClarificationActionType.ANSWER,
+    ClarificationActionType.CONFIRM,
+    ClarificationActionType.REJECT_SUGGESTION,
+})
+
 
 @dataclass(frozen=True)
 class ClarificationContextSnapshot:
@@ -176,13 +182,9 @@ class ClarificationAction:
             raise ValueError("非回答动作不能夹带answer_text。")
 
         if self.supplied_entity_fields:
-            if self.action_type not in {
-                ClarificationActionType.ANSWER,
-                ClarificationActionType.CONFIRM,
-                ClarificationActionType.REJECT_SUGGESTION,
-            }:
+            if self.action_type not in _ENTITY_CARRYING_ACTION_TYPES:
                 raise ValueError(
-                    "只有ANSWER/CONFIRM/REJECT_SUGGESTION可携带supplied_entity_fields。"
+                    "只有回答类动作（ANSWER/CONFIRM/REJECT_SUGGESTION）可携带supplied_entity_fields。"
                 )
             if len(self.supplied_entity_fields) != len(
                 set(self.supplied_entity_fields)
@@ -480,6 +482,4 @@ class ClarificationActionPlanner:
 
 def _is_explicit_confirmation(answer_text: str) -> bool:
     normalized = answer_text.strip()
-    return normalized in {"是", "是的", "对", "对的", "确认", "没错", "正确"} or (
-        normalized.startswith(("是的是", "没错是", "确认是"))
-    )
+    return normalized in {"是", "是的", "对", "对的", "确认", "没错", "正确"}

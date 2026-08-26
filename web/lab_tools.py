@@ -16,6 +16,8 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from types import MappingProxyType
+from typing import Mapping
 
 import domain
 import llm_bridge
@@ -24,13 +26,32 @@ from datetime import datetime, timedelta
 import threading
 import uuid
 
-from database.lab_record_store import current_session_id, next_segment_id, save_record
+from database.lab_record_store import (
+    current_session_id,
+    list_records,
+    next_segment_id,
+    save_record,
+)
 
 _REGISTRY: dict = {}
+
+
+@dataclass(frozen=True)
+class PresentedToolResult:
+    """Tool payload plus its deterministic, backend-owned presentation plan."""
+
+    payload: Mapping[str, object]
+    presentation_plan: PresentationDeliveryPlan
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "payload", MappingProxyType(dict(self.payload)))
+        if not isinstance(self.presentation_plan, PresentationDeliveryPlan):
+            raise TypeError("presentation_plan 必须是 PresentationDeliveryPlan。")
 
 # 计时器（内存态，足够单机网页演示使用）
 _timers: dict = {}
 _timers_lock = threading.Lock()
+_record_lock = threading.Lock()
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RESULTS_DIR = REPO_ROOT / "results"
@@ -116,7 +137,14 @@ def call(name: str, arguments: dict) -> dict:
     if item is None:
         return {"ok": False, "error": "未注册的工具：" + str(name)}
     try:
-        return {"ok": True, "result": item["handler"](**(arguments or {}))}
+        result = item["handler"](**(arguments or {}))
+        if isinstance(result, PresentedToolResult):
+            return {
+                "ok": True,
+                "result": dict(result.payload),
+                "presentation_plan": result.presentation_plan,
+            }
+        return {"ok": True, "result": result}
     except Exception as error:
         return {"ok": False, "error": f"{type(error).__name__}: {error}"}
 
@@ -464,6 +492,38 @@ def _delete_protocol_step(protocol_id, step_number):
 
 # ---------------- 实验记录 ----------------
 
+def _current_terms() -> tuple[str, ...]:
+    step = domain.session().current_step()
+    return tuple(step.terms) if step is not None else ()
+
+
+def _next_record_segment(session_id: str) -> int:
+    with _record_lock:
+        return next_segment_id(session_id)
+
+
+def _save_record_locked(item: dict[str, object]):
+    with _record_lock:
+        return save_record(item)
+
+
+def _build_record_service() -> SharedRecordService:
+    """Bind tool/runtime dependencies to the shared record application service."""
+
+    return SharedRecordService(
+        current_session_id=current_session_id,
+        next_segment_id=_next_record_segment,
+        list_records=list_records,
+        extract_entities_llm=llm_bridge.extract,
+        extract_entities_rule=extract_entities,
+        current_terms=_current_terms,
+        evaluate=domain.evaluate,
+        step_view=lambda: domain.step_view(domain.session()),
+        save_record=_save_record_locked,
+        clock=datetime.now,
+        request_id_factory=lambda: f"tool-{uuid.uuid4().hex[:12]}",
+    )
+
 @tool(
     "record_observation",
     "记录一段实验口述，系统会抽取其中的数量、单位、浓度、温度、时长等实测值，"
@@ -481,31 +541,41 @@ def _delete_protocol_step(protocol_id, step_number):
                           + [f"⚠ 偏差：{d['field']} 实际 {d['actual_value']}，方案 {d['protocol_value']}" for d in r["deviations"]]),
 )
 def _record_observation(transcript):
-    step = domain.session().current_step()
-    terms = tuple(step.terms) if step is not None else ()
-    entities = extract_entities(transcript, terms)
-    fields = {k: v for k, v in vars(entities).items() if v}
-    evaluation = domain.evaluate(fields)
-    session_id = current_session_id()
-    segment_id = next_segment_id(session_id)
-    saved = save_record({
-        "session_id": session_id,
-        "segment_id": segment_id,
-        "transcript": transcript,
-        "entities": fields,
-        "extraction": None,
-        "extraction_source": "rule",
-        "evaluation": evaluation,
-        "step": domain.step_view(domain.session()),
-        "at": datetime.now().isoformat(timespec="seconds"),
-    })
-    return {
-        "transcript": transcript,
-        "entities": fields,
-        "missing_fields": evaluation["missing_fields"],
-        "follow_up_question": evaluation["follow_up_question"],
-        "deviations": evaluation["deviations"],
+    result = _build_record_service().record(RecordCommand(transcript=transcript))
+    observation = result.observation_result
+    saved_evaluation = result.saved_record.get("evaluation")
+    evaluation = saved_evaluation if isinstance(saved_evaluation, dict) else {}
+    payload = {
+        "transcript": (
+            observation.transcript
+            if observation is not None
+            else result.saved_record["transcript"]
+        ),
+        "entities": dict(
+            observation.entities
+            if observation is not None
+            else result.saved_record.get("entities") or {}
+        ),
+        "missing_fields": list(
+            observation.missing_fields
+            if observation is not None
+            else evaluation.get("missing_fields") or ()
+        ),
+        "follow_up_question": (
+            observation.follow_up_question
+            if observation is not None
+            else evaluation.get("follow_up_question")
+        ),
+        "deviations": list(
+            observation.deviations
+            if observation is not None
+            else evaluation.get("deviations") or ()
+        ),
     }
+    return PresentedToolResult(
+        payload=payload,
+        presentation_plan=build_delivery_plan(result.intents, ui_mode="user"),
+    )
 
 
 # ---------------- 时间 / 计时 ----------------
