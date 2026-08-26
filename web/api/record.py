@@ -95,6 +95,12 @@ def record(payload: RecordPayload):
             extraction_source = "rule"
 
     evaluation = domain.evaluate(entities)
+    # 与 lab_tools.record_observation 一致：把本段口述登记进步骤进度并落盘。
+    step_now = domain.session().current_step()
+    if step_now is not None:
+        domain.record_step_fields(
+            step_now.step_number, entities, bool(evaluation.get("deviations"))
+        )
     item = {
         "segment_id": segment_id,
         "session_id": session_id,
