@@ -650,7 +650,7 @@ def list_community_entries(q="", kind="", limit=200):
     params.append(limit)
     with get_connection() as connection:
         rows = connection.execute(
-            f"SELECT id,kind,title,author,tags,downloads,status,created_at,updated_at FROM community_entries {where_sql} ORDER BY id DESC LIMIT ?",
+            f"SELECT id,kind,title,author,tags,downloads,status,created_at,updated_at,content_json FROM community_entries {where_sql} ORDER BY id DESC LIMIT ?",
             params,
         ).fetchall()
     return [dict(row) for row in rows]
