@@ -244,6 +244,25 @@
       var closeConvo = el('sh-close-conversation');
       if (closeConvo) closeConvo.onclick = function () { setConvoHidden(true); };
     }
+    // 兜底：无论初始化是否成功，点会话管理的 ✕ 都能关闭面板
+    document.addEventListener('click', function (e) {
+      var close = e.target.closest('#sh-close-conversation');
+      if (close) {
+        shell.classList.add('conversation-hidden');
+        try { localStorage.setItem('lab-conversation-hidden', '1'); } catch (_) {}
+        var cvBtn = el('sh-toggle-conversation');
+        if (cvBtn) cvBtn.classList.remove('active');
+      }
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && shell.classList.contains('conversation-hidden')) {
+        shell.classList.remove('conversation-hidden');
+        try { localStorage.setItem('lab-conversation-hidden', '0'); } catch (_) {}
+        var cvBtn = el('sh-toggle-conversation');
+        if (cvBtn) cvBtn.classList.add('active');
+      }
+    });
+
     var moreBtn = el('sh-more');
     var moreMenu = el('sh-more-menu');
     if (moreBtn && moreMenu) {
