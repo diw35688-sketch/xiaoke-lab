@@ -18,7 +18,10 @@
 
   // ---------- 顶栏状态 ----------
   function refreshStatus() {
-    Promise.all([api('/settings'), api('/protocols/session')]).then(function (out) {
+    var protocolPath = window.protocolSessionUrl
+      ? window.protocolSessionUrl('/protocols/session')
+      : '/protocols/session';
+    Promise.all([api('/settings'), api(protocolPath)]).then(function (out) {
       var s = out[0], p = out[1];
       session = p;
       var bits = [];
@@ -58,7 +61,7 @@
       Array.prototype.forEach.call(host.querySelectorAll('.p-card'), function (card) {
         card.onclick = function () {
           api('/protocols/session', 'POST', { protocol_id: card.dataset.id || null }).then(function () {
-            window.interactionModeState.select(card.dataset.id ? 'protocol' : 'free');
+            window.interactionModeState.select(card.dataset.id ? 'protocol' : 'free', card.dataset.id || null);
             refreshStatus();
             window.shellShow('chat');
             if (window.composerRefresh) window.composerRefresh();
@@ -122,31 +125,14 @@
 
   // ---------- 本次记录页 ----------
   window.shellRegisterView('records', function (host) {
-    api('/record/history').then(function (d) {
-      if (!d.count) {
-        host.innerHTML = '<div style="color:#94a3b8;font-size:13px">本次会话还没有记录。</div>';
-        return;
-      }
-      host.innerHTML = '<div style="max-width:820px"><div style="color:#64748b;font-size:12px;margin-bottom:12px">会话 '
-        + esc(d.session_id) + ' · 共 ' + d.count + ' 段</div>'
-        + d.items.map(function (it) {
-          var ents = Object.keys(it.entities || {}).map(function (k) {
-            return '<span style="background:#e0e7ff;color:#3730a3;border-radius:5px;padding:2px 7px;margin:2px 4px 2px 0;display:inline-block;font-size:11px">'
-              + esc(k) + '=' + esc(it.entities[k]) + '</span>';
-          }).join('') || '<span style="color:#94a3b8;font-size:12px">未抽到结构化字段</span>';
-          var ev = it.evaluation || {};
-          return '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;margin-bottom:11px">'
-            + '<div style="font-size:12px;color:#94a3b8;margin-bottom:5px">第 ' + it.segment_id + ' 段 · ' + esc(it.at) + '</div>'
-            + '<div style="color:#0f172a;margin-bottom:8px">' + esc(it.transcript) + '</div>'
-            + '<div>' + ents + '</div>'
-            + (ev.follow_up_required ? '<div style="background:#eff6ff;color:#1e40af;border-radius:8px;padding:9px 11px;margin-top:9px;font-size:12px">追问：'
-                + esc(ev.follow_up_question) + '</div>' : '')
-            + (ev.deviations || []).map(function (x) {
-                return '<div style="background:#fff7ed;color:#c2410c;border-radius:8px;padding:9px 11px;margin-top:7px;font-size:12px">偏差：'
-                  + esc(x.field) + ' 实际 ' + esc(x.actual_value) + '，方案 ' + esc(x.protocol_value) + '</div>';
-              }).join('')
-            + '</div>';
-        }).join('') + '</div>';
+    var path = window.protocolSessionUrl
+      ? window.protocolSessionUrl('/record/history')
+      : '/record/history';
+    api(path).then(function (data) {
+      host.innerHTML = window.renderExperimentLedger(data);
+    }).catch(function (error) {
+      host.innerHTML = '<div style="color:#c2410c;font-size:13px">读取本次实验账本失败：'
+        + esc(error.message || '未知错误') + '</div>';
     });
   });
 

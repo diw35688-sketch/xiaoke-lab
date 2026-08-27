@@ -135,3 +135,9 @@ def initialize_database():
             updated_at TEXT NOT NULL,
             PRIMARY KEY(conversation_id, lab_session_id),
             FOREIGN KEY(conversation_id) REFERENCES conversations(id))""")
+        _ensure_column(
+            connection,
+            "experiment_session_state",
+            "protocol_step_facts_json",
+            "TEXT NOT NULL DEFAULT '{}'",
+        )

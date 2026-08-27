@@ -25,6 +25,8 @@ from src.core.conversation_turn import ExperimentContext, InputSource, Interacti
 from src.core.turn_input import TurnInput
 from database.turn_store import TurnRequestConflictError
 from output_policy import select_output_policy
+from src.core.reply_coordinator import ReplyCoordinator
+import domain
 
 router = APIRouter(prefix="/record", tags=["实验记录"])
 
@@ -204,11 +206,69 @@ def record_stream(payload: RecordPayload):
 
 
 @router.get("/history")
-def history():
-    """本次会话已记录的全部段落。"""
+def history(
+    conversation_id: str | None = None,
+    lab_session_id: str | None = None,
+):
+    """读取实验账本；无联合身份时保留旧版全局会话兼容响应。"""
+    if conversation_id is not None or lab_session_id is not None:
+        if not conversation_id or not lab_session_id:
+            raise HTTPException(
+                status_code=400,
+                detail="conversation_id 和 lab_session_id 必须同时提供。",
+            )
+        from api.turn import turn_store
+
+        ledger = turn_store.load_experiment_ledger(
+            conversation_id, lab_session_id
+        )
+        coordinator = ReplyCoordinator.from_snapshot(
+            dict(ledger["reply_coordinator"])
+        )
+        clarification_answers = ledger.get("clarification_answers") or {}
+        clarifications = [{
+            "clarification_id": item.clarification_id,
+            "display_number": item.display_number,
+            "question": item.question,
+            "missing_fields": list(item.missing_fields),
+            "status": item.status.value,
+            "protocol_step_number": item.protocol_step_number,
+            "answers": clarification_answers.get(item.clarification_id, []),
+        } for item in coordinator.all_clarifications()]
+        protocol_execution = ledger["protocol_execution"]
+        projected_records = [
+            domain.project_record_evaluation(dict(item))
+            for item in ledger["records"]
+        ]
+        return {
+            "source": "unified_turn",
+            "conversation_id": conversation_id,
+            "session_id": lab_session_id,
+            "revision": ledger["revision"],
+            "count": len(projected_records),
+            "items": projected_records,
+            "clarifications": clarifications,
+            "protocol": {
+                "protocol_id": protocol_execution.get("protocol_id"),
+                "protocol_version": protocol_execution.get("protocol_version"),
+                "current_step_number": protocol_execution.get(
+                    "current_step_number"
+                ),
+                "step_statuses": protocol_execution.get("statuses") or {},
+                "steps": protocol_execution.get("steps") or {},
+            } if protocol_execution else None,
+        }
+
     session_id = current_session_id()
     items = list_records(session_id)
-    return {"session_id": session_id, "count": len(items), "items": items}
+    return {
+        "source": "legacy_record",
+        "session_id": session_id,
+        "count": len(items),
+        "items": items,
+        "clarifications": [],
+        "protocol": None,
+    }
 
 
 @router.post("/reset")

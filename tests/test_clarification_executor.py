@@ -252,6 +252,86 @@ class DeferTests(unittest.TestCase):
         self.assertFalse(result.state_changed)
 
 
+class ReactivateTests(unittest.TestCase):
+    def setUp(self):
+        self.coordinator = ReplyCoordinator()
+        self.executor = ClarificationExecutor(
+            self.coordinator,
+            entity_extractor=FakeEntityExtractor({"temperature"}),
+        )
+        created = self.coordinator.register_clarification(
+            segment_id=1,
+            raw_text="保存样品。",
+            question="请补充温度和时长。",
+            missing_fields=("temperature", "duration"),
+        )
+        self.coordinator.defer_clarification(
+            clarification_id=created.clarification_id,
+            expected_revision=created.revision,
+            segment_id=2,
+        )
+
+    def test_reactivate_preserves_number_and_allows_later_answer(self):
+        deferred = self.coordinator.find_unresolved_by_display_number(1)
+        reactivate = _action(
+            segment_id=3,
+            asr_transcript="继续问题1",
+            action_type=ClarificationActionType.REACTIVATE,
+            mutation_permission=ClarificationMutationPermission.PREPARE_UPDATE,
+            requires_evidence_persistence=True,
+            target_clarification_id=deferred.clarification_id,
+            target_display_number=deferred.display_number,
+            expected_revision=deferred.revision,
+        )
+        restored = self.executor.execute(reactivate)
+
+        self.assertTrue(restored.state_changed)
+        self.assertEqual(restored.affected_display_number, 1)
+        current = self.coordinator.current_clarification()
+        self.assertEqual(current.display_number, 1)
+        self.assertEqual(current.status.value, "active")
+
+        answer = _action(
+            segment_id=4,
+            asr_transcript="室温",
+            action_type=ClarificationActionType.ANSWER,
+            mutation_permission=ClarificationMutationPermission.PREPARE_UPDATE,
+            reason="继续补充已恢复问题。",
+            requires_evidence_persistence=True,
+            target_clarification_id=current.clarification_id,
+            target_display_number=current.display_number,
+            expected_revision=current.revision,
+            answer_text="室温",
+        )
+        answered = self.executor.execute(answer)
+
+        self.assertTrue(answered.state_changed)
+        self.assertEqual(answered.remaining_fields, ("duration",))
+        self.assertFalse(answered.resolved)
+
+    def test_reactivate_rejects_stale_revision(self):
+        deferred = self.coordinator.find_unresolved_by_display_number(1)
+        action = _action(
+            segment_id=3,
+            asr_transcript="继续问题1",
+            action_type=ClarificationActionType.REACTIVATE,
+            mutation_permission=ClarificationMutationPermission.PREPARE_UPDATE,
+            requires_evidence_persistence=True,
+            target_clarification_id=deferred.clarification_id,
+            target_display_number=deferred.display_number,
+            expected_revision=deferred.revision + 1,
+        )
+
+        result = self.executor.execute(action)
+
+        self.assertFalse(result.state_changed)
+        self.assertIn("版本已变更", result.reason)
+        self.assertEqual(
+            self.coordinator.find_unresolved_by_display_number(1).status.value,
+            "deferred",
+        )
+
+
 class ConfirmTests(unittest.TestCase):
     def setUp(self):
         self.coordinator = ReplyCoordinator()

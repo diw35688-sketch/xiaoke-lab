@@ -92,15 +92,21 @@ class IntentCandidate:
         if self.target_question_number is not None:
             if self.target_question_number <= 0:
                 raise ValueError("目标问题编号必须大于0。")
-            if self.command_type != InteractionCommandType.TARGETED_ANSWER:
+            if self.command_type not in {
+                InteractionCommandType.TARGETED_ANSWER,
+                InteractionCommandType.REACTIVATE_TARGETED,
+            }:
                 raise ValueError(
-                    "只有指定问题答复可以包含目标问题编号。"
+                    "只有指定问题答复或恢复命令可以包含目标问题编号。"
                 )
         if (
-            self.command_type == InteractionCommandType.TARGETED_ANSWER
+            self.command_type in {
+                InteractionCommandType.TARGETED_ANSWER,
+                InteractionCommandType.REACTIVATE_TARGETED,
+            }
             and self.target_question_number is None
         ):
-            raise ValueError("指定问题答复必须包含目标问题编号。")
+            raise ValueError("指定问题答复或恢复命令必须包含目标问题编号。")
         if self.answer_text is not None and not self.answer_text.strip():
             raise ValueError("answer_text不能是空白字符串。")
         if (
