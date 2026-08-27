@@ -17,6 +17,11 @@
             "amount_unit": "g",
             "amount_value": "3.58"
           },
+          "value_aliases": {
+            "object": [
+              "磷酸盐"
+            ]
+          },
           "must_record": [
             "amount_value"
           ],

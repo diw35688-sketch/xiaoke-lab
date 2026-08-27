@@ -11,6 +11,7 @@
     '.step-card.current{border-color:#2563eb;box-shadow:0 0 0 2px #bfdbfe,0 6px 20px rgba(37,99,235,.18)}',
     '.step-card.done{opacity:.62}',
     '.step-card.done .sc-num{background:#16a34a}',
+    '.step-card.pending .sc-num{background:#d97706}',
     '.step-card.current .sc-num{background:#2563eb}',
     '.sc-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:#94a3b8;color:#fff;font-size:12px;font-weight:700;margin-bottom:7px}',
     '.sc-title{font-weight:600;color:#0f172a;font-size:13px;margin-bottom:5px}',
@@ -38,7 +39,10 @@
     el('steps-head').innerHTML = '<b>' + esc(data.protocol.title) + '</b>'
       + '<span>第 ' + cur + ' / ' + data.protocol.total_steps + ' 步 · 点卡片可跳转</span>';
     inner.innerHTML = data.all_steps.map(function (s) {
-      var extra = s.number === cur ? ' current' : (s.number < cur ? ' done' : '');
+      var status = (data.step_statuses || {})[String(s.number)];
+      var extra = s.number === cur ? ' current'
+        : (status === 'completed' ? ' done'
+        : (status === 'left_with_pending' ? ' pending' : ''));
       var badges = '';
       var planned = Object.keys(s.protocol_values || {}).length;
       if (planned) badges += '<span class="sc-b">方案已定 ' + planned + ' 项</span>';
@@ -46,6 +50,7 @@
         badges += '<span class="sc-b rec">必测 ' + esc(f) + '</span>';
       });
       if (s.has_hazard) badges += '<span class="sc-b danger">安全提示</span>';
+      if (status === 'left_with_pending') badges += '<span class="sc-b rec">有暂缓问题</span>';
       return '<div class="step-card' + extra + '" data-n="' + s.number + '">'
         + '<div class="sc-num">' + s.number + '</div>'
         + '<div class="sc-title">' + esc(s.title) + '</div>'
@@ -54,10 +59,9 @@
     }).join('');
     Array.prototype.forEach.call(inner.querySelectorAll('.step-card'), function (card) {
       card.onclick = function () {
-        fetch('/protocols/session/move', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'jump', step_number: parseInt(card.dataset.n, 10) })
-        }).then(function () { load(); });
+        window.moveProtocolStep('jump', parseInt(card.dataset.n, 10))
+          .then(function () { load(); })
+          .catch(function (error) { window.alert(error.message); });
       };
     });
     var active = inner.querySelector('.step-card.current');
@@ -65,7 +69,10 @@
   }
 
   function load() {
-    return fetch('/protocols/session/steps').then(function (r) { return r.json(); })
+    var path = window.protocolSessionUrl
+      ? window.protocolSessionUrl('/protocols/session/steps')
+      : '/protocols/session/steps';
+    return fetch(path).then(function (r) { return r.json(); })
       .then(function (d) { data = d; render(); return d; })
       .catch(function () {});
   }
@@ -78,11 +85,28 @@
     var rail = document.createElement('div');
     rail.id = 'steps-rail';
     rail.innerHTML = '<div id="steps-head"></div><div id="steps-inner"></div>';
-    (document.getElementById('sh-center') || document.body).appendChild(rail);
+    var chat = document.getElementById('sh-chat');
+    var head = document.getElementById('sh-chat-head');
+    if (chat && head) {
+      chat.insertBefore(rail, head.nextSibling);
+    } else {
+      (document.getElementById('sh-center') || document.body).appendChild(rail);
+    }
     load();
     setInterval(load, 4000);
   }
 
-  // 步骤时间线已并入中间工作画布顶部，不再单独渲染。
-  void init;
+  function ensureInit() {
+    if (document.getElementById('sh-chat')) {
+      init();
+      return;
+    }
+    document.addEventListener('shell-ready', ensureInit, {once: true});
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', ensureInit);
+  } else {
+    ensureInit();
+  }
 })();

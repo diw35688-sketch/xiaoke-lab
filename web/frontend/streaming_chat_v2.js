@@ -4,7 +4,8 @@
 (() => {
   const $ = id => document.getElementById(id);
   const form = $('form'), input = $('message'), send = $('send'), mic = $('mic'), chat = $('chat'),
-        conversationKey = 'lab-agent-conversation-id';
+        conversationKey = 'lab-agent-conversation-id',
+        freshChatKey = 'lab-agent-fresh-chat';
   const avatar = state => window.dispatchAvatarState?.(state);
   let activeController = null, activeReply = null, requestId = 0;
   let activeThinkRow = null, blockRows = {};
@@ -48,6 +49,18 @@
     return reply && reply.parentElement && reply.parentElement.classList.contains('message')
       ? reply.parentElement
       : reply;
+  }
+
+  function settleCommittedReply(reply, assistant, publishAnswer) {
+    if (typeof window.settleTurnReplySurface === 'function') {
+      return window.settleTurnReplySurface({reply, assistant, publishAnswer});
+    }
+    if (assistant?.payload?.presentation === 'clarification_card') {
+      messageRow(reply)?.remove?.();
+      return 'card';
+    }
+    publishAnswer(assistant?.payload?.text || '处理完成。');
+    return 'text';
   }
 
   function ensureThinkRow(reply) {
@@ -158,6 +171,10 @@
   }
 
   function loadHistory() {
+    if (localStorage.getItem(freshChatKey)) {
+      localStorage.removeItem(freshChatKey);
+      return;
+    }
     const id = localStorage.getItem(conversationKey);
     const url = id
       ? `/chat/history?conversation_id=${encodeURIComponent(id)}`
@@ -189,7 +206,11 @@
   document.addEventListener('click', event => {
     const button = event.target.closest('#sh-new-chat');
     if (!button) return;
-    localStorage.removeItem(conversationKey);
+    if (window.turnClient?.clearSession) {
+      window.turnClient.clearSession();
+    } else {
+      localStorage.removeItem(conversationKey);
+    }
     activeThinkRow = null; blockRows = {};
     turnStore.clear();
     clearChat();
@@ -272,9 +293,7 @@
               turnStore.acceptCommittedTurn(committed);
               const assistant = committed.blocks.find(block => block.type === 'assistant_text');
               answer = assistant?.payload?.text || '';
-              if (assistant?.payload?.presentation !== 'clarification_card') {
-                publishAnswer(answer || '处理完成。');
-              }
+              settleCommittedReply(reply, assistant, publishAnswer);
               window.__voiceLastScreenAt = window.performance?.now?.() ?? Date.now();
               if (data.business?.kind === 'experiment') window.labStepsReload?.();
             } else if (data.type === 'voice_delivery') {

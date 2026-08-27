@@ -9,6 +9,7 @@
 
   function createInteractionModeState() {
     var selected = 'chat';
+    var protocolId = null;
     var version = 1;
     var listeners = [];
 
@@ -16,13 +17,16 @@
       return Object.freeze({
         interaction_mode: MODES[selected].interaction_mode,
         experiment_context: MODES[selected].experiment_context,
-        mode_version: version
+        mode_version: version,
+        protocol_id: protocolId
       });
     }
-    function select(name) {
+    function select(name, protocolIdValue) {
       if (!MODES[name]) throw new Error('未知交互模式：' + name);
-      if (name === selected) return current();
+      var nextProtocolId = name === 'protocol' ? (protocolIdValue || null) : null;
+      if (name === selected && nextProtocolId === protocolId) return current();
       selected = name;
+      protocolId = nextProtocolId;
       version += 1;
       var value = current();
       listeners.slice().forEach(function (listener) { listener(value); });
@@ -35,7 +39,8 @@
         interaction_mode: mode.interaction_mode,
         experiment_context: mode.experiment_context,
         mode_version: mode.mode_version,
-        input_source: inputSource
+        input_source: inputSource,
+        protocol_id: mode.protocol_id
       });
     }
     function subscribe(listener) {

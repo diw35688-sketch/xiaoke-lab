@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+import settings_store
 from agent.core import ModelServiceError, refine_chat_answer
 from database.crud import get_messages, latest_conversation
 from stream_contract import screen_delta_event
@@ -58,6 +59,7 @@ def _build_chat_spoken_delivery(answer: str, turn_id: str) -> VoiceDeliveryItem:
         voice_text=plan.voice_text,
         source_block_id=plan.source_block.block_id,
         max_chars=policy.estimated_max_chars or len(plan.voice_text),
+        speech_rate=settings_store.current().tts_speed,
     )
 
 

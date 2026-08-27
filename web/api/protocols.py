@@ -1,13 +1,18 @@
 # -*- coding: utf-8 -*-
 """实验方案接口：选方案、走步骤、按方案做确定性判断与安全提示。"""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 import domain
 import llm_bridge
+from database.turn_store import ExperimentStateConflictError, TurnStore
+from src.core.protocol_execution_state import ProtocolExecutionState
+from src.core.protocol_navigation import decide_protocol_move
+from src.core.reply_coordinator import ReplyCoordinator
 
 router = APIRouter(prefix="/protocols", tags=["实验方案"])
+turn_store = TurnStore()
 
 
 class SelectPayload(BaseModel):
@@ -15,6 +20,8 @@ class SelectPayload(BaseModel):
 
 
 class MovePayload(BaseModel):
+    conversation_id: str = Field(min_length=1, max_length=128)
+    lab_session_id: str = Field(min_length=1, max_length=128)
     action: str
     step_number: int | None = None
 
@@ -67,15 +74,21 @@ def save_draft(payload: SaveDraftPayload):
 
 
 @router.get("/session")
-def read_session():
+def read_session(
+    conversation_id: str | None = Query(default=None),
+    lab_session_id: str | None = Query(default=None),
+):
     """当前会话：已选方案、当前步骤、安全提示。"""
-    return domain.step_view(domain.session())
+    return _session_view(conversation_id, lab_session_id, include_steps=False)
 
 
 @router.get("/session/steps")
-def session_steps():
+def session_steps(
+    conversation_id: str | None = Query(default=None),
+    lab_session_id: str | None = Query(default=None),
+):
     """当前会话 + 全部步骤概要，供状态机卡片栏使用。"""
-    return domain.all_steps_view(domain.session())
+    return _session_view(conversation_id, lab_session_id, include_steps=True)
 
 
 @router.post("/session")
@@ -90,12 +103,111 @@ def start(payload: SelectPayload):
 
 @router.post("/session/move")
 def move(payload: MovePayload):
-    """显式推进步骤：next / prev / jump。不做模型猜测。"""
+    """按会话事实和问题状态确定性切步，不调用模型。"""
     try:
-        state = domain.move(payload.action, payload.step_number)
+        selected = domain.session()
+        selected_view = domain.step_view(selected)
+        if selected_view.get("mode") != "protocol":
+            raise ValueError("当前没有选择实验方案。")
+        protocol = selected_view["protocol"]
+        stored = turn_store.load_experiment_state(
+            payload.conversation_id, payload.lab_session_id
+        )
+        execution = ProtocolExecutionState.from_snapshot(
+            stored.get("protocol_step_facts"),
+            protocol_id=str(protocol["id"]),
+            protocol_version=str(protocol["version"]),
+            default_step_number=int(selected_view["step"]["number"]),
+        )
+        current_domain = selected.jump_to(execution.current_step_number)
+        current_facts = execution.step_state(execution.current_step_number)
+        evaluation = domain.evaluate_for_state(
+            current_domain, current_facts.entity_values()
+        )
+        coordinator = ReplyCoordinator.from_snapshot(
+            dict(stored.get("reply_coordinator") or {})
+        )
+        decision = decide_protocol_move(
+            state=execution,
+            action=payload.action,
+            target_step_number=payload.step_number,
+            total_steps=int(protocol["total_steps"]),
+            evaluation=evaluation,
+            unresolved=coordinator.active_clarifications(),
+        )
+        if not decision.allowed:
+            raise HTTPException(status_code=409, detail={
+                "reason": decision.reason,
+                "missing_fields": list(decision.missing_fields),
+                "blocking_question_numbers": list(
+                    decision.blocking_question_numbers
+                ),
+                "deferred_question_numbers": list(
+                    decision.deferred_question_numbers
+                ),
+                "current_step_number": decision.from_step_number,
+                "target_step_number": decision.target_step_number,
+            })
+        revision = turn_store.save_protocol_navigation(
+            conversation_id=payload.conversation_id,
+            lab_session_id=payload.lab_session_id,
+            expected_revision=int(stored["revision"]),
+            protocol_step_facts=decision.state.to_snapshot(),
+        )
+        state = selected.jump_to(decision.state.current_step_number)
     except Exception as error:
+        if isinstance(error, HTTPException):
+            raise
+        if isinstance(error, ExperimentStateConflictError):
+            raise HTTPException(status_code=409, detail=str(error))
         raise HTTPException(status_code=400, detail=str(error))
-    return domain.step_view(state)
+    result = domain.step_view(state)
+    result["revision"] = revision
+    result["move"] = {
+        "allowed": True,
+        "reason": decision.reason,
+        "from_step_number": decision.from_step_number,
+        "target_step_number": decision.target_step_number,
+        "deferred_question_numbers": list(decision.deferred_question_numbers),
+    }
+    return result
+
+
+def _session_view(
+    conversation_id: str | None,
+    lab_session_id: str | None,
+    *,
+    include_steps: bool,
+):
+    selected = domain.session()
+    base = (
+        domain.all_steps_view(selected)
+        if include_steps else domain.step_view(selected)
+    )
+    if (
+        not conversation_id or not lab_session_id
+        or base.get("mode") != "protocol"
+    ):
+        return base
+    stored = turn_store.load_experiment_state(conversation_id, lab_session_id)
+    protocol = base["protocol"]
+    execution = ProtocolExecutionState.from_snapshot(
+        stored.get("protocol_step_facts"),
+        protocol_id=str(protocol["id"]),
+        protocol_version=str(protocol["version"]),
+        default_step_number=int(base["step"]["number"]),
+    )
+    scoped = selected.jump_to(execution.current_step_number)
+    result = (
+        domain.all_steps_view(scoped)
+        if include_steps else domain.step_view(scoped)
+    )
+    result["revision"] = int(stored["revision"])
+    result["step_statuses"] = {
+        str(number): status.value
+        for number, status in execution.statuses.items()
+    }
+    return result
 
 
 @router.post("/evaluate")

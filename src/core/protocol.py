@@ -8,6 +8,7 @@ from types import MappingProxyType
 from typing import Mapping
 
 from src.llm.schemas import ExperimentEntities
+from src.core.protocol_value_equivalence import protocol_values_equivalent
 
 
 PROTOCOL_SCHEMA_VERSION = 1
@@ -89,6 +90,28 @@ def _normalize_protocol_values(
     return MappingProxyType(normalized)
 
 
+def _normalize_value_aliases(
+    value: object,
+    protocol_values: Mapping[str, str],
+) -> Mapping[str, tuple[str, ...]]:
+    """Validate step-local aliases; only loaded protocol steps can activate them."""
+
+    if not isinstance(value, Mapping):
+        raise ProtocolError("value_aliases必须是字段到字符串元组的映射。")
+    normalized: dict[str, tuple[str, ...]] = {}
+    for key, aliases in value.items():
+        _require_non_blank_string(key, "value_aliases字段名")
+        if key not in protocol_values:
+            raise ProtocolError(
+                f"value_aliases.{key}必须对应本步骤protocol_values中的字段。"
+            )
+        checked = _require_string_tuple(aliases, f"value_aliases.{key}")
+        if len(set(checked)) != len(checked):
+            raise ProtocolError(f"value_aliases.{key}不能重复。")
+        normalized[key] = checked
+    return MappingProxyType(normalized)
+
+
 @dataclass(frozen=True)
 class ProtocolSubStep:
     """一个大步骤下的操作小步。
@@ -130,6 +153,9 @@ class ProtocolStep:
     hazard_note: str | None
     field_prompts: Mapping[str, str] = field(default_factory=lambda: MappingProxyType({}))
     substeps: tuple[ProtocolSubStep, ...] = ()
+    value_aliases: Mapping[str, tuple[str, ...]] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
 
     def __post_init__(self) -> None:
         if (
@@ -142,6 +168,9 @@ class ProtocolStep:
         _require_non_blank_string(self.instruction, "步骤原文")
         normalized_must_record = _normalize_field_names(self.must_record, "must_record")
         normalized_protocol_values = _normalize_protocol_values(self.protocol_values)
+        normalized_value_aliases = _normalize_value_aliases(
+            self.value_aliases, normalized_protocol_values
+        )
         normalized_field_prompts = _normalize_field_prompts(
             self.field_prompts, normalized_must_record
         )
@@ -150,6 +179,7 @@ class ProtocolStep:
             _require_non_blank_string(self.hazard_note, "hazard_note")
         object.__setattr__(self, "must_record", normalized_must_record)
         object.__setattr__(self, "protocol_values", normalized_protocol_values)
+        object.__setattr__(self, "value_aliases", normalized_value_aliases)
         if not isinstance(self.substeps, tuple):
             raise ProtocolError("substeps 必须是 ProtocolSubStep 元组。")
         for index, sub_step in enumerate(self.substeps, start=1):
@@ -203,7 +233,12 @@ def materialize_field_values(
         if _is_present(actual_value):
             source = (
                 FieldValueSource.DEVIATION
-                if protocol_value is not None and actual_value != protocol_value
+                if protocol_value is not None and not protocol_values_equivalent(
+                    field_name,
+                    protocol_value,
+                    actual_value,
+                    aliases=step.value_aliases.get(field_name, ()),
+                )
                 else FieldValueSource.SPOKEN
             )
             result[field_name] = SourcedFieldValue(field_name, actual_value, source)
