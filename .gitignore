@@ -16,6 +16,7 @@ __pycache__/
 audio/recordings/
 audio/raw/
 results/
+web/data/
 
 # Local evaluation runs (plans and curated baselines remain tracked)
 evaluation/pre_roll_real/attempts.jsonl

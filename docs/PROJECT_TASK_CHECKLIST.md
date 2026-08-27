@@ -1910,3 +1910,18 @@ matched_term 以后存知识库匹配到的标准术语（如 ASR 的"一液枪"
 - 关键真实请求证据：`web-audio-daf62c42-f6be-4ea0-bf4c-531da8a10c82`；SQLite 最终 Turn 包含完整问题汇总和 `session_ended=true`。用户最终确认完整上屏、短收尾朗读、连续通话退出和麦克风停止均通过。
 - 自动证据分两轮：问题汇总接入相关 Python `48/48`；语音预算与 `done` 兜底相关 Python `37/37`、`test_phone_call_silero_fallback.js`、JavaScript 语法及 `git diff --check` 通过。自动结果不代替真实证据；本项因已有用户真实复验标记 `REAL_OK`。
 - 当前唯一下一能力：方案实验完整接入，按“free/protocol 状态隔离 → 当前步确定性评价 → 最终 protocol/step/safety Blocks → SQLite → 前端显示 → 真实验收”完成一个闭环；暂不开始提速，不删除旧公开接口。
+
+### 2026-08-27 修复：语速设置不起作用（tts_speed 未接入真实播放链路）
+
+- 根因：设置面板语速 `tts_speed` 只在 `/tts/test` 非流式链路被读取；真实语音播放走流式 `/tts/stream`，其语速取自 `VoiceDeliveryItem.speech_rate` 合同字段，而所有进入播放授权（`web_playback_service.authorize`）的构造点都没传 `speech_rate`（默认 1.0），真实播放语速被固定为 1.0，拖滑块无效。
+- 修复：6 处构造点统一注入 `speech_rate=settings_store.current().tts_speed` —— `web/turn_processors.py`（`_voice_item` 与 `_prepare_chat_spoken_delivery`）、`web/api/voice_runtime.py`（欢迎语，原硬编码 1.0）、`web/lab_tools.py`、`web/tool_presentation.py`、`web/api/chat.py`。
+- 测试修复：`tests/test_web_voice_runtime_event.py` 欢迎语测试 mock `settings_store.current` 并断言语速透传 1.2；`tests/test_settings_store.py` 补 `setUp` 复位进程内 `_cache`，消除其他测试读真实 settings.json 造成的测试间污染。
+- 测试基线：专项 `38/38` 通过；项目正式 `.venv` 全量 `1252` 中 `1251` 通过、`1` 个 error 为 `test_explicit_mode_switch`（`composer.js` 的 `interactionModeState.select('protocol')` 已改为带第二参数，属统一 Turn 前端既有未提交改动，与本修复无关），仅标 `AUTO_OK`。
+- 真实验收（2026-08-27）：用户拖滑块后真实播放确认语速跟随设置生效（原话"语速可以了"）；第一句（欢迎语）也跟随语速设置，用户选定方案 A（不再固定 1.0），仅标 `REAL_OK`。
+
+### 2026-08-27 「正在理解」提速探索 + 前端耗时观测接入
+
+- 摸清"正在理解"延迟构成：本质是一次 LLM 调用（非流式、等完整 JSON），延迟 = 首 token 时间 + 输出时长；三条 LLM 链路（`WebSettingsLLMClient`/`src/llm/client.py`/聊天 `run_agent`）均已禁用 thinking，精确命令走本地正则 0 次 LLM，聊天模式已流式。
+- 发现：服务端 `TurnTimingRecorder` 已记录完整阶段耗时（`llm_started→llm_completed` 等 `elapsed_ms`）并随 `turn_result` 的 `timing` 字段下发，但前端 `turn_client.js` 未读取、用户看不到。
+- 改动：`web/frontend/turn_client.js` 新增 `summarizeServerTiming`，读取 `event.timing` 并计算"理解 LLM / 理解总 / 落盘 / 总"耗时，输出到 `[turn-timing]` console。`node --check` 语法通过，相邻 JS 测试 `voice_delivery_client`、`turn_reply_surface` 通过。
+- 尚未真实验收：需用户跑一次真实语音，F12 Console 看 `[turn-timing]` 各阶段秒数，据此判断瓶颈是理解 LLM 还是生成回答，再决定是否上「首句流式语音」。

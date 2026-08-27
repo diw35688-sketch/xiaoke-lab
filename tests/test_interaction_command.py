@@ -71,6 +71,31 @@ class InteractionCommandParserTests(unittest.TestCase):
                     number,
                 )
 
+    def test_parses_reactivate_targeted_commands(self):
+        cases = (
+            ("继续问题二", 2),
+            ("继续回答问题2", 2),
+            ("恢复第二个问题", 2),
+            ("恢复回答问题一", 1),
+        )
+        for text, number in cases:
+            with self.subTest(text=text):
+                command = InteractionCommandParser.parse(text)
+                self.assertEqual(
+                    command.command_type,
+                    InteractionCommandType.REACTIVATE_TARGETED,
+                )
+                self.assertEqual(command.target_question_number, number)
+
+    def test_does_not_reactivate_without_question_number(self):
+        for text in ("继续问题", "恢复问题", "继续实验"):
+            with self.subTest(text=text):
+                command = InteractionCommandParser.parse(text)
+                self.assertEqual(
+                    command.command_type,
+                    InteractionCommandType.NORMAL,
+                )
+
     def test_ignores_sensevoice_trailing_emotion_for_command(self):
         cases = (
             (

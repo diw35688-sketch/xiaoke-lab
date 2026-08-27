@@ -179,7 +179,9 @@ class WebVoiceRuntimeEventTests(unittest.TestCase):
         self.assertIsNone(voice_runtime_sessions.snapshot("conversation-a"))
 
     @patch("api.voice_runtime.ensure_conversation", return_value="conversation-startup")
-    def test_startup_welcome_uses_formal_voice_delivery(self, ensure):
+    @patch("api.voice_runtime.settings_store.current")
+    def test_startup_welcome_uses_formal_voice_delivery(self, current, ensure):
+        current.return_value.tts_speed = 1.2
         response = self.client.post(
             "/voice/runtime/startup",
             json={
@@ -201,7 +203,7 @@ class WebVoiceRuntimeEventTests(unittest.TestCase):
         self.assertEqual(delivery["type"], "voice_delivery")
         self.assertEqual(delivery["authorization"], "READY")
         self.assertEqual(delivery["items"][0]["source_block_id"], "turn-startup:voice-startup")
-        self.assertEqual(delivery["items"][0]["speech_rate"], 1.0)
+        self.assertEqual(delivery["items"][0]["speech_rate"], 1.2)
         ensure.assert_called_once_with(None)
 
 
