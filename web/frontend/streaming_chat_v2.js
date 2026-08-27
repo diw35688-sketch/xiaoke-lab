@@ -114,6 +114,21 @@
     chat.scrollTop = chat.scrollHeight;
   }
 
+  // 单次录音和连续通话不经过文字表单的 activeReply，仍应使用同一张结构化卡片。
+  window.addCommittedAssistantSurface = committed => {
+    const cards = (committed?.blocks || []).filter(
+      block => block.type === 'confirmation_card'
+    );
+    if (cards.length) {
+      cards.forEach(block => ensureCardRow(block, null));
+      return;
+    }
+    const assistant = (committed?.blocks || []).find(
+      block => block.type === 'assistant_text'
+    );
+    if (assistant?.payload?.text) add(assistant.payload.text, 'assistant');
+  };
+
   turnStore.subscribe(turn => {
     if (!turn) return;
     turn.blocks.forEach(block => {
@@ -122,6 +137,11 @@
       } else if (block.type === 'tool_card' && activeReply) {
         ensureToolRow(block, activeReply);
       } else if (block.type === 'assistant_text' && activeReply) {
+        if (block.payload.presentation === 'clarification_card') {
+          const row = messageRow(activeReply);
+          if (row) row.hidden = true;
+          return;
+        }
         activeReply.textContent = block.payload.text || '';
         chat.scrollTop = chat.scrollHeight;
       } else {
@@ -234,6 +254,51 @@
     avatar('thinking');
 
     let answer = '';
+    if (window.turnClient) {
+      try {
+        await window.turnClient.submitText(message, {
+          modeSnapshot,
+          requestId: localRequestId,
+          turnId: localTurnId,
+          signal: activeController.signal,
+          onEvent: data => {
+            if (data.type === 'turn_accepted') {
+              if (data.conversation_id) localStorage.setItem(conversationKey, data.conversation_id);
+            } else if (data.type === 'turn_status') {
+              publishAnswer(data.text || '正在处理…');
+            } else if (data.type === 'turn_result') {
+              const committed = data.turn;
+              if (!committed) throw new Error('Turn 结果缺少 ConversationTurn');
+              turnStore.acceptCommittedTurn(committed);
+              const assistant = committed.blocks.find(block => block.type === 'assistant_text');
+              answer = assistant?.payload?.text || '';
+              if (assistant?.payload?.presentation !== 'clarification_card') {
+                publishAnswer(answer || '处理完成。');
+              }
+              window.__voiceLastScreenAt = window.performance?.now?.() ?? Date.now();
+              if (data.business?.kind === 'experiment') window.labStepsReload?.();
+            } else if (data.type === 'voice_delivery') {
+              window.consumeVoiceDelivery?.(data);
+            } else if (data.type === 'turn_error') {
+              throw new Error(data.detail || 'Turn 处理失败');
+            } else if (data.type === 'done') {
+              avatar('happy'); setTimeout(() => avatar('idle'), 1000);
+              if (typeof loadExperiments === 'function') loadExperiments();
+            }
+          },
+        });
+      } catch (error) {
+        if (error.name === 'AbortError' || ownId !== requestId) return;
+        reply.textContent = `出错了：${error.message}`;
+        avatar('interrupted'); setTimeout(() => avatar('idle'), 900);
+      } finally {
+        if (ownId === requestId) {
+          activeController = null; activeReply = null;
+          stopButton.disabled = true; input.focus();
+        }
+      }
+      return;
+    }
     try {
       if (modeSnapshot.interaction_mode === 'experiment') {
         await window.streamExperimentRecord(message, {

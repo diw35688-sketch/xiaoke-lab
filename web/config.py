@@ -13,3 +13,4 @@ MODEL_NAME = os.getenv("MODEL_NAME", "deepseek-v4-pro")
 LOCAL_QWEN_TTS_URL = os.getenv("LOCAL_QWEN_TTS_URL", "http://127.0.0.1:8001/tts").rstrip("/")
 
 DATABASE_PATH = BASE_DIR / "lab_agent.db"
+AUDIO_STORAGE_ROOT = BASE_DIR / "data" / "turn_audio"

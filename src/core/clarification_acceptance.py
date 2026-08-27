@@ -326,6 +326,18 @@ class ClarificationActionPlanner:
         )
 
     @classmethod
+    def from_end_execution(
+        cls,
+        request: DispatchExecutionRequest,
+    ) -> ClarificationAction:
+        """精确结束命令不是澄清问题，只产生显式结束计划。"""
+
+        return cls._no_action(
+            request,
+            "已采用用户的精确结束实验记录命令。",
+        )
+
+    @classmethod
     def from_experiment(
         cls,
         accepted: AcceptedExperimentAnalysis,
@@ -390,8 +402,8 @@ class ClarificationActionPlanner:
         candidate = understanding.control.intent
         return InteractionCommand(
             command_type=candidate.command_type,
-            raw_text=request.asr_evidence.asr_transcript,
-            normalized_text=request.asr_evidence.asr_transcript,
+            raw_text=request.raw_text,
+            normalized_text=request.raw_text,
             target_question_number=candidate.target_question_number,
             answer_text=candidate.answer_text,
         )
@@ -434,7 +446,7 @@ class ClarificationActionPlanner:
             request_id=request.request_id,
             session_id=request.session_id,
             segment_id=request.segment_id,
-            asr_transcript=request.asr_evidence.asr_transcript,
+            asr_transcript=request.raw_text,
             action_type=action_type,
             mutation_permission=_ACTION_PERMISSIONS[action_type],
             reason=reason,
