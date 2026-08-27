@@ -159,6 +159,195 @@ def names() -> list:
     return list(_REGISTRY.keys())
 
 
+# ---------------- 通用项目/研发调研工具（只读） ----------------
+
+_SKIP_DIRS = {".git", ".venv", "node_modules", "__pycache__", "results", "web/tools/avatar_eye_frames"}
+_SKIP_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".wav", ".mp3", ".onnx", ".wasm", ".mjs", ".ico", ".db", ".db-shm", ".db-wal", ".zip", ".exe", ".bat", ".woff", ".ttf"}
+_SKIP_FILES = {"page_dump.html", "restart_web.bat"}
+
+
+def _safe_project_path(rel: str) -> Path:
+    root = REPO_ROOT.resolve()
+    if not rel or rel == ".":
+        return root
+    candidate = (REPO_ROOT / str(rel)).resolve()
+    if not str(candidate).startswith(str(root)):
+        raise ValueError("路径超出项目仓库范围：" + str(rel))
+    return candidate
+
+
+@tool(
+    "list_project_files",
+    "列出项目目录里的文件和子目录，用于了解项目结构。只读，不修改任何文件。",
+    {"type": "object", "properties": {"path": {"type": "string", "description": "相对项目根目录的路径，默认 ."}},
+     "required": [], "additionalProperties": False},
+    kind="search", title="查看项目文件：{path}",
+    present=lambda a, r: [f"路径：{r['path']}", f"共 {r['count']} 项"]
+    + [f"· {x['type']} {x['name']}" for x in r["items"][:10]],
+)
+def _list_project_files(path: str = "."):
+    root = _safe_project_path(path)
+    if not root.is_dir():
+        raise ValueError("目录不存在：" + str(path))
+    entries = sorted(
+        root.iterdir(),
+        key=lambda x: (not x.is_dir(), x.name.lower()),
+    )
+    items = []
+    for entry in entries:
+        if entry.name in _SKIP_DIRS:
+            continue
+        if entry.is_dir():
+            items.append({"name": entry.name, "type": "dir"})
+        else:
+            if entry.name in _SKIP_FILES or entry.suffix.lower() in _SKIP_SUFFIXES:
+                continue
+            try:
+                size = entry.stat().st_size
+            except OSError:
+                size = 0
+            items.append({"name": entry.name, "type": "file", "size": size})
+    return {"path": str(path) or ".", "count": len(items), "items": items[:300]}
+
+
+@tool(
+    "read_project_file",
+    "读取项目内的文本文件（代码、JSON、Markdown等），用于查看实现。只读。",
+    {"type": "object", "properties": {
+        "path": {"type": "string", "description": "相对项目根目录的文件路径"},
+        "offset": {"type": "integer", "description": "从第几行开始读，默认 1"},
+        "limit": {"type": "integer", "description": "最多读多少行，默认 200"}
+     }, "required": ["path"], "additionalProperties": False},
+    kind="read", title="读取项目文件：{path}",
+    present=lambda a, r: [f"文件：{r['path']}", f"共 {r['total_lines']} 行，当前 {r['offset']}-{r['offset'] + len(r['lines']) - 1}"]
+    + r["lines"][:6],
+)
+def _read_project_file(path: str, offset: int = 1, limit: int = 200):
+    target = _safe_project_path(path)
+    if not target.is_file():
+        raise ValueError("文件不存在：" + str(path))
+    if target.suffix.lower() in _SKIP_SUFFIXES:
+        raise ValueError("不支持读取二进制文件：" + str(path))
+    try:
+        all_lines = target.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError as error:
+        raise ValueError("读取失败：" + str(error))
+    start = max(1, int(offset or 1))
+    count = max(1, min(500, int(limit or 200)))
+    lines = all_lines[start - 1:start - 1 + count]
+    return {
+        "path": str(path),
+        "total_lines": len(all_lines),
+        "offset": start,
+        "limit": count,
+        "lines": lines,
+    }
+
+
+@tool(
+    "search_project_text",
+    "在项目文本文件里用正则搜索关键词，用于找实现/文档线索。只读。",
+    {"type": "object", "properties": {
+        "query": {"type": "string", "description": "正则表达式或关键词"},
+        "path": {"type": "string", "description": "相对项目根目录的目录，默认 ."}
+     }, "required": ["query"], "additionalProperties": False},
+    kind="search", title="搜索项目文本：{query}",
+    present=lambda a, r: [f"搜索：{r['query']}", f"命中 {r['count']} 条"]
+    + [f"· {x['path']}:{x['line']}" for x in r["results"][:8]],
+)
+def _search_project_text(query: str, path: str = "."):
+    import re
+    root = _safe_project_path(path)
+    if not root.is_dir() and not root.is_file():
+        raise ValueError("路径不存在：" + str(path))
+    try:
+        pattern = re.compile(query, re.IGNORECASE)
+    except re.error as error:
+        raise ValueError("正则表达式错误：" + str(error))
+    results = []
+    files = [root] if root.is_file() else sorted(root.rglob("*"))
+    for fp in files:
+        if not fp.is_file():
+            continue
+        if any(part in _SKIP_DIRS for part in fp.parts):
+            continue
+        if fp.name in _SKIP_FILES or fp.suffix.lower() in _SKIP_SUFFIXES:
+            continue
+        if fp.stat().st_size > 2_000_000:
+            continue
+        try:
+            for line_no, line in enumerate(
+                fp.read_text(encoding="utf-8", errors="ignore").splitlines(), 1
+            ):
+                if pattern.search(line):
+                    rel = fp.relative_to(REPO_ROOT)
+                    results.append({
+                        "path": str(rel),
+                        "line": line_no,
+                        "text": line.strip()[:160],
+                    })
+                    break
+        except OSError:
+            continue
+        if len(results) >= 200:
+            break
+    return {"query": query, "count": len(results), "results": results[:200]}
+
+
+@tool(
+    "list_project_docs",
+    "列出项目 docs 目录下的文档，用于快速找到交接/架构/开发文档。只读。",
+    {"type": "object", "properties": {}, "additionalProperties": False},
+    kind="search", title="查看项目文档",
+    present=lambda a, r: [f"共 {r['count']} 篇"] + [f"· {x}" for x in r["items"][:12]],
+)
+def _list_project_docs():
+    root = REPO_ROOT / "docs"
+    if not root.is_dir():
+        return {"count": 0, "items": []}
+    items = []
+    for fp in sorted(root.rglob("*.md")):
+        rel = fp.relative_to(REPO_ROOT)
+        items.append(str(rel))
+    return {"count": len(items), "items": items}
+
+
+@tool(
+    "check_project_environment",
+    "检查项目运行环境：Python版本、Git分支、关键依赖是否安装。只读。",
+    {"type": "object", "properties": {}, "additionalProperties": False},
+    kind="read", title="检查项目环境",
+    present=lambda a, r: [
+        f"Python：{r['python']}",
+        f"Git 分支：{r['git_branch']}",
+        f"工作目录：{r['working_dir']}",
+        "依赖：" + ("、".join(k for k, v in r["dependencies"].items() if v) or "无"),
+    ],
+)
+def _check_project_environment():
+    import importlib.util
+    import sys
+    import subprocess
+    branch = "unknown"
+    try:
+        branch = subprocess.run(
+            ["git", "-C", str(REPO_ROOT), "rev-parse", "--abbrev-ref", "HEAD"],
+            capture_output=True, text=True, timeout=5,
+        ).stdout.strip() or "unknown"
+    except Exception:
+        pass
+    deps = {}
+    for name in ["fastapi", "uvicorn", "openai", "httpx", "numpy", "multipart", "sounddevice", "sherpa_onnx", "torch", "funasr"]:
+        deps[name] = importlib.util.find_spec(name) is not None
+    return {
+        "python": sys.version.split()[0],
+        "git_branch": branch,
+        "working_dir": str(REPO_ROOT),
+        "dependencies": deps,
+    }
+
+
+
 # ---------------- 实验方案 ----------------
 
 @tool(
