@@ -16,6 +16,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from src.core.protocol_segment_evaluation import evaluate_segment  # noqa: E402
+from src.core.protocol_deviations import detect_protocol_deviations  # noqa: E402
 from src.core.protocol_selection import select_protocol  # noqa: E402
 from src.core.protocol_session import ProtocolSessionState  # noqa: E402
 from src.llm.schemas import ExperimentEntities  # noqa: E402
@@ -123,6 +124,9 @@ def step_view(state: ProtocolSessionState) -> dict:
             "title": step.title,
             "instruction": step.instruction,
             "protocol_values": dict(step.protocol_values),
+            "value_aliases": {
+                name: list(values) for name, values in step.value_aliases.items()
+            },
             "must_record": list(step.must_record),
             "hazard_note": step.hazard_note,
             "terms": list(step.terms),
@@ -138,9 +142,13 @@ def step_view(state: ProtocolSessionState) -> dict:
 
 def evaluate(entities_dict: dict) -> dict:
     """按当前步骤做确定性判断：缺什么、有没有偏差。"""
+    return evaluate_for_state(session(), entities_dict)
+
+
+def evaluate_for_state(state: ProtocolSessionState, entities_dict: dict) -> dict:
+    """按调用方捕获的同一方案状态快照评价，避免步骤在处理中漂移。"""
     known = {f: entities_dict.get(f) for f in ExperimentEntities.__dataclass_fields__}
     entities = ExperimentEntities(**known)
-    state = session()
     result = evaluate_segment(state, entities)
     return {
         "missing_fields": list(result.missing_fields),
@@ -159,6 +167,45 @@ def evaluate(entities_dict: dict) -> dict:
             for name, v in result.sourced_values.items()
         },
     }
+
+
+def project_record_evaluation(record: dict) -> dict:
+    """Re-evaluate ledger display with the exact current protocol id/version/step."""
+
+    step_snapshot = record.get("step") or {}
+    protocol_snapshot = step_snapshot.get("protocol") or {}
+    recorded_step = step_snapshot.get("step") or {}
+    protocol_id = protocol_snapshot.get("id")
+    protocol_version = protocol_snapshot.get("version")
+    step_number = recorded_step.get("number")
+    if not protocol_id or not protocol_version or not step_number:
+        return record
+    protocol = protocols().get(str(protocol_id))
+    if protocol is None or protocol.version != str(protocol_version):
+        return record
+    step_index = int(step_number) - 1
+    if step_index < 0 or step_index >= len(protocol.steps):
+        return record
+    entities_dict = record.get("entities") or {}
+    known = {
+        name: entities_dict.get(name)
+        for name in ExperimentEntities.__dataclass_fields__
+    }
+    deviations = detect_protocol_deviations(
+        protocol.steps[step_index], ExperimentEntities(**known)
+    )
+    projected = dict(record)
+    stored_evaluation = dict(record.get("evaluation") or {})
+    evaluation = dict(stored_evaluation)
+    evaluation["stored_deviations"] = stored_evaluation.get("deviations") or []
+    evaluation["deviations"] = [{
+        "field": item.field_name,
+        "protocol_value": item.protocol_value,
+        "actual_value": item.actual_value,
+    } for item in deviations]
+    evaluation["deviation_rule_version"] = 2
+    projected["evaluation"] = evaluation
+    return projected
 
 def all_steps_view(state) -> dict:
     """当前方案的全部步骤概要，供状态机卡片栏渲染。"""
@@ -255,6 +302,8 @@ def update_step(payload: dict) -> dict:
         updated["must_record"] = list(payload["must_record"])
     if payload.get("field_prompts") is not None:
         updated["field_prompts"] = payload["field_prompts"]
+    if payload.get("value_aliases") is not None:
+        updated["value_aliases"] = payload["value_aliases"]
     if payload.get("substeps") is not None:
         updated["substeps"] = [
             {"order": i, "text": x.get("text", ""), "note": x.get("note") or None}
@@ -272,6 +321,10 @@ def update_step(payload: dict) -> dict:
         terms=tuple(updated.get("terms") or ()),
         hazard_note=updated.get("hazard_note") or None,
         field_prompts=updated.get("field_prompts") or {},
+        value_aliases={
+            key: tuple(values)
+            for key, values in (updated.get("value_aliases") or {}).items()
+        },
         substeps=tuple(
             ProtocolSubStep(order=x["order"], text=x["text"], note=x.get("note"))
             for x in (updated.get("substeps") or [])

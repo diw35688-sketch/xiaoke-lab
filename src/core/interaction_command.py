@@ -14,6 +14,7 @@ class InteractionCommandType(str, Enum):
     DENY = "deny"
     TARGETED_ANSWER = "targeted_answer"
     DEFER_TARGETED = "defer_targeted"
+    REACTIVATE_TARGETED = "reactivate_targeted"
 
 
 @dataclass(frozen=True)
@@ -35,6 +36,7 @@ class InteractionCommand:
         if self.command_type in {
             InteractionCommandType.TARGETED_ANSWER,
             InteractionCommandType.DEFER_TARGETED,
+            InteractionCommandType.REACTIVATE_TARGETED,
         }:
             if (
                 self.target_question_number is None
@@ -57,6 +59,7 @@ class InteractionCommand:
         return self.command_type in {
             InteractionCommandType.DEFER_CURRENT,
             InteractionCommandType.DEFER_TARGETED,
+            InteractionCommandType.REACTIVATE_TARGETED,
             InteractionCommandType.REVIEW_PENDING,
             InteractionCommandType.AFFIRM,
             InteractionCommandType.DENY,
@@ -168,6 +171,18 @@ class InteractionCommandParser:
         ),
     )
 
+    REACTIVATE_TARGETED_PATTERNS = (
+        re.compile(
+            r"^(?:继续|恢复)(?:回答)?问题"
+            r"(?P<number>\d+|[一二三四五六七八九十]+)$"
+        ),
+        re.compile(
+            r"^(?:继续|恢复)(?:回答)?第?"
+            r"(?P<number>\d+|[一二三四五六七八九十]+)"
+            r"个?问题$"
+        ),
+    )
+
     @classmethod
     def parse(
         cls,
@@ -209,6 +224,13 @@ class InteractionCommandParser:
         )
         if defer_targeted is not None:
             return defer_targeted
+
+        reactivate_targeted = cls._parse_reactivate_targeted(
+            raw_text,
+            normalized,
+        )
+        if reactivate_targeted is not None:
+            return reactivate_targeted
 
         targeted_answer = cls._parse_targeted_answer(
             raw_text,
@@ -316,6 +338,30 @@ class InteractionCommandParser:
                 normalized_text=normalized,
                 target_question_number=number,
                 answer_text=answer,
+            )
+
+        return None
+
+    @classmethod
+    def _parse_reactivate_targeted(
+        cls,
+        raw_text: str,
+        normalized: str,
+    ) -> InteractionCommand | None:
+        for pattern in cls.REACTIVATE_TARGETED_PATTERNS:
+            match = pattern.fullmatch(normalized)
+            if match is None:
+                continue
+
+            number = cls._parse_question_number(match.group("number"))
+            if number is None or number <= 0:
+                return None
+
+            return InteractionCommand(
+                command_type=InteractionCommandType.REACTIVATE_TARGETED,
+                raw_text=raw_text,
+                normalized_text=normalized,
+                target_question_number=number,
             )
 
         return None

@@ -14,6 +14,7 @@
     '.rc-sn{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:var(--n-200);color:var(--n-700);font-size:10px;font-weight:600;flex:0 0 17px}',
     '.rc-step.cur .rc-sn{background:var(--brand);color:#fff}',
     '.rc-step.done .rc-sn{background:var(--green-500);color:#fff}',
+    '.rc-step.pending .rc-sn{background:#d97706;color:#fff}',
       '.rc-progress{height:6px;background:var(--n-100);border-radius:999px;overflow:hidden;margin:0 0 6px}',
       '.rc-progress-bar{height:100%;background:var(--brand);border-radius:999px;transition:width .25s ease}',
       '.rc-progress-text{font-size:var(--fs-xs);color:var(--n-500);margin-bottom:12px}',
@@ -91,10 +92,15 @@
     if (!session || session.mode !== 'protocol' || !session.all_steps) return '';
     var cur = session.step.number;
     return '<div id="rc-steps">' + session.all_steps.map(function (s) {
-      var cls = s.number === cur ? ' cur' : (s.number < cur ? ' done' : '');
+      var status = (session.step_statuses || {})[String(s.number)];
+      var cls = s.number === cur ? ' cur'
+        : (status === 'completed' ? ' done'
+        : (status === 'left_with_pending' ? ' pending' : ''));
       return '<div class="rc-step' + cls + '" data-n="' + s.number + '">'
         + '<span class="rc-sn">' + s.number + '</span>'
-        + esc(s.title) + (s.substep_count ? '<span style="color:var(--n-400);font-size:var(--fs-xs)">·' + s.substep_count + '</span>' : '') + '</div>';
+        + esc(s.title)
+        + (status === 'left_with_pending' ? '<span style="color:#b45309;font-size:var(--fs-xs)">·有暂缓问题</span>' : '')
+        + (s.substep_count ? '<span style="color:var(--n-400);font-size:var(--fs-xs)">·' + s.substep_count + '</span>' : '') + '</div>';
     }).join('') + '</div>';
   }
 
@@ -162,19 +168,22 @@
 
     Array.prototype.forEach.call(canvas.querySelectorAll('.rc-step'), function (node) {
       node.onclick = function () {
-        api('/protocols/session/move', 'POST', { action: 'jump', step_number: parseInt(node.dataset.n, 10) })
-          .then(reload);
+        window.moveProtocolStep('jump', parseInt(node.dataset.n, 10))
+          .then(reload).catch(function (error) { window.alert(error.message); });
       };
     });
     var edit = document.getElementById('rc-edit');
     if (edit) edit.onclick = function () { if (window.openProtocolEditor) window.openProtocolEditor(); };
     var prev = document.getElementById('rc-prev'), next = document.getElementById('rc-next');
-    if (prev) prev.onclick = function () { api('/protocols/session/move', 'POST', { action: 'prev' }).then(reload); };
-    if (next) next.onclick = function () { api('/protocols/session/move', 'POST', { action: 'next' }).then(reload); };
+    if (prev) prev.onclick = function () { window.moveProtocolStep('prev').then(reload).catch(function (error) { window.alert(error.message); }); };
+    if (next) next.onclick = function () { window.moveProtocolStep('next').then(reload).catch(function (error) { window.alert(error.message); }); };
   }
 
   function reload() {
-    return api('/protocols/session/steps').then(function (d) { session = d; paint(); return d; })
+    var path = window.protocolSessionUrl
+      ? window.protocolSessionUrl('/protocols/session/steps')
+      : '/protocols/session/steps';
+    return api(path).then(function (d) { session = d; paint(); return d; })
       .catch(function () {});
   }
 

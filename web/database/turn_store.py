@@ -18,6 +18,10 @@ class TurnRequestConflictError(RuntimeError):
     """A global request identity was reused with different immutable input."""
 
 
+class ExperimentStateConflictError(RuntimeError):
+    """Experiment session state changed after a navigation decision was made."""
+
+
 @dataclass(frozen=True)
 class TurnReservation:
     disposition: str
@@ -262,21 +266,39 @@ class TurnStore:
                 )
 
             if session_state is not None:
+                expected_revision = int(session_state["revision"]) - 1
+                current_row = connection.execute(
+                    """SELECT revision FROM experiment_session_state
+                       WHERE conversation_id=? AND lab_session_id=?""",
+                    (turn.conversation_id, turn.lab_session_id),
+                ).fetchone()
+                current_revision = (
+                    int(current_row["revision"])
+                    if current_row is not None else 0
+                )
+                if current_revision != expected_revision:
+                    raise ExperimentStateConflictError(
+                        f"实验会话状态已变化（期望 {expected_revision}，"
+                        f"当前 {current_revision}），本轮未提交。"
+                    )
                 connection.execute(
                     """INSERT INTO experiment_session_state
                        (conversation_id, lab_session_id, revision,
-                        reply_coordinator_json, session_context_json, updated_at)
-                       VALUES (?, ?, ?, ?, ?, ?)
+                        reply_coordinator_json, session_context_json,
+                        protocol_step_facts_json, updated_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)
                        ON CONFLICT(conversation_id, lab_session_id) DO UPDATE SET
                          revision=excluded.revision,
                          reply_coordinator_json=excluded.reply_coordinator_json,
                          session_context_json=excluded.session_context_json,
+                         protocol_step_facts_json=excluded.protocol_step_facts_json,
                          updated_at=excluded.updated_at""",
                     (
                         turn.conversation_id, turn.lab_session_id,
                         int(session_state["revision"]),
                         _json(session_state["reply_coordinator"]),
-                        _json(session_state["session_context"]), now,
+                        _json(session_state["session_context"]),
+                        _json(session_state.get("protocol_step_facts") or {}), now,
                     ),
                 )
 
@@ -342,7 +364,8 @@ class TurnStore:
     ) -> dict[str, object]:
         with closing(self._connection_factory()) as connection:
             row = connection.execute(
-                """SELECT revision, reply_coordinator_json, session_context_json
+                """SELECT revision, reply_coordinator_json, session_context_json,
+                          protocol_step_facts_json
                    FROM experiment_session_state
                    WHERE conversation_id=? AND lab_session_id=?""",
                 (conversation_id, lab_session_id),
@@ -357,6 +380,7 @@ class TurnStore:
                 "revision": 0,
                 "reply_coordinator": {},
                 "session_context": {},
+                "protocol_step_facts": {},
                 "next_segment_id": int(segment_row[0]) + 1,
                 "experiment_step_count": int(segment_row[1]),
             }
@@ -364,9 +388,75 @@ class TurnStore:
             "revision": int(row["revision"]),
             "reply_coordinator": json.loads(row["reply_coordinator_json"]),
             "session_context": json.loads(row["session_context_json"]),
+            "protocol_step_facts": json.loads(row["protocol_step_facts_json"]),
             "next_segment_id": int(segment_row[0]) + 1,
             "experiment_step_count": int(segment_row[1]),
         }
+
+    def save_protocol_navigation(
+        self,
+        *,
+        conversation_id: str,
+        lab_session_id: str,
+        expected_revision: int,
+        protocol_step_facts: Mapping[str, object],
+    ) -> int:
+        """Persist one navigation decision with optimistic revision checking."""
+
+        initialize_database()
+        now = self._clock()
+        with closing(self._connection_factory()) as connection, connection:
+            connection.execute(
+                "INSERT OR IGNORE INTO conversations(id) VALUES (?)",
+                (conversation_id,),
+            )
+            row = connection.execute(
+                """SELECT revision FROM experiment_session_state
+                   WHERE conversation_id=? AND lab_session_id=?""",
+                (conversation_id, lab_session_id),
+            ).fetchone()
+            actual_revision = int(row["revision"]) if row is not None else 0
+            if actual_revision != expected_revision:
+                raise ExperimentStateConflictError(
+                    f"实验会话状态已变化（期望 {expected_revision}，"
+                    f"当前 {actual_revision}）。"
+                )
+            next_revision = actual_revision + 1
+            if row is None:
+                connection.execute(
+                    """INSERT INTO experiment_session_state
+                       (conversation_id, lab_session_id, revision,
+                        reply_coordinator_json, session_context_json,
+                        protocol_step_facts_json, updated_at)
+                       VALUES (?, ?, ?, '{}', '{}', ?, ?)""",
+                    (
+                        conversation_id,
+                        lab_session_id,
+                        next_revision,
+                        _json(protocol_step_facts),
+                        now,
+                    ),
+                )
+            else:
+                cursor = connection.execute(
+                    """UPDATE experiment_session_state
+                       SET revision=?, protocol_step_facts_json=?, updated_at=?
+                       WHERE conversation_id=? AND lab_session_id=?
+                         AND revision=?""",
+                    (
+                        next_revision,
+                        _json(protocol_step_facts),
+                        now,
+                        conversation_id,
+                        lab_session_id,
+                        expected_revision,
+                    ),
+                )
+                if cursor.rowcount != 1:
+                    raise ExperimentStateConflictError(
+                        "实验会话状态并发变化，切步未保存。"
+                    )
+        return next_revision
 
     def referenced_audio_paths(self) -> tuple[str, ...]:
         with closing(self._connection_factory()) as connection:
@@ -387,6 +477,102 @@ class TurnStore:
             if item.get(field) is not None:
                 item[field] = json.loads(item[field])
         return item
+
+    def load_experiment_ledger(
+        self, conversation_id: str, lab_session_id: str
+    ) -> dict[str, object]:
+        """Read the complete user-visible ledger for one unified experiment."""
+
+        state = self.load_experiment_state(conversation_id, lab_session_id)
+        with closing(self._connection_factory()) as connection:
+            rows = connection.execute(
+                """SELECT * FROM lab_records
+                   WHERE conversation_id=? AND session_id=?
+                   ORDER BY segment_id, id""",
+                (conversation_id, lab_session_id),
+            ).fetchall()
+            turn_rows = connection.execute(
+                """SELECT request_id, raw_text, result_json, committed_at
+                   FROM turn_requests
+                   WHERE conversation_id=? AND lab_session_id=?
+                     AND status='committed'
+                   ORDER BY committed_at, created_at, request_id""",
+                (conversation_id, lab_session_id),
+            ).fetchall()
+        records = []
+        for row in rows:
+            item = dict(row)
+            for field in ("entities", "extraction", "evaluation", "step"):
+                if item.get(field) is not None:
+                    item[field] = json.loads(item[field])
+            records.append(item)
+        answer_projection = self._project_clarification_answers(
+            turn_rows,
+            state.get("protocol_step_facts") or {},
+        )
+        return {
+            "conversation_id": conversation_id,
+            "lab_session_id": lab_session_id,
+            "revision": int(state["revision"]),
+            "records": records,
+            "reply_coordinator": state.get("reply_coordinator") or {},
+            "protocol_execution": state.get("protocol_step_facts") or {},
+            "clarification_answers": answer_projection,
+        }
+
+    @staticmethod
+    def _project_clarification_answers(
+        turn_rows: object, protocol_execution: dict[str, object]
+    ) -> dict[str, list[dict[str, object]]]:
+        """Join answer Turns to questions and protocol facts without text guessing."""
+
+        written_by_request: dict[str, list[dict[str, object]]] = {}
+        raw_steps = protocol_execution.get("steps") or {}
+        if isinstance(raw_steps, dict):
+            for raw_step_number, raw_step in raw_steps.items():
+                if not isinstance(raw_step, dict):
+                    continue
+                values = raw_step.get("values") or {}
+                if not isinstance(values, dict):
+                    continue
+                for field_name, observed in values.items():
+                    if not isinstance(observed, dict) or not observed.get("request_id"):
+                        continue
+                    request_id = str(observed["request_id"])
+                    written_by_request.setdefault(request_id, []).append({
+                        "field": str(field_name),
+                        "value": observed.get("value"),
+                        "protocol_step_number": int(raw_step_number),
+                    })
+
+        projected: dict[str, list[dict[str, object]]] = {}
+        for row in turn_rows:
+            result = json.loads(row["result_json"] or "{}")
+            business = result.get("business") or {}
+            if business.get("clarification_action") != "answer":
+                continue
+            turn = result.get("turn") or {}
+            blocks = turn.get("blocks") or []
+            card = next((
+                block.get("payload") or {}
+                for block in blocks
+                if isinstance(block, dict)
+                and block.get("type") == "confirmation_card"
+                and isinstance(block.get("payload"), dict)
+                and block["payload"].get("clarification_id")
+            ), None)
+            if card is None:
+                # Old Turn data without a question identity cannot be joined safely.
+                continue
+            clarification_id = str(card["clarification_id"])
+            request_id = str(row["request_id"])
+            projected.setdefault(clarification_id, []).append({
+                "request_id": request_id,
+                "raw_text": row["raw_text"],
+                "committed_at": row["committed_at"],
+                "written_fields": written_by_request.get(request_id, []),
+            })
+        return projected
 
     def delete_experiment_session(
         self, conversation_id: str, lab_session_id: str

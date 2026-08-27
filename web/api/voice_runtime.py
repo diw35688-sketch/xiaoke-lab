@@ -7,6 +7,7 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+import settings_store
 from database.crud import conversation_exists, ensure_conversation
 from src.core.voice_runtime_state import VoiceRuntimeEventType, VoiceRuntimeState
 from src.core.playback_reevaluation import ReevaluationTrigger
@@ -118,7 +119,7 @@ def create_voice_startup(request: VoiceStartupRequest):
             f"当前为{mode_text}。"
         ),
         source_block_id=request.source_block_id,
-        speech_rate=1.0,
+        speech_rate=settings_store.current().tts_speed,
     )
     return {
         "conversation_id": conversation_id,

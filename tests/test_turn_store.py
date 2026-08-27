@@ -12,6 +12,7 @@ if str(WEB) not in sys.path:
 
 from database import db  # noqa: E402
 from database.turn_store import (  # noqa: E402
+    ExperimentStateConflictError,
     TurnRequestConflictError,
     TurnStore,
     canonical_request_hash,
@@ -51,7 +52,13 @@ class TurnStoreTests(unittest.TestCase):
             names = {r[0] for r in connection.execute(
                 "SELECT name FROM sqlite_master WHERE type='table'"
             )}
+            state_columns = {
+                row["name"] for row in connection.execute(
+                    "PRAGMA table_info(experiment_session_state)"
+                )
+            }
         self.assertTrue({"turn_requests", "asr_evidence", "experiment_events"} <= names)
+        self.assertIn("protocol_step_facts_json", state_columns)
 
     def test_reserve_replay_conflict_and_failed_retry(self):
         turn = _turn()
@@ -80,6 +87,16 @@ class TurnStoreTests(unittest.TestCase):
             experiment_events=({"kind": "measurement"},),
             session_state={
                 "revision": 1, "reply_coordinator": {}, "session_context": [],
+                "protocol_step_facts": {
+                    "protocol_id": "p1", "protocol_version": "1.0",
+                    "step_number": 1,
+                    "values": {
+                        "temperature": {
+                            "value": "80", "request_id": "r1", "segment_id": 1,
+                        },
+                    },
+                    "clarification_id": None,
+                },
             },
         )
         replay = self.store.reserve(turn, digest)
@@ -88,6 +105,10 @@ class TurnStoreTests(unittest.TestCase):
         state = self.store.load_experiment_state("c1", "lab1")
         self.assertEqual(state["next_segment_id"], 2)
         self.assertEqual(state["experiment_step_count"], 1)
+        self.assertEqual(
+            state["protocol_step_facts"]["values"]["temperature"]["value"],
+            "80",
+        )
         with closing(db.get_connection()) as connection:
             self.assertEqual(connection.execute("SELECT COUNT(*) FROM lab_records").fetchone()[0], 1)
             self.assertEqual(connection.execute("SELECT COUNT(*) FROM experiment_events").fetchone()[0], 1)
@@ -107,6 +128,59 @@ class TurnStoreTests(unittest.TestCase):
                 "SELECT status FROM turn_requests WHERE request_id='r1'"
             ).fetchone()[0]
         self.assertEqual(status, "processing")
+
+    def test_protocol_navigation_uses_optimistic_revision(self):
+        revision = self.store.save_protocol_navigation(
+            conversation_id="c1",
+            lab_session_id="lab1",
+            expected_revision=0,
+            protocol_step_facts={"current_step_number": 2},
+        )
+        self.assertEqual(revision, 1)
+        state = self.store.load_experiment_state("c1", "lab1")
+        self.assertEqual(state["protocol_step_facts"]["current_step_number"], 2)
+        with self.assertRaises(ExperimentStateConflictError):
+            self.store.save_protocol_navigation(
+                conversation_id="c1",
+                lab_session_id="lab1",
+                expected_revision=0,
+                protocol_step_facts={"current_step_number": 3},
+            )
+
+    def test_turn_commit_rolls_back_when_navigation_changed_revision(self):
+        turn = _turn()
+        self.store.reserve(turn, canonical_request_hash(turn.to_wire()))
+        self.store.save_protocol_navigation(
+            conversation_id="c1",
+            lab_session_id="lab1",
+            expected_revision=0,
+            protocol_step_facts={"current_step_number": 2},
+        )
+        with self.assertRaises(ExperimentStateConflictError):
+            self.store.commit(
+                turn=turn,
+                result={"turn": {}, "business": {}},
+                timings={},
+                session_state={
+                    "revision": 1,
+                    "reply_coordinator": {},
+                    "session_context": {},
+                    "protocol_step_facts": {"current_step_number": 1},
+                },
+            )
+        with closing(db.get_connection()) as connection:
+            self.assertEqual(
+                connection.execute(
+                    "SELECT status FROM turn_requests WHERE request_id='r1'"
+                ).fetchone()[0],
+                "processing",
+            )
+            saved = connection.execute(
+                """SELECT protocol_step_facts_json
+                   FROM experiment_session_state
+                   WHERE conversation_id='c1' AND lab_session_id='lab1'"""
+            ).fetchone()[0]
+        self.assertEqual(json.loads(saved)["current_step_number"], 2)
 
     def test_recover_processing_makes_request_retryable(self):
         turn = _turn()
@@ -139,6 +213,92 @@ class TurnStoreTests(unittest.TestCase):
             self.assertEqual(connection.execute("SELECT COUNT(*) FROM turn_requests").fetchone()[0], 0)
             self.assertEqual(connection.execute("SELECT COUNT(*) FROM asr_evidence").fetchone()[0], 0)
             self.assertEqual(connection.execute("SELECT COUNT(*) FROM lab_records").fetchone()[0], 0)
+
+    def test_experiment_ledger_is_scoped_by_conversation_and_lab_session(self):
+        turn = _turn("溶液透明")
+        self.store.reserve(turn, canonical_request_hash(turn.to_wire()))
+        self.store.commit(
+            turn=turn,
+            result={"ok": True},
+            timings={},
+            lab_record={
+                "session_id": "lab1",
+                "segment_id": 1,
+                "transcript": "溶液透明",
+                "entities": {"observation": "溶液透明"},
+                "evaluation": {},
+                "step": {"step": {"number": 1}},
+                "at": "2026-08-27T00:00:00",
+            },
+            session_state={
+                "revision": 1,
+                "reply_coordinator": {"clarifications": []},
+                "session_context": {},
+                "protocol_step_facts": {
+                    "protocol_id": "p1",
+                    "protocol_version": "1",
+                    "current_step_number": 1,
+                    "steps": {},
+                    "statuses": {"1": "in_progress"},
+                },
+            },
+        )
+        with closing(db.get_connection()) as connection, connection:
+            connection.execute(
+                """INSERT INTO lab_records
+                   (session_id, segment_id, transcript, entities,
+                    extraction_source, evaluation, at, conversation_id)
+                   VALUES ('lab-other', 1, '别的实验', '{}', 'test', '{}',
+                           '2026-08-27T00:01:00', 'c1')"""
+            )
+
+        ledger = self.store.load_experiment_ledger("c1", "lab1")
+
+        self.assertEqual(len(ledger["records"]), 1)
+        self.assertEqual(ledger["records"][0]["transcript"], "溶液透明")
+        self.assertEqual(ledger["revision"], 1)
+        self.assertEqual(
+            ledger["protocol_execution"]["statuses"]["1"], "in_progress"
+        )
+
+    def test_ledger_projects_answer_text_and_request_owned_protocol_values(self):
+        turn = _turn("室温保存")
+        self.store.reserve(turn, canonical_request_hash(turn.to_wire()))
+        self.store.commit(
+            turn=turn,
+            result={
+                "turn": {"blocks": [{
+                    "type": "confirmation_card",
+                    "payload": {"clarification_id": "q1", "display_number": 1},
+                }]},
+                "business": {"clarification_action": "answer"},
+            },
+            timings={},
+            session_state={
+                "revision": 1,
+                "reply_coordinator": {"clarifications": []},
+                "session_context": {},
+                "protocol_step_facts": {
+                    "protocol_id": "p1",
+                    "protocol_version": "1",
+                    "current_step_number": 2,
+                    "steps": {"1": {"values": {"condition": {
+                        "value": "室温", "request_id": "r1", "segment_id": 2,
+                    }}}},
+                    "statuses": {"1": "completed", "2": "in_progress"},
+                },
+            },
+        )
+
+        answer = self.store.load_experiment_ledger("c1", "lab1")[
+            "clarification_answers"
+        ]["q1"][0]
+
+        self.assertEqual(answer["raw_text"], "室温保存")
+        self.assertEqual(answer["request_id"], "r1")
+        self.assertEqual(answer["written_fields"], [{
+            "field": "condition", "value": "室温", "protocol_step_number": 1,
+        }])
 
 
 if __name__ == "__main__":

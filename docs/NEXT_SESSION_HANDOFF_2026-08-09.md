@@ -776,3 +776,17 @@ docs/                 任务清单、交接和学习记录
 - 这证明"真实链 + 六步 + 真实执行器 + 真实协调器"能串联闭环（现有六步测试用 FakeObserver 未覆盖此衔接）；未做生产 `/record` 切换（存储适配 + 输出层适配 + 会话状态接入）。
 - 唯一下一项：第 37 项第二段生产切换（`/record` 自由实验分支用六步流水线替换降级 producer，需先解决存储适配 + 输出层适配 + 会话状态接入三块）。
 
+### 2026-08-27 补充：语速设置接入真实播放链路
+
+- 修复“设置面板语速不起作用”：`tts_speed` 之前只在 `/tts/test` 非流式链路被读，真实流式播放的语速来自 `VoiceDeliveryItem.speech_rate`，而所有进播放授权的构造点都没传它（默认 1.0）。
+- 改动：6 处构造点统一注入 `speech_rate=settings_store.current().tts_speed` —— `web/turn_processors.py`（两处）、`web/api/voice_runtime.py`（欢迎语，原硬编码 1.0）、`web/lab_tools.py`、`web/tool_presentation.py`、`web/api/chat.py`。
+- 测试：专项 `38/38`；全量 `1252` 中 `1251` 通过、`1` 个 error 为 `test_explicit_mode_switch`（`composer.js` 的 `interactionModeState.select('protocol')` 已改为带第二参数，统一 Turn 前端既有未提交改动，与本修复无关）。
+- 真实验收（2026-08-27）：用户拖滑块真实播放确认语速跟随设置生效；第一句（欢迎语）也跟随语速设置（用户选定方案 A，不再固定 1.0）。
+
+### 2026-08-27 补充：耗时观测接入 + 提速方向
+
+- 「正在理解」延迟 = 一次 LLM 调用（非流式、等完整 JSON）；thinking 已禁用、精确命令 0 次 LLM、聊天已流式，这些已做对。
+- 前端 `turn_client.js` 新增 `summarizeServerTiming`，把服务端已下发但无人读的 `event.timing` 换算成"理解 LLM / 落盘 / 总"耗时，输出到 `[turn-timing]` console。
+- 下一步依赖真实数据：用户跑一次真实语音，F12 Console 看各阶段秒数，判断瓶颈是理解 LLM 还是生成回答。
+- 已初步论证「首句流式语音」是更大的感知提速杠杆（生成一句就送 TTS，而非整段生成完才开口）；「流式理解」收益小（结构化 JSON 必须完整才可靠解析）。待观测数据确认后定下一步。
+

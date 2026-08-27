@@ -4649,3 +4649,41 @@ C 调 D：文件、函数、事件或网络请求
 
 六要素自检：①白话✓ ②最小知识块✓ ③专业术语✓ ④真实代码/运行输出✓ ⑤反面例子✓ ⑥确认点✓。
 
+## 2026-08-27：设置值为什么没生效——一个值两条链路，字段没接上
+
+### 知识点：字段分流与“合同字段要在源头定正确”
+
+- **白话解释**：语速这个值，你在设置面板里存进了一个抽屉（`tts_speed`），但真正开口播放时，音箱读的是另一个抽屉（`speech_rate`），中间没人把两个抽屉接通。就像你在遥控器上把音量调到 2 倍，可音箱一直读自己面板上的音量旋钮（默认 1.0），遥控器的数值从没传过去——所以怎么按遥控器都不响。
+
+- **最小知识块**：
+  1. 先解释“设置持久化”：拖滑块 → `web/frontend/tts_settings.js` 把值存进 `settings.json`，读的时候用 `settings_store.current().tts_speed`。
+  2. 再解释“合同字段”：后端发给前端一条“语音项”（`VoiceDeliveryItem`），它上面的 `speech_rate` 字段就是描述“这条语音用多快语速”的合同约定；前端只认这个字段，不自己去查设置。
+  3. 再解释“真实播放的数据流”：设置值 → 后端构造 `VoiceDeliveryItem` 时把语速写进 `speech_rate` → 前端读 `item.speech_rate` → 发 `/tts/stream` → 火山引擎按 `speed_ratio` 合成。断点就出在“后端构造时没写进去”，`speech_rate` 一直用默认 1.0。
+  4. 为什么“测试合成”按钮好像有效：那按钮走的是另一条非流式链路（`/tts/test` → `tts_providers._volcano`），它直接读 `settings.tts_speed`，所以两条链路行为不一致，反而更难排查。
+
+- **专业术语**：单一事实来源（single source of truth）、合同字段（contract field）、未接线字段（unwired field）、数据流断点（data-flow gap）。
+
+- **真实代码/运行输出**：
+  - 修复前，`web/api/voice_runtime.py` 欢迎语硬编码：`speech_rate=1.0`（旧），`web/turn_processors.py` 的 `VoiceDeliveryItem(...)` 完全没传 `speech_rate`。
+  - 修复后统一注入：`speech_rate=settings_store.current().tts_speed`（共 6 处）。
+  - 测试运行：专项 `Ran 38 tests ... OK`；全量 `Ran 1252 tests`，其中 1 个 error 为 `test_explicit_mode_switch`（`composer.js` 前端字符串契约断点，与语速无关）。
+
+- **反面例子**：不知道“合同字段要在源头定正确”会怎样——你会在前端 `local_tts.js` 里想办法“当 `speech_rate` 是 1.0 就用设置的语速”，但这样无法区分“用户真的设了 1.0”和“后端没传”，属于在错误的一层补丁；还会留下两条链路（测试按钮 vs 真实播放）语速不一致的隐蔽 bug。
+
+- **确认点**：为什么“在后端构造 `VoiceDeliveryItem` 时把语速写进 `speech_rate`”比“在前端发现 `speech_rate` 缺失时去读设置”更正确？
+
+六要素自检：①白话✓ ②最小知识块✓ ③专业术语✓ ④真实代码/运行输出✓ ⑤反面例子✓ ⑥确认点✓。
+
+## 2026-08-27：埋点数据已经存在，不消费就等于没有
+
+### 知识点：时序观测（埋点）要"生产端打点 + 消费端可见"才成立
+
+- **白话解释**：你家里已经装了电表（服务端每步都记了耗时），但没把读数显示出来（前端没读、没打印），于是你天天猜"电费高"却看不见到底哪台电器耗电。观测不是"记录"就完了，得有人把记录**读出来**才算数。
+- **最小知识块**：① 服务端 `TurnTimingRecorder` 在请求各阶段调 `mark(name)`，每个 mark 存一个 `elapsed_ms`（自请求起累计毫秒）；② 快照 `snapshot()` 放进 `turn_result` 事件的 `timing` 字段下发；③ 前端原来只算了浏览器侧 `browserTiming`，没读 `event.timing`；④ 本次补 `summarizeServerTiming` 读取并做差，得到"某一段花了多久"；⑤ 关键是**差值**：`llm_completed - llm_started` 才是"理解 LLM 耗时"，单个 elapsed_ms 只是累计时钟。
+- **专业术语**：埋点/打点（instrumentation）、时序快照（timing snapshot）、端到端延迟观测（end-to-end latency observability）、消费端（consumer）。
+- **真实代码/运行输出**：`web/turn_application_service.py` 里 `result["timing"] = timing.snapshot()`；`web/frontend/turn_client.js` 新增 `summarizeServerTiming` 后 `console.info('[turn-timing]', browserTiming, summarizeServerTiming(serverTiming))`。`node --check` 语法通过，相邻 JS 测试通过。
+- **反面例子**：只打点不消费，优化就是盲猜——不知道是理解 LLM 慢还是生成回答慢，可能去精简 prompt 却白费，真正的瓶颈（比如生成回答）一直没动。
+- **确认点**：为什么"服务端已经记了耗时"和"用户能看到耗时"是两件不同的事？缺了哪一环观测就不成立？
+
+六要素自检：①白话✓ ②最小知识块✓ ③专业术语✓ ④真实代码/运行输出✓ ⑤反面例子✓ ⑥确认点✓。
+

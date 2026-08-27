@@ -1,17 +1,24 @@
 import re
 from dataclasses import asdict, dataclass, fields
 
-from src.core.pending_clarification import PendingClarification
+from src.core.pending_clarification import (
+    ClarificationStatus,
+    PendingClarification,
+)
 from src.llm.schemas import ExperimentEntities, LLMAnalysisResult
 
 
 FIELD_LABELS = {
+    "action": "操作",
+    "object": "对象",
+    "instrument": "仪器",
     "amount_value": "体积或质量数值",
     "amount_unit": "体积或质量单位",
     "concentration": "浓度",
     "temperature": "温度",
     "duration": "时间",
     "condition": "实验条件",
+    "observation": "观察现象",
 }
 
 
@@ -187,6 +194,11 @@ class ReplyCoordinator:
             if clarification.is_unresolved
         )
 
+    def all_clarifications(self) -> tuple[PendingClarification, ...]:
+        """返回含已解决/已过期项的完整问题账本。"""
+
+        return tuple(self._clarifications)
+
     def find_unresolved_by_display_number(
         self,
         display_number: int,
@@ -227,6 +239,9 @@ class ReplyCoordinator:
         missing_fields: tuple[str, ...] = (),
         requires_confirmation: bool = False,
         clarification_id_prefix: str = "segment",
+        protocol_id: str | None = None,
+        protocol_version: str | None = None,
+        protocol_step_number: int | None = None,
     ) -> PendingClarification:
         """从已有字段直接创建一个待确认问题，不从 LLMAnalysisResult 推导。"""
 
@@ -249,6 +264,9 @@ class ReplyCoordinator:
             question=question,
             missing_fields=missing_fields,
             requires_confirmation=requires_confirmation,
+            protocol_id=protocol_id,
+            protocol_version=protocol_version,
+            protocol_step_number=protocol_step_number,
         )
         self._clarifications.append(clarification)
         self._next_display_number += 1
@@ -410,6 +428,32 @@ class ReplyCoordinator:
             return updated if updated != clarification else None
 
         return None
+
+    def reactivate_clarification(
+        self,
+        *,
+        clarification_id: str,
+        expected_revision: int,
+        segment_id: int,
+    ) -> PendingClarification:
+        """按不可变身份和版本恢复一条 DEFERRED 问题。"""
+
+        target = self._find_clarification(clarification_id)
+        if target is None:
+            raise ValueError(f"未找到待确认项：{clarification_id}")
+        if target.revision != expected_revision:
+            raise ValueError(
+                f"待确认项版本已变更（期望 {expected_revision}，"
+                f"当前 {target.revision}），拒绝过期恢复。"
+            )
+        if target.status != ClarificationStatus.DEFERRED:
+            raise ValueError("只能恢复 DEFERRED 状态的待确认项。")
+
+        updated = target.reactivate(segment_id=segment_id)
+        index = self._clarifications.index(target)
+        self._clarifications[index] = updated
+        self._current_clarification_id = updated.clarification_id
+        return updated
 
     def try_confirm_oldest(
         self,
