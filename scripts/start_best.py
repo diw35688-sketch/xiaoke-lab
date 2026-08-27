@@ -45,7 +45,15 @@ CLOUDFLARED_URL = (
     "cloudflared-windows-amd64.exe"
 )
 
-sys.path.insert(0, str(WEB_DIR))
+# The Web app imports both top-level modules from ``web`` (for example
+# ``phone_access``) and shared application/domain modules from ``src``.
+# Running this file as ``python scripts/start_best.py`` only puts ``scripts``
+# on sys.path, so changing cwd to ``web`` is not enough for ``import src``.
+# Keep both roots explicit; this also makes startup independent of the shell's
+# original working directory.
+for import_root in (str(REPO_ROOT), str(WEB_DIR)):
+    if import_root not in sys.path:
+        sys.path.insert(0, import_root)
 os.chdir(WEB_DIR)
 
 import phone_access  # noqa: E402

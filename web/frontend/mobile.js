@@ -1,5 +1,5 @@
-// 手机演示页逻辑：点击录音 → 16kHz WAV → /asr/transcribe → /record 结构化 → 播报追问。
-// 与 voice_asr.js 同一套接口约定；页面独立，不依赖桌面版 composer/shell。
+// 手机演示页逻辑：点击录音 → 16kHz WAV → /turn/audio → SQLite 提交 → 显示/播报。
+// 页面独立，不依赖桌面版 composer/shell。
 (function () {
   "use strict";
 
@@ -214,6 +214,48 @@
     setHint("正在识别，请稍候");
 
     var blob = stopRecording();
+    if (window.turnClient) {
+      window.turnClient.submitAudio(blob, {
+        modeSnapshot: {
+          interaction_mode: 'experiment',
+          experiment_context: 'free',
+          mode_version: 1,
+        },
+        inputSource: 'single_recording',
+        filename: 'mobile_segment.wav',
+        onEvent: function (event) {
+          if (event.type === 'turn_status') {
+            setStatus(event.text || '正在处理…');
+          } else if (event.type === 'turn_result') {
+            var blocks = event.turn?.blocks || [];
+            var user = blocks.find(function (block) { return block.type === 'user_text'; });
+            var record = blocks.find(function (block) { return block.type === 'record_card'; });
+            var assistant = blocks.find(function (block) { return block.type === 'assistant_text'; });
+            if (user?.payload?.text) addBubble(user.payload.text, 'user', '我的口述');
+            var entities = record?.payload?.entities || {};
+            var entityText = Object.keys(entities).map(function (key) {
+              return key + '：' + entities[key];
+            }).join('，');
+            if (entityText) addBubble('已结构化：\n' + entityText, null, '系统');
+            if (assistant?.payload?.text) addBubble(assistant.payload.text, null, '小科');
+            setStatus(event.replayed ? '已恢复已提交结果' : '已提交');
+          } else if (event.type === 'voice_delivery') {
+            window.consumeVoiceDelivery?.(event);
+          } else if (event.type === 'turn_error') {
+            throw new Error(event.detail || '语音 Turn 失败');
+          }
+        },
+      }).then(function () {
+        setHint('点击开始录音，说完再点一次');
+      }).catch(function (err) {
+        fail('处理失败：' + err.message);
+      }).finally(function () {
+        busy = false;
+        btn.disabled = false;
+        btn.textContent = '🎤';
+      });
+      return;
+    }
     postAsr(blob).then(function (res) {
       if (!res.ok) {
         var detail = res.data.detail || "未知错误";

@@ -84,6 +84,21 @@ class SessionContext:
 
         self._items.clear()
 
+    def to_snapshot(self) -> dict[str, object]:
+        return {"max_events": self.max_events, "items": list(self._items)}
+
+    @classmethod
+    def from_snapshot(cls, snapshot: dict[str, object]) -> "SessionContext":
+        max_events = int(snapshot.get("max_events", 8))
+        context = cls(max_events=max_events)
+        items = snapshot.get("items", [])
+        if not isinstance(items, list) or any(
+            not isinstance(item, str) for item in items
+        ):
+            raise ValueError("SessionContext items 快照必须是字符串列表。")
+        context._items.extend(items)
+        return context
+
     def __len__(self) -> int:
         return len(self._items)
 

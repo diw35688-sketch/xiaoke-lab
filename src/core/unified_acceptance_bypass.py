@@ -26,18 +26,28 @@ class UnifiedAcceptanceBypassInput:
     request_id: str
     session_id: str
     segment_id: int
-    asr_result: ASRResult
+    asr_result: ASRResult | None
     clarification_context: ClarificationContextSnapshot
     session_active: bool = True
     recent_context: tuple[str, ...] = ()
+    raw_text: str | None = None
 
     def __post_init__(self) -> None:
         if not self.request_id.strip() or not self.session_id.strip():
             raise ValueError("旁路请求身份不能为空。")
         if self.segment_id <= 0 or isinstance(self.segment_id, bool):
             raise ValueError("segment_id必须是正整数。")
-        if not self.asr_result.is_final:
-            raise ValueError("采用旁路只接受最终ASR证据。")
+        raw_text = self.raw_text
+        if raw_text is None and self.asr_result is not None:
+            raw_text = self.asr_result.asr_transcript
+            object.__setattr__(self, "raw_text", raw_text)
+        if not isinstance(raw_text, str) or not raw_text.strip():
+            raise ValueError("旁路原文不能为空。")
+        if self.asr_result is not None:
+            if not self.asr_result.is_final:
+                raise ValueError("采用旁路只接受最终ASR证据。")
+            if self.asr_result.asr_transcript != raw_text:
+                raise ValueError("ASR证据与旁路原文不一致。")
 
     def to_understanding_input(self) -> UnifiedUnderstandingInput:
         numbers = tuple(
@@ -46,7 +56,7 @@ class UnifiedAcceptanceBypassInput:
         )
         current = self.clarification_context.current
         return UnifiedUnderstandingInput(
-            raw_text=self.asr_result.asr_transcript,
+            raw_text=self.raw_text,
             session_active=self.session_active,
             session_id=self.session_id,
             segment_id=self.segment_id,
@@ -66,6 +76,7 @@ class UnifiedAcceptanceBypassResult:
     accepted_experiment: AcceptedExperimentAnalysis | None
     clarification_action: ClarificationAction
     end_confirmation_requested: bool = False
+    end_session_execution_requested: bool = False
 
     def __post_init__(self) -> None:
         identities = {
@@ -112,9 +123,11 @@ class UnifiedAcceptanceBypass:
             segment_id=bypass_input.segment_id,
             asr_evidence=bypass_input.asr_result,
             plan=plan,
+            raw_text=bypass_input.raw_text,
         )
 
         end_confirmation_requested = False
+        end_session_execution_requested = False
         if plan.destination in {
             UnifiedDispatchDestination.EXPERIMENT_PIPELINE,
             UnifiedDispatchDestination.DEGRADED_NOTE,
@@ -139,6 +152,13 @@ class UnifiedAcceptanceBypass:
                 request
             )
             end_confirmation_requested = True
+        elif (
+            plan.destination
+            == UnifiedDispatchDestination.END_SESSION_EXECUTION
+        ):
+            accepted = None
+            action = ClarificationActionPlanner.from_end_execution(request)
+            end_session_execution_requested = True
         else:
             raise ValueError(
                 "当前采用旁路不处理该结束会话目标，避免扩大副作用范围。"
@@ -149,4 +169,5 @@ class UnifiedAcceptanceBypass:
             accepted_experiment=accepted,
             clarification_action=action,
             end_confirmation_requested=end_confirmation_requested,
+            end_session_execution_requested=end_session_execution_requested,
         )
