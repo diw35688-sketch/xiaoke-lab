@@ -218,18 +218,21 @@
     };
     var ttsButton = el('sh-tts');
     function syncTtsButton(detail) {
+      if (!ttsButton) return;
       var muted = window.ttsMuted === true;
       ttsButton.textContent = muted ? '语音关闭' : '语音开启';
       ttsButton.classList.toggle('active', !muted);
       ttsButton.title = detail || (muted ? '回复语音已关闭，点击开启' : '回复语音已开启，点击关闭');
     }
-    syncTtsButton();
-    ttsButton.onclick = function () {
-      window.ttsMuted = !(window.ttsMuted === true);
-      try { localStorage.setItem('tts-muted', window.ttsMuted ? '1' : '0'); } catch (_) {}
-      if (window.ttsMuted) window.stopSpeech?.();
+    if (ttsButton) {
       syncTtsButton();
-    };
+      ttsButton.onclick = function () {
+        window.ttsMuted = !(window.ttsMuted === true);
+        try { localStorage.setItem('tts-muted', window.ttsMuted ? '1' : '0'); } catch (_) {}
+        if (window.ttsMuted) window.stopSpeech?.();
+        syncTtsButton();
+      };
+    }
     var convoBtn = el('sh-toggle-conversation');
     if (convoBtn) {
       var convoHidden = localStorage.getItem('lab-conversation-hidden') === '1';
