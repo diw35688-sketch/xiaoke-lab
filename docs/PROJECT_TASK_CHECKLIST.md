@@ -71,7 +71,7 @@ TODO → DESIGN → CODED → AUTO_OK → REAL_OK
 
 ## 2. 当前测试基线
 
-- 当前全量自动测试：`1091 tests OK`（Python 3.11.9 一次性运行时 + 现有 `.venv` 依赖，2026-08-25，VOICE-C6-A3 完成后实测；现有 `.venv` 启动器仍指向已缺失的 Python 3.11）
+- 当前全量自动测试：`1190 tests OK`（Python 3.11.9 一次性运行时 + 现有 `.venv` 依赖，2026-08-26，自由实验六步受控验证完成后实测；现有 `.venv` 启动器仍指向已缺失的 Python 3.11）
 - 环境执行纪律：受限环境出现进程启动错误时，必须先在获准的非受限环境用同一条项目 `.venv` 原命令重试；不得直接诊断 `.venv` 或启动器损坏，也不得用另一解释器混载 `.venv` 包代替正式全量验收
 - 最近 PRESENT 真实验收会话：`20260815_212615`（补充复验 `20260815_213926`）
 - 最近 PRESENT 双会话复验：`20260816_143151` → `20260816_143201`（同进程再次唤醒成功，零第三方泄漏）
@@ -250,7 +250,7 @@ PRESENT 之外的 Query/Safety/RAG 真实接入、ASR 路演稳定性和 LLM 格
 | 32d | `VOICE-C4-3D-SEGMENT-FINALIZED-ASR-BRIDGE` | 断句与 ASR 处理事件进入同一会话 | `AUTO_OK` | 断句后关闭采集；ASR 成功/失败都清理忙状态 |
 | 32e | `VOICE-C4-3E-SESSION-PLAYBACK-STATE` | PlaybackScheduler 读取同一 conversation 的语音状态 | `AUTO_OK` | A 讲话只延后 A；B 不受影响 |
 | 32f | `VOICE-C4-3F-TTS-FEEDBACK-REEVALUATION` | 浏览器 TTS 事实反馈与延后项重评 | `AUTO_OK` | STARTED/FINISHED/STOPPED/FAILED 闭环；延后项可恢复或过期丢弃 |
-| 33 | `VOICE-C6-UNIFIED-CONVERSATION-SURFACE` | 单聊天时间线、显式模式、分策略输出与真实播放收口 | **NEXT** | 真实验收已暴露普通 chat 无语音、双前端状态和隐式模式缺口 |
+| 33 | `VOICE-C6-UNIFIED-CONVERSATION-SURFACE` | 单聊天时间线、显式模式、分策略输出与真实播放收口 | `IN_PROGRESS` | Chat、自由实验、单录和结束连续通话已有真实证据；方案实验仍失败，整体尚未收口 |
 | 33a | `VOICE-C6-A1-TURN-BLOCK-CONTRACT` | 定义统一 Turn/Block 输出合同 | `AUTO_OK` | request/turn/block/voice 身份、mode_version 与纯幂等冲突判断；无副作用；专项 14/14、全量 1076/1076 |
 | 33b | `VOICE-C6-A2-SINGLE-CONVERSATION-STORE` | 前端建立唯一 ConversationTurnStore | `AUTO_OK` | 正文/think/tool 只写 Store；删除 run 双状态；稳定 tool_call_id；专项 27/27、全量 1083/1083 |
 | 33c | `VOICE-C6-A3-CHAT-FIRST-SURFACE` | 方案、步骤、安全、记录和 tool 收敛为聊天消息块 | `AUTO_OK` | 统一卡片骨架+BlockView；管理页保留，run 画布退役；专项 30/30、全量 1091/1091 |
@@ -262,8 +262,8 @@ PRESENT 之外的 Query/Safety/RAG 真实接入、ASR 路演稳定性和 LLM 格
 | 34 | `VOICE-C3-2-BARGE-IN-REAL` | 真机验证自激、漏检和打断停止 | `TODO` | C1/C2a/C4/C5 联合 REAL_OK 证据 |
 | 35a | `VOICE-D0-INPUT-EVIDENCE-CONTRACT` | 定义文字/单次录音/连续通话进入实验统一链的来源可信输入合同 | `AUTO_OK` | 文字不得伪装 ASR；语音必须携带匹配的最终 ASRResult；专项 9/9、相邻 35/35、全量 1162/1162 |
 | 35 | `VOICE-D1-SESSION-OWNERSHIP` | 服务端按对话与实验会话托管有状态会话 | `AUTO_OK` | 并发对话不共享 reply/voice 状态 |
-| 36 | `VOICE-D2-REAL-OBSERVER` | `/record` 原始 ASRResult 接 UnifiedObserver | `TODO` | LLM 失败可降级，原始 ASR 不丢 |
-| 37 | `VOICE-D3-DROP-IN-SWAP` | 降级生产者切换为真实观察器 | `TODO` | 输出层不改且全量回归通过 |
+| 36 | `VOICE-D2-REAL-OBSERVER` | 会话边界内接 UnifiedObserver（受控验证） | `AUTO_OK` | 语音映射/文字拒绝/0次LLM/1次LLM/降级ASR不丢；专项 6/6、全量 1186；接路由时定 `_submissions` 去重窗口期 |
+| 37 | `VOICE-D3-DROP-IN-SWAP` | 降级生产者切换为真实观察器并完成方案实验闭环 | **NEXT** | 当前唯一下一能力：free/protocol 状态隔离、方案评价、最终 Blocks、SQLite 与真实验收 |
 | 38 | `VOICE-D4-FIVE-BRANCH-CONTRACT` | 设计 `experiment/control/tool/chat/uncertain` 五分支 | `TODO` | 五分支互斥；理解层不执行工具 |
 | 39 | `VOICE-D5-TOOL-PERMISSION-ROUTING` | 工具参数校验、风险权限和安全分派 | `TODO` | 不确定输入不产生工具副作用 |
 | 40 | `VOICE-E1-FUNCTIONAL-REAL` | 真实录音到记录、追问、确认的功能验收 | `TODO` | 自由/方案模式分别留 session、终端和持久化证据 |
@@ -1870,4 +1870,43 @@ matched_term 以后存知识库匹配到的标准术语（如 ASR 的"一液枪"
 - 专项 `11/11`、相邻回归 `43/43`、项目正式 `.venv` 全量 `1175/1175`（8.485 秒）通过，仅标 `AUTO_OK`。
 - 本轮没有从 `Desktop\asr_demo` 复制或覆盖任何实现；当前 `Documents\107` 仍是唯一施工基线。
 - 尚未把注册表接到 `/record`，也未调用 `UnifiedObserver` 或真实 LLM；因此当前不能声称生产统一链已接入，也不能评价识别能力。
+- 遗留留白（2026-08-26 审查发现）：`ExperimentRuntimeSession._submissions` 只在 `submit` 写入、从不清理已完成记录，幂等去重会保留会话生命周期内的全部历史。该行为对幂等必要，但对背压"防内存增长"动机是过度保留；清理策略（去重窗口期）取决于未来 `/record` 路由的重试策略，待接路由时按真实重试行为确定，当前不阻塞。
 - 当前唯一下一项：第 36 项先让统一观察器在该会话边界内处理 `ExperimentTurnInput`，以受控测试验证真实观察结果；生产 `/record` 切换留到观察器合同稳定后。
+
+### 2026-08-26 VOICE-D2 会话边界内接入统一观察器（受控验证）
+
+- 新增 `src/core/experiment_observer_bridge.py::observe_experiment_turn`：把语音 `ExperimentTurnInput` + 会话状态映射到 `UnifiedObserver.observe()`，只观察不落盘不执行；文字输入（`asr_result=None`）显式抛 `ValueError`，落实"文字不伪装成 ASR"。
+- `session_id` / `segment_id` 走显式参数：`ExperimentTurnInput` 合同没有这两个字段，段号由调用方分配。
+- 受控测试 `tests/test_experiment_observer_bridge.py`：复用 `FixedAcceptanceProcessor` 模式（Fake 不触网、构造 source 匹配有效事件），验证语音映射、文字拒绝、明确命令 0 次 LLM、普通输入 1 次 LLM、降级 `degraded_evidence_note` 且 `asr_transcript` 保留、接线器在 `ExperimentRuntimeSession` 单 worker FIFO 边界内运行。
+- 专项 `6/6`、项目正式 `.venv` 全量 `1186/1186`（8.016 秒）通过，仅标 `AUTO_OK`。
+- 未接真实 LLM、未接 `/record` 路由、未落盘或执行澄清动作；真实观察结果验收需真实 LLM + 固定 WAV 授权后另行安排。
+- 当前唯一下一项：第 37 项 `VOICE-D3-DROP-IN-SWAP` 降级生产者切换为真实观察器（依赖 `UnifiedSegmentProcessor` 六步流水线接入 web 存储）。
+
+### 2026-08-26 方案实验闭环缺口统计（真实验收发现 + 代码审查）
+
+- **缺口 1（核心）· 无累计已记录字段状态**：`ProtocolSessionState` 只存 `selection`+`cursor`（当前步骤游标），不存"这一步已记录哪些字段"；用户分句补字段（先"3.58"后"克"）时系统不记得上一句、重复追问。方向：加"当前步骤累计字段"状态，`compute_missing_fields` 改用累计判断。
+- **缺口 2 · 追问是"死"的**：降级 producer 只产 `partial_question` 文本，无 `pending_action`、不更新 `ReplyCoordinator`，回答关联不上。方向：方案实验接入六步流水线。
+- **缺口 3 · deviations 被丢弃**：`detect_protocol_deviations` 能检测偏差（含 `action` 不匹配），但 `record_service.py` 的 `presentation_evaluation` 只取 3 字段丢弃 deviations，不提示"操作和方案不一致"。方向：deviations 接进呈现层。
+- **缺口 4 · 无法识别完全无关输入**：提取不到实体的无关话，系统只机械追问缺字段、不提示"请围绕当前步骤"。方向：加"未提供有效实体"判断。
+- **缺口 5（暂缓）· 文本字段无确定性识别**：`observation` 等文本字段 `answer_fallback` 正则覆盖不了；用户 2026-08-26 定"暂时不考虑"，靠 LLM 识别。
+- **缺口 6（共同地基）· 字段 schema 散落**：字段名+属性散落 10+ 处，加字段改 6-7 处、数量对不齐。方向：集中到 `entity_field_schema.py`。
+- 后续顺序：缺口 6（字段地基）→ 缺口 1+2（闭环地基：累计状态 + 六步流水线）→ 缺口 3+4（纠错能力：deviations + 无关输入）→ 缺口 5 暂缓。
+- **两类缺口的本质区分**（2026-08-26 澄清"终端通畅、Web 为何有缺口"）：① **Web 环境适配**（终端路径早已接好，Web 还没搬）——缺口 2（追问死 = 没接六步）、缺口 6（字段散落，两端都散）；② **真·新能力**（终端路径也没有，主要是方案实验特有）——缺口 1（累计状态）、缺口 3（deviations 呈现）、缺口 4（无关输入识别）。含义：统一链本身没坏，缺的是"Web 转接头 + 方案实验新能力"两块，可分别补。
+
+### 2026-08-26 自由实验六步流水线受控验证（第 37 项第一段）
+
+- 新增 `src/core/experiment_observer_bridge.py::process_experiment_turn`：把语音 `ExperimentTurnInput` 映射到 `SegmentJob`，交给 `UnifiedSegmentProcessor` 六步流水线完整处理（观察→落盘→执行澄清动作），文字输入拒绝；`processor` 由调用方装配并跨 turn 复用，保持协调器/上下文状态。
+- 集成测试 `tests/test_experiment_pipeline.py`：真实观察链（`UnifiedObserver` + Fake processor）+ 真实 `ClarificationExecutor` + 真实 `ReplyCoordinator` + Fake 三个存储，验证六步跑通、追问-回答闭环、文字拒绝、降级 ASR 不丢。
+- 专项 `4/4`、项目正式 `.venv` 全量 `1190/1190`（8.385 秒）通过，仅标 `AUTO_OK`。
+- 填补的空隙：现有 `test_unified_segment_processor.py` 用 FakeObserver，未证明"真实观察链 + 六步 + 真实执行器 + 真实协调器"能串联闭环；本项补上。
+- 未做：生产 `/record` 切换（存储适配 + 输出层适配 + 会话状态接入，留第 37 项第二段）。
+- 当前唯一下一项：第 37 项第二段生产切换（`/record` 自由实验分支用六步流水线替换降级 producer）。
+
+### 2026-08-27 Web 统一 Turn“结束实验记录”完整真实验收
+
+- 用户在真实桌面浏览器、麦克风和扬声器环境完成连续通话验收，确认精确口述“结束实验记录”后：`business.session_ended=true`、结束命令不新增实验记录、下一条实验轮换到新 `lab_session_id`、按钮回到未通话、麦克风停止且服务无 `ValueError/500`。
+- 真实验收继续暴露“只显示单句结束语”的缺口：`ExperimentProcessor` 的结束分支没有读取 SQLite 恢复的 `ReplyCoordinator`。现已把本次实验步骤数、全部未解决问题、稳定编号和“待回答/已暂缓”状态合成一个最终 `ConversationTurn` 屏幕摘要；已解决问题不重复出现。
+- 随后真实验收又暴露“完整文字已上屏，但不朗读且连续通话不退出”：完整屏幕摘要超过 SSE 每轮 50 字语音预算，`turn_result` 发出后 `voice_delivery` 序列化异常，同时吞掉 `done`。修复后屏幕保留完整明细，语音使用 50 字以内的 `SESSION_CLOSING_SUMMARY / SUMMARY` 短摘要；`web/api/turn.py` 隔离提交后的语音授权异常并保证最终 `done` 必达。
+- 关键真实请求证据：`web-audio-daf62c42-f6be-4ea0-bf4c-531da8a10c82`；SQLite 最终 Turn 包含完整问题汇总和 `session_ended=true`。用户最终确认完整上屏、短收尾朗读、连续通话退出和麦克风停止均通过。
+- 自动证据分两轮：问题汇总接入相关 Python `48/48`；语音预算与 `done` 兜底相关 Python `37/37`、`test_phone_call_silero_fallback.js`、JavaScript 语法及 `git diff --check` 通过。自动结果不代替真实证据；本项因已有用户真实复验标记 `REAL_OK`。
+- 当前唯一下一能力：方案实验完整接入，按“free/protocol 状态隔离 → 当前步确定性评价 → 最终 protocol/step/safety Blocks → SQLite → 前端显示 → 真实验收”完成一个闭环；暂不开始提速，不删除旧公开接口。

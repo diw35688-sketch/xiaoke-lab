@@ -206,6 +206,7 @@ def test_connection(settings: ModelSettings | None = None) -> tuple[bool, str]:
             },
             json={
                 "model": settings.model_name,
+                "thinking": {"type": "disabled"},
                 "messages": [{"role": "user", "content": "ping"}],
                 "max_tokens": 1,
             },

@@ -4608,3 +4608,44 @@ C 调 D：文件、函数、事件或网络请求
 
 六要素自检：①白话✓ ②最小知识块✓ ③专业术语✓ ④真实代码/运行输出✓ ⑤反面例子✓ ⑥确认点✓。
 
+## 2026-08-26：受控测试要“真链 + 假叶子”，而验收门会反过来约束假叶子的形态
+
+### 知识点：受控测试的分层与验收门对 Fake 的约束
+
+- **白话解释**：想验证“系统真的能观察”、又不想真花 LLM 的钱，怎么办？把“编排链”用真的（分派、采用、澄清规划都是真代码），只把最贵的叶子依赖（LLM 调用）换成假的。但假的必须“够像”——如果它给出的答案缺胳膊少腿，后面的验收门会当场拒绝，测试就崩了。
+
+- **最小知识块**：
+  1. 先讲“依赖注入”：`UnifiedObserver` 的构造是 `UnifiedObserver(UnifiedAcceptanceBypass(UnifiedUnderstandingRouter(处理器)))`，处理器是可替换的接口——所以测试塞 Fake，生产塞真实 LLM。
+  2. 再讲“受控测试”：把外部不可控依赖（LLM/网络）换成确定性 Fake，其余编排逻辑用真代码，既验证真实链路、又不触网。
+  3. 再讲“验收门”：`ExperimentCandidateAcceptor.accept` 是采用前的校验，要求 `analysis.events` 非空，且每个 `event.raw_text / source_session_id / source_segment_id` 与输入一致，否则抛错。
+
+- **专业术语**：受控测试（controlled test）、测试替身/Fake（test double）、验收门（acceptance gate）、依赖注入（dependency injection）。
+
+- **真实代码/运行输出**：`tests/test_experiment_observer_bridge.py::CountingFakeProcessor._experiment` 构造带 `source_session_id`/`source_segment_id` 的 `ExperimentEvent`；`src/core/experiment_acceptance.py::ExperimentCandidateAcceptor.accept` 校验 events 非空 + source 匹配。专项 `Ran 6 tests ... OK`、全量 `Ran 1186 tests in 8.016s ... OK`。
+
+- **反面例子**：旧的 `scripts/evaluate_unified_dispatch_bypass.py` 里 Fake 返回 `events=[]`（空事件），它只能配旧的 `UnifiedDispatchBypass`（只 plan 不 accept）；若把这套 Fake 直接塞进新的 `UnifiedAcceptanceBypass`，accept 会抛“实验采用候选至少需要一个事件”，测试崩掉——这就是“验收门反过来约束 Fake 必须够像”。
+
+- **确认点**：为什么“只把 LLM 换掉、分派/采用/澄清规划用真的”比“整个观察器都用假的”更能验证“真实观察结果”？
+
+六要素自检：①白话✓ ②最小知识块✓ ③专业术语✓ ④真实代码/运行输出✓ ⑤反面例子✓ ⑥确认点✓。
+
+## 2026-08-26：集成测试要串联“真实链 + 六步”，有状态依赖要跨 turn 复用
+
+### 知识点：受控集成测试与有状态依赖的复用
+
+- **白话解释**：观察器单独测过、六步流水线单独测过，但没测过“把真观察器插进六步、再插进真执行器”这条完整链——就像每个零件都合格，组装起来却可能对不上。受控集成测试就是“组装起来试跑”，验证追问→回答→解决的闭环；而问题状态（协调器）这种“有记忆”的零件，必须全程用同一个，否则段 1 问的、段 2 就忘了。
+
+- **最小知识块**：
+  1. 先讲“单元测试 vs 集成测试”：单元测试用 Fake 依赖测单个模块（`test_unified_segment_processor.py` 用 FakeObserver 只测六步逻辑），集成测试用真实模块串联验证“配合”是否正确。
+  2. 再讲“有状态依赖”：`ReplyCoordinator`/`SessionContext` 是有状态的（问题、上下文随处理变化），必须在多次处理间复用同一个实例，状态才能延续。
+
+- **专业术语**：集成测试（integration test）、单元测试（unit test）、测试替身/Fake、有状态依赖（stateful dependency）、受控（controlled）。
+
+- **真实代码/运行输出**：`tests/test_experiment_pipeline.py` 用真实 `UnifiedObserver`（Fake processor）+ 真实 `ClarificationExecutor` + 真实 `ReplyCoordinator` + Fake 三个存储，装配 `UnifiedSegmentProcessor`；`process_experiment_turn`（`src/core/experiment_observer_bridge.py`）接收已装配 processor 跨 turn 复用。专项 `Ran 4 tests ... OK`、全量 `Ran 1190 tests in 8.385s ... OK`。
+
+- **反面例子**：若 `process_experiment_turn` 每次内部重新 `UnifiedSegmentProcessor(...)`（新建协调器/上下文），段 1 建的追问到段 2 就“失忆”，回答找不到目标问题，闭环永远断；若六步测试只用 FakeObserver，那“真实观察链产出的 CREATE 动作能否被真实执行器正确落到协调器”这个衔接点就没被验证。
+
+- **确认点**：为什么“协调器必须跨 turn 复用同一个实例”和“闭环能验证成功”是同一件事的两面？
+
+六要素自检：①白话✓ ②最小知识块✓ ③专业术语✓ ④真实代码/运行输出✓ ⑤反面例子✓ ⑥确认点✓。
+

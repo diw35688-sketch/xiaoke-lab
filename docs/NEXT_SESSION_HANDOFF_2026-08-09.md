@@ -762,3 +762,17 @@ docs/                 任务清单、交接和学习记录
 - 专项 `11/11`、相邻 `43/43`、全量 `1175/1175` 通过；这只证明会话容器和并发规则，不证明 `/record` 已使用它。
 - 未复制或覆盖 `Desktop\asr_demo`；下一步在当前仓库中将 `UnifiedObserver` 接入该会话边界并单独检验观察结果。
 
+### 2026-08-26 补充：会话边界内接入统一观察器（受控验证）
+
+- 新增 `src/core/experiment_observer_bridge.py::observe_experiment_turn`：把语音 `ExperimentTurnInput` + 会话状态映射到 `UnifiedObserver.observe()`，只观察不落盘不执行；文字输入（`asr_result=None`）抛 `ValueError`，落实"文字不伪装成 ASR"。
+- 受控测试 `tests/test_experiment_observer_bridge.py`：Fake processor（不触网）+ 真实分派/采用/澄清规划链，验证明确命令 0 次 LLM、普通输入 1 次 LLM、降级 `degraded_evidence_note` 且 ASR 不丢、接线器在会话单 worker FIFO 边界内运行。
+- 专项 `6/6`、全量 `1186/1186`（8.016 秒）通过；这只证明"受控观察"链路正确，不证明真实 LLM 观察结果（需真实 LLM + 固定 WAV 授权后另行验收）。
+- 唯一下一项：第 37 项 `VOICE-D3-DROP-IN-SWAP`，先把 `UnifiedSegmentProcessor` 六步流水线（落盘 + 执行澄清动作）接入 web 存储，再用真实观察器替换降级 producer。
+
+### 2026-08-26 补充：自由实验六步流水线受控验证（第 37 项第一段）
+
+- 新增 `src/core/experiment_observer_bridge.py::process_experiment_turn`：语音 `ExperimentTurnInput` 映射到 `SegmentJob`，走 `UnifiedSegmentProcessor` 完整六步（观察→落盘→执行澄清动作），文字拒绝；`processor` 跨 turn 复用保持协调器/上下文状态。
+- 集成测试 `tests/test_experiment_pipeline.py`：真实观察链 + 真实执行器 + 真实协调器 + Fake 三个存储，验证六步跑通、追问-回答闭环、文字拒绝、降级 ASR 不丢。专项 `4/4`、全量 `1190/1190`（8.385 秒）。
+- 这证明"真实链 + 六步 + 真实执行器 + 真实协调器"能串联闭环（现有六步测试用 FakeObserver 未覆盖此衔接）；未做生产 `/record` 切换（存储适配 + 输出层适配 + 会话状态接入）。
+- 唯一下一项：第 37 项第二段生产切换（`/record` 自由实验分支用六步流水线替换降级 producer，需先解决存储适配 + 输出层适配 + 会话状态接入三块）。
+

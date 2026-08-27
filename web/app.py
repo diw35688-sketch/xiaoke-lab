@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 
 import network_mode
 import phone_access
+from asr_application_service import get_asr_application_service
 
 from api.asr import router as asr_router
 from api.chat import router as chat_router
@@ -16,6 +17,7 @@ from api.settings import router as settings_router
 from api.tasks import router as tasks_router
 from api.templates import router as templates_router
 from api.tts import router as tts_router
+from api.turn import router as turn_router, turn_application_service, turn_store
 from api.voice_runtime import router as voice_runtime_router
 from config import BASE_DIR
 from database.db import initialize_database
@@ -29,6 +31,10 @@ app.mount("/static", StaticFiles(directory=BASE_DIR / "frontend"), name="static"
 @app.on_event("startup")
 def startup():
     initialize_database()
+    turn_application_service.recover_after_restart()
+    get_asr_application_service().cleanup_pending(
+        referenced_paths=turn_store.referenced_audio_paths()
+    )
     start_daily_scheduler()
     task_manager.start()
 
@@ -54,7 +60,8 @@ def home(request: Request):
                                    '<script src="/static/tts_settings.js"></script>'
                                    '<script src="/static/speak.js?v=20260820"></script>'
                                    '<script src="/static/interaction_mode_state.js?v=20260825"></script>'
-                                   '<script src="/static/voice_asr.js?v=20260824-stream"></script>'
+                                   '<script src="/static/turn_client.js?v=20260826-session-end"></script>'
+        '<script src="/static/voice_asr.js?v=20260827-clarification-card"></script>'
                                    '</body>'))
     scripts = (
         '<script src="/static/experiment_confirmation.js"></script>'
@@ -64,10 +71,10 @@ def home(request: Request):
         '<script src="/static/conversation.js"></script>'
         '<script src="/static/avatar.js"></script>'
         '<script src="/static/voice_delivery_client.js?v=20260825-voice-timing"></script>'
-        '<script src="/static/conversation_turn_store.js?v=20260825"></script>'
-        '<script src="/static/conversation_block_view.js?v=20260826-startup-progress"></script>'
+        '<script src="/static/conversation_turn_store.js?v=20260826-committed-turn"></script>'
+        '<script src="/static/conversation_block_view.js?v=20260827-clarification-card"></script>'
         '<script src="/static/conversation_context_blocks.js?v=20260825"></script>'
-        '<script src="/static/streaming_chat_v2.js?v=20260825-record-turn-id"></script>'
+        '<script src="/static/streaming_chat_v2.js?v=20260827-clarification-card"></script>'
         '<script src="/static/template_planner.js"></script>'
         '<script src="/static/task_panel.js"></script>'
         '<script src="/static/shell.js?v=20260825-one-mic"></script>'
@@ -76,7 +83,7 @@ def home(request: Request):
         '<script src="/static/composer.js?v=20260825-mode-sync"></script>'
           '<script src="/static/voice_startup_ui.js?v=20260826"></script>'
           '<script src="/static/call_silero_vad.js?v=20260826-visible-progress"></script>'
-          '<script src="/static/phone_call.js?v=20260826-visible-progress"></script>'
+        '<script src="/static/phone_call.js?v=20260827-clarification-card"></script>'
     )
     return HTMLResponse(page.replace("</body>", scripts + "</body>"))
 
@@ -161,3 +168,4 @@ app.include_router(asr_router)
 app.include_router(record_router)
 app.include_router(tts_router)
 app.include_router(voice_runtime_router)
+app.include_router(turn_router)

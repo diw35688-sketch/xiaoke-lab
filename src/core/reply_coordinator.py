@@ -1,5 +1,5 @@
 import re
-from dataclasses import dataclass, fields
+from dataclasses import asdict, dataclass, fields
 
 from src.core.pending_clarification import PendingClarification
 from src.llm.schemas import ExperimentEntities, LLMAnalysisResult
@@ -63,6 +63,49 @@ class ReplyCoordinator:
         self._clarifications: list[PendingClarification] = []
         self._next_display_number = 1
         self._current_clarification_id: str | None = None
+
+    def to_snapshot(self) -> dict[str, object]:
+        """Return a JSON-safe complete state snapshot for transactional storage."""
+
+        items = []
+        for clarification in self._clarifications:
+            item = asdict(clarification)
+            item["status"] = clarification.status.value
+            item["missing_fields"] = list(clarification.missing_fields)
+            items.append(item)
+        return {
+            "clarifications": items,
+            "next_display_number": self._next_display_number,
+            "current_clarification_id": self._current_clarification_id,
+        }
+
+    @classmethod
+    def from_snapshot(cls, snapshot: dict[str, object]) -> "ReplyCoordinator":
+        """Restore only snapshots produced by ``to_snapshot``."""
+
+        from src.core.pending_clarification import ClarificationStatus
+
+        coordinator = cls()
+        raw_items = snapshot.get("clarifications", [])
+        if not isinstance(raw_items, list):
+            raise ValueError("clarifications 快照必须是列表。")
+        restored = []
+        for raw in raw_items:
+            if not isinstance(raw, dict):
+                raise ValueError("clarification 快照必须是对象。")
+            item = dict(raw)
+            item["missing_fields"] = tuple(item.get("missing_fields") or ())
+            item["status"] = ClarificationStatus(item.get("status", "active"))
+            restored.append(PendingClarification(**item))
+        coordinator._clarifications = restored
+        coordinator._next_display_number = int(
+            snapshot.get("next_display_number", len(restored) + 1)
+        )
+        current = snapshot.get("current_clarification_id")
+        coordinator._current_clarification_id = (
+            str(current) if current is not None else None
+        )
+        return coordinator
 
     def ingest_analysis(
         self,
