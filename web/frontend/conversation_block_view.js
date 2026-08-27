@@ -29,8 +29,8 @@
         return {label: 'Tool', title: text(payload.title || '工具调用'), tone: payload.status === 'error' ? 'danger' : 'tool',
           status: text(payload.status), lines: compact(payload.lines || []), meta: compact([payload.tool_call_id])};
       case 'confirmation_card':
-        return {label: '待确认', title: text(payload.title || '请确认'), tone: 'confirm',
-          status: text(payload.status), lines: compact(payload.lines || [payload.text]), meta: compact(payload.meta || [])};
+        return {label: '待确认问题', title: text(payload.title || '请确认'), tone: 'confirm',
+          status: text(payload.status), lines: compact(payload.lines || [payload.question || payload.text]), meta: compact(payload.meta || [])};
       case 'system_status':
         return {label: '状态', title: text(payload.title || '系统状态'), tone: payload.error ? 'danger' : 'status',
           status: payload.running ? '进行中' : text(payload.status),

@@ -87,7 +87,12 @@ class ExperimentRuntimeSession:
         request: ExperimentTurnInput,
         operation: Callable[[ReplyCoordinator, SessionContext], object],
     ) -> ExperimentSubmission:
-        """Submit new work in FIFO order or reuse an exact request retry."""
+        """提交新工作（FIFO）或复用完全一致请求的重试。
+
+    幂等只比较 ``request``：``operation`` 必须由 ``request`` 唯一决定，
+    因此相同 ``request_id`` 且内容一致时总是复用第一次提交的 Future，
+    不会执行第二个 ``operation``。
+    """
 
         if not isinstance(request, ExperimentTurnInput):
             raise TypeError("request 必须是 ExperimentTurnInput。")

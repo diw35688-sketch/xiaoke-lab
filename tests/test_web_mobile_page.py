@@ -2,7 +2,7 @@
 """手机演示页 /m 的路由与页面结构测试：不依赖网络、不触发数据库。
 
 覆盖：/m 路由已注册；mobile.html 含录音按钮与脚本引用；
-mobile.js 走现有 /asr/transcribe 与 /record 接口约定。
+mobile.js 通过 turn_client 走统一 /turn/audio SSE 合同。
 """
 
 import sys
@@ -50,20 +50,17 @@ class WebMobilePageTests(unittest.TestCase):
         self.assertIn("/static/mobile.js", html)
         self.assertIn('name="viewport"', html)
 
-    def test_mobile_js_uses_existing_api_contracts(self):
+    def test_mobile_js_uses_unified_turn_contract(self):
         js = (FRONTEND_DIR / "mobile.js").read_text(encoding="utf-8")
-        self.assertIn("/asr/transcribe", js)
-        self.assertIn('"/record/stream"', js)
-        self.assertIn("response.body.getReader()", js)
+        client = (FRONTEND_DIR / "turn_client.js").read_text(encoding="utf-8")
+        self.assertIn("turnClient.submitAudio", js)
+        self.assertIn("'/turn/audio'", client)
+        self.assertIn("turn_result", js)
+        self.assertIn("voice_delivery", js)
         self.assertIn("getUserMedia", js)
-        # B4：mobile.js 消费 /record 的 messages 合同（kind/screen_target/text），
-        # 前端只按 kind/screen_target 上样式、显示/朗读 text，不自行判断。
-        self.assertIn("messages", js)
-        self.assertIn("screen_target", js)
-        self.assertIn('"clarification"', js)
-        # 旧薄字典平行投影字段已退役（前端不再读 evaluation 自行判断/拼话）
-        self.assertNotIn("follow_up_question", js)
-        self.assertNotIn("deviations", js)
+        self.assertIn("/static/turn_client.js", (
+            FRONTEND_DIR / "mobile.html"
+        ).read_text(encoding="utf-8"))
 
     def test_mobile_page_does_not_depend_on_desktop_scripts(self):
         html = (FRONTEND_DIR / "mobile.html").read_text(encoding="utf-8")

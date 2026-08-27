@@ -44,6 +44,7 @@
 
   let segmentQueue = [];
   let processingQueue = false;
+  let sessionEndPending = false;
   let autoSpeakWas = false;
   let idleFrames = 0;          // 连续静音帧计数，用于自动重新校准噪音基线
   let runtimeEventChain = Promise.resolve();
@@ -372,6 +373,45 @@
       try {
         await queueVoiceRuntimeEvent('asr_processing_started');
         hint('正在识别语音…');
+        if (window.turnClient) {
+          const modeSnapshot = window.interactionModeState.capture('continuous_call');
+          let transcript = '';
+          await window.turnClient.submitAudio(blob, {
+            modeSnapshot,
+            inputSource: 'continuous_call',
+            filename: 'phone_segment.wav',
+            onEvent: event => {
+              if (event.type === 'turn_status') {
+                hint(event.text || '正在处理…');
+              } else if (event.type === 'turn_result') {
+                const committed = event.turn;
+                if (!committed) throw new Error('Turn 结果缺少 ConversationTurn');
+                window.conversationTurnStore?.acceptCommittedTurn(committed);
+                const user = committed.blocks.find(block => block.type === 'user_text');
+                transcript = user?.payload?.text || '';
+                if (transcript) window.addChatMessage?.(transcript, 'user');
+                window.addCommittedAssistantSurface?.(committed);
+                hint(transcript ? '转写：' + transcript : '处理完成');
+                setAvatar('thinking');
+                if (event.business?.session_ended === true && !event.replayed) {
+                  sessionEndPending = true;
+                  hint('实验记录已结束，正在关闭连续通话…');
+                }
+              } else if (event.type === 'voice_delivery') {
+                window.consumeVoiceDelivery?.(event);
+                if (sessionEndPending) stopCall({preservePlayback: true});
+              } else if (event.type === 'turn_error') {
+                throw new Error(event.detail || '连续通话 Turn 失败');
+              } else if (event.type === 'done' && sessionEndPending) {
+                stopCall({preservePlayback: true});
+              }
+            },
+          });
+          await queueVoiceRuntimeEvent('asr_processing_finished');
+          if (!transcript) hint('没听清，请再说一次');
+          await new Promise(resolve => setTimeout(resolve, 350));
+          continue;
+        }
         const form = new FormData();
         form.append('audio', blob, 'phone_segment.wav');
         const response = await fetch('/asr/transcribe', { method: 'POST', body: form });
@@ -431,6 +471,7 @@
 
       active = true;
       segmentQueue = [];
+      sessionEndPending = false;
       runtimeEventChain = Promise.resolve();
       await startPreferredCapture();
       window.__voiceStartupTimings = window.__voiceStartupTimings || {};
@@ -451,7 +492,7 @@
     }
   }
 
-  function stopCall() {
+  function stopCall(options = {}) {
     active = false;
     captureMode = 'idle';
     segmentQueue = [];
@@ -471,7 +512,8 @@
     } catch (_) {}
     processor = null; source = null; mute = null; stream = null; audioCtx = null;
     fallbackStarting = false;
-    window.stopSpeech?.();
+    sessionEndPending = false;
+    if (!options.preservePlayback) window.stopSpeech?.();
     setCallButton(false);
     setAvatar('idle');
     hint('通话已结束');
