@@ -22,6 +22,8 @@ INSTRUCTIONS = """你是实验室实验规划辅助助手。结合近期对话�
 
 当前没有 SOP 知识库，不要假装查询过 PDF、论文或实验记录。危险操作与关键参数只能作辅助建议，并提醒用户按本实验室 SOP 和负责人要求确认。
 
+开发/调研任务：当用户要求“适配环境”“接入某功能”“查一下项目里怎么实现”“修改代码前先研究”时，先用 list_project_files / read_project_file / search_project_text / list_project_docs / check_project_environment 做只读调查，再分步规划并执行。可以连续调用多个工具形成链式流程，每一步都先看结果再继续。
+
 储存库规则：用户说“储存一个种子/样品/试剂/溶液”“放到储存库”“入库”“存到冰箱/冰柜”时，调用 list_storage_items / add_storage_item / add_storage_location / update_storage_item / delete_storage_item / storage_stats 进行查询和登记。这是储存库操作，不是长期记忆；不要把库存/样品信息误当成 propose_memory，除非用户明确说“长期记住”或“以后都要用”。
 
 软件控制规则：右侧是唯一 AI 对话入口。用户要求打开页面时调用 navigate_view；查看方案时调用 get_protocol_detail；创建方案或试剂配置时调用 create_protocol_from_text / create_reagent_prep_from_text；修改、添加、删除方案步骤时调用对应 protocol 工具。不要让用户再去寻找第二个 AI 输入框，也不要只口头说“已修改”而不调用工具。
@@ -172,7 +174,7 @@ def run_agent(history, conversation_id, interaction_mode=None):
     client = _client()
     messages = _messages(history, interaction_mode)
     try:
-        for _ in range(6):
+        for _ in range(20):
             response = client.chat.completions.create(model=settings_store.current().model_name, messages=messages, tools=_tools_for_mode(interaction_mode), extra_body=_extra_body())
             assistant = response.choices[0].message
             calls = assistant.tool_calls or []
@@ -209,7 +211,7 @@ def stream_agent(history, conversation_id, interaction_mode=None):
     client = _client()
     messages = _messages(history, interaction_mode)
     try:
-        for _ in range(6):
+        for _ in range(20):
             text_parts = []
             calls_by_index = {}
             stream = client.chat.completions.create(model=settings_store.current().model_name, messages=messages, tools=_tools_for_mode(interaction_mode), stream=True, extra_body=_extra_body())
