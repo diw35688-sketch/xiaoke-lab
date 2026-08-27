@@ -75,7 +75,7 @@ def home(request: Request):
         '<script src="/static/streaming_chat_v2.js?v=20260825-record-turn-id"></script>'
         '<script src="/static/template_planner.js"></script>'
         '<script src="/static/task_panel.js"></script>'
-        '<script src="/static/shell.js?v=20260818"></script>'
+        '<script src="/static/shell.js?v=20260826c"></script>'
         '<script src="/static/conversation_list.js?v=20260818"></script>'
         '<script src="/static/run_canvas.js"></script>'
         '<script src="/static/views.js?v=20260820"></script>'
