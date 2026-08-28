@@ -216,9 +216,18 @@ TEMPLATE_SKILL = """你是「模板制作助手」。用户要制作实验模板
 """
 
 
-def run_template_agent(history, conversation_id):
+STORAGE_SKILL = """你是「储存库制作助手」。用户要制作储存库（存储位置/物品登记/库存模板）时：
+1. 识别是位置（冰箱/冰柜/试剂柜/架位）还是物品/样品/溶液。
+2. 收集字段：名称、类型、温度、容量、位置、数量、有效期、备注。
+3. 调用储存库工具（list_storage_items / add_storage_item / add_storage_location / update_storage_item / delete_storage_item / storage_stats）进行登记。
+4. 生成命名规范、格位建议和保存条件。
+5. 输出简洁中文；必要时提醒用户到“储存库”页面可视化编辑。
+"""
+
+
+def _run_skill_agent(skill: str, history, conversation_id):
     client = _client()
-    messages = [{"role": "system", "content": TEMPLATE_SKILL + "\n\n" + _memory_context()}] + list(history)
+    messages = [{"role": "system", "content": skill + "\n\n" + _memory_context()}] + list(history)
     try:
         for _ in range(20):
             response = client.chat.completions.create(
@@ -252,6 +261,14 @@ def run_template_agent(history, conversation_id):
     except APIStatusError as error:
         raise ModelServiceError(f"大模型服务返回异常（状态码 {error.status_code}）。", 502) from error
     return "工具调用次数过多，已停止本次请求。"
+
+
+def run_template_agent(history, conversation_id):
+    return _run_skill_agent(TEMPLATE_SKILL, history, conversation_id)
+
+
+def run_storage_agent(history, conversation_id):
+    return _run_skill_agent(STORAGE_SKILL, history, conversation_id)
 
 
 def stream_agent(history, conversation_id, interaction_mode=None):
