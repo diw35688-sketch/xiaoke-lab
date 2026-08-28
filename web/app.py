@@ -100,7 +100,7 @@ def home(request: Request):
         '<script src="/static/storage.js?v=20260821"></script>'
         '<script src="/static/community.js?v=20260831"></script>'
         '<script src="/static/notifications.js?v=20260821"></script>'
-        '<script src="/static/composer.js?v=20260831-plus"></script>'
+        '<script src="/static/composer.js?v=20260901-no-cpmodes"></script>'
           '<script src="/static/voice_startup_ui.js?v=20260826"></script>'
           '<script src="/static/call_silero_vad.js?v=20260826-visible-progress"></script>'
         '<script src="/static/phone_call.js?v=20260827-clarification-card"></script>'
