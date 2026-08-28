@@ -11,7 +11,7 @@ from typing import Mapping
 
 from asr_application_service import ASRApplicationService
 from database.turn_store import TurnRequestConflictError, TurnStore, canonical_request_hash
-from src.core.conversation_turn import InteractionMode
+from src.core.conversation_turn import ExperimentContext, InteractionMode
 from src.core.turn_input import TurnInput
 from src.core.turn_request_envelope import TurnRequestEnvelope
 from src.core.turn_timing import TurnTimingRecorder
@@ -74,10 +74,12 @@ class TurnApplicationService:
     """Reserve, dispatch, atomically commit, and forget in-process Futures."""
 
     def __init__(self, *, store: TurnStore, chat_processor: TurnProcessor,
-                 experiment_processor: TurnProcessor, max_chat_workers: int = 4) -> None:
+                 experiment_processor: TurnProcessor, template_processor: TurnProcessor,
+                 max_chat_workers: int = 4) -> None:
         self.store = store
         self._chat_processor = chat_processor
         self._experiment_processor = experiment_processor
+        self._template_processor = template_processor
         self._chat_executor = ThreadPoolExecutor(
             max_workers=max_chat_workers, thread_name_prefix="turn-chat"
         )
@@ -212,8 +214,12 @@ class TurnApplicationService:
                           timing: TurnTimingRecorder, progress: TurnProgress):
         timing.mark("dispatch_started")
         progress.publish("dispatching")
-        processor = (self._chat_processor if turn.interaction_mode == InteractionMode.CHAT
-                     else self._experiment_processor)
+        if turn.interaction_mode == InteractionMode.CHAT:
+            processor = self._chat_processor
+        elif turn.experiment_context == ExperimentContext.TEMPLATE:
+            processor = self._template_processor
+        else:
+            processor = self._experiment_processor
         try:
             progress.publish("understanding")
             prepared: PreparedTurn = processor.prepare(turn, timing)

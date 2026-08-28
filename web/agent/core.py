@@ -206,6 +206,54 @@ def run_agent(history, conversation_id, interaction_mode=None):
     return "工具调用次数过多，已停止本次请求。"
 
 
+TEMPLATE_SKILL = """你是「模板制作助手」。用户要制作实验模板（试剂配方或实验方案）时，按照以下规范工作：
+1. 先明确模板类型：试剂配方（reagent_prep）还是实验方案（protocol）。
+2. 收集字段：名称、用途、目标浓度、体积、溶剂、保存条件、有效期、步骤。
+3. 如果用户提供 PDF/图片，你可以建议调用文档解析接口（MinerU/OCR）读取，再整理成规范结构。
+4. 步骤必须一行一步，可用“+”连接；每步尽量包含可量化参数。
+5. 生成后询问用户是否保存到本地试剂配置库/实验方案库；如果要发布到社区，提醒先保存到本地再通过社区页发布。
+6. 输出使用清晰、无 Markdown 的简洁中文；复杂内容可分点但保持结构化。
+"""
+
+
+def run_template_agent(history, conversation_id):
+    client = _client()
+    messages = [{"role": "system", "content": TEMPLATE_SKILL + "\n\n" + _memory_context()}] + list(history)
+    try:
+        for _ in range(20):
+            response = client.chat.completions.create(
+                model=settings_store.current().model_name, messages=messages,
+                tools=TOOLS, extra_body=_extra_body(),
+            )
+            assistant = response.choices[0].message
+            calls = assistant.tool_calls or []
+            if not calls:
+                return assistant.content or "模型没有返回文字内容。"
+            messages.append(assistant)
+            presentation_plans = []
+            for call in calls:
+                try:
+                    result, presentation_plan = _execute_tool(
+                        call.function.name, json.loads(call.function.arguments),
+                        conversation_id, "experiment",
+                    )
+                except Exception as error:
+                    result = {"error": str(error)}
+                    presentation_plan = None
+                messages.append({"role": "tool", "tool_call_id": call.id, "content": json.dumps(result, ensure_ascii=False)})
+                if presentation_plan is not None:
+                    presentation_plans.append(presentation_plan)
+            if presentation_plans:
+                return tool_reply_text(merge_tool_plans(presentation_plans))
+    except APITimeoutError as error:
+        raise ModelServiceError("大模型连接超时，请检查网络后重试。", 504) from error
+    except APIConnectionError as error:
+        raise ModelServiceError("无法连接大模型服务，请检查网络后重试。", 502) from error
+    except APIStatusError as error:
+        raise ModelServiceError(f"大模型服务返回异常（状态码 {error.status_code}）。", 502) from error
+    return "工具调用次数过多，已停止本次请求。"
+
+
 def stream_agent(history, conversation_id, interaction_mode=None):
     """逐段产出模型文字；遇到工具调用时先执行工具，再继续流式回答。"""
     client = _client()

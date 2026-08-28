@@ -17,7 +17,7 @@ from src.core.conversation_turn import ExperimentContext, InputSource, Interacti
 from src.core.turn_input import TurnInput
 from src.core.turn_request_envelope import TurnRequestEnvelope
 from turn_application_service import TurnApplicationService, TurnSubmission
-from turn_processors import ChatProcessor, ExperimentProcessor
+from turn_processors import ChatProcessor, ExperimentProcessor, TemplateProcessor
 from turn_stream_contract import (
     sse_event, turn_accepted_event, turn_error_event, turn_status_event,
 )
@@ -30,6 +30,7 @@ turn_application_service = TurnApplicationService(
     store=turn_store,
     chat_processor=ChatProcessor(),
     experiment_processor=ExperimentProcessor(turn_store),
+    template_processor=TemplateProcessor(),
 )
 
 _STATUS_TEXT = {

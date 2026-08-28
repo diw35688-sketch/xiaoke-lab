@@ -3,7 +3,8 @@
   var MODES = {
     chat: {interaction_mode: 'chat', experiment_context: 'none'},
     free: {interaction_mode: 'experiment', experiment_context: 'free'},
-    protocol: {interaction_mode: 'experiment', experiment_context: 'protocol'}
+    protocol: {interaction_mode: 'experiment', experiment_context: 'protocol'},
+    template: {interaction_mode: 'experiment', experiment_context: 'template'}
   };
   var SOURCES = ['text', 'single_recording', 'continuous_call'];
 
