@@ -25,6 +25,7 @@ _tunnel_process = None
 _public_url = None
 _stop_event = threading.Event()
 _tunnel_log: list[str] = []
+_tunnel_error: str | None = None
 
 
 def lan_url() -> str:
@@ -42,7 +43,7 @@ def _cloudflared_path() -> str | None:
 
 
 def _read_tunnel_output(process: subprocess.Popen) -> None:
-    global _public_url, _tunnel_log
+    global _public_url, _tunnel_log, _tunnel_error
     pattern = re.compile(r"https://[a-z0-9-]+\.trycloudflare\.com")
     try:
         for line in process.stdout:
@@ -53,11 +54,14 @@ def _read_tunnel_output(process: subprocess.Popen) -> None:
                 _tunnel_log.append(line)
                 if len(_tunnel_log) > 30:
                     _tunnel_log = _tunnel_log[-30:]
+                if "failed" in line.lower() or "error" in line.lower() or "x509" in line.lower():
+                    _tunnel_error = line
             match = pattern.search(line)
             if match:
                 _public_url = match.group(0)
-    except Exception:
-        pass
+                _tunnel_error = None
+    except Exception as error:
+        _tunnel_error = str(error)
 
 
 def stop_tunnel() -> None:
@@ -66,7 +70,7 @@ def stop_tunnel() -> None:
     with _lock:
         _mode = "lan"
         _public_url = None
-        _stop_event.set()
+        _tunnel_error = None
         if _tunnel_process is not None:
             try:
                 _tunnel_process.terminate()
@@ -80,20 +84,22 @@ def stop_tunnel() -> None:
 
 
 def start_tunnel() -> dict:
-    """启动 cloudflared 隧道，并等待公网 URL。"""
-    global _mode, _tunnel_process, _public_url, _stop_event
+    """启动 cloudflared 隧道；不阻塞请求，立即返回，由状态接口轮询公网地址。"""
+    global _mode, _tunnel_process, _public_url, _stop_event, _tunnel_error
     with _lock:
-        if _mode == "tunnel" and _tunnel_process is not None and _tunnel_process.poll() is None and _public_url:
-            return {"ok": True, "mode": "tunnel", "public_url": _public_url}
+        if _mode == "tunnel" and _tunnel_process is not None and _tunnel_process.poll() is None:
+            return status()
 
         stop_tunnel()
 
         binary = _cloudflared_path()
         if binary is None:
-            return {"ok": False, "error": "cloudflared 未就绪，请先确认项目 bin/cloudflared.exe 存在"}
+            _tunnel_error = "cloudflared 未就绪，请先确认项目 bin/cloudflared.exe 存在"
+            return {"ok": False, "error": _tunnel_error}
 
         _stop_event = threading.Event()
         _public_url = None
+        _tunnel_error = None
         _tunnel_process = subprocess.Popen(
             [binary, "tunnel", "--no-autoupdate", "--url", "http://127.0.0.1:8000"],
             stdout=subprocess.PIPE,
@@ -104,18 +110,7 @@ def start_tunnel() -> dict:
         )
         threading.Thread(target=_read_tunnel_output, args=(_tunnel_process,), daemon=True).start()
         _mode = "tunnel"
-
-        deadline = time.time() + 25
-        while time.time() < deadline:
-            if _public_url is not None:
-                return {"ok": True, "mode": "tunnel", "public_url": _public_url}
-            if _tunnel_process.poll() is not None:
-                break
-            time.sleep(0.2)
-
-        log_tail = "\n".join(_tunnel_log[-15:]) if _tunnel_log else "（无输出）"
-        stop_tunnel()
-        return {"ok": False, "error": "隧道启动失败，没有获得公网地址\n" + log_tail}
+        return status()
 
 
 def set_mode(mode: str) -> dict:
@@ -132,12 +127,24 @@ def set_mode(mode: str) -> dict:
 
 def status() -> dict:
     with _lock:
+        running = bool(
+            _tunnel_process is not None and _tunnel_process.poll() is None
+        )
+        mode = _mode
+        if mode == "tunnel" and running and not _public_url and not _tunnel_error:
+            state = "starting"
+        elif mode == "tunnel" and _public_url:
+            state = "running"
+        elif mode == "tunnel" and _tunnel_error:
+            state = "error"
+        else:
+            state = "lan"
         return {
-            "mode": _mode,
+            "mode": mode,
+            "state": state,
             "lan_url": lan_url(),
             "public_url": _public_url,
+            "error": _tunnel_error,
             "cloudflared_ready": _cloudflared_path() is not None,
-            "tunnel_running": bool(
-                _tunnel_process is not None and _tunnel_process.poll() is None
-            ),
+            "tunnel_running": running,
         }
