@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f4f6fb">
   <title>实验助手 · 流程卡片（移动端原型）</title>
-  <link rel="stylesheet" href="/static/mobile.css?v=20260817p">
+  <link rel="stylesheet" href="/static/mobile.css?v=20260901-chat">
 </head>
 <body>
   <div class="m-shell">
@@ -43,6 +43,12 @@
       听到：<b id="transcript-text"></b>
     </div>
 
+    <!-- 正式入口：选择实验方案（不藏在 DEV 面板里） -->
+    <div class="m-toolbar">
+      <span class="m-toolbar-label">实验：</span>
+      <select id="m-protocol-select" class="m-select"></select>
+    </div>
+
     <!-- 卡片舞台：一屏一张主 Card，由 mobile_cards.js 渲染 -->
     <section class="m-stage" id="stage" aria-live="polite">
       <!-- 小科的回复气泡：AI 完整回复显示于此，8 秒后淡出，点按可关闭 -->
@@ -55,6 +61,12 @@
       <button class="m-btn round" id="btn-prev" aria-label="上一步">‹</button>
       <button class="m-btn round" id="btn-next" aria-label="下一步">›</button>
     </nav>
+
+    <!-- 文字聊天：和小科打字对话，也可继续用语音 -->
+    <div class="m-chat-bar">
+      <input id="m-chat-input" type="text" placeholder="和小科打字聊天…" autocomplete="off" />
+      <button id="m-chat-send" class="m-btn primary" type="button">发送</button>
+    </div>
 
     <!-- DEV / MOCK 调试面板：只服务于开发验收，不是正式产品逻辑 -->
     <details class="m-dev">
@@ -99,7 +111,7 @@
     </details>
 
   </div>
-  <script src="/static/mobile_cards.js?v=20260817p"></script>
-  <script src="/static/mobile_voice.js?v=20260817p"></script>
+  <script src="/static/mobile_cards.js?v=20260901-chat"></script>
+  <script src="/static/mobile_voice.js?v=20260901-chat"></script>
 </body>
 </html>
