@@ -601,6 +601,34 @@ class TurnStore:
             )
         return tuple(str(row[0]) for row in rows)
 
+    def list_committed_turns(self, conversation_id: str) -> list[dict]:
+        """按时间顺序列出某个会话已提交的完整 Turn（含 result blocks）。"""
+        initialize_database()
+        with closing(self._connection_factory()) as connection:
+            rows = connection.execute(
+                "SELECT request_id, turn_id, status, result_json, timing_json, created_at "
+                "FROM turn_requests WHERE conversation_id=? AND status='committed' "
+                "ORDER BY created_at ASC",
+                (conversation_id,),
+            ).fetchall()
+        turns = []
+        for row in rows:
+            result = None
+            if row["result_json"]:
+                try:
+                    result = json.loads(row["result_json"])
+                except Exception:
+                    result = None
+            turns.append({
+                "request_id": row["request_id"],
+                "turn_id": row["turn_id"],
+                "status": row["status"],
+                "result": result,
+                "timings": json.loads(row["timing_json"] or "{}"),
+                "created_at": row["created_at"],
+            })
+        return turns
+
     def delete_conversation_turn_data(self, conversation_id: str) -> tuple[str, ...]:
         """Delete unified Turn-owned rows for a conversation, leaving unrelated tasks."""
 

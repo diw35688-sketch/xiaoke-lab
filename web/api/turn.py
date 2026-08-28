@@ -190,6 +190,12 @@ def _delete_audio_paths(paths):
     return {"audio_removed": removed, "audio_failures": failures}
 
 
+@router.get("/history")
+def turn_history(conversation_id: str):
+    """按会话读取已提交 Turn 的完整结构（含 think/tool/assistant 等块）。"""
+    return {"turns": turn_store.list_committed_turns(conversation_id)}
+
+
 @router.delete("/conversations/{conversation_id}")
 def delete_conversation_turn_data(conversation_id: str):
     paths = turn_store.delete_conversation_turn_data(conversation_id)

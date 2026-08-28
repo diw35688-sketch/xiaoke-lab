@@ -170,11 +170,70 @@
     add(WELCOME_TEXT, 'assistant');
   }
 
+  function renderTurnHistory(result) {
+    const turnData = result?.turn || result || {};
+    const blocks = turnData.blocks || result?.blocks || [];
+    let reply = null;
+    blocks.forEach(block => {
+      const payload = block.payload || {};
+      if (block.type === 'user_text') {
+        add(payload.text || '', 'user');
+        return;
+      }
+      if (block.type === 'assistant_text') {
+        if (!reply) reply = add(payload.text || '', 'assistant');
+        else if (reply.parentElement) reply.textContent = payload.text || '';
+        return;
+      }
+      if (block.type === 'system_status' && payload.kind === 'think') {
+        if (!reply) reply = add('', 'assistant');
+        activeThinkRow = null;
+        ensureThinkRow(reply);
+        updateThink(reply, payload.text || '', Boolean(payload.running));
+        activeThinkRow = null;
+        return;
+      }
+      if (block.type === 'tool_card') {
+        if (!reply) reply = add('', 'assistant');
+        ensureToolRow(block, reply);
+        return;
+      }
+      if (block.type !== 'user_text') {
+        if (!reply) reply = add('', 'assistant');
+        ensureCardRow(block, reply);
+      }
+    });
+    if (reply && reply.parentElement && !reply.textContent.trim()) {
+      // 只有工具/思考卡片的回合保留空白气泡不太好，但保留结构可读
+    }
+  }
+
   function loadHistory(conversationId) {
     if (localStorage.getItem(freshChatKey)) {
       localStorage.removeItem(freshChatKey);
       return;
     }
+    const id = conversationId || localStorage.getItem(conversationKey);
+    if (id) {
+      fetch(`/turn/history?conversation_id=${encodeURIComponent(id)}`).then(response => {
+        if (!response.ok) throw new Error('读取 Turn 历史失败');
+        return response.json();
+      }).then(data => {
+        const turns = data.turns || [];
+        if (!turns.length) return loadFlatHistory(id);
+        chat.textContent = '';
+        add(WELCOME_TEXT, 'assistant');
+        activeThinkRow = null;
+        blockRows = {};
+        turns.forEach((turn) => renderTurnHistory(turn.result));
+        chat.scrollTop = chat.scrollHeight;
+      }).catch(() => loadFlatHistory(id));
+    } else {
+      loadFlatHistory(null);
+    }
+  }
+
+  function loadFlatHistory(conversationId) {
     const id = conversationId || localStorage.getItem(conversationKey);
     const url = id
       ? `/chat/history?conversation_id=${encodeURIComponent(id)}`
@@ -188,16 +247,15 @@
         document.dispatchEvent(new CustomEvent('conversation-changed'));
       }
       const messages = data.messages || [];
-      if (!messages.length) return;   // 没有历史时保留初始欢迎语
+      if (!messages.length) return;
       chat.textContent = '';
+      add(WELCOME_TEXT, 'assistant');
       messages.forEach(item => {
-          const clean = String(item.content || '').replace(/\[\[LABTHINK\]\]|\[\[LABCARD\]\]/g, '');
-          add(clean, item.role === 'user' ? 'user' : 'assistant');
-        });
+        const clean = String(item.content || '').replace(/\[\[LABTHINK\]\]|\[\[LABCARD\]\]/g, '');
+        add(clean, item.role === 'user' ? 'user' : 'assistant');
+      });
       chat.scrollTop = chat.scrollHeight;
-    }).catch(() => {
-      /* 服务端没有历史或接口失败时，保留当前欢迎语即可。 */
-    });
+    }).catch(() => {});
   }
 
   window.switchConversation = function (id) {
