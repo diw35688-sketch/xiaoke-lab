@@ -13,19 +13,9 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 router = APIRouter(prefix="/api", tags=["文件"])
 
-ALLOWED_SUFFIXES = {
-    ".txt", ".md", ".json", ".csv", ".py", ".js", ".html", ".xml", ".yaml", ".yml",
-    ".pdf", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".doc", ".docx", ".ppt", ".pptx",
-    ".xls", ".xlsx", ".csv", ".log",
-}
-
-
 def safe_upload_path(filename: str) -> tuple[Path, str]:
     path = Path(filename or "upload")
     name = path.name
-    suffix = Path(name).suffix.lower()
-    if suffix not in ALLOWED_SUFFIXES:
-        raise HTTPException(status_code=400, detail=f"不支持的文件类型：{suffix or '无扩展名'}")
     file_id = uuid.uuid4().hex[:16]
     stored = UPLOAD_DIR / f"{file_id}_{name}"
     return stored, file_id

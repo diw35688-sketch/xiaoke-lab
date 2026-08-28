@@ -52,9 +52,11 @@
   var HTML = [
     '<div id="cp-card">',
     '  <div id="cp-icons">',
-    '    <button class="cp-icon" id="cp-file" title="上传文件（PDF/图片/文本/代码）">🗎</button>',
+    '    <button class="cp-icon" id="cp-file" title="上传任意文件（+）">＋</button>',
     '    <input type="file" id="cp-file-input" style="display:none" />',
     '    <button class="cp-icon" id="cp-mic" title="单次录音：是否保存由当前模式决定">◉</button>',
+    '    <button class="cp-icon" id="cp-phone-call" title="通话/连续通话">📞</button>',
+    '    <button class="cp-icon" id="cp-phone" title="手机端">📱</button>',
     '    <span class="cp-chip plain" id="cp-hint">单次录音</span>',
     '  </div>',
     '  <textarea id="cp-text" rows="1" placeholder="给实验助手发消息，或按住麦克风口述"></textarea>',
@@ -265,6 +267,10 @@
       if (!real || real.disabled) return;
       real.click();
     };
+    var phoneCallBtn = el('cp-phone-call');
+    if (phoneCallBtn) phoneCallBtn.onclick = function () { window.phoneCallToggle?.(); };
+    var phoneBtn = el('cp-phone');
+    if (phoneBtn) phoneBtn.onclick = function () { window.open('/phone', '_blank'); };
 
     // 模型：直接进入模型设置页（选择模型/API/供应商）
     el('cp-model').onclick = function (e) {

@@ -67,12 +67,7 @@ def home(request: Request):
     page = page.replace('/static/inworld_tts.js', '/static/local_tts.js?v=20260826-shared-warmup')
     page = page.replace('</head>', '<link rel="stylesheet" href="/static/theme.css"></head>')
     # 注入模型设置面板（任何人都能在网页里配置模型）
-    page = page.replace('</body>', ('<script src="/static/settings.js?v=20260829"></script>'
-                                   '<script src="/static/tts_settings.js"></script>'
-                                   '<script src="/static/speak.js?v=20260820"></script>'
-                                   '<script src="/static/interaction_mode_state.js?v=20260829-storage"></script>'
-                                   '<script src="/static/turn_client.js?v=20260827-timing"></script>'
-        '<script src="/static/voice_asr.js?v=20260827-clarification-card"></script>'
+    page = page.replace('</body>', ('<script src="/static/voice_asr.js?v=20260827-clarification-card"></script>'
                                    '</body>'))
     scripts = (
         '<script src="/static/experiment_confirmation.js"></script>'
@@ -86,6 +81,8 @@ def home(request: Request):
         '<script src="/static/conversation_block_view.js?v=20260827-clarification-card"></script>'
         '<script src="/static/turn_reply_surface.js?v=20260827-progress-cleanup"></script>'
         '<script src="/static/conversation_context_blocks.js?v=20260825"></script>'
+        '<script src="/static/interaction_mode_state.js?v=20260829-storage"></script>'
+        '<script src="/static/turn_client.js?v=20260827-timing"></script>'
         '<script src="/static/streaming_chat_v2.js?v=20260830-mode-jump"></script>'
         '<script src="/static/template_planner.js"></script>'
         '<script src="/static/task_panel.js"></script>'
@@ -94,13 +91,16 @@ def home(request: Request):
         '<script src="/static/run_canvas.js"></script>'
         '<script src="/static/step_cards.js?v=20260827-restore"></script>'
         '<script src="/static/record_ledger_view.js?v=20260827-deviation-values"></script>'
+        '<script src="/static/settings.js?v=20260829"></script>'
+        '<script src="/static/tts_settings.js"></script>'
+        '<script src="/static/speak.js?v=20260820"></script>'
         '<script src="/static/views.js?v=20260827-unified-ledger"></script>'
         '<script src="/static/protocol_editor.js"></script>'
         '<script src="/static/reagent_prep.js?v=20260820"></script>'
         '<script src="/static/storage.js?v=20260821"></script>'
         '<script src="/static/community.js?v=20260831"></script>'
         '<script src="/static/notifications.js?v=20260821"></script>'
-        '<script src="/static/composer.js?v=20260830-model-fix"></script>'
+        '<script src="/static/composer.js?v=20260831-plus"></script>'
           '<script src="/static/voice_startup_ui.js?v=20260826"></script>'
           '<script src="/static/call_silero_vad.js?v=20260826-visible-progress"></script>'
         '<script src="/static/phone_call.js?v=20260827-clarification-card"></script>'
