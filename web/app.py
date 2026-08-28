@@ -82,7 +82,7 @@ def home(request: Request):
         '<script src="/static/protocol_editor.js"></script>'
         '<script src="/static/reagent_prep.js?v=20260820"></script>'
         '<script src="/static/storage.js?v=20260821"></script>'
-        '<script src="/static/community.js?v=20260829"></script>'
+        '<script src="/static/community.js?v=20260830"></script>'
         '<script src="/static/notifications.js?v=20260821"></script>'
         '<script src="/static/composer.js?v=20260816"></script>'
           '<script src="/static/phone_call.js"></script>'

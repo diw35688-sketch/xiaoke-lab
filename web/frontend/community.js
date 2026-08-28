@@ -2,6 +2,7 @@
 (function () {
   var REMOTE_BASE = localStorage.getItem('community_remote_base') || 'http://124.221.234.222:3000/api';
   var host, listEl, token = localStorage.getItem('community_remote_token') || '';
+  var currentUser = null;
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -32,11 +33,17 @@
       return;
     }
     api('/auth/me').then(function (res) {
-      if (!res.ok) { token = ''; localStorage.removeItem('community_remote_token'); userLabel(); return; }
-      box.innerHTML = '<span style="font-size:13px;color:#334155">' + esc(res.d.user.username) + '</span> '
+      if (!res.ok) { token = ''; localStorage.removeItem('community_remote_token'); currentUser = null; userLabel(); return; }
+      currentUser = res.d.user;
+      box.innerHTML = '<span style="font-size:13px;color:#334155">' + esc(res.d.user.username || '') + (res.d.user.role === 'admin' ? ' 👑' : '') + '</span> '
         + '<button class="sh-btn" id="com-logout">退出</button>';
+      var adminBtn = host.querySelector('#com-admin-btn');
+      if (adminBtn) adminBtn.style.display = res.d.user.role === 'admin' ? '' : 'none';
       box.querySelector('#com-logout').onclick = function () {
-        token = ''; localStorage.removeItem('community_remote_token'); userLabel(); load();
+        token = ''; localStorage.removeItem('community_remote_token'); currentUser = null;
+        var adminBtn = host.querySelector('#com-admin-btn');
+        if (adminBtn) adminBtn.style.display = 'none';
+        userLabel(); load();
       };
     });
   }
@@ -204,6 +211,44 @@
     });
   }
 
+  function showAdmin() {
+    if (!currentUser || currentUser.role !== 'admin') { alert('需要管理员权限'); return; }
+    api('/admin/entries').then(function (res) {
+      if (!res.ok) { alert(res.d.detail || '加载失败'); return; }
+      var items = res.d.items || [];
+      listEl.innerHTML = items.map(function (item) {
+        var statusLabel = item.status === 'published' ? '<span style="color:#15803d">已发布</span>' : (item.status === 'rejected' ? '<span style="color:#b91c1c">已拒绝</span>' : '<span style="color:#b45309">待审核</span>');
+        var c = item.content || {};
+        var desc = c.purpose || (c.summary || ((c.steps || []).length + ' 个步骤') || '');
+        return '<div class="com-card" data-id="' + item.id + '">'
+          + '<div class="com-card-head">' + kindBadge(item.kind) + statusLabel + '</div>'
+          + '<div class="com-card-title">' + esc(item.title) + ' <span style="font-size:11px;color:#94a3b8">@' + esc(item.author || '') + '</span></div>'
+          + '<div class="com-card-desc">' + esc(desc) + '</div>'
+          + '<div class="com-card-actions">'
+          + (item.status !== 'published' ? '<button class="sh-btn primary" data-approve="' + item.id + '">通过</button>' : '<button class="sh-btn" data-reject="' + item.id + '">下架</button>')
+          + '<button class="sh-btn" data-del="' + item.id + '" style="color:#b91c1c">删除</button>'
+          + '</div>'
+          + '</div>';
+      }).join('') || '<div class="com-empty">没有待审核/全部内容</div>';
+      Array.prototype.forEach.call(listEl.querySelectorAll('[data-approve]'), function (btn) {
+        btn.onclick = function () {
+          api('/admin/entries/' + btn.getAttribute('data-approve') + '/approve', { method: 'POST', body: '{}' }).then(function () { showAdmin(); });
+        };
+      });
+      Array.prototype.forEach.call(listEl.querySelectorAll('[data-reject]'), function (btn) {
+        btn.onclick = function () {
+          api('/admin/entries/' + btn.getAttribute('data-reject') + '/reject', { method: 'POST', body: '{}' }).then(function () { showAdmin(); });
+        };
+      });
+      Array.prototype.forEach.call(listEl.querySelectorAll('[data-del]'), function (btn) {
+        btn.onclick = function () {
+          if (!confirm('确定删除？')) return;
+          api('/community/' + btn.getAttribute('data-del'), { method: 'DELETE' }).then(function () { showAdmin(); });
+        };
+      });
+    });
+  }
+
   function ensureStyles() {
     if (document.getElementById('community-style')) return;
     var style = document.createElement('style');
@@ -237,6 +282,7 @@
       + '<input id="com-search" type="search" placeholder="搜索标题 / 作者 / 标签…">'
       + '<select id="com-kind"><option value="">全部类型</option><option value="reagent_prep">试剂配方</option><option value="protocol">实验方案</option></select>'
       + '<button class="sh-btn" id="com-publish">发布到社区</button>'
+      + '<button class="sh-btn" id="com-admin-btn" style="display:none">管理审核</button>'
       + '<span id="com-user-box" style="margin-left:auto;display:flex;align-items:center;gap:6px"></span>'
       + '</div><div id="com-auth-box" style="display:none;margin-bottom:10px"></div><div id="com-list"></div>';
     listEl = host.querySelector('#com-list');
@@ -248,6 +294,7 @@
       if (!token) { openAuth(); return; }
       publishForm();
     };
+    host.querySelector('#com-admin-btn').onclick = showAdmin;
     fetch('/settings').then(function (r) { return r.json(); }).then(function (d) {
       if (d && d.settings && d.settings.community_base_url) {
         REMOTE_BASE = String(d.settings.community_base_url).replace(/\/+$/, '');
