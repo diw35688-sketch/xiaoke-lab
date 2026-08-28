@@ -97,6 +97,7 @@ class ModelSettings:
     ocr_base_url: str = "https://api.llm.ustc.edu.cn/v1"
     ocr_api_key: str = ""
     ocr_model: str = "unlimited-ocr"
+    community_base_url: str = "http://124.221.234.222:3000/api"
 
     def masked(self) -> dict:
         """给前端看的版本：密钥掩码，永不回传明文。"""
@@ -209,6 +210,7 @@ def current() -> ModelSettings:
                     ocr_base_url=raw.get("ocr_base_url", "https://api.llm.ustc.edu.cn/v1"),
                     ocr_api_key=raw.get("ocr_api_key", ""),
                     ocr_model=raw.get("ocr_model", "unlimited-ocr"),
+                    community_base_url=raw.get("community_base_url", "http://124.221.234.222:3000/api"),
                 )
             except (json.JSONDecodeError, OSError):
                 _cache = _from_env()
@@ -224,7 +226,8 @@ def update(**changes) -> ModelSettings:
         settings = current()
         for name in ("base_url", "model_name", "tts_url",
                      "tts_provider", "tts_base_url", "tts_model", "tts_voice",
-                     "mineru_file_parse_url", "ocr_base_url", "ocr_model"):
+                     "mineru_file_parse_url", "ocr_base_url", "ocr_model",
+                     "community_base_url"):
             if name in changes and changes[name] is not None:
                 setattr(settings, name, str(changes[name]).strip())
         if "tts_enabled" in changes and changes["tts_enabled"] is not None:
