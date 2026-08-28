@@ -175,9 +175,45 @@
       '.nco-card:hover{box-shadow:0 6px 18px rgba(15,23,42,.08);transform:translateY(-2px)}',
       '.nco-ic{font-size:20px}',
       '.nco-title{font-weight:700;color:#0f172a;margin:4px 0 2px;font-size:14px}',
-      '.nco-desc{color:#64748b;font-size:12px;line-height:1.5}'
+      '.nco-desc{color:#64748b;font-size:12px;line-height:1.5}',
+      '.mode-intro{background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:12px 15px;margin:6px 0 12px}',
+      '.mi-title{font-weight:700;color:#0f172a;font-size:14px}',
+      '.mi-desc{color:#64748b;font-size:12px;line-height:1.6;margin:4px 0 8px}',
+      '.mi-actions{display:flex;gap:6px;flex-wrap:wrap}',
+      '.mi-btn{padding:5px 10px;border:1px solid #cbd5e1;background:#fff;border-radius:8px;cursor:pointer;font-size:12px;font-family:inherit}',
+      '.mi-btn.primary{background:#2563eb;border-color:#2563eb;color:#fff}',
+      '.mi-btn.ghost{background:#f8fafc}'
     ].join('\n');
     document.head.appendChild(style);
+  }
+
+  function openMode(mode) {
+    window.interactionModeState.select(mode === 'free' ? 'free' : mode);
+    var opt = chat.querySelector('.new-chat-options');
+    if (opt) opt.remove();
+    var intro = chat.querySelector('.mode-intro');
+    if (intro) intro.remove();
+    var div = document.createElement('div');
+    div.className = 'mode-intro';
+    if (mode === 'free') {
+      div.innerHTML = '<div class="mi-title">🧪 自由模式已开启</div>'
+        + '<div class="mi-desc">可以自由聊天、记录实验，不绑定方案。说一句即可开始。</div>';
+    } else if (mode === 'template') {
+      div.innerHTML = '<div class="mi-title">📄 制作模板模式已开启</div>'
+        + '<div class="mi-desc">我具备模板制作技能：可以读取你上传的 PDF/图片/文本，走 MinerU/OCR 识别，并按规范整理成试剂配方或实验方案模板。</div>'
+        + '<div class="mi-actions"><button class="mi-btn" id="mi-upload">上传文件</button><button class="mi-btn ghost" id="mi-goto-prep">去试剂配置库</button></div>';
+      div.querySelector('#mi-upload').onclick = function () { document.getElementById('cp-file')?.click(); };
+      div.querySelector('#mi-goto-prep').onclick = function () { if (window.shellShow) window.shellShow('reagent_prep'); };
+    } else if (mode === 'storage') {
+      div.innerHTML = '<div class="mi-title">🗃 制作储存库模式已开启</div>'
+        + '<div class="mi-desc">我可以帮你登记存储位置（冰箱/冰柜/试剂柜）、物品、库存数量、有效期，并调用储存库工具。也可以去储存库页面可视化编辑。</div>'
+        + '<div class="mi-actions"><button class="mi-btn primary" id="mi-goto-storage">去储存库页面</button></div>';
+      div.querySelector('#mi-goto-storage').onclick = function () { if (window.shellShow) window.shellShow('storage'); };
+    }
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+    var input = document.getElementById('message');
+    if (input) input.focus();
   }
 
   function showNewChatOptions() {
@@ -192,11 +228,7 @@
     ].join('');
     Array.prototype.forEach.call(wrap.querySelectorAll('.nco-card'), function (card) {
       card.onclick = function () {
-        var mode = card.getAttribute('data-mode');
-        window.interactionModeState.select(mode === 'free' ? 'free' : mode);
-        wrap.remove();
-        var input = document.getElementById('message');
-        if (input) input.focus();
+        openMode(card.getAttribute('data-mode'));
       };
     });
     chat.appendChild(wrap);
