@@ -241,6 +241,7 @@ class ExperimentProcessor:
             )
 
         timing.mark("understanding_started")
+        timing.mark("llm_started")
         observation = self._observer().observe(
             request_id=turn.request_id,
             session_id=turn.lab_session_id,
@@ -250,6 +251,7 @@ class ExperimentProcessor:
             reply_coordinator=coordinator,
             recent_context=context.as_prompt_context(),
         )
+        timing.mark("llm_completed")
         timing.mark("understanding_completed")
         if observation.status != UnifiedObservationStatus.OBSERVED:
             raise RuntimeError(f"统一理解失败：{observation.error_type}")
