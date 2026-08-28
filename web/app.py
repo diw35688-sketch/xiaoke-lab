@@ -64,6 +64,12 @@ def _is_mobile(user_agent: str) -> bool:
 def home(request: Request):
     if _is_mobile(request.headers.get("user-agent", "")):
         return HTMLResponse((BASE_DIR / "frontend" / "mobile.html").read_text(encoding="utf-8"))
+    # 公网隧道默认打开移动端流程卡片，方便手机/外部访问
+    try:
+        if network_mode.status().get("mode") == "tunnel":
+            return HTMLResponse((BASE_DIR / "frontend" / "mobile.html").read_text(encoding="utf-8"))
+    except Exception:
+        pass
     page = (BASE_DIR / "frontend" / "index.html").read_text(encoding="utf-8")
     page = page.replace('/static/inworld_tts.js', '/static/local_tts.js?v=20260826-shared-warmup')
     page = page.replace('</head>', '<link rel="stylesheet" href="/static/theme.css"></head>')
