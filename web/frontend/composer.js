@@ -102,6 +102,7 @@
     var box = el('cp-text');
     var text = box.value.trim();
     if (!text) return;
+    if (window.logAction) window.logAction('composer_send', { text: text.slice(0, 80), inputSource: (options && options.inputSource) || 'text' });
     var input = document.querySelector('#message');
     var form = document.querySelector('#form');
     if (!input || !form) return;
@@ -223,6 +224,7 @@
         }).then(function (res) {
           fileBtn.textContent = '＋';
           if (!res.ok) { alert(res.d.detail || '上传失败'); return; }
+          if (window.logAction) window.logAction('file_upload', { name: res.d.name, size: res.d.size });
           if (typeof window.addChatMessage === 'function') {
             window.addChatMessage('已上传文件：' + res.d.name + '（file_id=' + res.d.file_id + '）', 'user');
           }
@@ -259,13 +261,14 @@
       real.click();
     };
     var phoneCallBtn = el('cp-phone-call');
-    if (phoneCallBtn) phoneCallBtn.onclick = function () { window.phoneCallToggle?.(); };
+    if (phoneCallBtn) phoneCallBtn.onclick = function () { if (window.logAction) window.logAction('phone_call_toggle'); window.phoneCallToggle?.(); };
     var phoneBtn = el('cp-phone');
-    if (phoneBtn) phoneBtn.onclick = function () { window.open('/phone', '_blank'); };
+    if (phoneBtn) phoneBtn.onclick = function () { if (window.logAction) window.logAction('open_phone_page'); window.open('/phone', '_blank'); };
 
     // 模型：直接进入模型设置页（选择模型/API/供应商）
     el('cp-model').onclick = function (e) {
       e.stopPropagation();
+      if (window.logAction) window.logAction('open_settings');
       if (window.shellShow) window.shellShow('settings');
     };
     document.addEventListener('click', function () { el('cp-pop').classList.remove('on'); });

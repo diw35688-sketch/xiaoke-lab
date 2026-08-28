@@ -1,4 +1,5 @@
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -19,6 +20,7 @@ from api.memories import router as memories_router
 from api.network import router as network_router
 from api.files import router as files_router
 from api.logs import router as logs_router
+from api.telemetry import router as telemetry_router
 from api.notifications import router as notifications_router
 from api.protocols import router as protocols_router
 from api.reagent_prep import router as reagent_prep_router
@@ -39,6 +41,29 @@ from tasks.task_manager import task_manager
 
 app = FastAPI(title="实验助手 API", version="1.2.0")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "frontend"), name="static")
+
+
+@app.middleware("http")
+async def request_debug_log(request: Request, call_next):
+    start = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception as exc:
+        print(
+            f"[REQ] {time.strftime('%Y-%m-%d %H:%M:%S')} "
+            f"{request.method} {request.url.path} status=500 duration=?"
+            f" error={type(exc).__name__} {exc}",
+            flush=True,
+        )
+        raise
+    duration = (time.perf_counter() - start) * 1000
+    print(
+        f"[REQ] {time.strftime('%Y-%m-%d %H:%M:%S')} "
+        f"{request.method} {request.url.path} status={response.status_code} "
+        f"duration={duration:.0f}ms",
+        flush=True,
+    )
+    return response
 
 
 @app.on_event("startup")
@@ -78,6 +103,7 @@ def home(request: Request):
     page = page.replace('</body>', ('<script src="/static/voice_asr.js?v=20260827-clarification-card"></script>'
                                    '</body>'))
     scripts = (
+        '<script src="/static/debug_log.js?v=20260901"></script>'
         '<script src="/static/experiment_confirmation.js"></script>'
         '<script src="/static/experiment_status.js"></script>'
         '<script src="/static/history_panel.js"></script>'
@@ -91,10 +117,10 @@ def home(request: Request):
         '<script src="/static/conversation_context_blocks.js?v=20260825"></script>'
         '<script src="/static/interaction_mode_state.js?v=20260829-storage"></script>'
         '<script src="/static/turn_client.js?v=20260827-timing"></script>'
-        '<script src="/static/streaming_chat_v2.js?v=20260830-mode-jump"></script>'
+        '<script src="/static/streaming_chat_v2.js?v=20260901-telemetry"></script>'
         '<script src="/static/template_planner.js"></script>'
         '<script src="/static/task_panel.js"></script>'
-        '<script src="/static/shell.js?v=20260825-one-mic"></script>'
+        '<script src="/static/shell.js?v=20260901-telemetry"></script>'
         '<script src="/static/conversation_list.js?v=20260818"></script>'
         '<script src="/static/run_canvas.js"></script>'
         '<script src="/static/step_cards.js?v=20260827-restore"></script>'
@@ -106,9 +132,9 @@ def home(request: Request):
         '<script src="/static/protocol_editor.js"></script>'
         '<script src="/static/reagent_prep.js?v=20260820"></script>'
         '<script src="/static/storage.js?v=20260821"></script>'
-        '<script src="/static/community.js?v=20260901-proxy"></script>'
+        '<script src="/static/community.js?v=20260901-telemetry"></script>'
         '<script src="/static/notifications.js?v=20260821"></script>'
-        '<script src="/static/composer.js?v=20260901-no-cpmodes"></script>'
+        '<script src="/static/composer.js?v=20260901-telemetry"></script>'
           '<script src="/static/voice_startup_ui.js?v=20260826"></script>'
           '<script src="/static/call_silero_vad.js?v=20260826-visible-progress"></script>'
         '<script src="/static/phone_call.js?v=20260827-clarification-card"></script>'
@@ -210,6 +236,7 @@ app.include_router(memories_router)
 app.include_router(network_router)
 app.include_router(files_router)
 app.include_router(logs_router)
+app.include_router(telemetry_router)
 app.include_router(notifications_router)
 app.include_router(templates_router)
 app.include_router(tasks_router)
