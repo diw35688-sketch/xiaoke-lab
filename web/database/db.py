@@ -1,4 +1,6 @@
 import sqlite3
+from contextlib import closing
+
 from config import DATABASE_PATH
 
 
@@ -6,6 +8,7 @@ def get_connection():
     connection = sqlite3.connect(DATABASE_PATH, timeout=5)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA busy_timeout=5000")
+    connection.execute("PRAGMA foreign_keys = ON")
     return connection
 
 
@@ -16,7 +19,7 @@ def _ensure_column(connection, table, name, definition):
 
 
 def initialize_database():
-    with get_connection() as connection:
+    with closing(get_connection()) as connection, connection:
         connection.execute("PRAGMA journal_mode=WAL")
         connection.execute("""CREATE TABLE IF NOT EXISTS experiments (
             id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
@@ -139,3 +142,73 @@ def initialize_database():
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
         connection.execute("CREATE INDEX IF NOT EXISTS idx_community_kind ON community_entries(kind)")
+        _ensure_column(connection, "lab_records", "request_id", "TEXT")
+        _ensure_column(connection, "lab_records", "conversation_id", "TEXT")
+        _ensure_column(connection, "lab_records", "turn_id", "TEXT")
+        _ensure_column(connection, "messages", "request_id", "TEXT")
+        _ensure_column(connection, "messages", "turn_id", "TEXT")
+        _ensure_column(connection, "messages", "block_id", "TEXT")
+        connection.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS ux_lab_records_request_id "
+            "ON lab_records(request_id) WHERE request_id IS NOT NULL"
+        )
+        connection.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS ux_messages_request_role "
+            "ON messages(request_id, role) WHERE request_id IS NOT NULL"
+        )
+        connection.execute("""CREATE TABLE IF NOT EXISTS turn_requests (
+            request_id TEXT PRIMARY KEY,
+            turn_id TEXT NOT NULL UNIQUE,
+            conversation_id TEXT NOT NULL,
+            lab_session_id TEXT,
+            interaction_mode TEXT NOT NULL,
+            experiment_context TEXT NOT NULL,
+            mode_version INTEGER NOT NULL,
+            input_source TEXT NOT NULL,
+            raw_text TEXT,
+            request_hash TEXT NOT NULL,
+            status TEXT NOT NULL CHECK(status IN ('processing','committed','failed')),
+            attempt INTEGER NOT NULL DEFAULT 1,
+            result_json TEXT,
+            timing_json TEXT NOT NULL DEFAULT '{}',
+            error_code TEXT,
+            error_detail TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            committed_at TEXT,
+            FOREIGN KEY(conversation_id) REFERENCES conversations(id))""")
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_turn_requests_conversation "
+            "ON turn_requests(conversation_id, created_at)"
+        )
+        connection.execute("""CREATE TABLE IF NOT EXISTS asr_evidence (
+            request_id TEXT PRIMARY KEY,
+            payload_json TEXT NOT NULL,
+            audio_rel_path TEXT NOT NULL,
+            audio_sha256 TEXT NOT NULL,
+            audio_bytes INTEGER NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(request_id) REFERENCES turn_requests(request_id) ON DELETE CASCADE)""")
+        connection.execute("""CREATE TABLE IF NOT EXISTS experiment_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            request_id TEXT NOT NULL,
+            event_index INTEGER NOT NULL,
+            event_json TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            UNIQUE(request_id, event_index),
+            FOREIGN KEY(request_id) REFERENCES turn_requests(request_id) ON DELETE CASCADE)""")
+        connection.execute("""CREATE TABLE IF NOT EXISTS experiment_session_state (
+            conversation_id TEXT NOT NULL,
+            lab_session_id TEXT NOT NULL,
+            revision INTEGER NOT NULL,
+            reply_coordinator_json TEXT NOT NULL,
+            session_context_json TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY(conversation_id, lab_session_id),
+            FOREIGN KEY(conversation_id) REFERENCES conversations(id))""")
+        _ensure_column(
+            connection,
+            "experiment_session_state",
+            "protocol_step_facts_json",
+            "TEXT NOT NULL DEFAULT '{}'",
+        )

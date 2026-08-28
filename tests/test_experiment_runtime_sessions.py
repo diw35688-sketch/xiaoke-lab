@@ -225,6 +225,29 @@ class ExperimentRuntimeSessionRegistryTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     self.registry.session(conversation_id, lab_session_id)
 
+    def test_operation_must_be_callable(self):
+        runtime = self.registry.session("conversation-a", "lab-1")
+
+        with self.assertRaisesRegex(TypeError, "可调用"):
+            runtime.submit(_request(), "not-callable")
+
+    def test_pending_count_tracks_only_incomplete_work(self):
+        runtime = self.registry.session("conversation-a", "lab-1")
+        started = threading.Event()
+        release = threading.Event()
+
+        def blocking(coordinator, context):
+            started.set()
+            self.assertTrue(release.wait(timeout=1))
+
+        self.assertEqual(runtime.pending_count(), 0)
+        submission = runtime.submit(_request(), blocking)
+        self.assertTrue(started.wait(timeout=1))
+        self.assertEqual(runtime.pending_count(), 1)
+        release.set()
+        submission.future.result(timeout=1)
+        self.assertEqual(runtime.pending_count(), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

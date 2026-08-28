@@ -6,6 +6,7 @@ from dataclasses import dataclass, fields
 
 from src.core.protocol import ProtocolError, ProtocolStep
 from src.llm.schemas import ExperimentEntities
+from src.core.protocol_value_equivalence import protocol_values_equivalent
 
 
 @dataclass(frozen=True)
@@ -19,7 +20,7 @@ def detect_protocol_deviations(
     step: ProtocolStep,
     actual_entities: ExperimentEntities,
 ) -> tuple[ProtocolDeviation, ...]:
-    """返回现场值与方案值字符串不完全相等的字段；不做单位/数值归一化。
+    """返回通用归一化和步骤专属别名比较后仍不相等的字段。
 
     检查范围是**所有带方案目标值的字段**，而不只是 ``must_record``。
     偏差最常发生在方案已规定的参数上（例如方案写 0.1000 mol/L、学生用了
@@ -44,7 +45,12 @@ def detect_protocol_deviations(
             continue
         if isinstance(actual_value, str) and not actual_value.strip():
             continue
-        if actual_value != protocol_value:
+        if not protocol_values_equivalent(
+            field_name,
+            protocol_value,
+            actual_value,
+            aliases=step.value_aliases.get(field_name, ()),
+        ):
             deviations.append(
                 ProtocolDeviation(field_name, protocol_value, actual_value)
             )

@@ -4130,3 +4130,81 @@ PC 零改动；语音口述仍自动记录数据（不受影响）；未提交�
   真正写库前仍走 `ReagentPrep.from_dict` / `ProtocolStore._parse_protocol` 的严格校验。
   生成和校验分离，模型不会破坏数据库。
 - **验收**：新增 2 项测试；全量 `Ran 768 tests ... OK`。
+## 2026-08-26：受控测试要”真链 + 假叶子”，而验收门会反过来约束假叶子的形态
+
+### 知识点：受控测试的分层与验收门对 Fake 的约束
+
+- **白话解释**：想验证“系统真的能观察”、又不想真花 LLM 的钱，怎么办？把“编排链”用真的（分派、采用、澄清规划都是真代码），只把最贵的叶子依赖（LLM 调用）换成假的。但假的必须“够像”——如果它给出的答案缺胳膊少腿，后面的验收门会当场拒绝，测试就崩了。
+
+- **最小知识块**：
+  1. 先讲“依赖注入”：`UnifiedObserver` 的构造是 `UnifiedObserver(UnifiedAcceptanceBypass(UnifiedUnderstandingRouter(处理器)))`，处理器是可替换的接口——所以测试塞 Fake，生产塞真实 LLM。
+  2. 再讲“受控测试”：把外部不可控依赖（LLM/网络）换成确定性 Fake，其余编排逻辑用真代码，既验证真实链路、又不触网。
+  3. 再讲“验收门”：`ExperimentCandidateAcceptor.accept` 是采用前的校验，要求 `analysis.events` 非空，且每个 `event.raw_text / source_session_id / source_segment_id` 与输入一致，否则抛错。
+
+- **专业术语**：受控测试（controlled test）、测试替身/Fake（test double）、验收门（acceptance gate）、依赖注入（dependency injection）。
+
+- **真实代码/运行输出**：`tests/test_experiment_observer_bridge.py::CountingFakeProcessor._experiment` 构造带 `source_session_id`/`source_segment_id` 的 `ExperimentEvent`；`src/core/experiment_acceptance.py::ExperimentCandidateAcceptor.accept` 校验 events 非空 + source 匹配。专项 `Ran 6 tests ... OK`、全量 `Ran 1186 tests in 8.016s ... OK`。
+
+- **反面例子**：旧的 `scripts/evaluate_unified_dispatch_bypass.py` 里 Fake 返回 `events=[]`（空事件），它只能配旧的 `UnifiedDispatchBypass`（只 plan 不 accept）；若把这套 Fake 直接塞进新的 `UnifiedAcceptanceBypass`，accept 会抛“实验采用候选至少需要一个事件”，测试崩掉——这就是“验收门反过来约束 Fake 必须够像”。
+
+- **确认点**：为什么“只把 LLM 换掉、分派/采用/澄清规划用真的”比“整个观察器都用假的”更能验证“真实观察结果”？
+
+六要素自检：①白话✓ ②最小知识块✓ ③专业术语✓ ④真实代码/运行输出✓ ⑤反面例子✓ ⑥确认点✓。
+
+## 2026-08-26：集成测试要串联“真实链 + 六步”，有状态依赖要跨 turn 复用
+
+### 知识点：受控集成测试与有状态依赖的复用
+
+- **白话解释**：观察器单独测过、六步流水线单独测过，但没测过“把真观察器插进六步、再插进真执行器”这条完整链——就像每个零件都合格，组装起来却可能对不上。受控集成测试就是“组装起来试跑”，验证追问→回答→解决的闭环；而问题状态（协调器）这种“有记忆”的零件，必须全程用同一个，否则段 1 问的、段 2 就忘了。
+
+- **最小知识块**：
+  1. 先讲“单元测试 vs 集成测试”：单元测试用 Fake 依赖测单个模块（`test_unified_segment_processor.py` 用 FakeObserver 只测六步逻辑），集成测试用真实模块串联验证“配合”是否正确。
+  2. 再讲“有状态依赖”：`ReplyCoordinator`/`SessionContext` 是有状态的（问题、上下文随处理变化），必须在多次处理间复用同一个实例，状态才能延续。
+
+- **专业术语**：集成测试（integration test）、单元测试（unit test）、测试替身/Fake、有状态依赖（stateful dependency）、受控（controlled）。
+
+- **真实代码/运行输出**：`tests/test_experiment_pipeline.py` 用真实 `UnifiedObserver`（Fake processor）+ 真实 `ClarificationExecutor` + 真实 `ReplyCoordinator` + Fake 三个存储，装配 `UnifiedSegmentProcessor`；`process_experiment_turn`（`src/core/experiment_observer_bridge.py`）接收已装配 processor 跨 turn 复用。专项 `Ran 4 tests ... OK`、全量 `Ran 1190 tests in 8.385s ... OK`。
+
+- **反面例子**：若 `process_experiment_turn` 每次内部重新 `UnifiedSegmentProcessor(...)`（新建协调器/上下文），段 1 建的追问到段 2 就“失忆”，回答找不到目标问题，闭环永远断；若六步测试只用 FakeObserver，那“真实观察链产出的 CREATE 动作能否被真实执行器正确落到协调器”这个衔接点就没被验证。
+
+- **确认点**：为什么“协调器必须跨 turn 复用同一个实例”和“闭环能验证成功”是同一件事的两面？
+
+六要素自检：①白话✓ ②最小知识块✓ ③专业术语✓ ④真实代码/运行输出✓ ⑤反面例子✓ ⑥确认点✓。
+
+## 2026-08-27：设置值为什么没生效——一个值两条链路，字段没接上
+
+### 知识点：字段分流与“合同字段要在源头定正确”
+
+- **白话解释**：语速这个值，你在设置面板里存进了一个抽屉（`tts_speed`），但真正开口播放时，音箱读的是另一个抽屉（`speech_rate`），中间没人把两个抽屉接通。就像你在遥控器上把音量调到 2 倍，可音箱一直读自己面板上的音量旋钮（默认 1.0），遥控器的数值从没传过去——所以怎么按遥控器都不响。
+
+- **最小知识块**：
+  1. 先解释“设置持久化”：拖滑块 → `web/frontend/tts_settings.js` 把值存进 `settings.json`，读的时候用 `settings_store.current().tts_speed`。
+  2. 再解释“合同字段”：后端发给前端一条“语音项”（`VoiceDeliveryItem`），它上面的 `speech_rate` 字段就是描述“这条语音用多快语速”的合同约定；前端只认这个字段，不自己去查设置。
+  3. 再解释“真实播放的数据流”：设置值 → 后端构造 `VoiceDeliveryItem` 时把语速写进 `speech_rate` → 前端读 `item.speech_rate` → 发 `/tts/stream` → 火山引擎按 `speed_ratio` 合成。断点就出在“后端构造时没写进去”，`speech_rate` 一直用默认 1.0。
+  4. 为什么“测试合成”按钮好像有效：那按钮走的是另一条非流式链路（`/tts/test` → `tts_providers._volcano`），它直接读 `settings.tts_speed`，所以两条链路行为不一致，反而更难排查。
+
+- **专业术语**：单一事实来源（single source of truth）、合同字段（contract field）、未接线字段（unwired field）、数据流断点（data-flow gap）。
+
+- **真实代码/运行输出**：
+  - 修复前，`web/api/voice_runtime.py` 欢迎语硬编码：`speech_rate=1.0`（旧），`web/turn_processors.py` 的 `VoiceDeliveryItem(...)` 完全没传 `speech_rate`。
+  - 修复后统一注入：`speech_rate=settings_store.current().tts_speed`（共 6 处）。
+  - 测试运行：专项 `Ran 38 tests ... OK`；全量 `Ran 1252 tests`，其中 1 个 error 为 `test_explicit_mode_switch`（`composer.js` 前端字符串契约断点，与语速无关）。
+
+- **反面例子**：不知道“合同字段要在源头定正确”会怎样——你会在前端 `local_tts.js` 里想办法“当 `speech_rate` 是 1.0 就用设置的语速”，但这样无法区分“用户真的设了 1.0”和“后端没传”，属于在错误的一层补丁；还会留下两条链路（测试按钮 vs 真实播放）语速不一致的隐蔽 bug。
+
+- **确认点**：为什么“在后端构造 `VoiceDeliveryItem` 时把语速写进 `speech_rate`”比“在前端发现 `speech_rate` 缺失时去读设置”更正确？
+
+六要素自检：①白话✓ ②最小知识块✓ ③专业术语✓ ④真实代码/运行输出✓ ⑤反面例子✓ ⑥确认点✓。
+
+## 2026-08-27：埋点数据已经存在，不消费就等于没有
+
+### 知识点：时序观测（埋点）要"生产端打点 + 消费端可见"才成立
+
+- **白话解释**：你家里已经装了电表（服务端每步都记了耗时），但没把读数显示出来（前端没读、没打印），于是你天天猜"电费高"却看不见到底哪台电器耗电。观测不是"记录"就完了，得有人把记录**读出来**才算数。
+- **最小知识块**：① 服务端 `TurnTimingRecorder` 在请求各阶段调 `mark(name)`，每个 mark 存一个 `elapsed_ms`（自请求起累计毫秒）；② 快照 `snapshot()` 放进 `turn_result` 事件的 `timing` 字段下发；③ 前端原来只算了浏览器侧 `browserTiming`，没读 `event.timing`；④ 本次补 `summarizeServerTiming` 读取并做差，得到"某一段花了多久"；⑤ 关键是**差值**：`llm_completed - llm_started` 才是"理解 LLM 耗时"，单个 elapsed_ms 只是累计时钟。
+- **专业术语**：埋点/打点（instrumentation）、时序快照（timing snapshot）、端到端延迟观测（end-to-end latency observability）、消费端（consumer）。
+- **真实代码/运行输出**：`web/turn_application_service.py` 里 `result["timing"] = timing.snapshot()`；`web/frontend/turn_client.js` 新增 `summarizeServerTiming` 后 `console.info('[turn-timing]', browserTiming, summarizeServerTiming(serverTiming))`。`node --check` 语法通过，相邻 JS 测试通过。
+- **反面例子**：只打点不消费，优化就是盲猜——不知道是理解 LLM 慢还是生成回答慢，可能去精简 prompt 却白费，真正的瓶颈（比如生成回答）一直没动。
+- **确认点**：为什么"服务端已经记了耗时"和"用户能看到耗时"是两件不同的事？缺了哪一环观测就不成立？
+
+六要素自检：①白话✓ ②最小知识块✓ ③专业术语✓ ④真实代码/运行输出✓ ⑤反面例子✓ ⑥确认点✓。

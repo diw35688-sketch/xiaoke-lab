@@ -173,7 +173,7 @@ class WebRendererFieldTests(unittest.TestCase):
 
         payloads = web_renderer.WebRenderer().render_plan(plan)
 
-        self.assertEqual(payloads[0]["text"], "已记录。")
+        self.assertEqual(payloads[0]["text"], "本段结构化处理失败，原始记录已保存。")
         self.assertIsNone(payloads[0]["voice_text"])
         self.assertEqual(payloads[1]["voice_text"], "时间是多少？")
 

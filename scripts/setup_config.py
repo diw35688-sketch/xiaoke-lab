@@ -106,6 +106,7 @@ def test_connection(values, timeout=30.0):
 
     payload = json.dumps({
         "model": model,
+        "thinking": {"type": "disabled"},
         "messages": [{"role": "user", "content": "ping"}],
         "max_tokens": 1,
     }).encode("utf-8")

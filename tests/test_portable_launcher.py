@@ -41,6 +41,16 @@ class PortableLauncherTests(unittest.TestCase):
         self.assertIn(f"仓库目录：{PROJECT_DIR}", completed.stdout)
         self.assertIn("体检完成", completed.stdout)
 
+    def test_web_launcher_exposes_repository_and_web_import_roots(self):
+        content = (
+            PROJECT_DIR / "scripts" / "start_best.py"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn(
+            "for import_root in (str(REPO_ROOT), str(WEB_DIR)):",
+            content,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

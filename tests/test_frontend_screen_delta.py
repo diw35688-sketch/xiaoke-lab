@@ -78,33 +78,30 @@ class FrontendScreenDeltaTests(unittest.TestCase):
         self.assertIn("deliverResults", source)
         self.assertIn("window.enqueueSpeech?.(text)", source)
 
-    def test_chat_stream_routes_agent_chunks_through_contract(self):
+    def test_legacy_chat_routes_through_unified_turn_service(self):
         source = CHAT_API.read_text(encoding="utf-8")
 
-        self.assertIn("from stream_contract import agent_output_event", source)
-        self.assertIn("payload = agent_output_event(output)", source)
-        self.assertIn("isinstance(output, ToolVoiceDeliveryBatch)", source)
+        self.assertIn("from api.turn import turn_application_service", source)
+        self.assertIn("turn_application_service.submit(turn).future.result()", source)
+        self.assertNotIn("add_message(conversation_id, \"user\"", source)
 
-    def test_chat_tool_voice_uses_shared_playback_service(self):
+    def test_legacy_chat_voice_uses_shared_playback_service(self):
         source = CHAT_API.read_text(encoding="utf-8")
         self.assertIn("web_playback_service.authorize(", source)
-        self.assertIn("bind_voice_items(tool_voice_items, assistant_block_id)", source)
+        self.assertIn("completed.voice_items", source)
         self.assertIn("conversation_id=conversation_id", source)
-        self.assertNotIn("voice_delivery_event(output.items", source)
+        self.assertIn("if not completed.replayed", source)
 
-    def test_plain_chat_reply_also_uses_shared_playback_service_once(self):
+    def test_plain_chat_compatibility_returns_final_screen_delta(self):
         source = CHAT_API.read_text(encoding="utf-8")
 
-        self.assertIn("kind=MessageKind.ASSISTANT_REPLY", source)
-        self.assertIn("_prepare_chat_spoken_delivery(", source)
-        self.assertIn("_build_chat_spoken_delivery(refined, turn_id)", source)
         self.assertIn("screen_delta_event(answer)", source)
-        self.assertIn("(reply_item,), conversation_id=conversation_id", source)
+        self.assertIn("_assistant_text(completed.result)", source)
 
     def test_record_voice_uses_the_same_shared_playback_service(self):
         source = RECORD_API.read_text(encoding="utf-8")
         self.assertIn("web_playback_service.authorize(", source)
-        self.assertIn("plan.voice_items,", source)
+        self.assertIn("completed.voice_items", source)
         self.assertIn("conversation_id=", source)
 
     def test_record_frontends_only_consume_scheduler_events(self):

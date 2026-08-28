@@ -19,7 +19,10 @@
 
   window.publishProtocolContextBlocks = async turnId => {
     if (!store || !turnId) return;
-    const response = await fetch('/protocols/session/steps');
+    const path = window.protocolSessionUrl
+      ? window.protocolSessionUrl('/protocols/session/steps')
+      : '/protocols/session/steps';
+    const response = await fetch(path);
     if (!response.ok) return;
     const data = await response.json();
     if (data.mode !== 'protocol') {

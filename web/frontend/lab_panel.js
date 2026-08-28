@@ -90,7 +90,10 @@
   }
 
   function loadSession() {
-    return api('/protocols/session').then(function (d) { state = d; paint(); return d; });
+    var path = window.protocolSessionUrl
+      ? window.protocolSessionUrl('/protocols/session')
+      : '/protocols/session';
+    return api(path).then(function (d) { state = d; paint(); return d; });
   }
 
   // 供语音链路调用：拿到实体后做确定性判断并显示结果
@@ -161,12 +164,14 @@
         .then(function (d) { state = d; el('lab-result').innerHTML = ''; paint(); });
     };
     el('lab-prev').onclick = function () {
-      api('/protocols/session/move', 'POST', { action: 'prev' })
-        .then(function (d) { state = d; el('lab-result').innerHTML = ''; paint(); });
+      window.moveProtocolStep('prev')
+        .then(function (d) { state = d; el('lab-result').innerHTML = ''; paint(); })
+        .catch(function (error) { el('lab-result').textContent = error.message; });
     };
     el('lab-next').onclick = function () {
-      api('/protocols/session/move', 'POST', { action: 'next' })
-        .then(function (d) { state = d; el('lab-result').innerHTML = ''; paint(); });
+      window.moveProtocolStep('next')
+        .then(function (d) { state = d; el('lab-result').innerHTML = ''; paint(); })
+        .catch(function (error) { el('lab-result').textContent = error.message; });
     };
   }
 

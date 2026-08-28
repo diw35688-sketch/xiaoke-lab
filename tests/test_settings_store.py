@@ -20,6 +20,12 @@ import settings_store  # noqa: E402
 
 
 class SettingsStoreFileReadTests(unittest.TestCase):
+    def setUp(self):
+        # 其他测试（如 turn_processors / voice_runtime）会读真实 settings.json
+        # 并写进程内 _cache；这里在读取前复位，确保 mock 临时文件真正生效。
+        with settings_store._lock:
+            settings_store._cache = None
+
     def tearDown(self):
         # 复位进程内缓存，避免影响其他测试
         with settings_store._lock:
