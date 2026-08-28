@@ -59,6 +59,7 @@
     '        <button class="cp-mode active" type="button" data-mode="chat">自由聊天</button>',
     '        <button class="cp-mode" type="button" data-mode="free">自由实验记录</button>',
     '        <button class="cp-mode" type="button" data-mode="protocol">方案实验记录</button>',
+    '        <button class="cp-mode" type="button" data-mode="template">制作模板</button>',
     '      </div>',
     '    </div>',
     '    <div class="cp-right">',
