@@ -1,6 +1,6 @@
 /* 社区：远程开放式社区。本地页只做前端交互，数据/账号在远程服务器。 */
 (function () {
-  var REMOTE_BASE = 'http://124.221.234.222:3000/api';
+  var REMOTE_BASE = localStorage.getItem('community_remote_base') || 'http://124.221.234.222:3000/api';
   var host, listEl, token = localStorage.getItem('community_remote_token') || '';
 
   function esc(s) {
@@ -248,8 +248,17 @@
       if (!token) { openAuth(); return; }
       publishForm();
     };
-    userLabel();
-    load();
+    fetch('/settings').then(function (r) { return r.json(); }).then(function (d) {
+      if (d && d.settings && d.settings.community_base_url) {
+        REMOTE_BASE = String(d.settings.community_base_url).replace(/\/+$/, '');
+        localStorage.setItem('community_remote_base', REMOTE_BASE);
+      }
+      userLabel();
+      load();
+    }).catch(function () {
+      userLabel();
+      load();
+    });
   }
 
   var timer = null;
