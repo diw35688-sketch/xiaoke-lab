@@ -2,116 +2,143 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <!-- viewport-fit=cover：适配 iPhone 刘海屏安全区 -->
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f4f6fb">
-  <title>实验助手 · 流程卡片（移动端原型）</title>
-  <link rel="stylesheet" href="/static/mobile.css?v=20260901-chat">
+  <title>实验助手 · 移动端</title>
+  <link rel="stylesheet" href="/static/mobile.css?v=20260902-chat-default">
 </head>
 <body>
   <div class="m-shell">
 
-    <!-- 顶栏：品牌 + 演示模式齿轮（演示模式下 DEV 面板隐藏，齿轮可见） -->
-    <header class="m-top">
-      <div class="m-brand">⚗ 实验助手</div>
-      <button class="m-gear" id="gear-btn" hidden aria-label="退出演示模式">⚙</button>
-      <div class="m-mock-badge" title="本轮为界面原型：卡片数据与步骤推进均为本地 MOCK，未接后端">DEV · MOCK 数据</div>
-    </header>
+    <!-- ========== 默认视图：聊天 ========== -->
+    <div id="chat-view" class="m-view" style="display:block">
+      <header class="m-top">
+        <div class="m-brand">⚗ 实验助手</div>
+        <div class="m-chat-title">和小科聊天</div>
+      </header>
 
-    <!-- AI 形象"小科" + 语音状态（复用 PC 端立绘与状态体系，由 setVoice 驱动） -->
-    <div class="m-avatar-row" id="avatar-row">
-      <div class="m-avatar" id="avatar-box">
-        <img id="avatar-img" src="/static/assets/assistant_portrait_transparent.png" alt="小科实验助手">
-      </div>
-      <div class="m-avatar-side">
-        <div class="m-avatar-info">
-          <span class="m-avatar-name">小科</span>
-          <span class="m-avatar-state" id="avatar-label">准备就绪</span>
+      <div class="m-chat-log" id="m-chat-log">
+        <div class="m-msg assistant">
+          <span class="m-msg-name">小科</span>
+          <span class="m-msg-text">你好！我可以帮你聊实验、记录口述、查询试剂，也可以开始一个实验进入流程卡片。</span>
         </div>
-        <div class="m-voice-status" id="voice-status">
-          <span class="vs-dot" id="vs-dot"></span>
-          <span id="voice-status-text">自动聆听中 · 直接说话即可</span>
-          <button class="m-voice-toggle" id="voice-toggle">语音已开</button>
+      </div>
+
+      <div class="m-chat-input-row">
+        <input id="m-chat-input" type="text" placeholder="打字或点下方麦克风说话…" autocomplete="off" />
+        <button id="m-chat-send" class="m-btn primary" type="button">发送</button>
+      </div>
+
+      <div class="m-chat-actions">
+        <button id="m-start-experiment" class="m-btn primary" type="button">开始实验 → 流程卡片</button>
+      </div>
+    </div>
+
+    <!-- ========== 实验视图：流程卡片 ========== -->
+    <div id="card-view" class="m-view" style="display:none">
+
+      <!-- 顶栏：品牌 + 演示模式齿轮（演示模式下 DEV 面板隐藏，齿轮可见） -->
+      <header class="m-top">
+        <div class="m-brand">⚗ 实验助手</div>
+        <button id="m-back-chat" class="m-btn small" type="button">← 返回聊天</button>
+        <button class="m-gear" id="gear-btn" hidden aria-label="退出演示模式">⚙</button>
+        <div class="m-mock-badge" title="本轮为界面原型：卡片数据与步骤推进均为本地 MOCK，未接后端">DEV · MOCK 数据</div>
+      </header>
+
+      <!-- AI 形象"小科" + 语音状态（复用 PC 端立绘与状态体系，由 setVoice 驱动） -->
+      <div class="m-avatar-row" id="avatar-row">
+        <div class="m-avatar" id="avatar-box">
+          <img id="avatar-img" src="/static/assets/assistant_portrait_transparent.png" alt="小科实验助手">
         </div>
-        <!-- 任务进度清单：横屏时显示在左栏（✓ 完成 / → 当前 / ○ 未到） -->
-        <div class="m-progress-panel" id="progress-panel"></div>
+        <div class="m-avatar-side">
+          <div class="m-avatar-info">
+            <span class="m-avatar-name">小科</span>
+            <span class="m-avatar-state" id="avatar-label">准备就绪</span>
+          </div>
+          <div class="m-voice-status" id="voice-status">
+            <span class="vs-dot" id="vs-dot"></span>
+            <span id="voice-status-text">自动聆听中 · 直接说话即可</span>
+            <button class="m-voice-toggle" id="voice-toggle">语音已开</button>
+          </div>
+          <!-- 任务进度清单：横屏时显示在左栏（✓ 完成 / → 当前 / ○ 未到） -->
+          <div class="m-progress-panel" id="progress-panel"></div>
+        </div>
       </div>
-    </div>
 
-    <!-- 识别转写行：真实语音识别结果（只显示最近一句，弱存在感） -->
-    <div class="m-transcript" id="transcript-line" hidden>
-      听到：<b id="transcript-text"></b>
-    </div>
-
-    <!-- 正式入口：选择实验方案（不藏在 DEV 面板里） -->
-    <div class="m-toolbar">
-      <span class="m-toolbar-label">实验：</span>
-      <select id="m-protocol-select" class="m-select"></select>
-    </div>
-
-    <!-- 卡片舞台：一屏一张主 Card，由 mobile_cards.js 渲染 -->
-    <section class="m-stage" id="stage" aria-live="polite">
-      <!-- 小科的回复气泡：AI 完整回复显示于此，8 秒后淡出，点按可关闭 -->
-      <div class="m-ai-bubble" id="ai-bubble" hidden></div>
-      <p class="m-loading">正在载入流程卡片…</p>
-    </section>
-
-    <!-- 底部控制：上一步 / 下一步（语音为自动聆听模式，无需按钮） -->
-    <nav class="m-controls">
-      <button class="m-btn round" id="btn-prev" aria-label="上一步">‹</button>
-      <button class="m-btn round" id="btn-next" aria-label="下一步">›</button>
-    </nav>
-
-    <!-- 文字聊天：和小科打字对话，也可继续用语音 -->
-    <div class="m-chat-bar">
-      <input id="m-chat-input" type="text" placeholder="和小科打字聊天…" autocomplete="off" />
-      <button id="m-chat-send" class="m-btn primary" type="button">发送</button>
-    </div>
-
-    <!-- DEV / MOCK 调试面板：只服务于开发验收，不是正式产品逻辑 -->
-    <details class="m-dev">
-      <summary>DEV / MOCK 调试面板（正式版将移除）</summary>
-      <p class="m-dev-note">
-        正式链路（默认"真实接口"数据源）：语音 → /chat → 大模型工具调用
-        （record_observation 记录口述 / move_step 翻页）→ 后端确定性状态机判定
-        → 前端只照着 status 渲染。方案 B：完成打勾后不自动翻页，翻页靠上滑/按钮/说"下一步"。
-        "演示数据"数据源为本地 MOCK，供无后端时展示界面。
-      </p>
-      <p class="m-dev-hint">演示模式：<button class="m-btn small" id="dev-demo">进入演示模式</button>
-        <span style="margin-left:8px">开启后调试面板隐藏，右上角齿轮可退出。</span></p>
-      <p class="m-dev-hint">数据源：
-        <span id="ds-row">
-          <button class="m-btn small m-theme-btn on" id="ds-real">真实接口</button>
-          <button class="m-btn small m-theme-btn" id="ds-mock">演示数据</button>
-        </span>
-        <span style="margin-left:8px">真实=后端状态机+大模型工具；演示=本地 MOCK</span>
-      </p>
-      <p class="m-dev-hint">实验方案：<select id="protocol-select" class="m-select"></select></p>
-      <p class="m-dev-hint">对话记忆：<button class="m-btn small" id="dev-reset-conv">重置对话记忆</button>
-        <span style="margin-left:8px">每句话带同一对话编号，AI 才记得上文。</span></p>
-      <div class="m-dev-row">
-        <button class="m-btn small" id="dev-complete">模拟记录完成（打勾）</button>
-        <button class="m-btn small" id="dev-deviation">模拟记录偏差</button>
-        <button class="m-btn small" id="dev-status">轮换状态样式</button>
+      <!-- 识别转写行：真实语音识别结果（只显示最近一句，弱存在感） -->
+      <div class="m-transcript" id="transcript-line" hidden>
+        听到：<b id="transcript-text"></b>
       </div>
-      <p class="m-dev-hint">三个模拟按钮仅在「演示数据」源下可用。</p>
-      <p class="m-dev-hint">卡面主题（选择会被浏览器记住）：<span id="theme-row"></span></p>
-      <p class="m-dev-hint">卡面背景图（本地选择，自动压缩并加薄纱保证文字可读）：</p>
-      <div class="m-dev-row">
-        <button class="m-btn small" id="bg-choose">选择图片</button>
-        <button class="m-btn small" id="bg-clear">清除背景图</button>
-        <input type="file" id="bg-file" accept="image/*" hidden>
-      </div>
-      <p class="m-dev-hint">
-        调试手势：上滑 = 下一步，下滑 = 上一步；桌面浏览器可用 ← → 键
-        （横屏/矮屏模式下滑动用于卡片内滚动，翻页请用 ‹ › 按钮）。
-        数据源：本地 MOCK（正式版将替换为 /protocols/session/steps 的结构化数据，该接口已含 status 字段）。
-        语音识别是真实浏览器能力：点底部大按钮说话，识别文本只显示、不直接推进步骤。
-      </p>
-    </details>
 
+      <!-- 正式入口：选择实验方案 -->
+      <div class="m-toolbar">
+        <span class="m-toolbar-label">实验：</span>
+        <select id="m-protocol-select" class="m-select"></select>
+      </div>
+
+      <!-- 卡片舞台：一屏一张主 Card，由 mobile_cards.js 渲染 -->
+      <section class="m-stage" id="stage" aria-live="polite">
+        <div class="m-ai-bubble" id="ai-bubble" hidden></div>
+        <p class="m-loading">正在载入流程卡片…</p>
+      </section>
+
+      <!-- 底部控制：上一步 / 下一步 -->
+      <nav class="m-controls">
+        <button class="m-btn round" id="btn-prev" aria-label="上一步">‹</button>
+        <button class="m-btn round" id="btn-next" aria-label="下一步">›</button>
+      </nav>
+
+      <!-- 卡片页内也可打字/语音聊天 -->
+      <div class="m-chat-bar">
+        <input id="m-chat-card-input" type="text" placeholder="和小科打字聊天…" autocomplete="off" />
+        <button id="m-chat-card-send" class="m-btn primary" type="button">发送</button>
+      </div>
+
+      <!-- DEV / MOCK 调试面板：只服务于开发验收，不是正式产品逻辑 -->
+      <details class="m-dev">
+        <summary>DEV / MOCK 调试面板（正式版将移除）</summary>
+        <p class="m-dev-note">
+          正式链路（默认"真实接口"数据源）：语音 → /chat → 大模型工具调用
+          （record_observation 记录口述 / move_step 翻页）→ 后端确定性状态机判定
+          → 前端只照着 status 渲染。方案 B：完成打勾后不自动翻页，翻页靠上滑/按钮/说"下一步"。
+          "演示数据"数据源为本地 MOCK，供无后端时展示界面。
+        </p>
+        <p class="m-dev-hint">演示模式：<button class="m-btn small" id="dev-demo">进入演示模式</button>
+          <span style="margin-left:8px">开启后调试面板隐藏，右上角齿轮可退出。</span></p>
+        <p class="m-dev-hint">数据源：
+          <span id="ds-row">
+            <button class="m-btn small m-theme-btn on" id="ds-real">真实接口</button>
+            <button class="m-btn small m-theme-btn" id="ds-mock">演示数据</button>
+          </span>
+          <span style="margin-left:8px">真实=后端状态机+大模型工具；演示=本地 MOCK</span>
+        </p>
+        <p class="m-dev-hint">实验方案：<select id="protocol-select" class="m-select"></select></p>
+        <p class="m-dev-hint">对话记忆：<button class="m-btn small" id="dev-reset-conv">重置对话记忆</button>
+          <span style="margin-left:8px">每句话带同一对话编号，AI 才记得上文。</span></p>
+        <div class="m-dev-row">
+          <button class="m-btn small" id="dev-complete">模拟记录完成（打勾）</button>
+          <button class="m-btn small" id="dev-deviation">模拟记录偏差</button>
+          <button class="m-btn small" id="dev-status">轮换状态样式</button>
+        </div>
+        <p class="m-dev-hint">三个模拟按钮仅在「演示数据」源下可用。</p>
+        <p class="m-dev-hint">卡面主题（选择会被浏览器记住）：<span id="theme-row"></span></p>
+        <p class="m-dev-hint">卡面背景图（本地选择，自动压缩并加薄纱保证文字可读）：</p>
+        <div class="m-dev-row">
+          <button class="m-btn small" id="bg-choose">选择图片</button>
+          <button class="m-btn small" id="bg-clear">清除背景图</button>
+          <input type="file" id="bg-file" accept="image/*" hidden>
+        </div>
+        <p class="m-dev-hint">
+          调试手势：上滑 = 下一步，下滑 = 上一步；桌面浏览器可用 ← → 键
+          （横屏/矮屏模式下滑动用于卡片内滚动，翻页请用 ‹ › 按钮）。
+          数据源：本地 MOCK（正式版将替换为 /protocols/session/steps 的结构化数据，该接口已含 status 字段）。
+          语音识别是真实浏览器能力：点底部大按钮说话，识别文本只显示、不直接推进步骤。
+        </p>
+      </details>
+
+    </div>
   </div>
-  <script src="/static/mobile_cards.js?v=20260902-desktop-session"></script>
-  <script src="/static/mobile_voice.js?v=20260901-chat"></script>
+  <script src="/static/mobile_cards.js?v=20260902-chat-default"></script>
+  <script src="/static/mobile_voice.js?v=20260902-chat-default"></script>
 </body>
 </html>

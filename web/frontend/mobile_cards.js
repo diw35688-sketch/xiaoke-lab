@@ -538,6 +538,7 @@
       var answer = (res.d && res.d.answer) || '';
       setVoice('speaking', 'AI：' + String(answer).slice(0, 40));
       showAiBubble(answer);          // 完整回复进气泡，不再截断
+      appendChatLog('assistant', answer);
       loadReal();
     }).catch(function (e) {
       setVoice('idle', '网络错误');
@@ -574,12 +575,24 @@
     bindProtocolSelect(el('m-protocol-select'));
   }
 
-  function submitTextChat() {
-    var input = el('m-chat-input');
+  function appendChatLog(role, text) {
+    var log = el('m-chat-log');
+    if (!log || !text) return;
+    var div = document.createElement('div');
+    div.className = 'm-msg ' + role;
+    div.innerHTML = '<span class="m-msg-name">' + (role === 'user' ? '我' : '小科') + '</span><span class="m-msg-text"></span>';
+    div.querySelector('.m-msg-text').textContent = text;
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function submitTextChat(inputId) {
+    var input = el(inputId || 'm-chat-input');
     var text = input ? input.value.trim() : '';
     if (!text) return;
     if (input) input.value = '';
     if (window.logAction) window.logAction('mobile_chat_send', { text: text.slice(0, 80) });
+    appendChatLog('user', text);
     submitTranscript(text);
   }
 
@@ -770,6 +783,18 @@
   }
 
   // ---------- 12. 绑定 ----------
+  function showChatView() {
+    var chat = el('chat-view'), card = el('card-view');
+    if (chat) chat.style.display = 'block';
+    if (card) card.style.display = 'none';
+  }
+  function showCardView() {
+    var chat = el('chat-view'), card = el('card-view');
+    if (chat) chat.style.display = 'none';
+    if (card) card.style.display = 'block';
+    loadReal();
+  }
+
   function bind() {
     var prev = el('btn-prev'), next = el('btn-next');
     if (prev) prev.onclick = gesturePrev;
@@ -812,12 +837,24 @@
     bindBgControls();
     var chatInput = el('m-chat-input'), chatSend = el('m-chat-send');
     if (chatInput && chatSend) {
-      chatSend.onclick = submitTextChat;
+      chatSend.onclick = function () { submitTextChat('m-chat-input'); };
       chatInput.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); submitTextChat(); }
+        if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); submitTextChat('m-chat-input'); }
       });
     }
+    var cardInput = el('m-chat-card-input'), cardSend = el('m-chat-card-send');
+    if (cardInput && cardSend) {
+      cardSend.onclick = function () { submitTextChat('m-chat-card-input'); };
+      cardInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); submitTextChat('m-chat-card-input'); }
+      });
+    }
+    var startBtn = el('m-start-experiment');
+    if (startBtn) startBtn.onclick = showCardView;
+    var backBtn = el('m-back-chat');
+    if (backBtn) backBtn.onclick = showChatView;
     populateProtocols();
+    showChatView();   // 默认进入聊天，用户点“开始实验”后才进流程卡片
     // 预加载 AI 形象立绘，切状态不闪
     Object.keys(AVATAR).forEach(function (k) {
       var preload = new Image();
