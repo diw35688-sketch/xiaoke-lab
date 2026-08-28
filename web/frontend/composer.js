@@ -205,15 +205,6 @@
     if (asrBar) asrBar.style.display = 'none';
 
     var box = el('cp-text');
-    Array.prototype.forEach.call(el('cp-modes').querySelectorAll('.cp-mode'), function (button) {
-      button.onclick = function () { selectComposerMode(button.dataset.mode); };
-    });
-    window.interactionModeState.subscribe(function (snapshot) {
-      var selected = snapshot.interaction_mode === 'chat' ? 'chat' : snapshot.experiment_context;
-      Array.prototype.forEach.call(el('cp-modes').querySelectorAll('.cp-mode'), function (button) {
-        button.classList.toggle('active', button.dataset.mode === selected);
-      });
-    });
     box.addEventListener('input', autoGrow);
     box.addEventListener('focus', function () { el('cp-card').classList.add('focus'); });
     box.addEventListener('blur', function () { el('cp-card').classList.remove('focus'); });
@@ -230,13 +221,13 @@
         fetch('/api/upload', { method: 'POST', body: form }).then(function (r) {
           return r.json().then(function (d) { return { ok: r.ok, d: d }; });
         }).then(function (res) {
-          fileBtn.textContent = '🗎';
+          fileBtn.textContent = '＋';
           if (!res.ok) { alert(res.d.detail || '上传失败'); return; }
           if (typeof window.addChatMessage === 'function') {
             window.addChatMessage('已上传文件：' + res.d.name + '（file_id=' + res.d.file_id + '）', 'user');
           }
           window.composerSend('请读取并处理我上传的文件：file_id=' + res.d.file_id + '，文件名为 ' + res.d.name);
-        }).catch(function (e) { fileBtn.textContent = '🗎'; alert('上传失败：' + e.message); });
+        }).catch(function (e) { fileBtn.textContent = '＋'; alert('上传失败：' + e.message); });
       };
     }
 
