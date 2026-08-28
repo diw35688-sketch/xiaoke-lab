@@ -18,6 +18,7 @@ from api.experiments import router as experiments_router
 from api.memories import router as memories_router
 from api.network import router as network_router
 from api.files import router as files_router
+from api.logs import router as logs_router
 from api.notifications import router as notifications_router
 from api.protocols import router as protocols_router
 from api.reagent_prep import router as reagent_prep_router
@@ -208,6 +209,7 @@ app.include_router(experiments_router)
 app.include_router(memories_router)
 app.include_router(network_router)
 app.include_router(files_router)
+app.include_router(logs_router)
 app.include_router(notifications_router)
 app.include_router(templates_router)
 app.include_router(tasks_router)
