@@ -55,7 +55,7 @@ def catalog_for_models(models: list[str]) -> list[dict]:
 
 
 PRESETS = [
-    {"id": "ustc", "label": "中科大校内 LLM",
+    {"id": "ustc", "label": "中科大 LLM",
      "base_url": "https://api.llm.ustc.edu.cn/v1", "model": "deepseek-v4-pro",
      "api_url": "https://api.llm.ustc.edu.cn"},
     {"id": "deepseek", "label": "DeepSeek 官方",
