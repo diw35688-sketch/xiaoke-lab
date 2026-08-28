@@ -1,6 +1,6 @@
 /* 社区：远程模板市场。本地作为前端，用户浏览/预览/导入/发布自己的试剂配方或实验方案模板。 */
 (function () {
-  var REMOTE_BASE = localStorage.getItem('community_remote_base') || 'http://124.221.234.222:3000/api';
+  var REMOTE_BASE = '/community-proxy';
   var host, listEl, token = localStorage.getItem('community_remote_token') || '';
   var currentUser = null;
 
@@ -358,17 +358,8 @@
       publishForm();
     };
     host.querySelector('#com-admin-btn').onclick = showAdmin;
-    fetch('/settings').then(function (r) { return r.json(); }).then(function (d) {
-      if (d && d.settings && d.settings.community_base_url) {
-        REMOTE_BASE = String(d.settings.community_base_url).replace(/\/+$/, '');
-        localStorage.setItem('community_remote_base', REMOTE_BASE);
-      }
-      userLabel();
-      load();
-    }).catch(function () {
-      userLabel();
-      load();
-    });
+    userLabel();
+    load();
   }
 
   var timer = null;
