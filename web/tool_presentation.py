@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable
 
+import settings_store
 from src.core.presentation_delivery import (
     PresentationDeliveryPlan,
     VoiceDeliveryItem,
@@ -46,7 +47,10 @@ def merge_tool_plans(
     intents = tuple(
         intent for plan in batch for intent in plan.screen_intents
     )
-    return build_delivery_plan(intents, ui_mode="user")
+    return build_delivery_plan(
+        intents, ui_mode="user",
+        speech_rate=settings_store.current().tts_speed,
+    )
 
 
 def render_tool_plan(plan: PresentationDeliveryPlan) -> tuple[dict, ...]:

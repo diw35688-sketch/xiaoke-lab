@@ -143,8 +143,10 @@ class ThreeProducerAutoMatrixTests(unittest.TestCase):
         record = (WEB / "api" / "record.py").read_text(encoding="utf-8")
         stream = (WEB / "frontend" / "streaming_chat_v2.js").read_text(encoding="utf-8")
         context = (WEB / "frontend" / "conversation_context_blocks.js").read_text(encoding="utf-8")
-        self.assertIn('assistant_block_id = f"{spoken_turn_id}:spoken"', chat)
-        self.assertIn('f"{turn_id}:confirmation:{intent.intent_id}"', record)
+        self.assertIn("TurnInput(", chat)
+        self.assertIn("TurnInput(", record)
+        self.assertIn("completed.voice_items", chat)
+        self.assertIn("completed.voice_items", record)
         self.assertIn("request_id: localRequestId, turn_id: localTurnId", stream)
         self.assertIn("confirmation:${message.intent_id || index}", context)
 
