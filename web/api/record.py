@@ -94,13 +94,8 @@ def record(payload: RecordPayload):
             entities.update(rule_fields)
             extraction_source = "rule"
 
-    evaluation = domain.evaluate(entities)
-    # 与 lab_tools.record_observation 一致：把本段口述登记进步骤进度并落盘。
-    step_now = domain.session().current_step()
-    if step_now is not None:
-        domain.record_step_fields(
-            step_now.step_number, entities, bool(evaluation.get("deviations"))
-        )
+    # 先累计本段字段，再按整个步骤的累计状态决定是否追问。
+    evaluation = domain.evaluate_and_record(entities)
     item = {
         "segment_id": segment_id,
         "session_id": session_id,
@@ -131,11 +126,8 @@ def history():
 
 @router.post("/reset")
 def reset():
-    """开始新会话。"""
-    session_id = start_new_session()
+    """开始全新会话：记录编号、方案、步骤进度和偏差一起重置。"""
     with _lock:
-        pass
-
-
-
+        domain.reset_session()
+        session_id = start_new_session()
     return {"session_id": session_id, "message": "已开始新会话"}

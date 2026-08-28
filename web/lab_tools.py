@@ -227,11 +227,8 @@ def _record_observation(transcript):
     terms = tuple(step.terms) if step is not None else ()
     entities = extract_entities(transcript, terms)
     fields = {k: v for k, v in vars(entities).items() if v}
-    evaluation = domain.evaluate(fields)
-    # 把本段口述登记进步骤进度：字段累积 + 偏差标记。
-    # 状态（打勾/待办/需处理）由 step_progress 的确定性规则计算，大模型不直接改。
-    if step is not None:
-        domain.record_step_fields(step.step_number, fields, bool(evaluation.get("deviations")))
+    # 把本段字段累计后，再按整步状态决定追问，避免重复询问此前已记录的信息。
+    evaluation = domain.evaluate_and_record(fields)
     session_id = current_session_id()
     segment_id = next_segment_id(session_id)
     saved = save_record({

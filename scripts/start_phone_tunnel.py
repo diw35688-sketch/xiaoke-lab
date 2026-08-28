@@ -31,6 +31,7 @@ os.chdir(WEB_DIR)
 
 import app as app_module  # noqa: E402
 import phone_access  # noqa: E402
+import access_control  # noqa: E402
 
 TUNNEL_CANDIDATES = {
     "cloudflared": {
@@ -122,11 +123,12 @@ def main() -> None:
             match = TUNNEL_CANDIDATES[tunnel]["url_pattern"].search(line)
             if match:
                 public_url = match.group(0)
+                protected_url = access_control.add_token(public_url)
                 print("=" * 56)
-                print(f"隧道已建立，手机浏览器直接打开：{public_url}")
-                print(f"桌面二维码页：{public_url}/phone")
+                print(f"隧道已建立，手机浏览器直接打开：{protected_url}")
+                print(f"桌面二维码页：{access_control.add_token(public_url + '/phone')}")
                 print("=" * 56)
-                print_ascii_qr(public_url)
+                print_ascii_qr(protected_url)
                 # 打印后继续读输出，保持隧道存活；URL 一般只出现一次。
         if public_url is None:
             print("[!] 未从隧道输出中解析到公网 URL，请把上面的输出发给我。")

@@ -1,9 +1,10 @@
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 import network_mode
 import phone_access
+import access_control
 
 from api.asr import router as asr_router
 from api.chat import router as chat_router
@@ -23,6 +24,39 @@ from tasks.task_manager import task_manager
 
 app = FastAPI(title="实验助手 API", version="1.2.0")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "frontend"), name="static")
+
+
+@app.middleware("http")
+async def require_remote_access_token(request: Request, call_next):
+    """本机免登录；局域网和公网访问必须持有启动时生成的随机令牌。"""
+    hostname = (request.url.hostname or "").lower()
+    client_host = (request.client.host if request.client else "").lower()
+    loopbacks = {"127.0.0.1", "localhost", "::1"}
+    # Host 和连接来源都必须是回环地址，避免外部请求伪造 Host: localhost 绕过。
+    local_request = hostname in loopbacks and client_host in loopbacks
+    query_token = request.query_params.get(access_control.ACCESS_TOKEN_PARAM)
+    cookie_token = request.cookies.get(access_control.ACCESS_TOKEN_COOKIE)
+    supplied = query_token or cookie_token
+    if not local_request and not access_control.is_valid(supplied):
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "访问链接无效或已过期，请在电脑端重新打开二维码页面扫码。"},
+        )
+    # 首次扫码后立即把令牌移入 HttpOnly cookie，并从地址栏删掉，避免链接进入日志/引用页。
+    if not local_request and access_control.is_valid(query_token):
+        clean_url = access_control.without_token(str(request.url))
+        response = RedirectResponse(clean_url, status_code=303)
+    else:
+        response = await call_next(request)
+    if not local_request and access_control.is_valid(supplied):
+        response.set_cookie(
+            access_control.ACCESS_TOKEN_COOKIE,
+            access_control.current_token(),
+            httponly=True,
+            secure=request.url.scheme == "https",
+            samesite="strict",
+        )
+    return response
 
 
 @app.on_event("startup")
@@ -70,7 +104,9 @@ def health():
 def phone_access_page(request: Request):
     """手机访问入口页：桌面端打开本页，手机扫二维码即可访问。"""
     status = network_mode.status()
-    url = status.get("public_url") or status.get("lan_url") or phone_access.phone_url(request)
+    url = access_control.add_token(
+        status.get("public_url") or status.get("lan_url") or phone_access.phone_url(request)
+    )
     svg = phone_access.qr_svg(url)
     qr_block = svg if svg else f"<pre>{url}</pre>"
     mode_label = "公网隧道" if status.get("mode") == "tunnel" else "局域网"
