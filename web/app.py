@@ -17,6 +17,7 @@ from api.chat import router as chat_router
 from api.experiments import router as experiments_router
 from api.memories import router as memories_router
 from api.network import router as network_router
+from api.files import router as files_router
 from api.notifications import router as notifications_router
 from api.protocols import router as protocols_router
 from api.reagent_prep import router as reagent_prep_router
@@ -99,7 +100,7 @@ def home(request: Request):
         '<script src="/static/storage.js?v=20260821"></script>'
         '<script src="/static/community.js?v=20260831"></script>'
         '<script src="/static/notifications.js?v=20260821"></script>'
-        '<script src="/static/composer.js?v=20260828-template"></script>'
+        '<script src="/static/composer.js?v=20260828-file"></script>'
           '<script src="/static/voice_startup_ui.js?v=20260826"></script>'
           '<script src="/static/call_silero_vad.js?v=20260826-visible-progress"></script>'
         '<script src="/static/phone_call.js?v=20260827-clarification-card"></script>'
@@ -199,6 +200,7 @@ app.include_router(calculator_router)
 app.include_router(experiments_router)
 app.include_router(memories_router)
 app.include_router(network_router)
+app.include_router(files_router)
 app.include_router(notifications_router)
 app.include_router(templates_router)
 app.include_router(tasks_router)
