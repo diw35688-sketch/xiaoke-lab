@@ -52,6 +52,8 @@
     '  <textarea id="cp-text" rows="1" placeholder="给实验助手发消息，或按住麦克风口述"></textarea>',
     '  <div id="cp-row">',
     '    <div class="cp-left">',
+    '      <button class="cp-icon" id="cp-file" title="上传文件（PDF/图片/文本/代码）">🗎</button>',
+    '      <input type="file" id="cp-file-input" style="display:none" />',
     '      <button class="cp-icon" id="cp-mic" title="单次录音：是否保存由当前模式决定">◉</button>',
     '      <span class="cp-chip plain" id="cp-hint">单次录音</span>',
     '      <label id="cp-continuous-label"><input id="cp-continuous" type="checkbox">连续通话</label>',
@@ -218,6 +220,29 @@
     box.addEventListener('input', autoGrow);
     box.addEventListener('focus', function () { el('cp-card').classList.add('focus'); });
     box.addEventListener('blur', function () { el('cp-card').classList.remove('focus'); });
+    var fileBtn = el('cp-file');
+    var fileInput = el('cp-file-input');
+    if (fileBtn && fileInput) {
+      fileBtn.onclick = function () { fileInput.click(); };
+      fileInput.onchange = function () {
+        var file = fileInput.files && fileInput.files[0];
+        if (!file) return;
+        var form = new FormData();
+        form.append('file', file);
+        fileBtn.textContent = '…';
+        fetch('/api/upload', { method: 'POST', body: form }).then(function (r) {
+          return r.json().then(function (d) { return { ok: r.ok, d: d }; });
+        }).then(function (res) {
+          fileBtn.textContent = '🗎';
+          if (!res.ok) { alert(res.d.detail || '上传失败'); return; }
+          if (typeof window.addChatMessage === 'function') {
+            window.addChatMessage('已上传文件：' + res.d.name + '（file_id=' + res.d.file_id + '）', 'user');
+          }
+          window.composerSend('请读取并处理我上传的文件：file_id=' + res.d.file_id + '，文件名为 ' + res.d.name);
+        }).catch(function (e) { fileBtn.textContent = '🗎'; alert('上传失败：' + e.message); });
+      };
+    }
+
     box.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); }
     });
