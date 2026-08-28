@@ -118,8 +118,8 @@ def phone_access_page(request: Request):
     mode_box_html = (
         '<div id="mode-box" style="margin-top:16px;font-size:13px;color:#334155">'
         '当前模式：' + mode_label + '<br>'
-        '<a href="/network/set?mode=lan" style="display:inline-block;margin:8px 6px 0 0;padding:7px 14px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#334155;text-decoration:none">局域网</a>'
-        '<a href="/network/set?mode=tunnel" style="display:inline-block;margin:8px 6px 0 0;padding:7px 14px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#334155;text-decoration:none">公网隧道</a>'
+        '<button onclick="switchMode(\'lan\')" style="display:inline-block;margin:8px 6px 0 0;padding:7px 14px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#334155;text-decoration:none">局域网</button>'
+        '<button onclick="switchMode(\'tunnel\')" style="display:inline-block;margin:8px 6px 0 0;padding:7px 14px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#334155;text-decoration:none">公网隧道</button>'
         '<div id="mode-msg" style="margin-top:8px;color:#697586"></div>'
         + error_html
         + '</div>'
@@ -138,14 +138,8 @@ def phone_access_page(request: Request):
 <div class="qr">{qr_block}</div><div class="url">{url}</div><p class="note">手机浏览器需要允许麦克风权限。若使用 HTTPS 自签名证书，请在手机上信任该证书。</p>
 </main>
   {mode_box}
-  <!--
-    fetch('/network/status').then(function(r){return r.json()}).then(function(s){
-      var box=document.getElementById('mode-box');
-      box.innerHTML = '当前模式：' + (s.mode === 'tunnel' ? '公网隧道' : '局域网') + '<br>'
-        + '<button onclick="switchMode(\'lan\')" style="margin:8px 6px 0 0">局域网</button>'
-        + '<button onclick="switchMode(\'tunnel\')">公网隧道</button>'
-        + '<div id="mode-msg" style="margin-top:8px;color:#697586"></div>';
-    });
+  <script>
+    var _pollTimer=null;
     function switchMode(mode){
       var msg=document.getElementById('mode-msg');
       msg.textContent='正在切换…';
@@ -153,8 +147,30 @@ def phone_access_page(request: Request):
         .then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d}})})
         .then(function(res){
           if(!res.ok){msg.textContent=res.d.detail||'切换失败';return;}
-          location.reload();
+          pollStatus();
         }).catch(function(e){msg.textContent='切换失败：'+e.message});
+    }
+    function pollStatus(){
+      fetch('/network/status').then(function(r){return r.json()}).then(function(s){
+        var msg=document.getElementById('mode-msg');
+        if(s.state==='running'&&s.public_url){
+          msg.textContent='公网隧道已就绪：'+s.public_url;
+          setTimeout(function(){location.reload();},800);
+          return;
+        }
+        if(s.state==='lan'&&s.mode==='lan'){
+          msg.textContent='已切换到局域网';
+          setTimeout(function(){location.reload();},600);
+          return;
+        }
+        if(s.state==='error'){
+          msg.textContent=s.error||'隧道启动失败';
+          return;
+        }
+        msg.textContent='公网隧道启动中…';
+        clearTimeout(_pollTimer);
+        _pollTimer=setTimeout(pollStatus,1200);
+      }).catch(function(e){var msg=document.getElementById('mode-msg');msg.textContent='状态查询失败：'+e.message;});
     }
   </script>
   </body></html>""".replace("{qr_block}", qr_block).replace("{url}", url).replace("{mode_box}", mode_box_html)
