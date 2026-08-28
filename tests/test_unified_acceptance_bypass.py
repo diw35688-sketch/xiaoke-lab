@@ -181,6 +181,17 @@ class UnifiedAcceptanceBypassTests(unittest.TestCase):
             ClarificationActionType.NO_ACTION,
         )
 
+    def test_exact_end_session_executes_without_llm_or_value_error(self):
+        result = self.inspect("结束实验记录")
+        self.assertEqual(self.processor.calls, [])
+        self.assertTrue(result.end_session_execution_requested)
+        self.assertFalse(result.end_confirmation_requested)
+        self.assertIsNone(result.accepted_experiment)
+        self.assertEqual(
+            result.clarification_action.action_type,
+            ClarificationActionType.NO_ACTION,
+        )
+
     def test_llm_natural_review_forms_only_read_only_review(self):
         result = self.inspect("我还有什么没回答？")
         self.assertEqual(self.processor.calls, ["我还有什么没回答？"])

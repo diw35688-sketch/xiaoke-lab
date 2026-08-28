@@ -1,0 +1,132 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1120" viewBox="0 0 1600 1120">
+  <defs>
+    <style>
+      text { font-family: "Microsoft YaHei", "Noto Sans SC", sans-serif; fill:#172033; }
+      .title { font-size:36px; font-weight:700; }
+      .sub { font-size:19px; fill:#526078; }
+      .h { font-size:23px; font-weight:700; }
+      .t { font-size:18px; }
+      .small { font-size:16px; fill:#526078; }
+      .code { font-family:Consolas,monospace; font-size:16px; fill:#26344d; }
+      .box { stroke-width:2.5; rx:18; }
+      .arrow { stroke:#5b6b83; stroke-width:3; fill:none; marker-end:url(#arrow); }
+      .dash { stroke:#8794a8; stroke-width:2; stroke-dasharray:8 7; fill:none; }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#5b6b83"/>
+    </marker>
+    <linearGradient id="input" x1="0" x2="1"><stop stop-color="#eaf4ff"/><stop offset="1" stop-color="#d8ecff"/></linearGradient>
+    <linearGradient id="core" x1="0" x2="1"><stop stop-color="#efe9ff"/><stop offset="1" stop-color="#e1d8ff"/></linearGradient>
+    <linearGradient id="business" x1="0" x2="1"><stop stop-color="#fff5dc"/><stop offset="1" stop-color="#ffebbd"/></linearGradient>
+    <linearGradient id="output" x1="0" x2="1"><stop stop-color="#e8f8ee"/><stop offset="1" stop-color="#d2f1de"/></linearGradient>
+  </defs>
+
+  <rect width="1600" height="1120" fill="#f8fafc"/>
+  <text x="800" y="55" text-anchor="middle" class="title">Web 统一 Turn 沙漏结构</text>
+  <text x="800" y="88" text-anchor="middle" class="sub">多种输入先汇合成可信 TurnInput，统一理解后分业务，再汇合成最终 Turn，最后分别显示和播报</text>
+
+  <!-- input sources -->
+  <rect x="75" y="135" width="330" height="125" class="box" fill="url(#input)" stroke="#5b9bd5"/>
+  <text x="240" y="173" text-anchor="middle" class="h">文字输入</text>
+  <text x="240" y="207" text-anchor="middle" class="t">用户直接提交 text</text>
+  <text x="240" y="235" text-anchor="middle" class="code">input_source = text</text>
+
+  <rect x="635" y="135" width="330" height="125" class="box" fill="url(#input)" stroke="#5b9bd5"/>
+  <text x="800" y="173" text-anchor="middle" class="h">单次录音</text>
+  <text x="800" y="207" text-anchor="middle" class="t">WAV → ASRApplicationService</text>
+  <text x="800" y="235" text-anchor="middle" class="code">single_recording</text>
+
+  <rect x="1195" y="135" width="330" height="125" class="box" fill="url(#input)" stroke="#5b9bd5"/>
+  <text x="1360" y="173" text-anchor="middle" class="h">连续通话</text>
+  <text x="1360" y="207" text-anchor="middle" class="t">麦克风 → VAD切段 → ASR</text>
+  <text x="1360" y="235" text-anchor="middle" class="code">continuous_call</text>
+
+  <path d="M240 260 C240 310 585 305 690 350" class="arrow"/>
+  <path d="M800 260 L800 342" class="arrow"/>
+  <path d="M1360 260 C1360 310 1015 305 910 350" class="arrow"/>
+
+  <!-- TurnInput neck -->
+  <rect x="575" y="345" width="450" height="150" class="box" fill="url(#core)" stroke="#7b61c9"/>
+  <text x="800" y="382" text-anchor="middle" class="h">汇合口：TurnInput</text>
+  <text x="800" y="414" text-anchor="middle" class="t">统一身份 + 冻结模式 + 可信原文 + 可选ASR证据</text>
+  <text x="800" y="445" text-anchor="middle" class="code">request_id · turn_id · conversation_id</text>
+  <text x="800" y="472" text-anchor="middle" class="code">interaction_mode · experiment_context · raw_text · asr_result</text>
+
+  <rect x="80" y="326" width="385" height="168" class="box" fill="#ffffff" stroke="#aeb9c8"/>
+  <text x="272" y="360" text-anchor="middle" class="h">语音功能的职责边界</text>
+  <text x="105" y="395" class="t">✓ 保存/校验 WAV、哈希、ASRResult</text>
+  <text x="105" y="425" class="t">✓ 给 TurnInput 提供可信 raw_text</text>
+  <text x="105" y="455" class="t">✗ 不判断 experiment/control/uncertain</text>
+  <text x="105" y="480" class="t">✗ 不决定是否播放语音</text>
+  <path d="M465 410 L565 410" class="dash"/>
+
+  <rect x="1090" y="326" width="420" height="168" class="box" fill="#ffffff" stroke="#aeb9c8"/>
+  <text x="1300" y="360" text-anchor="middle" class="h">先按业务模式分派</text>
+  <text x="1115" y="395" class="t">TurnApplicationService</text>
+  <text x="1115" y="425" class="t">chat → ChatProcessor → 不进三分支</text>
+  <text x="1115" y="455" class="t">experiment → ExperimentProcessor</text>
+  <text x="1115" y="480" class="t">→ UnifiedObserver → 统一理解</text>
+  <path d="M1025 410 L1080 410" class="dash"/>
+
+  <path d="M800 495 L800 550" class="arrow"/>
+
+  <!-- unified understanding -->
+  <rect x="530" y="550" width="540" height="125" class="box" fill="url(#core)" stroke="#7b61c9"/>
+  <text x="800" y="587" text-anchor="middle" class="h">实验路径中的统一理解入口</text>
+  <text x="800" y="620" text-anchor="middle" class="t">UnifiedUnderstandingRouter：先规则命令，必要时再调用LLM</text>
+  <text x="800" y="649" text-anchor="middle" class="code">raw_text → experiment | control | uncertain</text>
+
+  <rect x="1100" y="535" width="420" height="155" class="box" fill="#ffffff" stroke="#aeb9c8"/>
+  <text x="1310" y="570" text-anchor="middle" class="h">UnifiedObserver 是什么？</text>
+  <text x="1125" y="605" class="t">它把当前 ReplyCoordinator 快照交给统一链，</text>
+  <text x="1125" y="634" class="t">得到“观察结果 + 待执行动作计划”。</text>
+  <text x="1125" y="663" class="small">自身负责隔离错误，不负责最终 SQLite COMMIT。</text>
+  <path d="M1070 612 L1095 612" class="dash"/>
+
+  <!-- branches -->
+  <path d="M800 675 C800 710 320 700 320 750" class="arrow"/>
+  <path d="M800 675 L800 750" class="arrow"/>
+  <path d="M800 675 C800 710 1280 700 1280 750" class="arrow"/>
+
+  <rect x="95" y="750" width="450" height="165" class="box" fill="url(#business)" stroke="#d39b2a"/>
+  <text x="320" y="787" text-anchor="middle" class="h">experiment：实验事实</text>
+  <text x="120" y="823" class="t">统一理解得到实验事件与实体</text>
+  <text x="120" y="854" class="t">→ 保存 experiment_events / lab_record</text>
+  <text x="120" y="885" class="t">→ 必要时创建追问动作</text>
+
+  <rect x="575" y="750" width="450" height="165" class="box" fill="url(#business)" stroke="#d39b2a"/>
+  <text x="800" y="787" text-anchor="middle" class="h">control：明确控制</text>
+  <text x="600" y="823" class="t">查看、回答、暂缓、确认、结束</text>
+  <text x="600" y="854" class="t">→ 明确命令尽量零次 LLM</text>
+  <text x="600" y="885" class="t">→ 只规划允许的状态动作</text>
+
+  <rect x="1055" y="750" width="450" height="165" class="box" fill="url(#business)" stroke="#d39b2a"/>
+  <text x="1280" y="787" text-anchor="middle" class="h">uncertain：证据不足</text>
+  <text x="1080" y="823" class="t">不能可靠判断实验还是控制</text>
+  <text x="1080" y="854" class="t">→ abstention / 提示换种说法</text>
+  <text x="1080" y="885" class="t">→ 不写实验事实，不改状态</text>
+
+  <!-- converge -->
+  <path d="M320 915 C320 960 625 940 700 980" class="arrow"/>
+  <path d="M800 915 L800 972" class="arrow"/>
+  <path d="M1280 915 C1280 960 975 940 900 980" class="arrow"/>
+
+  <rect x="535" y="975" width="530" height="105" class="box" fill="url(#output)" stroke="#4f9b69"/>
+  <text x="800" y="1011" text-anchor="middle" class="h">再汇合：PreparedTurn → SQLite COMMIT</text>
+  <text x="800" y="1043" text-anchor="middle" class="t">ConversationTurn / Blocks + 状态 + 证据 + 计时</text>
+  <text x="800" y="1069" text-anchor="middle" class="small">只有提交成功，才发布 turn_result 与 voice_delivery</text>
+
+  <!-- outputs -->
+  <rect x="80" y="970" width="360" height="110" class="box" fill="#e8f8ee" stroke="#4f9b69"/>
+  <text x="260" y="1008" text-anchor="middle" class="h">屏幕输出</text>
+  <text x="260" y="1040" text-anchor="middle" class="t">用户文字、助手文字、记录卡、步骤卡</text>
+  <text x="260" y="1068" text-anchor="middle" class="small">Block 决定“看见什么”</text>
+
+  <rect x="1160" y="970" width="360" height="110" class="box" fill="#e8f8ee" stroke="#4f9b69"/>
+  <text x="1340" y="1008" text-anchor="middle" class="h">语音输出</text>
+  <text x="1340" y="1040" text-anchor="middle" class="t">voice_delivery → TTS → 播放队列</text>
+  <text x="1340" y="1068" text-anchor="middle" class="small">独立决定“是否说出来”</text>
+
+  <path d="M535 1030 L450 1030" class="arrow"/>
+  <path d="M1065 1030 L1150 1030" class="arrow"/>
+</svg>

@@ -85,7 +85,41 @@ class ProtocolStoreTests(unittest.TestCase):
 
             protocol = store.get_by_id("heating-demo")
 
-            self.assertEqual(protocol.title, "加热示例")
+        self.assertEqual(protocol.title, "加热示例")
+
+    def test_loads_validated_step_local_value_aliases(self):
+        with tempfile.TemporaryDirectory() as directory:
+            data = valid_library()
+            data["protocols"][0]["steps"][0]["value_aliases"] = {
+                "temperature": ["60℃"]
+            }
+            protocol = ProtocolStore(self.write_library(directory, data)).get(
+                "heating-demo"
+            )
+
+            self.assertEqual(
+                protocol.steps[0].value_aliases["temperature"], ("60℃",)
+            )
+
+    def test_rejects_alias_for_field_without_protocol_value(self):
+        with tempfile.TemporaryDirectory() as directory:
+            data = valid_library()
+            data["protocols"][0]["steps"][0]["value_aliases"] = {
+                "object": ["样品"]
+            }
+
+            with self.assertRaisesRegex(ProtocolStoreError, "必须对应.*protocol_values"):
+                ProtocolStore(self.write_library(directory, data))
+
+    def test_rejects_aliases_that_are_not_a_json_array(self):
+        with tempfile.TemporaryDirectory() as directory:
+            data = valid_library()
+            data["protocols"][0]["steps"][0]["value_aliases"] = {
+                "temperature": "60℃"
+            }
+
+            with self.assertRaisesRegex(ProtocolStoreError, "必须是JSON数组"):
+                ProtocolStore(self.write_library(directory, data))
 
     def test_get_alias_returns_matching_protocol(self):
         with tempfile.TemporaryDirectory() as directory:

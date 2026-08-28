@@ -119,6 +119,9 @@ class ExperimentTurnInputContractTests(unittest.TestCase):
         wire = request.to_wire()
         self.assertEqual(json.loads(json.dumps(wire)), wire)
         self.assertEqual(wire["asr_result"]["schema_version"], 2)
+        self.assertEqual(wire["interaction_mode"], "experiment")
+        self.assertEqual(wire["experiment_context"], "free")
+        self.assertEqual(wire["input_source"], "single_recording")
 
     def test_contract_has_no_business_side_effect_methods(self):
         request = _input()

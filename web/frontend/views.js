@@ -44,7 +44,10 @@
 
   // ---------- 顶栏状态 ----------
   function refreshStatus() {
-    Promise.all([api('/settings'), api('/protocols/session')]).then(function (out) {
+    var protocolPath = window.protocolSessionUrl
+      ? window.protocolSessionUrl('/protocols/session')
+      : '/protocols/session';
+    Promise.all([api('/settings'), api(protocolPath)]).then(function (out) {
       var s = out[0], p = out[1];
       session = p;
       var bits = [];
@@ -358,14 +361,13 @@
 
       Array.prototype.forEach.call(host.querySelectorAll('.p-card'), function (card) {
         card.onclick = function () {
-          if (!card.dataset.id) {
-            api('/protocols/session', 'POST', { protocol_id: null }).then(function () {
-              refreshStatus();
-              window.shellShow('run');
-            });
-            return;
-          }
-          showProtocolDetail(host, card.dataset.id);
+          api('/protocols/session', 'POST', { protocol_id: card.dataset.id || null }).then(function () {
+            window.interactionModeState.select(card.dataset.id ? 'protocol' : 'free', card.dataset.id || null);
+            refreshStatus();
+            window.shellShow('chat');
+            if (window.composerRefresh) window.composerRefresh();
+            if (window.labStepsReload) window.labStepsReload();
+          });
         };
       });
 
@@ -604,52 +606,21 @@
   });
 
   // ---------- 本次记录页 ----------
-  window.shellRegisterView('records', function (host) {
-    api('/record/history').then(function (d) {
-      if (!d.count) {
-        host.innerHTML = '<div style="color:#94a3b8;font-size:13px">本次会话还没有记录。</div>';
-        return;
-      }
-      ensureCardStyles();
-      host.innerHTML = '<div class="card-toolbar">'
-        + '<input type="search" id="record-search" placeholder="搜索记录内容 / 字段…" autocomplete="off">'
-        + '<span style="font-size:12px;color:#64748b">会话 ' + esc(d.session_id) + ' · 共 ' + d.count + ' 段</span>'
-        + '</div>'
-        + '<div id="record-grid" class="card-grid"></div>';
-
-      function renderRecords(items) {
-        var grid = host.querySelector('#record-grid');
-        grid.innerHTML = items.map(function (it) {
-          var ents = Object.keys(it.entities || {}).map(function (k) {
-            return '<span style="background:#e0e7ff;color:#3730a3;border-radius:5px;padding:2px 7px;margin:2px 4px 2px 0;display:inline-block;font-size:11px">'
-              + esc(k) + '=' + esc(it.entities[k]) + '</span>';
-          }).join('') || '<span style="color:#94a3b8;font-size:12px">未抽到结构化字段</span>';
-          var ev = it.evaluation || {};
-          return '<div class="record-card">'
-            + '<div style="font-size:12px;color:#94a3b8;margin-bottom:5px">第 ' + it.segment_id + ' 段 · ' + esc(it.at) + '</div>'
-            + '<div style="color:#0f172a;margin-bottom:8px">' + esc(it.transcript) + '</div>'
-            + '<div>' + ents + '</div>'
-            + (ev.follow_up_required ? '<div style="background:#eff6ff;color:#1e40af;border-radius:8px;padding:9px 11px;margin-top:9px;font-size:12px">追问：'
-                + esc(ev.follow_up_question) + '</div>' : '')
-            + (ev.deviations || []).map(function (x) {
-                return '<div style="background:#fff7ed;color:#c2410c;border-radius:8px;padding:9px 11px;margin-top:7px;font-size:12px">偏差：'
-                  + esc(x.field) + ' 实际 ' + esc(x.actual_value) + '，方案 ' + esc(x.protocol_value) + '</div>';
-              }).join('')
-            + '</div>';
-        }).join('') || '<div class="card-empty">没有匹配的记录。</div>';
-      }
-      renderRecords(d.items || []);
-      var searchInput = host.querySelector('#record-search');
-      searchInput.addEventListener('input', function () {
-        var q = searchInput.value.trim().toLowerCase();
-        renderRecords((d.items || []).filter(function (it) {
-          if (!q) return true;
-          var hay = (it.transcript || '') + ' ' + Object.keys(it.entities || {}).join(' ') + ' ' + Object.values(it.entities || {}).join(' ');
-          return hay.toLowerCase().indexOf(q) >= 0;
-        }));
-      });
+  function reloadRecords() {
+    var host = window.shellCanvas ? window.shellCanvas() : document.getElementById('sh-canvas');
+    if (!host) return;
+    var path = window.protocolSessionUrl
+      ? window.protocolSessionUrl('/record/history')
+      : '/record/history';
+    api(path).then(function (data) {
+      host.innerHTML = window.renderExperimentLedger(data);
+    }).catch(function (error) {
+      host.innerHTML = '<div style="color:#c2410c;font-size:13px">读取本次实验账本失败：'
+        + esc(error.message || '未知错误') + '</div>';
     });
-  });
+  }
+  window.labRecordsReload = reloadRecords;
+  window.shellRegisterView('records', reloadRecords);
 
   // ---------- 设置页：分类侧边栏 + 内容区 ----------
   window.shellRegisterView('settings', function (host) {

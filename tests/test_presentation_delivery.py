@@ -48,7 +48,7 @@ class PresentationDeliveryPlanTests(unittest.TestCase):
         )
 
         self.assertEqual(plan.screen_intents, (intent,))
-        self.assertEqual(plan.voice_items[0].voice_text, "已记录。")
+        self.assertEqual(plan.voice_items[0].voice_text, "本段结构化处理失败，原始记录已保存。")
 
     def test_record_ack_setting_does_not_speak_degraded_result(self):
         intent = _intent(

@@ -28,6 +28,7 @@ class ClarificationActionType(str, Enum):
     ANSWER = "answer"
     CONFIRM = "confirm"
     REJECT_SUGGESTION = "reject_suggestion"
+    REACTIVATE = "reactivate"
     NO_ACTION = "no_action"
 
 
@@ -53,6 +54,9 @@ _ACTION_PERMISSIONS = {
         ClarificationMutationPermission.PREPARE_UPDATE
     ),
     ClarificationActionType.REJECT_SUGGESTION: (
+        ClarificationMutationPermission.PREPARE_UPDATE
+    ),
+    ClarificationActionType.REACTIVATE: (
         ClarificationMutationPermission.PREPARE_UPDATE
     ),
     ClarificationActionType.NO_ACTION: ClarificationMutationPermission.NONE,
@@ -129,6 +133,9 @@ class ClarificationAction:
     missing_fields: tuple[str, ...] = ()
     requires_confirmation: bool = False
     supplied_entity_fields: tuple[str, ...] = ()
+    protocol_id: str | None = None
+    protocol_version: str | None = None
+    protocol_step_number: int | None = None
 
     def __post_init__(self) -> None:
         for value, name in (
@@ -160,6 +167,7 @@ class ClarificationAction:
             ClarificationActionType.ANSWER,
             ClarificationActionType.CONFIRM,
             ClarificationActionType.REJECT_SUGGESTION,
+            ClarificationActionType.REACTIVATE,
         }
         if needs_target:
             if any(value is None for value in target_values):
@@ -206,6 +214,21 @@ class ClarificationAction:
             or self.requires_confirmation
         ):
             raise ValueError("非CREATE动作不能夹带新问题字段。")
+
+        protocol_scope = (
+            self.protocol_id,
+            self.protocol_version,
+            self.protocol_step_number,
+        )
+        if any(value is not None for value in protocol_scope):
+            if self.action_type != ClarificationActionType.CREATE:
+                raise ValueError("只有CREATE动作可以设置新问题的方案归属。")
+            if any(value is None for value in protocol_scope):
+                raise ValueError("方案归属必须同时包含方案、版本和步骤号。")
+            if not self.protocol_id.strip() or not self.protocol_version.strip():
+                raise ValueError("方案归属身份不能为空。")
+            if self.protocol_step_number <= 0:
+                raise ValueError("方案归属步骤号必须为正整数。")
 
 
 class ClarificationActionPlanner:
@@ -262,6 +285,19 @@ class ClarificationActionPlanner:
                 target,
                 ClarificationActionType.DEFER,
                 reason="准备按编号暂缓指定问题。",
+            )
+        if command_type == InteractionCommandType.REACTIVATE_TARGETED:
+            number = command.target_question_number
+            target = context.find_by_number(number) if number is not None else None
+            if target is None:
+                return cls._no_action(request, "指定的问题编号不存在。")
+            if target.status.value != "deferred":
+                return cls._no_action(request, "指定问题当前不是已暂缓状态。")
+            return cls._target_or_no_action(
+                request,
+                target,
+                ClarificationActionType.REACTIVATE,
+                reason="准备按编号恢复已暂缓问题。",
             )
         if command_type in {
             InteractionCommandType.AFFIRM,
@@ -323,6 +359,18 @@ class ClarificationActionPlanner:
         return cls._no_action(
             request,
             "LLM 识别到结束意图，需用户确认后才能结束会话。",
+        )
+
+    @classmethod
+    def from_end_execution(
+        cls,
+        request: DispatchExecutionRequest,
+    ) -> ClarificationAction:
+        """精确结束命令不是澄清问题，只产生显式结束计划。"""
+
+        return cls._no_action(
+            request,
+            "已采用用户的精确结束实验记录命令。",
         )
 
     @classmethod
@@ -390,8 +438,8 @@ class ClarificationActionPlanner:
         candidate = understanding.control.intent
         return InteractionCommand(
             command_type=candidate.command_type,
-            raw_text=request.asr_evidence.asr_transcript,
-            normalized_text=request.asr_evidence.asr_transcript,
+            raw_text=request.raw_text,
+            normalized_text=request.raw_text,
             target_question_number=candidate.target_question_number,
             answer_text=candidate.answer_text,
         )
@@ -434,7 +482,7 @@ class ClarificationActionPlanner:
             request_id=request.request_id,
             session_id=request.session_id,
             segment_id=request.segment_id,
-            asr_transcript=request.asr_evidence.asr_transcript,
+            asr_transcript=request.raw_text,
             action_type=action_type,
             mutation_permission=_ACTION_PERMISSIONS[action_type],
             reason=reason,

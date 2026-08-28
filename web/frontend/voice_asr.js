@@ -168,6 +168,48 @@
       button.textContent = '识别中…';
       say('正在识别，首次调用需加载模型，请稍候');
       var blob = stop();
+      if (window.turnClient) {
+        var unifiedSnapshot = recordingModeSnapshot;
+        recordingModeSnapshot = null;
+        var requestId = window.turnClient.identity('web-audio');
+        var turnId = window.turnClient.identity('turn-audio');
+        window.turnClient.submitAudio(blob, {
+          modeSnapshot: unifiedSnapshot,
+          inputSource: 'single_recording',
+          requestId: requestId,
+          turnId: turnId,
+          filename: 'segment.wav',
+          onEvent: function (event) {
+            if (event.type === 'turn_status') {
+              say(event.text || '正在处理…');
+            } else if (event.type === 'turn_result') {
+              var committed = event.turn;
+              if (!committed) throw new Error('Turn 结果缺少 ConversationTurn');
+              window.conversationTurnStore?.acceptCommittedTurn(committed);
+              var user = committed.blocks.find(function (block) { return block.type === 'user_text'; });
+              var transcript = user && user.payload ? user.payload.text : '';
+              el('asr-text').textContent = transcript;
+              if (transcript) window.addChatMessage?.(transcript, 'user');
+              window.addCommittedAssistantSurface?.(committed);
+              say(event.replayed ? '已恢复已提交结果' : '处理完成');
+              if (event.business?.kind === 'experiment') {
+                window.labStepsReload?.();
+                if (window.shellCurrentView?.() === 'records') window.labRecordsReload?.();
+              }
+            } else if (event.type === 'voice_delivery') {
+              window.consumeVoiceDelivery?.(event);
+            } else if (event.type === 'turn_error') {
+              throw new Error(event.detail || '语音 Turn 失败');
+            }
+          }
+        }).catch(function (err) {
+          say('处理失败：' + err.message);
+        }).finally(function () {
+          button.disabled = false;
+          button.textContent = '开始录音';
+        });
+        return;
+      }
       upload(blob).then(function (res) {
         button.disabled = false;
         button.textContent = '开始录音';

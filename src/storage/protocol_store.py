@@ -38,8 +38,9 @@ _STEP_FIELDS = frozenset({
     "terms",
     "hazard_note",
     "field_prompts",
+    "value_aliases",
 })
-_OPTIONAL_STEP_FIELDS = frozenset({"field_prompts", "substeps"})
+_OPTIONAL_STEP_FIELDS = frozenset({"field_prompts", "substeps", "value_aliases"})
 
 
 def _require_object(value: Any, location: str) -> dict[str, Any]:
@@ -179,6 +180,13 @@ class ProtocolStore:
             optional=_OPTIONAL_STEP_FIELDS,
         )
         terms = _require_list(data["terms"], f"{location}.terms")
+        raw_value_aliases = _require_object(
+            data.get("value_aliases", {}), f"{location}.value_aliases"
+        )
+        value_aliases = {
+            key: tuple(_require_list(value, f"{location}.value_aliases.{key}"))
+            for key, value in raw_value_aliases.items()
+        }
         try:
             return ProtocolStep(
                 step_number=data["step_number"],
@@ -197,6 +205,7 @@ class ProtocolStore:
                     for index, item in enumerate(data.get("substeps", []) or [], start=1)
                 ),
                 field_prompts=data.get("field_prompts", {}),
+                value_aliases=value_aliases,
             )
         except ProtocolError as error:
             raise ProtocolStoreError(f"{location}无效：{error}") from error

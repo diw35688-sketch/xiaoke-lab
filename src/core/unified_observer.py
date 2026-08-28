@@ -58,9 +58,12 @@ class UnifiedObservation:
     ) = None
     pending_action: ClarificationAction | None = None
     end_confirmation_requested: bool = False
+    end_session_execution_requested: bool = False
     answer_remaining_fields: tuple[str, ...] = ()
     answer_resolved: bool = False
     answer_hint: bool = False
+    partial: bool = False
+    partial_question: str | None = None
 
     def __post_init__(self) -> None:
         if self.partial:
@@ -113,9 +116,10 @@ class UnifiedObserver:
         request_id: str,
         session_id: str,
         segment_id: int,
-        asr_result: ASRResult,
+        asr_result: ASRResult | None,
         reply_coordinator: ReplyCoordinator,
         recent_context: tuple[str, ...] = (),
+        raw_text: str | None = None,
     ) -> UnifiedObservation:
         try:
             snapshot = ClarificationContextSnapshot(
@@ -133,6 +137,7 @@ class UnifiedObserver:
                 asr_result=asr_result,
                 clarification_context=snapshot,
                 recent_context=recent_context,
+                raw_text=raw_text,
             ))
             plan = result.execution_request.plan
             accepted = result.accepted_experiment
@@ -168,6 +173,9 @@ class UnifiedObserver:
                 pending_action=action,
                 end_confirmation_requested=(
                     result.end_confirmation_requested
+                ),
+                end_session_execution_requested=(
+                    getattr(result, "end_session_execution_requested", False)
                 ),
             )
         except Exception as error:

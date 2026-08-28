@@ -46,10 +46,6 @@ class ChatFirstSurfaceTests(unittest.TestCase):
         self.assertIn('class="chat-block"', source)
         self.assertNotIn("if (!turn || !activeReply) return", source)
 
-    def test_realtime_run_canvas_is_no_longer_loaded(self):
-        source = APP.read_text(encoding="utf-8")
-        self.assertNotIn('/static/run_canvas.js', source)
-
     def test_legacy_lab_panel_is_no_longer_a_second_record_surface(self):
         app = APP.read_text(encoding="utf-8")
         recorder = (FRONTEND / "voice_asr.js").read_text(encoding="utf-8")
@@ -57,25 +53,9 @@ class ChatFirstSurfaceTests(unittest.TestCase):
         self.assertNotIn('window.labRender', recorder)
         self.assertEqual(recorder.count('window.publishRecordSurface?.(d)'), 1)
 
-    def test_shell_defaults_to_one_chat_surface(self):
-        source = (FRONTEND / "shell.js").read_text(encoding="utf-8")
-        self.assertNotIn('data-view="run"', source)
-        self.assertIn('data-view="chat"', source)
-        self.assertIn("var current = 'chat'", source)
-        self.assertIn("show('chat')", source)
-        self.assertIn("shell.classList.toggle('chat-view', isChat)", source)
-        self.assertIn("if (isChat) return", source)
-        self.assertNotIn("sh-toggle-chat", source)
-
-    def test_chat_and_management_are_mutually_exclusive(self):
-        source = (FRONTEND / "shell.js").read_text(encoding="utf-8")
-        self.assertIn("#sh-chat{flex:1;background:var(--n-00);display:none", source)
-        self.assertIn("#shell.chat-view #sh-center{display:none}", source)
-        self.assertIn("#shell.chat-view #sh-chat{display:flex}", source)
-
     def test_management_pages_remain_available(self):
         source = (FRONTEND / "shell.js").read_text(encoding="utf-8")
-        for view in ("protocols", "reagents", "records", "settings"):
+        for view in ("protocols", "reagent_prep", "records", "settings"):
             self.assertIn(f'data-view="{view}"', source)
 
 

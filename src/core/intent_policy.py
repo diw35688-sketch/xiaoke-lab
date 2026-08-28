@@ -93,6 +93,13 @@ INTENT_POLICIES = {
         requires_clarification_context=True,
         reversible=True,
     ),
+    InteractionCommandType.REACTIVATE_TARGETED: IntentPolicy(
+        command_type=InteractionCommandType.REACTIVATE_TARGETED,
+        risk=IntentRisk.MEDIUM,
+        changes_session_state=True,
+        requires_clarification_context=True,
+        reversible=True,
+    ),
     InteractionCommandType.AFFIRM: IntentPolicy(
         command_type=InteractionCommandType.AFFIRM,
         risk=IntentRisk.MEDIUM,

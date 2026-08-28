@@ -26,7 +26,7 @@ def make_step(**changes):
 
 
 class ProtocolDeviationTests(unittest.TestCase):
-    def test_returns_only_string_level_mismatches_in_step_order(self):
+    def test_common_temperature_notation_is_not_a_deviation(self):
         deviations = detect_protocol_deviations(
             make_step(
                 protocol_values={
@@ -47,17 +47,40 @@ class ProtocolDeviationTests(unittest.TestCase):
             deviations,
             (
                 ProtocolDeviation(
-                    field_name="temperature",
-                    protocol_value="60摄氏度",
-                    actual_value="60℃",
-                ),
-                ProtocolDeviation(
                     field_name="condition",
                     protocol_value="恒温水浴",
                     actual_value="室温水浴",
                 ),
             ),
         )
+
+    def test_common_action_unit_and_numeric_notation_are_normalized(self):
+        deviations = detect_protocol_deviations(
+            make_step(
+                protocol_values={
+                    "action": "称量", "amount_unit": "g", "amount_value": "3.50",
+                },
+                must_record=("amount_value",),
+            ),
+            ExperimentEntities(action="称取", amount_unit="克", amount_value="3.5"),
+        )
+
+        self.assertEqual(deviations, ())
+
+    def test_step_local_alias_applies_only_when_declared_on_that_step(self):
+        actual = ExperimentEntities(object="磷酸盐")
+        without_alias = make_step(
+            protocol_values={"object": "磷酸二氢盐和磷酸氢二盐"},
+            must_record=("observation",),
+        )
+        with_alias = make_step(
+            protocol_values={"object": "磷酸二氢盐和磷酸氢二盐"},
+            must_record=("observation",),
+            value_aliases={"object": ("磷酸盐",)},
+        )
+
+        self.assertEqual(len(detect_protocol_deviations(without_alias, actual)), 1)
+        self.assertEqual(detect_protocol_deviations(with_alias, actual), ())
 
     def test_reports_deviation_for_protocol_only_field(self):
         """方案规定了目标值但该字段不在must_record里时，仍必须报告偏差。

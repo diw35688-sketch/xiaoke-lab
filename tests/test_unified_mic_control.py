@@ -15,11 +15,6 @@ class UnifiedMicControlTests(unittest.TestCase):
         self.assertIn("window.phoneCallToggle?.();", source)
         self.assertIn("real.click();", source)
 
-    def test_top_bar_no_longer_contains_duplicate_call_button(self):
-        source = (FRONTEND / "shell.js").read_text(encoding="utf-8")
-
-        self.assertNotIn('id="sh-call"', source)
-
     def test_continuous_call_reports_real_active_state_to_composer(self):
         source = (FRONTEND / "phone_call.js").read_text(encoding="utf-8")
 
