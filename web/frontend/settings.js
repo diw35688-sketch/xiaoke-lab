@@ -26,13 +26,13 @@
     '    <label class="settings-field"><span>MinerU 文件解析地址</span>',
     '      <input id="settings-mineru-url" type="text" placeholder="https://api.llm.ustc.edu.cn/mineru/file_parse" /></label>',
     '    <label class="settings-field"><span>MinerU 密钥</span>',
-    '      <input id="settings-mineru-key" type="password" autocomplete="off" placeholder="留空则使用科大 LLM 密钥" /></label>',
+    '      <input id="settings-mineru-key" type="password" autocomplete="off" placeholder="留空则使用主 LLM 密钥" /></label>',
     '    <label class="settings-field"><span>图片 OCR 地址</span>',
     '      <input id="settings-ocr-url" type="text" placeholder="https://api.llm.ustc.edu.cn/v1" /></label>',
     '    <label class="settings-field"><span>图片 OCR 模型</span>',
     '      <input id="settings-ocr-model" type="text" placeholder="unlimited-ocr" /></label>',
     '    <label class="settings-field"><span>图片 OCR 密钥</span>',
-    '      <input id="settings-ocr-key" type="password" autocomplete="off" placeholder="留空则使用科大 LLM 密钥" /></label>',
+    '      <input id="settings-ocr-key" type="password" autocomplete="off" placeholder="留空则使用主 LLM 密钥" /></label>',
     '    <div style="font-size:13px;font-weight:700;color:#0f172a;margin:18px 0 10px">社区设置</div>',
     '    <label class="settings-field"><span>远程社区服务地址</span>',
     '      <input id="settings-community-url" type="text" placeholder="http://124.221.234.222:3000/api" /></label>',
@@ -131,7 +131,7 @@
       el('settings-mineru-url').value = data.settings.mineru_file_parse_url || '';
       el('settings-mineru-key').placeholder = data.settings.mineru_api_key_set
         ? ('已保存 ' + data.settings.mineru_api_key + '，留空表示不修改')
-        : '留空则使用科大 LLM 密钥';
+        : '留空则使用主 LLM 密钥';
       el('settings-ocr-url').value = data.settings.ocr_base_url || '';
       el('settings-ocr-model').value = data.settings.ocr_model || 'unlimited-ocr';
       el('settings-voice-short').checked = data.settings.voice_short_reply !== false;
@@ -139,7 +139,7 @@
       el('settings-community-url').value = data.settings.community_base_url || 'http://124.221.234.222:3000/api';
       el('settings-ocr-key').placeholder = data.settings.ocr_api_key_set
         ? ('已保存 ' + data.settings.ocr_api_key + '，留空表示不修改')
-        : '留空则使用科大 LLM 密钥';
+        : '留空则使用主 LLM 密钥';
       var hit = presets.filter(function (p) { return p.base_url === data.settings.base_url; })[0];
       if (!hit && data.settings.model_name) {
         hit = presets.filter(function (p) { return p.model === data.settings.model_name; })[0];

@@ -198,11 +198,11 @@ def run_agent(history, conversation_id, interaction_mode=None):
             if presentation_plans:
                 return tool_reply_text(merge_tool_plans(presentation_plans))
     except APITimeoutError as error:
-        raise ModelServiceError("学校大模型连接超时。请检查校园网或 VPN 后重试。", 504) from error
+        raise ModelServiceError("大模型连接超时，请检查网络后重试。", 504) from error
     except APIConnectionError as error:
-        raise ModelServiceError("无法连接学校大模型服务。请检查网络后重试。", 502) from error
+        raise ModelServiceError("无法连接大模型服务，请检查网络后重试。", 502) from error
     except APIStatusError as error:
-        raise ModelServiceError(f"学校大模型服务返回异常（状态码 {error.status_code}）。", 502) from error
+        raise ModelServiceError(f"大模型服务返回异常（状态码 {error.status_code}）。", 502) from error
     return "工具调用次数过多，已停止本次请求。"
 
 
@@ -280,9 +280,9 @@ def stream_agent(history, conversation_id, interaction_mode=None):
                     yield ToolVoiceDeliveryBatch(plan.voice_items)
                 return
     except APITimeoutError as error:
-        raise ModelServiceError("学校大模型连接超时。请检查校园网或 VPN 后重试。", 504) from error
+        raise ModelServiceError("大模型连接超时，请检查网络后重试。", 504) from error
     except APIConnectionError as error:
-        raise ModelServiceError("无法连接学校大模型服务。请检查网络后重试。", 502) from error
+        raise ModelServiceError("无法连接大模型服务，请检查网络后重试。", 502) from error
     except APIStatusError as error:
-        raise ModelServiceError(f"学校大模型服务返回异常（状态码 {error.status_code}）。", 502) from error
+        raise ModelServiceError(f"大模型服务返回异常（状态码 {error.status_code}）。", 502) from error
     raise ModelServiceError("工具调用次数过多，已停止本次请求。", 500)
