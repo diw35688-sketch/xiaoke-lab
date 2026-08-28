@@ -188,6 +188,7 @@
   }
 
   function openMode(mode) {
+    if (window.logAction) window.logAction('new_chat_mode', { mode: mode });
     window.interactionModeState.select(mode === 'free' ? 'free' : mode);
     var opt = chat.querySelector('.new-chat-options');
     if (opt) opt.remove();

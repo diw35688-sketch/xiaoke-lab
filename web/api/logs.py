@@ -9,6 +9,7 @@ from fastapi.responses import PlainTextResponse
 REPO_ROOT = Path(__file__).resolve().parents[2]
 OUT_LOG = REPO_ROOT / "uvicorn_out.log"
 ERR_LOG = REPO_ROOT / "uvicorn_err.log"
+EVENT_LOG = REPO_ROOT / "debug_events.log"
 
 router = APIRouter(prefix="/api", tags=["调试日志"])
 
@@ -28,6 +29,14 @@ def _tail(path: Path, limit: int) -> str:
 def logs(limit: int = Query(default=200, ge=10, le=2000)):
     out = _tail(OUT_LOG, limit)
     err = _tail(ERR_LOG, limit)
-    if not out and not err:
+    events = _tail(EVENT_LOG, limit)
+    sections = []
+    if out:
+        sections.append("===== stdout =====\n" + out)
+    if err:
+        sections.append("===== stderr =====\n" + err)
+    if events:
+        sections.append("===== 前端行为 telemetry =====\n" + events)
+    if not sections:
         return "(暂无日志文件)"
-    return f"===== stdout =====\n{out}\n\n===== stderr =====\n{err}"
+    return "\n\n".join(sections)

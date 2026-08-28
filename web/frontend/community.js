@@ -12,6 +12,7 @@
 
   function api(path, opts) {
     opts = opts || {};
+    if (window.logAction) window.logAction('community_api', { path: path, method: opts.method || 'GET' });
     opts.headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
     if (token) opts.headers.Authorization = 'Bearer ' + token;
     return fetch(REMOTE_BASE + path, opts).then(function (r) {
