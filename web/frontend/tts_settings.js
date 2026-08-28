@@ -15,6 +15,13 @@
     '  <span style="display:block;font-size:13px;color:#334155;margin-bottom:6px;font-weight:600">语音服务密钥</span>',
     '  <input id="tts-key" type="password" placeholder="留空表示不修改" autocomplete="off" />',
     '</div>',
+    '<div id="tts-volcano-row" class="settings-field" style="display:none">',
+    '  <span style="display:block;font-size:13px;color:#334155;margin-bottom:6px;font-weight:600">火山引擎密钥（AppID 与 Access Token）</span>',
+    '  <div style="display:flex;gap:8px;flex-wrap:wrap">',
+    '    <input id="tts-appid" type="text" placeholder="AppID" style="flex:1;min-width:140px" />',
+    '    <input id="tts-access-token" type="password" placeholder="Access Token" style="flex:2;min-width:220px" autocomplete="off" />',
+    '  </div>',
+    '</div>',
     '<div id="tts-model-row" class="settings-field" style="display:none">',
     '  <span style="display:block;font-size:13px;color:#334155;margin-bottom:6px;font-weight:600">合成模型</span>',
     '  <div class="model-row"><input id="tts-model" type="text" list="tts-model-list" />',
@@ -47,7 +54,9 @@
       apiLink.href = meta.api_url || '#';
       apiLink.style.visibility = meta.api_url ? 'visible' : 'hidden';
     }
-    el('tts-key-row').style.display = meta.needs_key ? 'block' : 'none';
+    var isVolcano = id === 'volcano';
+    el('tts-key-row').style.display = (meta.needs_key && !isVolcano) ? 'block' : 'none';
+    el('tts-volcano-row').style.display = isVolcano ? 'block' : 'none';
     el('tts-model-row').style.display = meta.default_model ? 'block' : 'none';
     var voices = meta.voices || [];
     el('tts-voice-row').style.display = voices.length ? 'block' : 'none';
@@ -85,8 +94,14 @@
       tts_enabled: el('tts-enabled').checked,
       speak_record_ack: el('speak-record-ack').checked
     };
-    var key = el('tts-key').value.trim();
-    if (key) data.tts_api_key = key;
+    if (el('tts-provider').value === 'volcano') {
+      var appid = el('tts-appid').value.trim();
+      var accessToken = el('tts-access-token').value.trim();
+      if (appid && accessToken) data.tts_api_key = appid + ':' + accessToken;
+    } else {
+      var key = el('tts-key').value.trim();
+      if (key) data.tts_api_key = key;
+    }
     return data;
   }
 

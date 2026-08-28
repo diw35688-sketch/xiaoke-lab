@@ -93,7 +93,7 @@ def home(request: Request):
         '<script src="/static/step_cards.js?v=20260827-restore"></script>'
         '<script src="/static/record_ledger_view.js?v=20260827-deviation-values"></script>'
         '<script src="/static/settings.js?v=20260901-hidden"></script>'
-        '<script src="/static/tts_settings.js?v=20260901-tts-api"></script>'
+        '<script src="/static/tts_settings.js?v=20260901-volcano-fields"></script>'
         '<script src="/static/speak.js?v=20260820"></script>'
         '<script src="/static/views.js?v=20260827-unified-ledger"></script>'
         '<script src="/static/protocol_editor.js"></script>'
