@@ -110,8 +110,8 @@ class ExperimentCandidateAcceptor:
         understanding = outcome.value
         if understanding.experiment is None:
             raise ValueError("实验采用请求缺少experiment理解分支。")
-        if understanding.raw_text != request.asr_evidence.asr_transcript:
-            raise ValueError("统一理解原文与ASR证据不一致。")
+        if understanding.raw_text != request.raw_text:
+            raise ValueError("统一理解原文与可信输入原文不一致。")
 
         if outcome.degraded:
             cls._validate_degraded_dispatch(request, outcome.error)
@@ -125,18 +125,18 @@ class ExperimentCandidateAcceptor:
             raise ValueError("实验采用候选至少需要一个事件。")
         _validate_event_sources(
             analysis,
-            transcript=request.asr_evidence.asr_transcript,
+            transcript=request.raw_text,
             session_id=request.session_id,
             segment_id=request.segment_id,
         )
         if outcome.degraded:
             _validate_degraded_note(
                 analysis,
-                request.asr_evidence.asr_transcript,
+                request.raw_text,
             )
         elif _looks_like_degraded_note(
             analysis,
-            request.asr_evidence.asr_transcript,
+            request.raw_text,
         ):
             raise ValueError("降级NOTE不能伪装成正常实验采用。")
 
@@ -150,7 +150,7 @@ class ExperimentCandidateAcceptor:
             request_id=request.request_id,
             session_id=request.session_id,
             segment_id=request.segment_id,
-            asr_transcript=request.asr_evidence.asr_transcript,
+            asr_transcript=request.raw_text,
             kind=kind,
             analysis_json=analysis_json,
             event_count=len(analysis.events),

@@ -85,7 +85,7 @@ class ModeOutputPolicyTests(unittest.TestCase):
         self.assertNotIn("save", calls)
 
     def test_record_endpoint_rejects_explicit_chat_without_calling_service(self):
-        with mock.patch("api.record._build_record_service") as builder:
+        with mock.patch("api.turn.turn_application_service") as service:
             with self.assertRaises(HTTPException) as caught:
                 record(RecordPayload(
                     transcript="温度升到60度",
@@ -93,7 +93,7 @@ class ModeOutputPolicyTests(unittest.TestCase):
                     mode_version=4, input_source="single_recording",
                 ))
         self.assertEqual(caught.exception.status_code, 409)
-        builder.assert_not_called()
+        service.submit.assert_not_called()
 
     def test_chat_hides_and_hard_blocks_record_tool(self):
         names = [item["function"]["name"] for item in agent_core._tools_for_mode(InteractionMode.CHAT)]

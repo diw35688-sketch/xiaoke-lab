@@ -36,6 +36,26 @@ assert.strictEqual(tools[0].payload.status, 'done');
 assert.strictEqual(store.beginTurn(base).blocks.length, 3);
 assert.throws(() => store.beginTurn({...base, mode_version: 4}), /冲突/);
 
+// The committed result may add output Blocks without changing the immutable
+// request. It replaces the optimistic runtime view instead of looking like a
+// request_id collision.
+const committed = {
+  ...base,
+  blocks: [
+    ...base.blocks,
+    {block_id: 'assistant-1', type: 'assistant_text', payload: {text: '你好！'}},
+  ],
+};
+assert.strictEqual(store.acceptCommittedTurn(committed).blocks.length, 2);
+assert.strictEqual(store.getSnapshot().blocks[1].payload.text, '你好！');
+assert.throws(() => store.acceptCommittedTurn({
+  ...committed,
+  blocks: [
+    {block_id: 'user-1', type: 'user_text', payload: {text: '篡改输入'}},
+    committed.blocks[1],
+  ],
+}), /冲突/);
+
 const leaked = store.getSnapshot();
 leaked.blocks[0].payload.text = '篡改';
 assert.strictEqual(store.getSnapshot().blocks[0].payload.text, '你好');

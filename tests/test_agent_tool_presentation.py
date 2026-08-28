@@ -41,7 +41,8 @@ def _import_agent_core():
         "settings_store": _stub_module(
             "settings_store",
             current=lambda: SimpleNamespace(
-                api_key="test", base_url="test", model_name="test"
+                api_key="test", base_url="test", model_name="test",
+                voice_disable_thinking=False,
             ),
         ),
         "database.crud": _stub_module(
@@ -242,7 +243,7 @@ class AgentToolPresentationTests(unittest.TestCase):
         ):
             chunks = list(self.core.stream_agent([], "c-1"))
 
-        self.assertIn("已记录。", chunks)
+        self.assertIn("本段结构化处理失败，原始记录已保存。", chunks)
         self.assertFalse(
             any(isinstance(chunk, ToolVoiceDeliveryBatch) for chunk in chunks)
         )

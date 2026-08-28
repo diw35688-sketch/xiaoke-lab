@@ -31,6 +31,9 @@ class PendingClarification:
     revision: int = 1
     reply_pending: bool = True
     last_updated_segment_id: int | None = None
+    protocol_id: str | None = None
+    protocol_version: str | None = None
+    protocol_step_number: int | None = None
 
     def __post_init__(self) -> None:
         if not self.clarification_id.strip():
@@ -64,6 +67,18 @@ class PendingClarification:
             raise ValueError(
                 "只有 ACTIVE 问题可以等待主动提问。"
             )
+        protocol_scope = (
+            self.protocol_id,
+            self.protocol_version,
+            self.protocol_step_number,
+        )
+        if any(value is not None for value in protocol_scope):
+            if any(value is None for value in protocol_scope):
+                raise ValueError("方案问题必须包含完整的方案步骤归属。")
+            if not self.protocol_id.strip() or not self.protocol_version.strip():
+                raise ValueError("方案问题的方案身份不能为空。")
+            if self.protocol_step_number <= 0:
+                raise ValueError("方案问题的步骤号必须为正整数。")
 
     @property
     def is_active(self) -> bool:

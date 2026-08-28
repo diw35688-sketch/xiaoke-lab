@@ -22,6 +22,7 @@ from typing import Mapping
 
 import domain
 import llm_bridge
+import settings_store
 from record_service import RecordCommand, SharedRecordService
 from src.core.presentation_delivery import (
     PresentationDeliveryPlan,
@@ -776,7 +777,10 @@ def _record_observation(transcript):
     }
     return PresentedToolResult(
         payload=payload,
-        presentation_plan=build_delivery_plan(result.intents, ui_mode="user"),
+        presentation_plan=build_delivery_plan(
+            result.intents, ui_mode="user",
+            speech_rate=settings_store.current().tts_speed,
+        ),
     )
 
 

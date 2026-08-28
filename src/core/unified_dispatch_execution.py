@@ -26,23 +26,32 @@ class DispatchExecutionStatus(str, Enum):
 
 @dataclass(frozen=True)
 class DispatchExecutionRequest:
-    """带可信身份和ASR证据的分派执行请求；本身不执行动作。"""
+    """带可信身份、原文和可选 ASR 证据的分派执行请求。"""
 
     request_id: str
     session_id: str
     segment_id: int
-    asr_evidence: ASRResult
+    asr_evidence: ASRResult | None
     plan: UnifiedDispatchPlan
+    raw_text: str | None = None
 
     def __post_init__(self) -> None:
         _require_text(self.request_id, "request_id")
         _require_text(self.session_id, "session_id")
         if self.segment_id <= 0 or isinstance(self.segment_id, bool):
             raise ValueError("segment_id必须是正整数。")
-        if not self.asr_evidence.is_final:
-            raise ValueError("执行请求只接受最终ASR证据。")
-        if self.asr_evidence.asr_transcript != self.plan.asr_transcript:
-            raise ValueError("执行请求的ASR证据与分派计划原文不一致。")
+        raw_text = self.raw_text
+        if raw_text is None and self.asr_evidence is not None:
+            raw_text = self.asr_evidence.asr_transcript
+            object.__setattr__(self, "raw_text", raw_text)
+        _require_text(raw_text, "raw_text")
+        if self.asr_evidence is not None:
+            if not self.asr_evidence.is_final:
+                raise ValueError("执行请求只接受最终ASR证据。")
+            if self.asr_evidence.asr_transcript != raw_text:
+                raise ValueError("ASR证据与请求原文不一致。")
+        if raw_text != self.plan.asr_transcript:
+            raise ValueError("执行请求原文与分派计划原文不一致。")
 
     @property
     def destination(self) -> UnifiedDispatchDestination:

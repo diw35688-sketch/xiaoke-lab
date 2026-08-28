@@ -132,7 +132,10 @@
       var meta = (d.providers || []).filter(function (p) { return p.id === d.current.provider; })[0];
       el('cp-pop-tts').innerHTML = (meta ? meta.label.split('（')[0] : '—') + '<span class="chev">›</span>';
     }).catch(function () {});
-    fetch('/protocols/session').then(function (r) { return r.json(); }).then(function (d) {
+    var protocolPath = window.protocolSessionUrl
+      ? window.protocolSessionUrl('/protocols/session')
+      : '/protocols/session';
+    fetch(protocolPath).then(function (r) { return r.json(); }).then(function (d) {
       el('cp-pop-proto').innerHTML = (d.mode === 'protocol'
         ? d.protocol.title + ' 第' + d.step.number + '步' : '自由记录') + '<span class="chev">›</span>';
     }).catch(function () {});
@@ -171,7 +174,7 @@
         if (window.shellShow) window.shellShow('protocols');
         return false;
       }
-      window.interactionModeState.select('protocol');
+      window.interactionModeState.select('protocol', session.protocol.id);
       return true;
     }).catch(function () {
       if (window.shellShow) window.shellShow('protocols');

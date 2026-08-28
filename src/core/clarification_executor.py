@@ -74,6 +74,7 @@ _STATE_CHANGING_ACTIONS = frozenset({
     ClarificationActionType.ANSWER,
     ClarificationActionType.CONFIRM,
     ClarificationActionType.REJECT_SUGGESTION,
+    ClarificationActionType.REACTIVATE,
 })
 
 
@@ -128,6 +129,9 @@ class ClarificationExecutor:
         if action.action_type == ClarificationActionType.DEFER:
             return self._execute_targeted(action, "defer")
 
+        if action.action_type == ClarificationActionType.REACTIVATE:
+            return self._execute_reactivate(action)
+
         if action.action_type == ClarificationActionType.ANSWER:
             return self._execute_answer(action)
 
@@ -152,6 +156,9 @@ class ClarificationExecutor:
             missing_fields=action.missing_fields,
             requires_confirmation=action.requires_confirmation,
             clarification_id_prefix="unified",
+            protocol_id=action.protocol_id,
+            protocol_version=action.protocol_version,
+            protocol_step_number=action.protocol_step_number,
         )
         return self._result(
             action,
@@ -198,6 +205,35 @@ class ClarificationExecutor:
             ),
             affected_clarification_id=updated.clarification_id,
             affected_display_number=updated.display_number,
+        )
+
+    def _execute_reactivate(
+        self,
+        action: ClarificationAction,
+    ) -> ClarificationExecutionResult:
+        try:
+            updated = self._coordinator.reactivate_clarification(
+                clarification_id=action.target_clarification_id,
+                expected_revision=action.expected_revision,
+                segment_id=action.segment_id,
+            )
+        except ValueError as error:
+            return self._result(
+                action,
+                state_changed=False,
+                reason=str(error),
+            )
+
+        return self._result(
+            action,
+            state_changed=True,
+            reason=(
+                f"已恢复问题 {updated.display_number}："
+                f"{updated.question}"
+            ),
+            affected_clarification_id=updated.clarification_id,
+            affected_display_number=updated.display_number,
+            remaining_fields=updated.missing_fields,
         )
 
     def _execute_confirm(
