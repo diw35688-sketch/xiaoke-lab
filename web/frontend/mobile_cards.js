@@ -541,8 +541,7 @@
   }
 
   // ---------- 8. 实验方案选择（真实数据源） ----------
-  function populateProtocols() {
-    var sel = el('protocol-select');
+  function bindProtocolSelect(sel) {
     if (!sel) return;
     fetch('/protocols').then(function (r) { return r.json(); }).then(function (d) {
       var items = d.protocols || [];
@@ -563,6 +562,20 @@
         setVoiceSoon('idle', '选择方案失败', 1500);
       });
     };
+  }
+
+  function populateProtocols() {
+    bindProtocolSelect(el('protocol-select'));
+    bindProtocolSelect(el('m-protocol-select'));
+  }
+
+  function submitTextChat() {
+    var input = el('m-chat-input');
+    var text = input ? input.value.trim() : '';
+    if (!text) return;
+    if (input) input.value = '';
+    if (window.logAction) window.logAction('mobile_chat_send', { text: text.slice(0, 80) });
+    submitTranscript(text);
   }
 
   // ---------- 9. 数据源切换 ----------
@@ -792,6 +805,13 @@
     renderThemeButtons();
     restoreBgImage();
     bindBgControls();
+    var chatInput = el('m-chat-input'), chatSend = el('m-chat-send');
+    if (chatInput && chatSend) {
+      chatSend.onclick = submitTextChat;
+      chatInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); submitTextChat(); }
+      });
+    }
     populateProtocols();
     // 预加载 AI 形象立绘，切状态不闪
     Object.keys(AVATAR).forEach(function (k) {
@@ -814,6 +834,7 @@
     setVoice: setVoice,
     setTheme: setTheme,
     submitTranscript: submitTranscript,
+    submitTextChat: submitTextChat,
     resetConversation: resetConversation,
     isReal: function () { return dataSource === 'real'; },
     MOCK_CARDS: MOCK_CARDS,
