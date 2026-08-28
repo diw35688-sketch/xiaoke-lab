@@ -49,6 +49,7 @@ sys.path.insert(0, str(WEB_DIR))
 os.chdir(WEB_DIR)
 
 import phone_access  # noqa: E402
+import access_control  # noqa: E402
 
 
 def find_cloudflared() -> str | None:
@@ -103,10 +104,11 @@ def run_tunnel_mode(cloudflared: str) -> None:
                 print("=" * 58)
                 print("实验助手已通过公网隧道启动（手机无需同一 WiFi）")
                 print(f"  电脑访问: http://127.0.0.1:8000")
-                print(f"  手机访问: {public_url}")
-                print(f"  二维码页: {public_url}/phone")
+                protected_url = access_control.add_token(public_url)
+                print(f"  手机访问: {protected_url}")
+                print(f"  二维码页: {access_control.add_token(public_url + '/phone')}")
                 print("=" * 58)
-                print_ascii_qr(public_url)
+                print_ascii_qr(protected_url)
 
         if public_url is None:
             print("[!] 隧道启动失败：没有读取到公网地址。")
@@ -136,14 +138,15 @@ def run_lan_mode() -> None:
     print("=" * 58)
     print("实验助手已启动（局域网模式）")
     print(f"  电脑访问: {scheme}://127.0.0.1:8000")
-    print(f"  手机访问: {url}")
+    protected_url = access_control.add_token(url)
+    print(f"  手机访问: {protected_url}")
     print(f"  二维码页: {scheme}://127.0.0.1:8000/phone")
     if scheme == "https":
         print("  已启用 HTTPS 自签名证书；手机首次打开需信任证书")
     else:
         print("  未启用 HTTPS；手机麦克风可能被浏览器禁用")
     print("=" * 58)
-    print_ascii_qr(url)
+    print_ascii_qr(protected_url)
 
     import uvicorn
 

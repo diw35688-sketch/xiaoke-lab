@@ -25,6 +25,13 @@ def get_status():
 def set_mode(payload: ModePayload):
     if payload.mode not in {"lan", "tunnel"}:
         raise HTTPException(status_code=400, detail="mode 必须是 lan 或 tunnel")
+    try:
+        result = network_mode.set_mode(payload.mode)
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+    if payload.mode == "tunnel" and not result.get("tunnel_running"):
+        raise HTTPException(status_code=502, detail=result.get("error", "隧道启动失败"))
+    return result
 
 @router.get("/set")
 def set_mode_get(mode: str):
@@ -38,11 +45,3 @@ def set_mode_get(mode: str):
         error = result.get("error", "隧道启动失败")
         return RedirectResponse(f"/phone?error={quote(error)}", status_code=303)
     return RedirectResponse("/phone", status_code=303)
-
-    try:
-        result = network_mode.set_mode(payload.mode)
-    except Exception as error:
-        raise HTTPException(status_code=500, detail=str(error)) from error
-    if payload.mode == "tunnel" and not result.get("tunnel_running"):
-        raise HTTPException(status_code=502, detail=result.get("error", "隧道启动失败"))
-    return result

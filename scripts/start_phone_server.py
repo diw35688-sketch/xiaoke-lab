@@ -28,6 +28,7 @@ sys.path.insert(0, str(WEB_DIR))
 os.chdir(WEB_DIR)
 
 import phone_access  # noqa: E402
+import access_control  # noqa: E402
 
 
 def ensure_self_signed_cert(ip: str) -> tuple[str, str] | None:
@@ -112,15 +113,16 @@ def main() -> None:
             print("    2) 用 cloudflared tunnel --url http://localhost:8000 走临时公网 HTTPS")
 
     url = f"{scheme}://{ip}:{args.port}"
+    protected_url = access_control.add_token(url)
     print("=" * 56)
     print("实验助手已发布，手机和电脑连同一个 WiFi")
     print(f"  桌面访问: {scheme}://127.0.0.1:{args.port}")
-    print(f"  手机访问: {url}")
+    print(f"  手机访问: {protected_url}")
     print(f"  二维码页: {scheme}://127.0.0.1:{args.port}/phone")
     if scheme == "https":
         print("  HTTPS 自签名证书已就绪；手机首次打开需信任证书")
     print("=" * 56)
-    print_ascii_qr(url)
+    print_ascii_qr(protected_url)
 
     import uvicorn
 

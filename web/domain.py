@@ -107,6 +107,11 @@ def start_session(selection) -> ProtocolSessionState:
         return _session
 
 
+def reset_session() -> ProtocolSessionState:
+    """开始全新的实验会话：退出旧方案并清空全部步骤进度。"""
+    return start_session(None)
+
+
 def record_step_fields(step_number: int, fields: dict, has_deviation: bool) -> None:
     """把一段口述的实体字段与偏差登记进当前步骤并落盘。"""
     with _lock:
@@ -278,6 +283,27 @@ def evaluate(entities_dict: dict) -> dict:
             for name, v in result.sourced_values.items()
         },
     }
+
+
+def evaluate_and_record(entities_dict: dict) -> dict:
+    """原子地评估本段、累计步骤字段，再按累计进度生成追问。"""
+    with _lock:
+        result = evaluate(entities_dict)
+        step = session().current_step()
+        if step is None:
+            return result
+        record_step_fields(
+            step.step_number, entities_dict, bool(result.get("deviations"))
+        )
+        missing = _progress.missing_fields(step)
+        prompts = [
+            step.field_prompts.get(name, f"请补充现场记录：{name}。")
+            for name in missing
+        ]
+        result["missing_fields"] = missing
+        result["follow_up_question"] = " ".join(prompts) if prompts else None
+        result["follow_up_required"] = bool(missing)
+        return result
 
 def all_steps_view(state) -> dict:
     """当前方案的全部步骤概要，供状态机卡片栏渲染。"""
