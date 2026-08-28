@@ -8,7 +8,8 @@
     '<hr style="border:0;border-top:1px solid #e2e8f0;margin:20px 0">',
     '<h3 style="margin:0 0 14px;font-size:16px;color:#0f172a">语音合成</h3>',
     '<label class="settings-field"><span>合成方式</span>',
-    '  <select id="tts-provider"></select>',
+    '  <div class="preset-row"><select id="tts-provider"></select>',
+    '    <a id="tts-api-url" href="#" target="_blank" rel="noopener" class="api-link" style="visibility:hidden">获取 API</a></div>',
     '  <em id="tts-note"></em></label>',
     '<div id="tts-key-row" class="settings-field" style="display:none">',
     '  <span style="display:block;font-size:13px;color:#334155;margin-bottom:6px;font-weight:600">语音服务密钥</span>',
@@ -41,6 +42,11 @@
     var meta = providers.filter(function (p) { return p.id === id; })[0];
     if (!meta) return;
     el('tts-note').textContent = meta.note || '';
+    var apiLink = el('tts-api-url');
+    if (apiLink) {
+      apiLink.href = meta.api_url || '#';
+      apiLink.style.visibility = meta.api_url ? 'visible' : 'hidden';
+    }
     el('tts-key-row').style.display = meta.needs_key ? 'block' : 'none';
     el('tts-model-row').style.display = meta.default_model ? 'block' : 'none';
     var voices = meta.voices || [];
