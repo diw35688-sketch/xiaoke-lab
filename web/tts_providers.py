@@ -73,7 +73,7 @@ PROVIDERS = [
         "needs_key": True, "server_side": True,
         "default_base_url": "https://openspeech.bytedance.com/api/v1/tts",
         "default_model": "volcano_tts",
-        "api_url": "https://console.volcengine.com/ark/region:ark+cn-beijing/openManagement?OpenToken=1",
+        "api_url": "https://console.volcengine.com/speech/app",
         "note": "密钥填 appid:access_token（冒号分隔）。「合成模型」框填控制台 cluster（默认 volcano_tts）。音色为火山官方中文女声/童声（免费21款内为主），可自由切换试听。",
         "voices": [
             {"id": "BV001_streaming", "label": "通用女声（亲切，12种情感）"},
