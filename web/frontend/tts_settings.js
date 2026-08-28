@@ -14,10 +14,6 @@
     '  <span style="display:block;font-size:13px;color:#334155;margin-bottom:6px;font-weight:600">语音服务密钥</span>',
     '  <input id="tts-key" type="password" placeholder="留空表示不修改" autocomplete="off" />',
     '</div>',
-    '<div id="tts-url-row" class="settings-field" style="display:none">',
-    '  <span style="display:block;font-size:13px;color:#334155;margin-bottom:6px;font-weight:600">接口地址</span>',
-    '  <input id="tts-base-url" type="text" />',
-    '</div>',
     '<div id="tts-model-row" class="settings-field" style="display:none">',
     '  <span style="display:block;font-size:13px;color:#334155;margin-bottom:6px;font-weight:600">合成模型</span>',
     '  <div class="model-row"><input id="tts-model" type="text" list="tts-model-list" />',
@@ -46,14 +42,12 @@
     if (!meta) return;
     el('tts-note').textContent = meta.note || '';
     el('tts-key-row').style.display = meta.needs_key ? 'block' : 'none';
-    el('tts-url-row').style.display = meta.default_base_url ? 'block' : 'none';
     el('tts-model-row').style.display = meta.default_model ? 'block' : 'none';
     var voices = meta.voices || [];
     el('tts-voice-row').style.display = voices.length ? 'block' : 'none';
     el('tts-voice').innerHTML = voices.map(function (v) {
       return '<option value="' + v.id + '">' + v.label + '</option>';
     }).join('');
-    if (meta.default_base_url && !el('tts-base-url').value) el('tts-base-url').value = meta.default_base_url;
     if (meta.default_model && !el('tts-model').value) el('tts-model').value = meta.default_model;
   }
 
@@ -65,7 +59,6 @@
       }).join('');
       var cur = d.current || {};
       el('tts-provider').value = cur.provider || 'browser';
-      el('tts-base-url').value = cur.base_url || '';
       el('tts-model').value = cur.model || '';
       el('tts-speed').value = cur.speed || 1;
       el('tts-speed-label').textContent = (cur.speed || 1).toFixed ? (cur.speed || 1).toFixed(1) : cur.speed;
@@ -80,7 +73,6 @@
   function payload() {
     var data = {
       tts_provider: el('tts-provider').value,
-      tts_base_url: el('tts-base-url').value.trim(),
       tts_model: el('tts-model').value.trim(),
       tts_voice: el('tts-voice').value || '',
       tts_speed: parseFloat(el('tts-speed').value),
@@ -122,7 +114,6 @@
       msg.textContent = '正在拉取语音模型…';
       var payload = {
         provider: el('tts-provider').value,
-        base_url: el('tts-base-url').value.trim(),
         api_key: el('tts-key').value.trim()
       };
       fetch('/tts/models', {

@@ -47,7 +47,6 @@ def providers():
             "speed": current.tts_speed,
             "enabled": current.tts_enabled,
             "speak_record_ack": current.speak_record_ack,
-            "base_url": current.tts_base_url,
             "model": current.tts_model,
             "api_key_set": bool(current.tts_api_key),
         },

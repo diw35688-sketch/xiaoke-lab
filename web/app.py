@@ -25,6 +25,7 @@ from api.record import router as record_router
 from api.settings import router as settings_router
 from api.storage import router as storage_router
 from api.community import router as community_router
+from api.community_proxy import router as community_proxy_router
 from api.tasks import router as tasks_router
 from api.templates import router as templates_router
 from api.tts import router as tts_router
@@ -91,14 +92,14 @@ def home(request: Request):
         '<script src="/static/run_canvas.js"></script>'
         '<script src="/static/step_cards.js?v=20260827-restore"></script>'
         '<script src="/static/record_ledger_view.js?v=20260827-deviation-values"></script>'
-        '<script src="/static/settings.js?v=20260829"></script>'
-        '<script src="/static/tts_settings.js"></script>'
+        '<script src="/static/settings.js?v=20260901-hidden"></script>'
+        '<script src="/static/tts_settings.js?v=20260901-hidden"></script>'
         '<script src="/static/speak.js?v=20260820"></script>'
         '<script src="/static/views.js?v=20260827-unified-ledger"></script>'
         '<script src="/static/protocol_editor.js"></script>'
         '<script src="/static/reagent_prep.js?v=20260820"></script>'
         '<script src="/static/storage.js?v=20260821"></script>'
-        '<script src="/static/community.js?v=20260831"></script>'
+        '<script src="/static/community.js?v=20260901-proxy"></script>'
         '<script src="/static/notifications.js?v=20260821"></script>'
         '<script src="/static/composer.js?v=20260901-no-cpmodes"></script>'
           '<script src="/static/voice_startup_ui.js?v=20260826"></script>'
@@ -209,6 +210,7 @@ app.include_router(protocols_router)
 app.include_router(reagent_prep_router)
 app.include_router(storage_router)
 app.include_router(community_router)
+app.include_router(community_proxy_router)
 app.include_router(asr_router)
 app.include_router(record_router)
 app.include_router(tts_router)
