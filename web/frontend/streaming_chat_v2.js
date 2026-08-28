@@ -191,29 +191,29 @@
     window.interactionModeState.select(mode === 'free' ? 'free' : mode);
     var opt = chat.querySelector('.new-chat-options');
     if (opt) opt.remove();
-    var intro = chat.querySelector('.mode-intro');
-    if (intro) intro.remove();
-    var div = document.createElement('div');
-    div.className = 'mode-intro';
+    var input = document.getElementById('message');
     if (mode === 'free') {
+      // 自由模式留在聊天区，并显示预设提示
+      var intro = chat.querySelector('.mode-intro');
+      if (intro) intro.remove();
+      var div = document.createElement('div');
+      div.className = 'mode-intro';
       div.innerHTML = '<div class="mi-title">🧪 自由模式已开启</div>'
         + '<div class="mi-desc">可以自由聊天、记录实验，不绑定方案。说一句即可开始。</div>';
-    } else if (mode === 'template') {
-      div.innerHTML = '<div class="mi-title">📄 制作模板模式已开启</div>'
-        + '<div class="mi-desc">我具备模板制作技能：可以读取你上传的 PDF/图片/文本，走 MinerU/OCR 识别，并按规范整理成试剂配方或实验方案模板。</div>'
-        + '<div class="mi-actions"><button class="mi-btn" id="mi-upload">上传文件</button><button class="mi-btn ghost" id="mi-goto-prep">去试剂配置库</button></div>';
-      div.querySelector('#mi-upload').onclick = function () { document.getElementById('cp-file')?.click(); };
-      div.querySelector('#mi-goto-prep').onclick = function () { if (window.shellShow) window.shellShow('reagent_prep'); };
-    } else if (mode === 'storage') {
-      div.innerHTML = '<div class="mi-title">🗃 制作储存库模式已开启</div>'
-        + '<div class="mi-desc">我可以帮你登记存储位置（冰箱/冰柜/试剂柜）、物品、库存数量、有效期，并调用储存库工具。也可以去储存库页面可视化编辑。</div>'
-        + '<div class="mi-actions"><button class="mi-btn primary" id="mi-goto-storage">去储存库页面</button></div>';
-      div.querySelector('#mi-goto-storage').onclick = function () { if (window.shellShow) window.shellShow('storage'); };
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+      if (input) input.focus();
+      return;
     }
-    chat.appendChild(div);
-    chat.scrollTop = chat.scrollHeight;
-    var input = document.getElementById('message');
-    if (input) input.focus();
+    if (mode === 'template') {
+      // 制作模板：跳转到实验方案页（支持 PDF/图片 OCR 生成规范模板）
+      if (window.shellShow) window.shellShow('protocols');
+      return;
+    }
+    if (mode === 'storage') {
+      // 制作储存库：跳转到储存库页面
+      if (window.shellShow) window.shellShow('storage');
+    }
   }
 
   function showNewChatOptions() {

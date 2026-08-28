@@ -258,31 +258,18 @@
       continuousActive = Boolean(event.detail && event.detail.active);
       el('cp-mic').classList.toggle('rec', continuousActive);
       el('cp-mic').textContent = continuousActive ? '■' : '◉';
-      el('cp-hint').textContent = continuousActive ? '连续通话中，正在聆听' :
-        (el('cp-continuous').checked ? '连续通话，点麦克风开始' : '单次录音');
+      el('cp-hint').textContent = continuousActive ? '连续通话中，正在聆听' : '单次录音';
     });
-    el('cp-continuous').onchange = function () {
-      if (!this.checked && window.phoneCallIsActive?.()) window.phoneCallToggle?.();
-      if (!continuousActive) {
-        el('cp-hint').textContent = this.checked ? '连续通话，点麦克风开始' : '单次录音';
-        el('cp-mic').title = this.checked ? '开始或结束连续通话' : '开始或结束单次录音';
-      }
-    };
     el('cp-mic').onclick = function () {
-      if (el('cp-continuous').checked) {
-        window.phoneCallToggle?.();
-        return;
-      }
       var real = document.getElementById('asr-btn');
       if (!real || real.disabled) return;
       real.click();
     };
 
-    // 模型/语音/方案 快捷面板
+    // 模型：直接进入模型设置页（选择模型/API/供应商）
     el('cp-model').onclick = function (e) {
       e.stopPropagation();
-      el('cp-pop').classList.toggle('on');
-      refresh();
+      if (window.shellShow) window.shellShow('settings');
     };
     document.addEventListener('click', function () { el('cp-pop').classList.remove('on'); });
     el('cp-pop').onclick = function (e) { e.stopPropagation(); };
