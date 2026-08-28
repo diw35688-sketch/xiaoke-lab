@@ -478,30 +478,22 @@
     });
   }
 
-  // 对话记忆：后端按 conversation_id 记住上下文；不带它就会每句"失忆"。
+  // 对话记忆：手机端不保存自己的会话，统一使用电脑端/服务端的最新会话。
   function convId() {
-    var id = null;
-    try { id = localStorage.getItem('mobileConversationId'); } catch (e) {}
-    return id || null;
+    return null;
   }
-  function saveConvId(id) {
-    if (!id) return;
-    try { localStorage.setItem('mobileConversationId', id); } catch (e) {}
+  function saveConvId(_id) {
+    // 手机端不写本地会话，始终跟随电脑端最新会话。
   }
-  // 与电脑端共用对话：手机端没有本地会话时，优先使用服务端最新会话。
+  // 与电脑端共用对话：每次直接从服务端取最新会话。
   function resolveConvId() {
-    var local = convId();
-    if (local) return Promise.resolve(local);
     return fetch('/chat/conversations').then(function (r) { return r.json(); }).then(function (d) {
       var items = (d && d.items) || [];
-      var latest = items[0] && items[0].conversation_id;
-      if (latest) saveConvId(latest);
-      return latest || null;
+      return (items[0] && items[0].conversation_id) || null;
     }).catch(function () { return null; });
   }
   function resetConversation() {
-    try { localStorage.removeItem('mobileConversationId'); } catch (e) {}
-    setVoiceSoon('idle', '对话记忆已重置（下一句开始全新上下文）', 1800);
+    setVoiceSoon('idle', '手机端不保存独立会话，重置无效；请到电脑端新建/切换会话', 1800);
   }
 
   // 语音文本 → /chat → 大模型工具调用（record_observation / move_step）→ 状态机判定
