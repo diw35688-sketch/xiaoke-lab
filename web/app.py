@@ -61,7 +61,7 @@ def home(request: Request):
     page = page.replace('/static/inworld_tts.js', '/static/local_tts.js?v=20260826-shared-warmup')
     page = page.replace('</head>', '<link rel="stylesheet" href="/static/theme.css"></head>')
     # 注入模型设置面板（任何人都能在网页里配置模型）
-    page = page.replace('</body>', ('<script src="/static/settings.js"></script>'
+    page = page.replace('</body>', ('<script src="/static/settings.js?v=20260829"></script>'
                                    '<script src="/static/tts_settings.js"></script>'
                                    '<script src="/static/speak.js?v=20260820"></script>'
                                    '<script src="/static/interaction_mode_state.js?v=20260825"></script>'
@@ -92,7 +92,7 @@ def home(request: Request):
         '<script src="/static/protocol_editor.js"></script>'
         '<script src="/static/reagent_prep.js?v=20260820"></script>'
         '<script src="/static/storage.js?v=20260821"></script>'
-        '<script src="/static/community.js?v=20260822"></script>'
+        '<script src="/static/community.js?v=20260830"></script>'
         '<script src="/static/notifications.js?v=20260821"></script>'
         '<script src="/static/composer.js?v=20260825-mode-sync"></script>'
           '<script src="/static/voice_startup_ui.js?v=20260826"></script>'
