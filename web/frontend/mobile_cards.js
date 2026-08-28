@@ -488,6 +488,17 @@
     if (!id) return;
     try { localStorage.setItem('mobileConversationId', id); } catch (e) {}
   }
+  // 与电脑端共用对话：手机端没有本地会话时，优先使用服务端最新会话。
+  function resolveConvId() {
+    var local = convId();
+    if (local) return Promise.resolve(local);
+    return fetch('/chat/conversations').then(function (r) { return r.json(); }).then(function (d) {
+      var items = (d && d.items) || [];
+      var latest = items[0] && items[0].conversation_id;
+      if (latest) saveConvId(latest);
+      return latest || null;
+    }).catch(function () { return null; });
+  }
   function resetConversation() {
     try { localStorage.removeItem('mobileConversationId'); } catch (e) {}
     setVoiceSoon('idle', '对话记忆已重置（下一句开始全新上下文）', 1800);
@@ -516,12 +527,14 @@
   function submitTranscript(text) {
     setVoice('thinking', 'AI 正在理解…');
     hideAiBubble();
-    return fetch('/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text, conversation_id: convId() }),
-    }).then(function (r) {
-      return r.json().then(function (d) { return { ok: r.ok, d: d }; });
+    return resolveConvId().then(function (conversationId) {
+      return fetch('/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, conversation_id: conversationId }),
+      }).then(function (r) {
+        return r.json().then(function (d) { return { ok: r.ok, d: d }; });
+      });
     }).then(function (res) {
       if (!res.ok) {
         var err = (res.d && res.d.detail) || '未知错误';
