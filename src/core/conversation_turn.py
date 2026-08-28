@@ -24,6 +24,7 @@ class ExperimentContext(str, Enum):
     FREE = "free"
     PROTOCOL = "protocol"
     TEMPLATE = "template"
+    STORAGE = "storage"
 
 
 class InputSource(str, Enum):
@@ -170,7 +171,7 @@ class ConversationTurn:
             if self.experiment_context != ExperimentContext.NONE:
                 raise ValueError("chat 模式的 experiment_context 必须是 none。")
         elif self.experiment_context == ExperimentContext.NONE:
-            raise ValueError("experiment 模式必须选择 free、protocol 或 template 上下文。")
+            raise ValueError("experiment 模式必须选择 free、protocol、template 或 storage 上下文。")
 
         block_ids = [block.block_id for block in self.blocks]
         if len(block_ids) != len(set(block_ids)):

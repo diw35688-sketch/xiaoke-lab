@@ -9,7 +9,7 @@ from typing import Callable, Mapping, Protocol
 import domain
 import llm_bridge
 import settings_store
-from agent.core import refine_chat_answer, run_agent, run_template_agent
+from agent.core import refine_chat_answer, run_agent, run_storage_agent, run_template_agent
 from database.crud import get_recent_messages
 from database.turn_store import TurnStore
 from src.core.clarification_executor import ClarificationExecutor
@@ -198,6 +198,47 @@ class TemplateProcessor:
         return PreparedTurn(
             turn=conversation_turn,
             business={"kind": "template"},
+            messages=(
+                {"role": "user", "content": turn.raw_text, "block_id": user.block_id},
+                {"role": "assistant", "content": answer, "block_id": assistant.block_id},
+            ),
+            voice_items=(),
+        )
+
+
+class StorageProcessor:
+    """制作储存库：识别位置/物品并调用储存库工具登记。"""
+
+    def __init__(self, *, generate=run_storage_agent, history=get_recent_messages) -> None:
+        self._generate = generate
+        self._history = history
+
+    def prepare(self, turn: TurnInput, timing: TurnTimingRecorder) -> PreparedTurn:
+        history = list(self._history(turn.conversation_id))
+        history.append({"role": "user", "content": turn.raw_text})
+        timing.mark("understanding_started")
+        timing.mark("llm_started")
+        answer = self._generate(history, turn.conversation_id)
+        timing.mark("llm_completed")
+        timing.mark("understanding_completed")
+        user = _text_block(turn, "user", turn.raw_text, assistant=False)
+        assistant = _text_block(turn, "spoken", answer or "储存库处理完成。", assistant=True)
+        voice = ConversationBlock(
+            block_id=f"{turn.turn_id}:voice",
+            type=BlockType.VOICE,
+            payload={},
+            source_block_id=assistant.block_id,
+            intent_id=f"{turn.turn_id}:voice",
+            priority=MessagePriority.REVIEW,
+        )
+        conversation_turn = ConversationTurn(
+            turn.conversation_id, turn.request_id, turn.turn_id,
+            turn.interaction_mode, turn.experiment_context, turn.mode_version,
+            turn.input_source, (user, assistant, voice),
+        )
+        return PreparedTurn(
+            turn=conversation_turn,
+            business={"kind": "storage"},
             messages=(
                 {"role": "user", "content": turn.raw_text, "block_id": user.block_id},
                 {"role": "assistant", "content": answer, "block_id": assistant.block_id},

@@ -165,9 +165,48 @@
 
   const WELCOME_TEXT = '你好！我是实验助手。你可以让我记录实验口述、查询试剂安全、推进实验步骤，或安排实验。';
 
+  function ensureNewChatStyles() {
+    if (document.getElementById('new-chat-options-style')) return;
+    var style = document.createElement('style');
+    style.id = 'new-chat-options-style';
+    style.textContent = [
+      '.new-chat-options{display:flex;gap:10px;flex-wrap:wrap;padding:6px 0 12px}',
+      '.nco-card{flex:1 1 180px;max-width:260px;background:#fff;border:1px solid #e5e8f0;border-radius:14px;padding:12px 14px;cursor:pointer;transition:box-shadow .15s,transform .15s}',
+      '.nco-card:hover{box-shadow:0 6px 18px rgba(15,23,42,.08);transform:translateY(-2px)}',
+      '.nco-ic{font-size:20px}',
+      '.nco-title{font-weight:700;color:#0f172a;margin:4px 0 2px;font-size:14px}',
+      '.nco-desc{color:#64748b;font-size:12px;line-height:1.5}'
+    ].join('\n');
+    document.head.appendChild(style);
+  }
+
+  function showNewChatOptions() {
+    ensureNewChatStyles();
+    if (chat.querySelector('.new-chat-options')) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'new-chat-options';
+    wrap.innerHTML = [
+      '<div class="nco-card" data-mode="free"><div class="nco-ic">🧪</div><div class="nco-title">自由模式</div><div class="nco-desc">记录/聊天，不绑定方案</div></div>',
+      '<div class="nco-card" data-mode="template"><div class="nco-ic">📄</div><div class="nco-title">制作模板</div><div class="nco-desc">把配方/方案做成规范模板</div></div>',
+      '<div class="nco-card" data-mode="storage"><div class="nco-ic">🗃</div><div class="nco-title">制作储存库</div><div class="nco-desc">登记位置/物品/库存</div></div>'
+    ].join('');
+    Array.prototype.forEach.call(wrap.querySelectorAll('.nco-card'), function (card) {
+      card.onclick = function () {
+        var mode = card.getAttribute('data-mode');
+        window.interactionModeState.select(mode === 'free' ? 'free' : mode);
+        wrap.remove();
+        var input = document.getElementById('message');
+        if (input) input.focus();
+      };
+    });
+    chat.appendChild(wrap);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
   function clearChat() {
     chat.textContent = '';
     add(WELCOME_TEXT, 'assistant');
+    showNewChatOptions();
   }
 
   function renderTurnHistory(result) {
@@ -247,7 +286,12 @@
         document.dispatchEvent(new CustomEvent('conversation-changed'));
       }
       const messages = data.messages || [];
-      if (!messages.length) return;
+      if (!messages.length) {
+        chat.textContent = '';
+        add(WELCOME_TEXT, 'assistant');
+        showNewChatOptions();
+        return;
+      }
       chat.textContent = '';
       add(WELCOME_TEXT, 'assistant');
       messages.forEach(item => {

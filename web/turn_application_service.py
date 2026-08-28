@@ -75,11 +75,12 @@ class TurnApplicationService:
 
     def __init__(self, *, store: TurnStore, chat_processor: TurnProcessor,
                  experiment_processor: TurnProcessor, template_processor: TurnProcessor,
-                 max_chat_workers: int = 4) -> None:
+                 storage_processor: TurnProcessor, max_chat_workers: int = 4) -> None:
         self.store = store
         self._chat_processor = chat_processor
         self._experiment_processor = experiment_processor
         self._template_processor = template_processor
+        self._storage_processor = storage_processor
         self._chat_executor = ThreadPoolExecutor(
             max_workers=max_chat_workers, thread_name_prefix="turn-chat"
         )
@@ -218,6 +219,8 @@ class TurnApplicationService:
             processor = self._chat_processor
         elif turn.experiment_context == ExperimentContext.TEMPLATE:
             processor = self._template_processor
+        elif turn.experiment_context == ExperimentContext.STORAGE:
+            processor = self._storage_processor
         else:
             processor = self._experiment_processor
         try:
