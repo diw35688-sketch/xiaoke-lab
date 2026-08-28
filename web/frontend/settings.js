@@ -33,6 +33,9 @@
     '      <input id="settings-ocr-model" type="text" placeholder="unlimited-ocr" /></label>',
     '    <label class="settings-field"><span>图片 OCR 密钥</span>',
     '      <input id="settings-ocr-key" type="password" autocomplete="off" placeholder="留空则使用科大 LLM 密钥" /></label>',
+    '    <div style="font-size:13px;font-weight:700;color:#0f172a;margin:18px 0 10px">社区设置</div>',
+    '    <label class="settings-field"><span>远程社区服务地址</span>',
+    '      <input id="settings-community-url" type="text" placeholder="http://124.221.234.222:3000/api" /></label>',
     '    <div style="font-size:13px;font-weight:700;color:#0f172a;margin:18px 0 10px">语音模型</div>',
     '    <label class="settings-field settings-inline">',
     '      <input id="settings-tts" type="checkbox" />',
@@ -133,6 +136,7 @@
       el('settings-ocr-model').value = data.settings.ocr_model || 'unlimited-ocr';
       el('settings-voice-short').checked = data.settings.voice_short_reply !== false;
       el('settings-voice-no-think').checked = data.settings.voice_disable_thinking !== false;
+      el('settings-community-url').value = data.settings.community_base_url || 'http://124.221.234.222:3000/api';
       el('settings-ocr-key').placeholder = data.settings.ocr_api_key_set
         ? ('已保存 ' + data.settings.ocr_api_key + '，留空表示不修改')
         : '留空则使用科大 LLM 密钥';
@@ -167,7 +171,8 @@
       provider_label: selectedProvider.label || selectedProviderId,
       mineru_file_parse_url: el('settings-mineru-url').value.trim(),
       ocr_base_url: el('settings-ocr-url').value.trim(),
-      ocr_model: el('settings-ocr-model').value.trim()
+      ocr_model: el('settings-ocr-model').value.trim(),
+      community_base_url: el('settings-community-url').value.trim() || 'http://124.221.234.222:3000/api'
     };
     var key = el('settings-key').value.trim();
     if (key) payload.api_key = key;
