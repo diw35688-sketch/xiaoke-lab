@@ -303,6 +303,31 @@ class ChatProcessor:
                     )
                     cards_list = list(cards.values())
                     direct_protocol = match
+        # 1.5) 模型自己已经调了“打开配方/选择实验”，同样把正文改成确认语，
+        #      避免它一边打开页面一边还在聊天里追问体积/pH。
+        if not direct_reagent:
+            reagent_card = next((
+                card for card in cards_list
+                if card.get("status") == "done"
+                and str(card.get("title") or "").startswith("查看试剂配方")
+            ), None)
+            if reagent_card is not None:
+                first_line = (reagent_card.get("lines") or [""])[0]
+                name_zh = first_line.split("：", 1)[1].strip() if "：" in first_line else first_line.strip()
+                direct_reagent = {"name_zh": name_zh or "该试剂"}
+        if not direct_protocol:
+            protocol_card = next((
+                card for card in cards_list
+                if card.get("status") == "done"
+                and (str(card.get("title") or "").startswith("选择实验方案")
+                     or card.get("kind") == "execute")
+            ), None)
+            if protocol_card is not None:
+                first_line = (protocol_card.get("lines") or [""])[0]
+                protocol_title = first_line
+                if first_line.startswith("方案："):
+                    protocol_title = first_line.split("：", 1)[1].strip()
+                direct_protocol = {"title": protocol_title or "所选实验"}
         # 2) 没直接命中时，用户明确要“列方案/选实验/看试剂库”则强制列出概览。
         if not direct_protocol and not direct_reagent:
             if not any(card.get("title") == "查看可选实验方案" for card in cards_list) \
