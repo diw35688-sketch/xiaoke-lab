@@ -11,7 +11,7 @@ class UnifiedMicControlTests(unittest.TestCase):
         source = (FRONTEND / "composer.js").read_text(encoding="utf-8")
 
         self.assertEqual(source.count('id="cp-mic"'), 1)
-        self.assertIn('id="cp-continuous"', source)
+        self.assertIn('id="cp-phone-call"', source)
         self.assertIn("window.phoneCallToggle?.();", source)
         self.assertIn("real.click();", source)
 

@@ -112,7 +112,7 @@ class FrontendScreenDeltaTests(unittest.TestCase):
         self.assertNotIn("labSpeakMessages(d.messages", desktop)
         self.assertIn("consumeVoiceDelivery?.(", mobile)
         self.assertNotIn("if (m.voice_text)", mobile)
-        self.assertLess(mobile_html.index("voice_delivery_client.js"), mobile_html.index("mobile.js"))
+        self.assertNotIn("voice_delivery_client.js", mobile_html)
 
     def test_record_frontends_stream_status_before_final_result(self):
         desktop = VOICE_ASR.read_text(encoding="utf-8")

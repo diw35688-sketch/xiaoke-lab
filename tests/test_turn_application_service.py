@@ -76,6 +76,7 @@ class TurnApplicationServiceTests(unittest.TestCase):
         self.service = TurnApplicationService(
             store=self.store, chat_processor=processor,
             experiment_processor=processor,
+            template_processor=processor, storage_processor=processor,
         )
         first = self.service.submit(_turn())
         second = self.service.submit(_turn())
@@ -91,6 +92,7 @@ class TurnApplicationServiceTests(unittest.TestCase):
         self.service = TurnApplicationService(
             store=self.store, chat_processor=processor,
             experiment_processor=processor,
+            template_processor=processor, storage_processor=processor,
         )
         self.service.submit(_turn()).future.result(2)
         replay = self.service.submit(_turn()).future.result(2)
@@ -103,6 +105,7 @@ class TurnApplicationServiceTests(unittest.TestCase):
         self.service = TurnApplicationService(
             store=self.store, chat_processor=failing,
             experiment_processor=failing,
+            template_processor=failing, storage_processor=failing,
         )
         with self.assertRaises(RuntimeError):
             self.service.submit(_turn()).future.result(2)
@@ -115,6 +118,7 @@ class TurnApplicationServiceTests(unittest.TestCase):
         self.service = TurnApplicationService(
             store=self.store, chat_processor=processor,
             experiment_processor=processor,
+            template_processor=processor, storage_processor=processor,
         )
         original = self.store.update_committed_result
         self.store.update_committed_result = lambda *args, **kwargs: (_ for _ in ()).throw(
