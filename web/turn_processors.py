@@ -9,6 +9,7 @@ from typing import Callable, Mapping, Protocol
 import json
 
 import domain
+import lab_tools
 import llm_bridge
 import settings_store
 from agent.core import (
@@ -133,6 +134,26 @@ def _prepare_chat_spoken_delivery(
     return refined, build(refined)
 
 
+def _wants_protocol_list(text: str) -> bool:
+    lowered = (text or "").strip()
+    if not lowered:
+        return False
+    return any(keyword in lowered for keyword in (
+        "选择实验", "列出来", "列出", "哪些方案", "有哪些实验",
+        "哪12", "开始实验", "实验方案", "选实验",
+    ))
+
+
+def _wants_reagent_list(text: str) -> bool:
+    lowered = (text or "").strip()
+    if not lowered:
+        return False
+    return any(keyword in lowered for keyword in (
+        "列试剂", "列出试剂", "有哪些试剂", "有什么溶液",
+        "配什么", "试剂配置库", "开始配置", "开始配液",
+    ))
+
+
 class ChatProcessor:
     """Prepare Chat messages and Blocks without writing the conversation ledger."""
 
@@ -161,8 +182,41 @@ class ChatProcessor:
             elif isinstance(chunk, str):
                 text_parts.append(chunk)
         cards_list = list(cards.values())
+        # 兜底：用户明确要“列方案/选实验/看试剂库”但模型没调用工具时，强制列出。
+        if not any(card.get("title") == "查看可选实验方案" for card in cards_list) \
+                and _wants_protocol_list(turn.raw_text):
+            outcome = lab_tools.call("list_protocols", {})
+            if outcome.get("ok"):
+                cards["__fallback_protocols"] = lab_tools.present_result(
+                    "list_protocols", {}, outcome
+                )
+                cards_list = list(cards.values())
+        elif not any(card.get("title") == "查看试剂配置库" for card in cards_list) \
+                and _wants_reagent_list(turn.raw_text):
+            outcome = lab_tools.call("list_reagent_preps", {})
+            if outcome.get("ok"):
+                cards["__fallback_reagents"] = lab_tools.present_result(
+                    "list_reagent_preps", {}, outcome
+                )
+                cards_list = list(cards.values())
         answer = "".join(text_parts).strip() or "处理完成。"
-        answer, voice_item = _prepare_chat_spoken_delivery(turn, answer)
+        # 如果模型只回“共12个，你要做哪个”，直接把完整列表写进聊天区。
+        list_card = next((
+            card for card in cards_list
+            if card.get("status") == "done"
+            and card.get("title") in {"查看可选实验方案", "查看试剂配置库"}
+        ), None)
+        if list_card:
+            list_lines = [line for line in (list_card.get("lines") or []) if line.strip()]
+            if len(list_lines) > 1:
+                answer = "\n".join(list_lines)
+                _, voice_item = _prepare_chat_spoken_delivery(
+                    turn, "已列出完整内容，请看屏幕选择。"
+                )
+            else:
+                answer, voice_item = _prepare_chat_spoken_delivery(turn, answer)
+        else:
+            answer, voice_item = _prepare_chat_spoken_delivery(turn, answer)
         timing.mark("first_chunk")
         timing.mark("llm_completed")
         timing.mark("understanding_completed")
