@@ -122,6 +122,11 @@ def present_result(name: str, arguments: dict, outcome: dict) -> dict:
     result = outcome.get("result")
     if isinstance(result, dict) and isinstance(result.get("ui_action"), dict):
         view["ui_action"] = result["ui_action"]
+    # 列出方案/试剂库时直接打开对应卡片页，避免只给文字列表。
+    if outcome.get("ok") and name == "list_protocols":
+        view["ui_action"] = {"type": "navigate", "view": "protocols"}
+    elif outcome.get("ok") and name == "list_reagent_preps":
+        view["ui_action"] = {"type": "navigate", "view": "reagent_prep"}
     return view
 
 
