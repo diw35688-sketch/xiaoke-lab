@@ -8,6 +8,24 @@ from src.core.interaction_command import (
 
 
 class InteractionCommandParserTests(unittest.TestCase):
+    def test_parses_only_standalone_next_protocol_step_commands(self):
+        for text in ("下一步", "进入下一步。", "继续下一步😊"):
+            with self.subTest(text=text):
+                command = InteractionCommandParser.parse(text)
+                self.assertEqual(
+                    command.command_type,
+                    InteractionCommandType.NEXT_PROTOCOL_STEP,
+                )
+
+        for text in (
+            "等示数稳定后再进行下一步",
+            "下一步需要加多少水",
+            "不要进入下一步",
+        ):
+            with self.subTest(text=text):
+                command = InteractionCommandParser.parse(text)
+                self.assertEqual(command.command_type, InteractionCommandType.NORMAL)
+
     def test_parses_supported_end_session_commands(self):
         for text in (
             "结束实验记录",

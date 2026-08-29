@@ -107,7 +107,7 @@ def decide_protocol_move(
         for field in item.missing_fields
     }
     uncovered = tuple(field for field in missing if field not in deferred_fields)
-    if uncovered:
+    if uncovered and scoped:
         return ProtocolMoveDecision(
             False,
             "当前步骤仍有未被暂缓问题承接的缺失字段。",
@@ -124,11 +124,12 @@ def decide_protocol_move(
         if missing
         else ProtocolStepProgressStatus.COMPLETED
     )
-    reason = (
-        "已带着暂缓问题进入下一步。"
-        if missing
-        else "当前步骤已完成，已进入下一步。"
-    )
+    if missing and deferred:
+        reason = "已带着暂缓问题进入下一步。"
+    elif missing:
+        reason = "当前步骤仍有未记录字段，已进入下一步。"
+    else:
+        reason = "当前步骤已完成，已进入下一步。"
     return _allowed(state, target, leaving_status, reason, missing, deferred)
 
 

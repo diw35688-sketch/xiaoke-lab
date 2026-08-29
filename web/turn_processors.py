@@ -29,6 +29,7 @@ from src.core.protocol_execution_state import (
     ProtocolExecutionState,
     ProtocolStepProgressStatus,
 )
+from src.core.protocol_navigation import decide_protocol_move
 from src.core.presentation_delivery import VoiceDeliveryItem
 from src.core.presentation_intent import MessageKind, MessagePriority
 from src.core.reply_coordinator import FIELD_LABELS, ReplyCoordinator
@@ -261,7 +262,30 @@ class ExperimentProcessor:
         analysis = None
         entities: dict[str, str] = {}
         protocol_completion = None
+        protocol_navigation = None
         final_action = observation.pending_action
+        if observation.protocol_navigation_action is not None:
+            if (
+                turn.experiment_context == ExperimentContext.PROTOCOL
+                and protocol_execution is not None
+                and protocol_domain_state is not None
+            ):
+                protocol_navigation = decide_protocol_move(
+                    state=protocol_execution,
+                    action=observation.protocol_navigation_action,
+                    total_steps=int(step["protocol"]["total_steps"]),
+                    evaluation=domain.evaluate_for_state(
+                        protocol_domain_state,
+                        protocol_state.entity_values(),
+                    ),
+                    unresolved=coordinator.active_clarifications(),
+                )
+                if protocol_navigation.allowed:
+                    protocol_execution = protocol_navigation.state
+                    protocol_domain_state = selected_domain_state.jump_to(
+                        protocol_execution.current_step_number
+                    )
+                    step = domain.step_view(protocol_domain_state)
         if observation.accepted_analysis is not None:
             analysis = observation.accepted_analysis.materialize_analysis()
             events = tuple(event.to_dict() for event in analysis.events)
@@ -440,6 +464,15 @@ class ExperimentProcessor:
             analysis,
             effective_question=effective_question,
             protocol_completion=protocol_completion,
+            protocol_navigation=protocol_navigation,
+            protocol_navigation_requested=(
+                observation.protocol_navigation_action is not None
+            ),
+            protocol_navigation_step=(
+                step.get("step")
+                if protocol_navigation is not None and protocol_navigation.allowed
+                else None
+            ),
             experiment_step_count=int(
                 stored.get("experiment_step_count", max(segment_id - 1, 0))
             ),
@@ -616,7 +649,9 @@ class ExperimentProcessor:
             turn.input_source, tuple(blocks),
         )
         state_changed = bool(
-            analysis is not None or (execution is not None and execution.state_changed)
+            analysis is not None
+            or (execution is not None and execution.state_changed)
+            or (protocol_navigation is not None and protocol_navigation.allowed)
         )
         session_state = None
         if state_changed:
@@ -665,6 +700,9 @@ class ExperimentProcessor:
         *,
         effective_question,
         protocol_completion,
+        protocol_navigation,
+        protocol_navigation_requested: bool,
+        protocol_navigation_step,
         experiment_step_count: int,
     ):
         if observation.end_session_execution_requested:
@@ -689,6 +727,17 @@ class ExperimentProcessor:
             return "\n".join(lines), MessageKind.SESSION_CLOSING_SUMMARY
         if observation.end_confirmation_requested:
             return "要结束本次实验记录吗？请明确回答确认或继续。", MessageKind.CLARIFICATION
+        if protocol_navigation_requested:
+            if protocol_navigation is None:
+                return "当前没有运行实验方案，无法进入下一步。", MessageKind.NO_ACTION_FEEDBACK
+            if not protocol_navigation.allowed:
+                return protocol_navigation.reason, MessageKind.NO_ACTION_FEEDBACK
+            return (
+                f"{protocol_navigation.reason}"
+                f"当前是第 {protocol_navigation_step['number']} 步："
+                f"{protocol_navigation_step['title']}。",
+                MessageKind.CONFIRMATION_ACK,
+            )
         if observation.clarification_action == "review":
             active = coordinator.active_clarifications()
             if not active:
