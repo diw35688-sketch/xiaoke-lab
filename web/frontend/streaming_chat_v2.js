@@ -8,7 +8,7 @@
         freshChatKey = 'lab-agent-fresh-chat';
   const avatar = state => window.dispatchAvatarState?.(state);
   let activeController = null, activeReply = null, requestId = 0;
-  let activeThinkRow = null, blockRows = {};
+  let activeThinkRow = null, blockRows = {}, appliedToolUi = {};
   const turnStore = window.conversationTurnStore;
   const blockView = window.conversationBlockView;
   if (!turnStore) throw new Error('ConversationTurnStore 未加载');
@@ -152,6 +152,11 @@
         updateThink(activeReply, block.payload.text, block.payload.running);
       } else if (block.type === 'tool_card' && activeReply) {
         ensureToolRow(block, activeReply);
+        const action = block.payload?.ui_action;
+        if (action && !appliedToolUi[block.block_id]) {
+          appliedToolUi[block.block_id] = true;
+          if (window.appApplyUiAction) window.appApplyUiAction(action);
+        }
       } else if (block.type === 'assistant_text' && activeReply) {
         if (block.payload.presentation === 'clarification_card') {
           const row = messageRow(activeReply);

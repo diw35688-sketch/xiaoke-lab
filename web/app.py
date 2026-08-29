@@ -93,7 +93,7 @@ def home(request: Request):
     page = (BASE_DIR / "frontend" / "index.html").read_text(encoding="utf-8")
     page = page.replace('/static/inworld_tts.js', '/static/local_tts.js?v=20260826-shared-warmup')
     page = page.replace('</head>', '<link rel="stylesheet" href="/static/theme.css"></head>')
-    page = page.replace('</head>', '<link rel="stylesheet" href="/static/mobile-shell.css?v=20260902-height-fix"></head>')
+    page = page.replace('</head>', '<link rel="stylesheet" href="/static/mobile-shell.css?v=20260902-turn-cards"></head>')
     # 注入模型设置面板（任何人都能在网页里配置模型）
     page = page.replace('</body>', ('<script src="/static/voice_asr.js?v=20260827-clarification-card"></script>'
                                    '</body>'))
@@ -112,7 +112,7 @@ def home(request: Request):
         '<script src="/static/conversation_context_blocks.js?v=20260825"></script>'
         '<script src="/static/interaction_mode_state.js?v=20260829-storage"></script>'
         '<script src="/static/turn_client.js?v=20260827-timing"></script>'
-        '<script src="/static/streaming_chat_v2.js?v=20260902-svg-icons"></script>'
+        '<script src="/static/streaming_chat_v2.js?v=20260902-tool-cards"></script>'
         '<script src="/static/template_planner.js"></script>'
         '<script src="/static/task_panel.js"></script>'
         '<script src="/static/shell.js?v=20260901-telemetry"></script>'
