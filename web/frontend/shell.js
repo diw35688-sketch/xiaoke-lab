@@ -178,6 +178,11 @@
       show(current);
       return;
     }
+    if (action.type === 'open_reagent_prep' && action.id) {
+      if (window.prepOpenDetail) window.prepOpenDetail(action.id);
+      else show('reagent_prep');
+      return;
+    }
     if (action.type === 'focus_chat') {
       var input = document.getElementById('message');
       if (input) input.focus();

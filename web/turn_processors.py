@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import difflib
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from typing import Callable, Mapping, Protocol
@@ -154,6 +155,74 @@ def _wants_reagent_list(text: str) -> bool:
     ))
 
 
+def _normalize_match_text(text: str) -> str:
+    lowered = (text or "").lower()
+    for word in ("请", "帮我", "我要", "我想", "开始", "选择", "进入",
+                 "打开", "看看", "做", "用", "配置", "配", "一下", "实验"):
+        lowered = lowered.replace(word, "")
+    return lowered.strip()
+
+
+def _best_protocol_match(text: str) -> dict | None:
+    outcome = lab_tools.call("list_protocols", {})
+    if not outcome.get("ok"):
+        return None
+    raw = _normalize_match_text(text)
+    best: dict | None = None
+    best_score = 0.0
+    for item in outcome.get("result") or []:
+        title = (item.get("title") or "").lower()
+        if not title:
+            continue
+        if raw and title in raw:
+            score = 3.0
+        elif raw and raw in title:
+            score = 2.5
+        else:
+            score = difflib.SequenceMatcher(None, raw, title).ratio()
+        if score > best_score:
+            best_score = score
+            best = item
+    return best if best_score >= 0.62 else None
+
+
+def _best_reagent_match(text: str) -> dict | None:
+    outcome = lab_tools.call("list_reagent_preps", {})
+    if not outcome.get("ok"):
+        return None
+    raw = _normalize_match_text(text)
+    best: dict | None = None
+    best_score = 0.0
+    for item in outcome.get("result", {}).get("items") or []:
+        title = (item.get("name_zh") or "").lower()
+        if not title:
+            continue
+        if raw and title in raw:
+            score = 3.0
+        elif raw and raw in title:
+            score = 2.5
+        else:
+            score = difflib.SequenceMatcher(None, raw, title).ratio()
+        if score > best_score:
+            best_score = score
+            best = item
+    return best if best_score >= 0.62 else None
+
+
+def _looks_like_direct_protocol(text: str) -> bool:
+    lowered = (text or "").strip()
+    return bool(lowered) and any(keyword in lowered for keyword in (
+        "做", "开始", "选择", "进入", "打开", "用",
+    ))
+
+
+def _looks_like_direct_reagent(text: str) -> bool:
+    lowered = (text or "").strip()
+    return bool(lowered) and any(keyword in lowered for keyword in (
+        "配", "配置", "做", "打开", "查看", "用",
+    ))
+
+
 class ChatProcessor:
     """Prepare Chat messages and Blocks without writing the conversation ledger."""
 
@@ -182,31 +251,70 @@ class ChatProcessor:
             elif isinstance(chunk, str):
                 text_parts.append(chunk)
         cards_list = list(cards.values())
-        # 兜底：用户明确要“列方案/选实验/看试剂库”但模型没调用工具时，强制列出。
-        if not any(card.get("title") == "查看可选实验方案" for card in cards_list) \
-                and _wants_protocol_list(turn.raw_text):
-            outcome = lab_tools.call("list_protocols", {})
-            if outcome.get("ok"):
-                cards["__fallback_protocols"] = lab_tools.present_result(
-                    "list_protocols", {}, outcome
+        direct_protocol = None
+        direct_reagent = None
+        # 1) 用户说了具体方案名/试剂名时，直接选择或打开对应卡片页。
+        if not any(card.get("title") == "选择实验方案" or card.get("kind") == "execute"
+                   for card in cards_list) and _looks_like_direct_protocol(turn.raw_text):
+            match = _best_protocol_match(turn.raw_text)
+            if match is not None:
+                outcome = lab_tools.call(
+                    "select_protocol", {"protocol_id": match["protocol_id"]}
                 )
-                cards_list = list(cards.values())
-        elif not any(card.get("title") == "查看试剂配置库" for card in cards_list) \
-                and _wants_reagent_list(turn.raw_text):
-            outcome = lab_tools.call("list_reagent_preps", {})
-            if outcome.get("ok"):
-                cards["__fallback_reagents"] = lab_tools.present_result(
-                    "list_reagent_preps", {}, outcome
+                if outcome.get("ok"):
+                    cards["__direct_protocol"] = lab_tools.present_result(
+                        "select_protocol",
+                        {"protocol_id": match["protocol_id"]},
+                        outcome,
+                    )
+                    cards_list = list(cards.values())
+                    direct_protocol = match
+        if not direct_protocol and not any(card.get("title") == "查看试剂配方"
+                                           for card in cards_list) \
+                and _looks_like_direct_reagent(turn.raw_text):
+            match = _best_reagent_match(turn.raw_text)
+            if match is not None:
+                outcome = lab_tools.call(
+                    "get_reagent_prep", {"reagent_prep_id": match["reagent_prep_id"]}
                 )
-                cards_list = list(cards.values())
+                if outcome.get("ok"):
+                    cards["__direct_reagent"] = lab_tools.present_result(
+                        "get_reagent_prep",
+                        {"reagent_prep_id": match["reagent_prep_id"]},
+                        outcome,
+                    )
+                    cards_list = list(cards.values())
+                    direct_reagent = match
+        # 2) 没直接命中时，用户明确要“列方案/选实验/看试剂库”则强制列出概览。
+        if not direct_protocol and not direct_reagent:
+            if not any(card.get("title") == "查看可选实验方案" for card in cards_list) \
+                    and _wants_protocol_list(turn.raw_text):
+                outcome = lab_tools.call("list_protocols", {})
+                if outcome.get("ok"):
+                    cards["__fallback_protocols"] = lab_tools.present_result(
+                        "list_protocols", {}, outcome
+                    )
+                    cards_list = list(cards.values())
+            elif not any(card.get("title") == "查看试剂配置库" for card in cards_list) \
+                    and _wants_reagent_list(turn.raw_text):
+                outcome = lab_tools.call("list_reagent_preps", {})
+                if outcome.get("ok"):
+                    cards["__fallback_reagents"] = lab_tools.present_result(
+                        "list_reagent_preps", {}, outcome
+                    )
+                    cards_list = list(cards.values())
         answer = "".join(text_parts).strip() or "处理完成。"
+        if direct_protocol:
+            answer = f"已进入「{direct_protocol['title']}」，开始实验。"
+        elif direct_reagent:
+            answer = f"已找到「{direct_reagent['name_zh']}」并打开试剂配置库。"
         # 方案/试剂很多时，聊天只给简短概览，真正的选择交给方案库/配置库页面。
         list_card = next((
             card for card in cards_list
             if card.get("status") == "done"
             and card.get("title") in {"查看可选实验方案", "查看试剂配置库"}
         ), None)
-        if list_card:
+        if list_card and not direct_protocol and not direct_reagent:
             lines = list_card.get("lines") or []
             count_line = lines[0] if lines else ""
             if list_card.get("title") == "查看可选实验方案":
