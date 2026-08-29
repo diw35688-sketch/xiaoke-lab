@@ -61,6 +61,19 @@ class ProtocolNavigationTests(unittest.TestCase):
         self.assertFalse(decision.allowed)
         self.assertEqual(decision.missing_fields, ("duration",))
 
+    def test_missing_fields_without_any_question_can_move_next(self):
+        decision = decide_protocol_move(
+            state=self.state,
+            action="next",
+            total_steps=3,
+            evaluation={"missing_fields": ["condition"]},
+            unresolved=(),
+        )
+        self.assertTrue(decision.allowed)
+        self.assertEqual(decision.state.current_step_number, 2)
+        self.assertEqual(decision.state.statuses[1].value, "left_with_pending")
+        self.assertIn("仍有未记录字段", decision.reason)
+
     def test_complete_step_moves_and_marks_completed(self):
         decision = decide_protocol_move(
             state=self.state,

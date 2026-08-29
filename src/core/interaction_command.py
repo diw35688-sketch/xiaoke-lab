@@ -10,6 +10,7 @@ class InteractionCommandType(str, Enum):
     END_SESSION = "end_session"
     DEFER_CURRENT = "defer_current"
     REVIEW_PENDING = "review_pending"
+    NEXT_PROTOCOL_STEP = "next_protocol_step"
     AFFIRM = "affirm"
     DENY = "deny"
     TARGETED_ANSWER = "targeted_answer"
@@ -114,6 +115,12 @@ class InteractionCommandParser:
         "重复待确认问题",
     }
 
+    NEXT_PROTOCOL_STEP_COMMANDS = {
+        "下一步",
+        "进入下一步",
+        "继续下一步",
+    }
+
     AFFIRM_EXACT = {
         "是",
         "是的",
@@ -214,6 +221,13 @@ class InteractionCommandParser:
         ):
             return cls._simple_command(
                 InteractionCommandType.REVIEW_PENDING,
+                raw_text,
+                normalized,
+            )
+
+        if normalized in cls.NEXT_PROTOCOL_STEP_COMMANDS:
+            return cls._simple_command(
+                InteractionCommandType.NEXT_PROTOCOL_STEP,
                 raw_text,
                 normalized,
             )

@@ -1,6 +1,7 @@
 import sys
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 WEB = Path(__file__).resolve().parent.parent / "web"
@@ -8,6 +9,7 @@ if str(WEB) not in sys.path:
     sys.path.insert(0, str(WEB))
 
 import domain  # noqa: E402
+from src.asr.schemas import ASRResult  # noqa: E402
 from src.core.conversation_turn import (  # noqa: E402
     ExperimentContext, InputSource, InteractionMode,
 )
@@ -159,6 +161,98 @@ def _text(mode, context, text, *, lab=None):
 
 
 class TurnProcessorTests(unittest.TestCase):
+    def test_exact_next_step_moves_protocol_in_same_turn_without_llm(self):
+        llm = _NeverLLM()
+        processor = ExperimentProcessor(
+            _StateStore(),
+            observer_factory=lambda: UnifiedObserver(UnifiedAcceptanceBypass(
+                UnifiedUnderstandingRouter(llm)
+            )),
+        )
+        selected = SimpleNamespace(
+            jump_to=lambda number: SimpleNamespace(step_number=number)
+        )
+
+        def step_view(state):
+            number = getattr(state, "step_number", 1)
+            return {
+                "mode": "protocol",
+                "protocol": {
+                    "id": "p1", "title": "测试方案", "source": "test",
+                    "version": "1", "total_steps": 3,
+                },
+                "step": {
+                    "number": number, "title": f"步骤{number}",
+                    "instruction": f"执行步骤{number}",
+                    "protocol_values": {}, "must_record": [],
+                    "hazard_note": None, "terms": [], "substeps": [],
+                },
+                "safety": [], "safety_note": None,
+            }
+
+        with mock.patch("turn_processors.domain.session", return_value=selected), \
+             mock.patch("turn_processors.domain.step_view", side_effect=step_view), \
+             mock.patch(
+                 "turn_processors.domain.evaluate_for_state",
+                 return_value={"missing_fields": []},
+             ):
+            result = processor.prepare(
+                TurnInput(
+                    "c1", "r-voice-next", "t-voice-next", "lab1",
+                    InteractionMode.EXPERIMENT,
+                    ExperimentContext.PROTOCOL,
+                    1,
+                    InputSource.SINGLE_RECORDING,
+                    "下一步",
+                    ASRResult(
+                        asr_transcript="下一步",
+                        asr_model_raw_text="下一步",
+                        audio_path="fixed://next-step.wav",
+                        audio_duration_seconds=0.8,
+                        recognition_seconds=0.1,
+                        model="fake-asr",
+                        language="zh",
+                    ),
+                ),
+                TurnTimingRecorder(),
+            )
+
+        self.assertEqual(llm.calls, 0)
+        self.assertIsNone(result.lab_record)
+        self.assertEqual(
+            result.session_state["protocol_step_facts"]["current_step_number"],
+            2,
+        )
+        step_cards = [
+            block for block in result.turn.blocks if block.type.value == "step_card"
+        ]
+        self.assertEqual(step_cards[0].payload["number"], 2)
+        self.assertIn("已进入下一步", result.voice_items[0].voice_text)
+        self.assertIn("第 2 步：步骤2", result.voice_items[0].voice_text)
+
+    def test_next_step_in_free_mode_does_not_change_state(self):
+        llm = _NeverLLM()
+        processor = ExperimentProcessor(
+            _StateStore(),
+            observer_factory=lambda: UnifiedObserver(UnifiedAcceptanceBypass(
+                UnifiedUnderstandingRouter(llm)
+            )),
+        )
+
+        result = processor.prepare(
+            _text(
+                InteractionMode.EXPERIMENT,
+                ExperimentContext.FREE,
+                "下一步",
+                lab="lab1",
+            ),
+            TurnTimingRecorder(),
+        )
+
+        self.assertEqual(llm.calls, 0)
+        self.assertIsNone(result.session_state)
+        self.assertIn("当前没有运行实验方案", result.voice_items[0].voice_text)
+
     def test_protocol_complete_turn_ignores_llm_create_decision(self):
         step_view = {
             "mode": "protocol",

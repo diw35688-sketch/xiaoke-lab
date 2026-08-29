@@ -374,6 +374,18 @@ class ClarificationActionPlanner:
         )
 
     @classmethod
+    def from_protocol_navigation(
+        cls,
+        request: DispatchExecutionRequest,
+    ) -> ClarificationAction:
+        """方案导航不修改待确认问题，只留下可审计的无动作计划。"""
+
+        return cls._no_action(
+            request,
+            "已采用用户的精确下一步命令，交由方案导航边界处理。",
+        )
+
+    @classmethod
     def from_experiment(
         cls,
         accepted: AcceptedExperimentAnalysis,
