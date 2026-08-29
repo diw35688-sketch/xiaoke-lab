@@ -176,9 +176,10 @@
       '.new-chat-options{display:flex;gap:10px;flex-wrap:wrap;padding:6px 0 12px}',
       '.nco-card{flex:1 1 180px;max-width:260px;background:#fff;border:1px solid #e5e8f0;border-radius:14px;padding:12px 14px;cursor:pointer;transition:box-shadow .15s,transform .15s}',
       '.nco-card:hover{box-shadow:0 6px 18px rgba(15,23,42,.08);transform:translateY(-2px)}',
-      '.nco-ic{font-size:20px}',
-      '.nco-title{font-weight:700;color:#0f172a;margin:4px 0 2px;font-size:14px}',
-      '.nco-desc{color:#64748b;font-size:12px;line-height:1.5}',
+      '.nco-ic{color:#64748b;margin-bottom:7px;display:flex}',
+      '.nco-card:hover .nco-ic{color:#2563eb}',
+      '.nco-title{font-weight:700;color:#0f172a;font-size:14px}',
+      '.nco-desc{color:#64748b;font-size:12px;line-height:1.5;margin-top:3px}',
       '.mode-intro{background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:12px 15px;margin:6px 0 12px}',
       '.mi-title{font-weight:700;color:#0f172a;font-size:14px}',
       '.mi-desc{color:#64748b;font-size:12px;line-height:1.6;margin:4px 0 8px}',
@@ -202,7 +203,7 @@
       if (intro) intro.remove();
       var div = document.createElement('div');
       div.className = 'mode-intro';
-      div.innerHTML = '<div class="mi-title">🧪 自由模式已开启</div>'
+      div.innerHTML = '<div class="mi-title">自由模式已开启</div>'
         + '<div class="mi-desc">可以自由聊天、记录实验，不绑定方案。说一句即可开始。</div>';
       chat.appendChild(div);
       chat.scrollTop = chat.scrollHeight;
@@ -223,12 +224,17 @@
   function showNewChatOptions() {
     ensureNewChatStyles();
     if (chat.querySelector('.new-chat-options')) return;
+    var MODE_ICONS = {
+      free: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>',
+      template: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
+      storage: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>'
+    };
     var wrap = document.createElement('div');
     wrap.className = 'new-chat-options';
     wrap.innerHTML = [
-      '<div class="nco-card" data-mode="free"><div class="nco-ic">🧪</div><div class="nco-title">自由模式</div><div class="nco-desc">记录/聊天，不绑定方案</div></div>',
-      '<div class="nco-card" data-mode="template"><div class="nco-ic">📄</div><div class="nco-title">制作模板</div><div class="nco-desc">把配方/方案做成规范模板</div></div>',
-      '<div class="nco-card" data-mode="storage"><div class="nco-ic">🗃</div><div class="nco-title">制作储存库</div><div class="nco-desc">登记位置/物品/库存</div></div>'
+      '<div class="nco-card" data-mode="free"><div class="nco-ic">' + MODE_ICONS.free + '</div><div class="nco-title">自由模式</div><div class="nco-desc">记录 / 聊天，不绑定方案</div></div>',
+      '<div class="nco-card" data-mode="template"><div class="nco-ic">' + MODE_ICONS.template + '</div><div class="nco-title">制作模板</div><div class="nco-desc">把配方 / 方案做成规范模板</div></div>',
+      '<div class="nco-card" data-mode="storage"><div class="nco-ic">' + MODE_ICONS.storage + '</div><div class="nco-title">制作储存库</div><div class="nco-desc">登记位置 / 物品 / 库存</div></div>'
     ].join('');
     Array.prototype.forEach.call(wrap.querySelectorAll('.nco-card'), function (card) {
       card.onclick = function () {

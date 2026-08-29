@@ -49,14 +49,21 @@
     '.cp-pop-row .chev{color:var(--n-400);font-size:11px}'
   ].join('');
 
+  var ICONS = {
+    plus: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>',
+    mic: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><path d="M12 18v4"/></svg>',
+    phoneCall: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.09 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>',
+    phone: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M12 18h.01"/></svg>'
+  };
+
   var HTML = [
     '<div id="cp-card">',
     '  <div id="cp-icons">',
-    '    <button class="cp-icon" id="cp-file" title="上传任意文件（+）">＋</button>',
+    '    <button class="cp-icon" id="cp-file" title="上传任意文件（+）">' + ICONS.plus + '</button>',
     '    <input type="file" id="cp-file-input" style="display:none" />',
-    '    <button class="cp-icon" id="cp-mic" title="单次录音：是否保存由当前模式决定">◉</button>',
-    '    <button class="cp-icon" id="cp-phone-call" title="通话/连续通话">📞</button>',
-    '    <button class="cp-icon" id="cp-phone" title="手机端">📱</button>',
+    '    <button class="cp-icon" id="cp-mic" title="单次录音：是否保存由当前模式决定">' + ICONS.mic + '</button>',
+    '    <button class="cp-icon" id="cp-phone-call" title="通话/连续通话">' + ICONS.phoneCall + '</button>',
+    '    <button class="cp-icon" id="cp-phone" title="手机端">' + ICONS.phone + '</button>',
     '    <span class="cp-chip plain" id="cp-hint">单次录音</span>',
     '  </div>',
     '  <textarea id="cp-text" rows="1" placeholder="给实验助手发消息，或按住麦克风口述"></textarea>',
