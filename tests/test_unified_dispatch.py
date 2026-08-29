@@ -77,6 +77,28 @@ def control_route(command_type, **candidate_fields):
 
 
 class UnifiedDispatchPlannerTests(unittest.TestCase):
+    def test_exact_next_step_gets_only_protocol_navigation_permission(self):
+        plan = UnifiedDispatchPlanner.plan(
+            exact_route(InteractionCommandType.NEXT_PROTOCOL_STEP)
+        )
+
+        self.assertEqual(
+            plan.destination,
+            UnifiedDispatchDestination.PROTOCOL_NAVIGATION,
+        )
+        self.assertEqual(
+            plan.permission,
+            UnifiedDispatchPermission.EXECUTE_PROTOCOL_NAVIGATION,
+        )
+
+    def test_llm_next_step_candidate_cannot_execute(self):
+        plan = UnifiedDispatchPlanner.plan(
+            control_route(InteractionCommandType.NEXT_PROTOCOL_STEP)
+        )
+
+        self.assertEqual(plan.destination, UnifiedDispatchDestination.ABSTENTION)
+        self.assertEqual(plan.permission, UnifiedDispatchPermission.NO_ACTION)
+
     def test_experiment_goes_only_to_experiment_pipeline(self):
         understanding = UnifiedUnderstandingResult(
             raw_text=RAW_TEXT,

@@ -59,6 +59,7 @@ class UnifiedObservation:
     pending_action: ClarificationAction | None = None
     end_confirmation_requested: bool = False
     end_session_execution_requested: bool = False
+    protocol_navigation_action: str | None = None
     answer_remaining_fields: tuple[str, ...] = ()
     answer_resolved: bool = False
     answer_hint: bool = False
@@ -176,6 +177,9 @@ class UnifiedObserver:
                 ),
                 end_session_execution_requested=(
                     getattr(result, "end_session_execution_requested", False)
+                ),
+                protocol_navigation_action=(
+                    getattr(result, "protocol_navigation_action", None)
                 ),
             )
         except Exception as error:
