@@ -136,7 +136,7 @@ def _prepare_chat_spoken_delivery(
 class ChatProcessor:
     """Prepare Chat messages and Blocks without writing the conversation ledger."""
 
-    def __init__(self, *, generate=run_agent, history=get_recent_messages) -> None:
+    def __init__(self, *, generate=stream_agent, history=get_recent_messages) -> None:
         self._generate = generate
         self._history = history
 
@@ -148,7 +148,7 @@ class ChatProcessor:
         # 使用流式 agent 生成：保留工具卡片与 ui_action，不再只返回一段纯文本。
         text_parts: list[str] = []
         cards: dict[str, dict] = {}
-        for chunk in stream_agent(history, turn.conversation_id, turn.interaction_mode):
+        for chunk in self._generate(history, turn.conversation_id, turn.interaction_mode):
             if isinstance(chunk, str) and chunk.startswith("[[LABTHINK]]"):
                 continue
             if isinstance(chunk, str) and chunk.startswith("[[LABCARD]]"):

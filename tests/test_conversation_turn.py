@@ -135,7 +135,7 @@ class ConversationTurnContractTests(unittest.TestCase):
                 interaction_mode=InteractionMode.CHAT,
                 experiment_context=ExperimentContext.FREE,
             )
-        with self.assertRaisesRegex(ValueError, "free 或 protocol"):
+        with self.assertRaisesRegex(ValueError, "free.*protocol"):
             _turn(experiment_context=ExperimentContext.NONE)
 
     def test_ids_are_non_blank_and_unique_inside_turn(self):

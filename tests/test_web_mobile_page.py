@@ -23,7 +23,7 @@ class WebMobilePageTests(unittest.TestCase):
         paths = [getattr(route, "path", "") for route in app.routes]
         self.assertIn("/m", paths)
 
-    def test_mobile_ua_on_root_serves_mobile_page(self):
+    def test_mobile_ua_on_root_serves_responsive_desktop_page(self):
         from fastapi.testclient import TestClient
 
         from app import app
@@ -31,7 +31,8 @@ class WebMobilePageTests(unittest.TestCase):
         with TestClient(app) as client:
             response = client.get("/", headers={"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1"})
         self.assertEqual(response.status_code, 200)
-        self.assertIn('id="m-record-btn"', response.text)
+        self.assertIn("mobile-shell.css", response.text)
+        self.assertIn("mobile_shell.js", response.text)
 
     def test_desktop_ua_on_root_serves_desktop_page(self):
         from fastapi.testclient import TestClient
@@ -44,13 +45,13 @@ class WebMobilePageTests(unittest.TestCase):
         self.assertNotIn('id="m-record-btn"', response.text)
         self.assertIn("实验工作台", response.text)
 
-    def test_mobile_html_has_record_button(self):
+    def test_legacy_mobile_html_has_chat_entry(self):
         html = (FRONTEND_DIR / "mobile.html").read_text(encoding="utf-8")
-        self.assertIn('id="m-record-btn"', html)
-        self.assertIn("/static/mobile.js", html)
+        self.assertIn('id="m-chat-input"', html)
+        self.assertIn("/static/mobile_cards.js", html)
         self.assertIn('name="viewport"', html)
 
-    def test_mobile_js_uses_unified_turn_contract(self):
+    def test_legacy_mobile_assets_keep_unified_turn_client_available(self):
         js = (FRONTEND_DIR / "mobile.js").read_text(encoding="utf-8")
         client = (FRONTEND_DIR / "turn_client.js").read_text(encoding="utf-8")
         self.assertIn("turnClient.submitAudio", js)
@@ -58,9 +59,7 @@ class WebMobilePageTests(unittest.TestCase):
         self.assertIn("turn_result", js)
         self.assertIn("voice_delivery", js)
         self.assertIn("getUserMedia", js)
-        self.assertIn("/static/turn_client.js", (
-            FRONTEND_DIR / "mobile.html"
-        ).read_text(encoding="utf-8"))
+        self.assertIn("'/turn/audio'", client)
 
     def test_mobile_page_does_not_depend_on_desktop_scripts(self):
         html = (FRONTEND_DIR / "mobile.html").read_text(encoding="utf-8")
