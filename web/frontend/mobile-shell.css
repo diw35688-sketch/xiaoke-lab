@@ -46,10 +46,9 @@
   body.mobile-mode-work #sh-chat { display: none !important; }
   body.mobile-mode-work #sh-center { flex: 1 1 100% !important; display: flex !important; }
 
-  /* 会话面板在手机上作为抽屉 */
+  /* 会话面板在手机上默认收起，避免盖住输入区；后续可加专门的会话按钮 */
   #sh-conversation-panel {
-    width: min(78vw, 260px);
-    box-shadow: 8px 0 24px rgba(15,23,42,.15);
+    display: none !important;
   }
 
   /* 输入区适配 */
