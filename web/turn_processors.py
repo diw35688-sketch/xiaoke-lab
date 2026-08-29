@@ -6,6 +6,8 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from typing import Callable, Mapping, Protocol
 
+import json
+
 import domain
 import llm_bridge
 import settings_store
@@ -15,6 +17,7 @@ from agent.core import (
     run_experiment_tool_agent,
     run_storage_agent,
     run_template_agent,
+    stream_agent,
 )
 from database.crud import get_recent_messages
 from database.turn_store import TurnStore
@@ -142,13 +145,38 @@ class ChatProcessor:
         history.append({"role": "user", "content": turn.raw_text})
         timing.mark("understanding_started")
         timing.mark("llm_started")
-        answer = self._generate(history, turn.conversation_id, turn.interaction_mode)
+        # 使用流式 agent 生成：保留工具卡片与 ui_action，不再只返回一段纯文本。
+        text_parts: list[str] = []
+        cards: dict[str, dict] = {}
+        for chunk in stream_agent(history, turn.conversation_id, turn.interaction_mode):
+            if isinstance(chunk, str) and chunk.startswith("[[LABTHINK]]"):
+                continue
+            if isinstance(chunk, str) and chunk.startswith("[[LABCARD]]"):
+                try:
+                    card = json.loads(chunk[len("[[LABCARD]]"):])
+                except json.JSONDecodeError:
+                    continue
+                key = card.get("tool_call_id") or "anon:" + str(len(cards))
+                cards[key] = card
+            elif isinstance(chunk, str):
+                text_parts.append(chunk)
+        cards_list = list(cards.values())
+        answer = "".join(text_parts).strip() or "处理完成。"
         answer, voice_item = _prepare_chat_spoken_delivery(turn, answer)
         timing.mark("first_chunk")
         timing.mark("llm_completed")
         timing.mark("understanding_completed")
         user = _text_block(turn, "user", turn.raw_text, assistant=False)
+        blocks = [user]
+        for card in cards_list:
+            block_id = card.get("tool_call_id") or f"{turn.turn_id}:tool:{card.get('title') or len(cards_list)}"
+            blocks.append(ConversationBlock(
+                block_id=block_id,
+                type=BlockType.TOOL_CARD,
+                payload=dict(card),
+            ))
         assistant = _text_block(turn, "spoken", answer, assistant=True)
+        blocks.append(assistant)
         voice = ConversationBlock(
             block_id=f"{turn.turn_id}:voice",
             type=BlockType.VOICE,
@@ -157,10 +185,11 @@ class ChatProcessor:
             intent_id=f"{turn.turn_id}:voice",
             priority=MessagePriority.REVIEW,
         )
+        blocks.append(voice)
         conversation_turn = ConversationTurn(
             turn.conversation_id, turn.request_id, turn.turn_id,
             turn.interaction_mode, turn.experiment_context, turn.mode_version,
-            turn.input_source, (user, assistant, voice),
+            turn.input_source, tuple(blocks),
         )
         return PreparedTurn(
             turn=conversation_turn,

@@ -87,8 +87,8 @@
     rail.innerHTML = '<div id="steps-head"></div><div id="steps-inner"></div>';
     var chat = document.getElementById('sh-chat');
     var head = document.getElementById('sh-chat-head');
-    if (chat && head) {
-      chat.insertBefore(rail, head.nextSibling);
+    if (chat && head && head.parentNode) {
+      head.parentNode.insertBefore(rail, head.nextSibling);
     } else {
       (document.getElementById('sh-center') || document.body).appendChild(rail);
     }
