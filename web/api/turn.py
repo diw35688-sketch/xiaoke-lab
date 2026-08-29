@@ -17,7 +17,7 @@ from src.core.conversation_turn import ExperimentContext, InputSource, Interacti
 from src.core.turn_input import TurnInput
 from src.core.turn_request_envelope import TurnRequestEnvelope
 from turn_application_service import TurnApplicationService, TurnSubmission
-from turn_processors import ChatProcessor, ExperimentProcessor
+from turn_processors import ChatProcessor, ExperimentProcessor, StorageProcessor, TemplateProcessor
 from turn_stream_contract import (
     sse_event, turn_accepted_event, turn_error_event, turn_status_event,
 )
@@ -30,6 +30,8 @@ turn_application_service = TurnApplicationService(
     store=turn_store,
     chat_processor=ChatProcessor(),
     experiment_processor=ExperimentProcessor(turn_store),
+    template_processor=TemplateProcessor(),
+    storage_processor=StorageProcessor(),
 )
 
 _STATUS_TEXT = {
@@ -188,6 +190,12 @@ def _delete_audio_paths(paths):
         except Exception as error:
             failures.append({"path": path, "error": str(error)})
     return {"audio_removed": removed, "audio_failures": failures}
+
+
+@router.get("/history")
+def turn_history(conversation_id: str):
+    """按会话读取已提交 Turn 的完整结构（含 think/tool/assistant 等块）。"""
+    return {"turns": turn_store.list_committed_turns(conversation_id)}
 
 
 @router.delete("/conversations/{conversation_id}")

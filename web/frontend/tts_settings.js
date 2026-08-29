@@ -8,15 +8,19 @@
     '<hr style="border:0;border-top:1px solid #e2e8f0;margin:20px 0">',
     '<h3 style="margin:0 0 14px;font-size:16px;color:#0f172a">语音合成</h3>',
     '<label class="settings-field"><span>合成方式</span>',
-    '  <select id="tts-provider"></select>',
+    '  <div class="preset-row"><select id="tts-provider"></select>',
+    '    <a id="tts-api-url" href="#" target="_blank" rel="noopener" class="api-link" style="visibility:hidden">获取 API</a></div>',
     '  <em id="tts-note"></em></label>',
     '<div id="tts-key-row" class="settings-field" style="display:none">',
     '  <span style="display:block;font-size:13px;color:#334155;margin-bottom:6px;font-weight:600">语音服务密钥</span>',
     '  <input id="tts-key" type="password" placeholder="留空表示不修改" autocomplete="off" />',
     '</div>',
-    '<div id="tts-url-row" class="settings-field" style="display:none">',
-    '  <span style="display:block;font-size:13px;color:#334155;margin-bottom:6px;font-weight:600">接口地址</span>',
-    '  <input id="tts-base-url" type="text" />',
+    '<div id="tts-volcano-row" class="settings-field" style="display:none">',
+    '  <span style="display:block;font-size:13px;color:#334155;margin-bottom:6px;font-weight:600">火山引擎密钥（AppID 与 Access Token）</span>',
+    '  <div style="display:flex;gap:8px;flex-wrap:wrap">',
+    '    <input id="tts-appid" type="text" placeholder="AppID" style="flex:1;min-width:140px" />',
+    '    <input id="tts-access-token" type="password" placeholder="Access Token" style="flex:2;min-width:220px" autocomplete="off" />',
+    '  </div>',
     '</div>',
     '<div id="tts-model-row" class="settings-field" style="display:none">',
     '  <span style="display:block;font-size:13px;color:#334155;margin-bottom:6px;font-weight:600">合成模型</span>',
@@ -45,15 +49,20 @@
     var meta = providers.filter(function (p) { return p.id === id; })[0];
     if (!meta) return;
     el('tts-note').textContent = meta.note || '';
-    el('tts-key-row').style.display = meta.needs_key ? 'block' : 'none';
-    el('tts-url-row').style.display = meta.default_base_url ? 'block' : 'none';
+    var apiLink = el('tts-api-url');
+    if (apiLink) {
+      apiLink.href = meta.api_url || '#';
+      apiLink.style.visibility = meta.api_url ? 'visible' : 'hidden';
+    }
+    var isVolcano = id === 'volcano';
+    el('tts-key-row').style.display = (meta.needs_key && !isVolcano) ? 'block' : 'none';
+    el('tts-volcano-row').style.display = isVolcano ? 'block' : 'none';
     el('tts-model-row').style.display = meta.default_model ? 'block' : 'none';
     var voices = meta.voices || [];
     el('tts-voice-row').style.display = voices.length ? 'block' : 'none';
     el('tts-voice').innerHTML = voices.map(function (v) {
       return '<option value="' + v.id + '">' + v.label + '</option>';
     }).join('');
-    if (meta.default_base_url && !el('tts-base-url').value) el('tts-base-url').value = meta.default_base_url;
     if (meta.default_model && !el('tts-model').value) el('tts-model').value = meta.default_model;
   }
 
@@ -65,7 +74,6 @@
       }).join('');
       var cur = d.current || {};
       el('tts-provider').value = cur.provider || 'browser';
-      el('tts-base-url').value = cur.base_url || '';
       el('tts-model').value = cur.model || '';
       el('tts-speed').value = cur.speed || 1;
       el('tts-speed-label').textContent = (cur.speed || 1).toFixed ? (cur.speed || 1).toFixed(1) : cur.speed;
@@ -80,15 +88,20 @@
   function payload() {
     var data = {
       tts_provider: el('tts-provider').value,
-      tts_base_url: el('tts-base-url').value.trim(),
       tts_model: el('tts-model').value.trim(),
       tts_voice: el('tts-voice').value || '',
       tts_speed: parseFloat(el('tts-speed').value),
       tts_enabled: el('tts-enabled').checked,
       speak_record_ack: el('speak-record-ack').checked
     };
-    var key = el('tts-key').value.trim();
-    if (key) data.tts_api_key = key;
+    if (el('tts-provider').value === 'volcano') {
+      var appid = el('tts-appid').value.trim();
+      var accessToken = el('tts-access-token').value.trim();
+      if (appid && accessToken) data.tts_api_key = appid + ':' + accessToken;
+    } else {
+      var key = el('tts-key').value.trim();
+      if (key) data.tts_api_key = key;
+    }
     return data;
   }
 
@@ -122,7 +135,6 @@
       msg.textContent = '正在拉取语音模型…';
       var payload = {
         provider: el('tts-provider').value,
-        base_url: el('tts-base-url').value.trim(),
         api_key: el('tts-key').value.trim()
       };
       fetch('/tts/models', {

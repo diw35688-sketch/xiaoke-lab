@@ -5,16 +5,18 @@
 (function () {
   var CSS = [
     '#cp-wrap{padding:0 16px 10px;background:var(--n-00);flex:0 0 auto}',
-    '#cp-card{box-sizing:border-box;position:relative;display:flex;flex-direction:column;gap:12px;',
-    '  width:100%;padding-top:10px;border:1px solid rgba(0,0,0,.10);border-radius:22px;',
+    '#cp-card{box-sizing:border-box;position:relative;display:flex;flex-direction:column;gap:8px;',
+    '  width:100%;padding-top:6px;border:1px solid rgba(0,0,0,.10);border-radius:22px;',
     '  background:var(--n-00);box-shadow:0 1px 2px rgba(0,0,0,.04),0 4px 12px rgba(0,0,0,.05)}',
     '#cp-card.focus{border-color:rgba(0,0,0,.16)}',
-    '#cp-text{border:0;outline:0;resize:none;width:100%;box-sizing:border-box;padding:0 16px;',
+    '#cp-icons{display:flex;align-items:center;gap:5px;padding:4px 10px 0}',
+    '#cp-text{border:0;outline:0;resize:none;width:100%;box-sizing:border-box;padding:4px 16px 2px;',
     '  font-size:15px;line-height:23px;font-family:inherit;color:var(--n-900);background:transparent;',
     '  max-height:168px;overflow-y:auto}',
     '#cp-text::placeholder{color:var(--n-400)}',
-    '#cp-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:2px 8px 6px;min-width:0}',
+    '#cp-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 8px 6px;min-width:0}',
     '.cp-left,.cp-right{display:flex;align-items:center;gap:7px;min-width:0}',
+    '.cp-left{flex-wrap:wrap}',
     '.cp-icon{width:30px;height:30px;border-radius:50%;border:1px solid rgba(0,0,0,.10);background:var(--n-00);',
     '  color:var(--n-600);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:15px;flex:0 0 auto;font-family:inherit}',
     '.cp-icon:hover{background:var(--n-60)}',
@@ -27,8 +29,8 @@
     '.cp-chip.plain{border:0;background:transparent;padding:0 4px;cursor:default}',
     '#cp-continuous-label{display:inline-flex;align-items:center;gap:5px;color:var(--n-700);font-size:var(--fs-xs);white-space:nowrap;cursor:pointer}',
     '#cp-continuous{margin:0;accent-color:var(--brand)}',
-    '#cp-modes{display:flex;align-items:center;gap:3px;padding:3px;border-radius:16px;background:var(--n-60)}',
-    '.cp-mode{border:0;border-radius:13px;padding:5px 9px;background:transparent;color:var(--n-600);cursor:pointer;font:inherit;font-size:var(--fs-xs)}',
+    '#cp-modes{display:flex;align-items:center;gap:2px;padding:3px;border-radius:16px;background:var(--n-60);flex-wrap:nowrap;overflow-x:auto;max-width:56vw}',
+    '.cp-mode{border:0;border-radius:13px;padding:5px 9px;background:transparent;color:var(--n-600);cursor:pointer;font:inherit;font-size:var(--fs-xs);white-space:nowrap}',
     '.cp-mode.active{background:var(--n-00);color:var(--brand);box-shadow:0 1px 3px rgba(0,0,0,.10)}',
     '#cp-send{width:32px;height:32px;border-radius:50%;border:0;background:var(--brand);color:#fff;',
     '  cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:15px;flex:0 0 auto}',
@@ -49,18 +51,16 @@
 
   var HTML = [
     '<div id="cp-card">',
+    '  <div id="cp-icons">',
+    '    <button class="cp-icon" id="cp-file" title="上传任意文件（+）">＋</button>',
+    '    <input type="file" id="cp-file-input" style="display:none" />',
+    '    <button class="cp-icon" id="cp-mic" title="单次录音：是否保存由当前模式决定">◉</button>',
+    '    <button class="cp-icon" id="cp-phone-call" title="通话/连续通话">📞</button>',
+    '    <button class="cp-icon" id="cp-phone" title="手机端">📱</button>',
+    '    <span class="cp-chip plain" id="cp-hint">单次录音</span>',
+    '  </div>',
     '  <textarea id="cp-text" rows="1" placeholder="给实验助手发消息，或按住麦克风口述"></textarea>',
     '  <div id="cp-row">',
-    '    <div class="cp-left">',
-    '      <button class="cp-icon" id="cp-mic" title="单次录音：是否保存由当前模式决定">◉</button>',
-    '      <span class="cp-chip plain" id="cp-hint">单次录音</span>',
-    '      <label id="cp-continuous-label"><input id="cp-continuous" type="checkbox">连续通话</label>',
-    '      <div id="cp-modes" aria-label="交互模式">',
-    '        <button class="cp-mode active" type="button" data-mode="chat">自由聊天</button>',
-    '        <button class="cp-mode" type="button" data-mode="free">自由实验记录</button>',
-    '        <button class="cp-mode" type="button" data-mode="protocol">方案实验记录</button>',
-    '      </div>',
-    '    </div>',
     '    <div class="cp-right">',
     '      <button class="cp-chip" id="cp-model"><span id="cp-model-name">未配置模型</span><span class="v">⌄</span></button>',
     '      <button id="cp-send" title="发送">↑</button>',
@@ -102,6 +102,7 @@
     var box = el('cp-text');
     var text = box.value.trim();
     if (!text) return;
+    if (window.logAction) window.logAction('composer_send', { text: text.slice(0, 80), inputSource: (options && options.inputSource) || 'text' });
     var input = document.querySelector('#message');
     var form = document.querySelector('#form');
     if (!input || !form) return;
@@ -205,18 +206,33 @@
     if (asrBar) asrBar.style.display = 'none';
 
     var box = el('cp-text');
-    Array.prototype.forEach.call(el('cp-modes').querySelectorAll('.cp-mode'), function (button) {
-      button.onclick = function () { selectComposerMode(button.dataset.mode); };
-    });
-    window.interactionModeState.subscribe(function (snapshot) {
-      var selected = snapshot.interaction_mode === 'chat' ? 'chat' : snapshot.experiment_context;
-      Array.prototype.forEach.call(el('cp-modes').querySelectorAll('.cp-mode'), function (button) {
-        button.classList.toggle('active', button.dataset.mode === selected);
-      });
-    });
     box.addEventListener('input', autoGrow);
     box.addEventListener('focus', function () { el('cp-card').classList.add('focus'); });
     box.addEventListener('blur', function () { el('cp-card').classList.remove('focus'); });
+    var fileBtn = el('cp-file');
+    var fileInput = el('cp-file-input');
+    if (fileBtn && fileInput) {
+      fileBtn.onclick = function () { fileInput.click(); };
+      fileInput.onchange = function () {
+        var file = fileInput.files && fileInput.files[0];
+        if (!file) return;
+        var form = new FormData();
+        form.append('file', file);
+        fileBtn.textContent = '…';
+        fetch('/api/upload', { method: 'POST', body: form }).then(function (r) {
+          return r.json().then(function (d) { return { ok: r.ok, d: d }; });
+        }).then(function (res) {
+          fileBtn.textContent = '＋';
+          if (!res.ok) { alert(res.d.detail || '上传失败'); return; }
+          if (window.logAction) window.logAction('file_upload', { name: res.d.name, size: res.d.size });
+          if (typeof window.addChatMessage === 'function') {
+            window.addChatMessage('已上传文件：' + res.d.name + '（file_id=' + res.d.file_id + '）', 'user');
+          }
+          window.composerSend('请读取并处理我上传的文件：file_id=' + res.d.file_id + '，文件名为 ' + res.d.name);
+        }).catch(function (e) { fileBtn.textContent = '＋'; alert('上传失败：' + e.message); });
+      };
+    }
+
     box.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); }
     });
@@ -237,31 +253,23 @@
       continuousActive = Boolean(event.detail && event.detail.active);
       el('cp-mic').classList.toggle('rec', continuousActive);
       el('cp-mic').textContent = continuousActive ? '■' : '◉';
-      el('cp-hint').textContent = continuousActive ? '连续通话中，正在聆听' :
-        (el('cp-continuous').checked ? '连续通话，点麦克风开始' : '单次录音');
+      el('cp-hint').textContent = continuousActive ? '连续通话中，正在聆听' : '单次录音';
     });
-    el('cp-continuous').onchange = function () {
-      if (!this.checked && window.phoneCallIsActive?.()) window.phoneCallToggle?.();
-      if (!continuousActive) {
-        el('cp-hint').textContent = this.checked ? '连续通话，点麦克风开始' : '单次录音';
-        el('cp-mic').title = this.checked ? '开始或结束连续通话' : '开始或结束单次录音';
-      }
-    };
     el('cp-mic').onclick = function () {
-      if (el('cp-continuous').checked) {
-        window.phoneCallToggle?.();
-        return;
-      }
       var real = document.getElementById('asr-btn');
       if (!real || real.disabled) return;
       real.click();
     };
+    var phoneCallBtn = el('cp-phone-call');
+    if (phoneCallBtn) phoneCallBtn.onclick = function () { if (window.logAction) window.logAction('phone_call_toggle'); window.phoneCallToggle?.(); };
+    var phoneBtn = el('cp-phone');
+    if (phoneBtn) phoneBtn.onclick = function () { if (window.logAction) window.logAction('open_phone_page'); window.open('/phone', '_blank'); };
 
-    // 模型/语音/方案 快捷面板
+    // 模型：直接进入模型设置页（选择模型/API/供应商）
     el('cp-model').onclick = function (e) {
       e.stopPropagation();
-      el('cp-pop').classList.toggle('on');
-      refresh();
+      if (window.logAction) window.logAction('open_settings');
+      if (window.shellShow) window.shellShow('settings');
     };
     document.addEventListener('click', function () { el('cp-pop').classList.remove('on'); });
     el('cp-pop').onclick = function (e) { e.stopPropagation(); };

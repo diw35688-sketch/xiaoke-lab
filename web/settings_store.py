@@ -128,6 +128,15 @@ class ModelSettings:
         else:
             data["api_key"] = _mask_key(key)
             data["api_key_set"] = True
+        # 服务器/远程地址仅由后端代理使用，不暴露给浏览器，防止被攻击。
+        for name in (
+            "community_base_url",
+            "mineru_file_parse_url",
+            "ocr_base_url",
+            "tts_base_url",
+            "tts_url",
+        ):
+            data.pop(name, None)
         return data
 
     def key_for(self, provider_id: str | None) -> str:

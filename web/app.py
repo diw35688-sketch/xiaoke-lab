@@ -1,3 +1,9 @@
+import sys
+import time
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -12,6 +18,9 @@ from api.chat import router as chat_router
 from api.experiments import router as experiments_router
 from api.memories import router as memories_router
 from api.network import router as network_router
+from api.files import router as files_router
+from api.logs import router as logs_router
+from api.telemetry import router as telemetry_router
 from api.notifications import router as notifications_router
 from api.protocols import router as protocols_router
 from api.reagent_prep import router as reagent_prep_router
@@ -19,6 +28,7 @@ from api.record import router as record_router
 from api.settings import router as settings_router
 from api.storage import router as storage_router
 from api.community import router as community_router
+from api.community_proxy import router as community_proxy_router
 from api.tasks import router as tasks_router
 from api.templates import router as templates_router
 from api.tts import router as tts_router
@@ -31,6 +41,29 @@ from tasks.task_manager import task_manager
 
 app = FastAPI(title="实验助手 API", version="1.2.0")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "frontend"), name="static")
+
+
+@app.middleware("http")
+async def request_debug_log(request: Request, call_next):
+    start = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception as exc:
+        print(
+            f"[REQ] {time.strftime('%Y-%m-%d %H:%M:%S')} "
+            f"{request.method} {request.url.path} status=500 duration=?"
+            f" error={type(exc).__name__} {exc}",
+            flush=True,
+        )
+        raise
+    duration = (time.perf_counter() - start) * 1000
+    print(
+        f"[REQ] {time.strftime('%Y-%m-%d %H:%M:%S')} "
+        f"{request.method} {request.url.path} status={response.status_code} "
+        f"duration={duration:.0f}ms",
+        flush=True,
+    )
+    return response
 
 
 @app.on_event("startup")
@@ -57,18 +90,20 @@ def _is_mobile(user_agent: str) -> bool:
 def home(request: Request):
     if _is_mobile(request.headers.get("user-agent", "")):
         return HTMLResponse((BASE_DIR / "frontend" / "mobile.html").read_text(encoding="utf-8"))
+    # 公网隧道默认打开移动端流程卡片，方便手机/外部访问
+    try:
+        if network_mode.status().get("mode") == "tunnel":
+            return HTMLResponse((BASE_DIR / "frontend" / "mobile.html").read_text(encoding="utf-8"))
+    except Exception:
+        pass
     page = (BASE_DIR / "frontend" / "index.html").read_text(encoding="utf-8")
     page = page.replace('/static/inworld_tts.js', '/static/local_tts.js?v=20260826-shared-warmup')
     page = page.replace('</head>', '<link rel="stylesheet" href="/static/theme.css"></head>')
     # 注入模型设置面板（任何人都能在网页里配置模型）
-    page = page.replace('</body>', ('<script src="/static/settings.js?v=20260829"></script>'
-                                   '<script src="/static/tts_settings.js"></script>'
-                                   '<script src="/static/speak.js?v=20260820"></script>'
-                                   '<script src="/static/interaction_mode_state.js?v=20260825"></script>'
-                                   '<script src="/static/turn_client.js?v=20260827-timing"></script>'
-        '<script src="/static/voice_asr.js?v=20260827-clarification-card"></script>'
+    page = page.replace('</body>', ('<script src="/static/voice_asr.js?v=20260827-clarification-card"></script>'
                                    '</body>'))
     scripts = (
+        '<script src="/static/debug_log.js?v=20260901"></script>'
         '<script src="/static/experiment_confirmation.js"></script>'
         '<script src="/static/experiment_status.js"></script>'
         '<script src="/static/history_panel.js"></script>'
@@ -80,21 +115,26 @@ def home(request: Request):
         '<script src="/static/conversation_block_view.js?v=20260827-clarification-card"></script>'
         '<script src="/static/turn_reply_surface.js?v=20260827-progress-cleanup"></script>'
         '<script src="/static/conversation_context_blocks.js?v=20260825"></script>'
-        '<script src="/static/streaming_chat_v2.js?v=20260827-progress-cleanup-2"></script>'
+        '<script src="/static/interaction_mode_state.js?v=20260829-storage"></script>'
+        '<script src="/static/turn_client.js?v=20260827-timing"></script>'
+        '<script src="/static/streaming_chat_v2.js?v=20260901-telemetry"></script>'
         '<script src="/static/template_planner.js"></script>'
         '<script src="/static/task_panel.js"></script>'
-        '<script src="/static/shell.js?v=20260825-one-mic"></script>'
+        '<script src="/static/shell.js?v=20260901-telemetry"></script>'
         '<script src="/static/conversation_list.js?v=20260818"></script>'
         '<script src="/static/run_canvas.js"></script>'
         '<script src="/static/step_cards.js?v=20260827-restore"></script>'
         '<script src="/static/record_ledger_view.js?v=20260827-deviation-values"></script>'
+        '<script src="/static/settings.js?v=20260901-hidden"></script>'
+        '<script src="/static/tts_settings.js?v=20260901-volcano-fields"></script>'
+        '<script src="/static/speak.js?v=20260820"></script>'
         '<script src="/static/views.js?v=20260827-unified-ledger"></script>'
         '<script src="/static/protocol_editor.js"></script>'
         '<script src="/static/reagent_prep.js?v=20260820"></script>'
         '<script src="/static/storage.js?v=20260821"></script>'
-        '<script src="/static/community.js?v=20260831"></script>'
+        '<script src="/static/community.js?v=20260901-telemetry"></script>'
         '<script src="/static/notifications.js?v=20260821"></script>'
-        '<script src="/static/composer.js?v=20260825-mode-sync"></script>'
+        '<script src="/static/composer.js?v=20260901-telemetry"></script>'
           '<script src="/static/voice_startup_ui.js?v=20260826"></script>'
           '<script src="/static/call_silero_vad.js?v=20260826-visible-progress"></script>'
         '<script src="/static/phone_call.js?v=20260827-clarification-card"></script>'
@@ -194,6 +234,9 @@ app.include_router(calculator_router)
 app.include_router(experiments_router)
 app.include_router(memories_router)
 app.include_router(network_router)
+app.include_router(files_router)
+app.include_router(logs_router)
+app.include_router(telemetry_router)
 app.include_router(notifications_router)
 app.include_router(templates_router)
 app.include_router(tasks_router)
@@ -202,6 +245,7 @@ app.include_router(protocols_router)
 app.include_router(reagent_prep_router)
 app.include_router(storage_router)
 app.include_router(community_router)
+app.include_router(community_proxy_router)
 app.include_router(asr_router)
 app.include_router(record_router)
 app.include_router(tts_router)
