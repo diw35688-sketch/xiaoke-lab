@@ -127,6 +127,9 @@ def present_result(name: str, arguments: dict, outcome: dict) -> dict:
         view["ui_action"] = {"type": "navigate", "view": "protocols"}
     elif outcome.get("ok") and name == "list_reagent_preps":
         view["ui_action"] = {"type": "navigate", "view": "reagent_prep"}
+    elif outcome.get("ok") and name == "get_reagent_prep":
+        prep_id = (outcome.get("result") or {}).get("reagent_prep_id")
+        view["ui_action"] = {"type": "open_reagent_prep", "id": prep_id}
     return view
 
 

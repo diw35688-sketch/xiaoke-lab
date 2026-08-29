@@ -228,6 +228,22 @@
   window.shellRegisterView('protocols', function (host) {
     api('/protocols').then(function (d) {
       ensureCardStyles();
+      var protocolPageSize = 6;
+      function protocolMark(text, q) {
+        var safe = esc(text);
+        if (!q) return safe;
+        var escaped = String(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return safe.replace(new RegExp('(' + escaped + ')', 'gi'), '<mark>$1</mark>');
+      }
+      function startProtocol(id) {
+        api('/protocols/session', 'POST', { protocol_id: id || null }).then(function () {
+          window.interactionModeState.select(id ? 'protocol' : 'free', id || null);
+          refreshStatus();
+          window.shellShow('chat');
+          if (window.composerRefresh) window.composerRefresh();
+          if (window.labStepsReload) window.labStepsReload();
+        });
+      }
       host.innerHTML = '<div class="card-toolbar">'
         + '<input type="search" id="protocol-search" placeholder="搜索方案名称 / 来源…" autocomplete="off">'
         + '<button class="sh-btn primary" id="protocol-chat-create">AI 创建</button>'
@@ -236,17 +252,20 @@
         + '<span id="protocol-file-msg" style="font-size:12px;color:#64748b"></span>'
         + '</div>'
         + '<div class="search-note">文件自动识别：JSON 直接入库；PDF/图片走 OCR 识别成方案</div>'
+        + '<div id="protocol-summary" style="font-size:12px;color:#64748b;margin:2px 0 10px"></div>'
         + '<div id="protocol-grid" class="card-grid"></div>'
+        + '<div id="protocol-more-box" style="margin-top:10px;text-align:center"></div>'
         + '<div id="ai-draft-box"></div>'
         + '<div id="ocr-draft-box"></div>';
 
-      function renderProtocols(items, all) {
-        var cards = items.map(function (p) {
+      function renderProtocols(items, all, q) {
+        var visible = items.slice(0, protocolPageSize);
+        var cards = visible.map(function (p) {
           var on = session && session.mode === 'protocol' && session.protocol.id === p.id;
           return '<div class="p-card' + (on ? ' active' : '') + '" data-id="' + p.id + '">'
-            + '<div style="font-weight:600;color:#0f172a;margin-bottom:5px">' + esc(p.title)
+            + '<div style="font-weight:600;color:#0f172a;margin-bottom:5px">' + protocolMark(p.title, q)
             + (on ? '<span style="color:#2563eb;font-size:12px;margin-left:8px">进行中</span>' : '') + '</div>'
-            + '<div style="color:#64748b;font-size:12px;line-height:1.6">共 ' + p.total_steps + ' 步 · ' + esc(p.source) + '</div>'
+            + '<div style="color:#64748b;font-size:12px;line-height:1.6">共 ' + p.total_steps + ' 步 · ' + protocolMark(p.source, q) + '</div>'
             + '<div style="margin-top:8px"><button class="sh-btn" type="button" data-view-detail="' + p.id + '" style="padding:3px 9px;font-size:12px">查看方案</button></div></div>';
         }).join('');
         var freeActive = session && session.mode === 'free';
@@ -259,14 +278,7 @@
         Array.prototype.forEach.call(grid.querySelectorAll('.p-card'), function (card) {
           card.onclick = function (e) {
             if (e.target.closest('[data-view-detail]')) return;
-            if (!card.dataset.id) {
-              api('/protocols/session', 'POST', { protocol_id: null }).then(function () {
-                refreshStatus();
-                window.shellShow('run');
-              });
-              return;
-            }
-            showProtocolDetail(host, card.dataset.id);
+            startProtocol(card.dataset.id);
           };
         });
         Array.prototype.forEach.call(grid.querySelectorAll('[data-view-detail]'), function (btn) {
@@ -274,23 +286,36 @@
             e.stopPropagation();
             var id = btn.getAttribute('data-view-detail');
             if (!id) {
-              api('/protocols/session', 'POST', { protocol_id: null }).then(function () {
-                refreshStatus();
-                window.shellShow('run');
-              });
+              startProtocol('');
               return;
             }
             showProtocolDetail(host, id);
           };
         });
+        var summary = host.querySelector('#protocol-summary');
+        summary.textContent = '共 ' + items.length + ' 份方案' + (q ? '，命中 ' + items.length + ' 份' : '');
+        var moreBox = host.querySelector('#protocol-more-box');
+        if (items.length > protocolPageSize) {
+          moreBox.innerHTML = '<button class="sh-btn" id="protocol-more" style="padding:5px 14px">显示全部 ' + items.length + ' 份</button>';
+          var moreBtn = moreBox.querySelector('#protocol-more');
+          moreBtn.onclick = function () {
+            protocolPageSize = items.length;
+            renderProtocols(items, all, q);
+            moreBox.innerHTML = '';
+          };
+        } else {
+          moreBox.innerHTML = '';
+        }
       }
-      renderProtocols(d.protocols || [], d.protocols || []);
+      protocolPageSize = 6;
+      renderProtocols(d.protocols || [], d.protocols || [], '');
       var searchInput = host.querySelector('#protocol-search');
       searchInput.addEventListener('input', function () {
         var q = searchInput.value.trim().toLowerCase();
+        protocolPageSize = 6;
         renderProtocols((d.protocols || []).filter(function (p) {
           return !q || (p.title || '').toLowerCase().indexOf(q) >= 0 || (p.source || '').toLowerCase().indexOf(q) >= 0;
-        }), d.protocols || []);
+        }), d.protocols || [], q);
       });
       var chatCreate = host.querySelector('#protocol-chat-create');
       if (chatCreate) chatCreate.onclick = function () {
