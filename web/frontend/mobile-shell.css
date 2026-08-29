@@ -1,0 +1,63 @@
+/* 移动端外壳：电脑界面的手机版本。
+   默认打开聊天区全屏；左侧导航改为抽屉；实验/其他工作视图切到中间工作台。 */
+@media (min-width: 901px) {
+  #sh-mobile-menu, #sh-mobile-view-toggle { display: none !important; }
+}
+
+@media (max-width: 900px) {
+  body { overflow: hidden; }
+  #shell { min-height: 100vh; height: 100vh; }
+
+  /* 左侧导航抽屉 */
+  #sh-side {
+    position: fixed; left: 0; top: 0; bottom: 0; z-index: 100;
+    width: 218px; flex: 0 0 218px;
+    transform: translateX(-100%);
+    transition: transform .2s;
+    box-shadow: 12px 0 28px rgba(15,23,42,.18);
+  }
+  body.mobile-nav-open #sh-side { transform: translateX(0); }
+  body.mobile-nav-open #sh-mobile-overlay { display: block; }
+  #sh-mobile-overlay {
+    display: none; position: fixed; inset: 0; z-index: 90;
+    background: rgba(15,23,42,.42);
+  }
+
+  /* 顶部工具按钮 */
+  #sh-top { padding: 0 8px; gap: 6px; }
+  #sh-mobile-menu, #sh-mobile-view-toggle {
+    border: 1px solid var(--bd-2); background: var(--n-00);
+    border-radius: var(--r-md); padding: 5px 8px; font-size: 13px;
+    color: var(--n-800); cursor: pointer; font-family: inherit;
+  }
+  #sh-title { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #sh-notify { margin-left: auto; }
+
+  /* 默认聊天全屏 */
+  #sh-chat-resizer { display: none !important; }
+  #sh-center { min-width: 0 !important; }
+  body.mobile-mode-chat #sh-center { display: none !important; }
+  body.mobile-mode-chat #sh-chat {
+    flex: 1 1 100% !important; width: 100% !important;
+    border-left: 0 !important; flex-basis: 100% !important;
+  }
+  body.mobile-mode-work #sh-chat { display: none !important; }
+  body.mobile-mode-work #sh-center { flex: 1 1 100% !important; display: flex !important; }
+
+  /* 会话面板在手机上作为抽屉 */
+  #sh-conversation-panel {
+    width: min(78vw, 260px);
+    box-shadow: 8px 0 24px rgba(15,23,42,.15);
+  }
+
+  /* 输入区适配 */
+  #cp-wrap { padding: 0 8px 8px; }
+  #cp-card { border-radius: 16px; }
+  #cp-modes { max-width: 78vw; }
+  #cp-icons { padding: 4px 4px 0; }
+  .cp-icon { width: 30px; height: 30px; }
+
+  /* 工作台适配 */
+  #sh-canvas { padding: 10px; }
+  .settings-nav { font-size: 12px; }
+}

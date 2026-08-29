@@ -88,17 +88,12 @@ def _is_mobile(user_agent: str) -> bool:
 
 @app.get("/", include_in_schema=False)
 def home(request: Request):
-    if _is_mobile(request.headers.get("user-agent", "")):
-        return HTMLResponse((BASE_DIR / "frontend" / "mobile.html").read_text(encoding="utf-8"))
-    # 公网隧道默认打开移动端流程卡片，方便手机/外部访问
-    try:
-        if network_mode.status().get("mode") == "tunnel":
-            return HTMLResponse((BASE_DIR / "frontend" / "mobile.html").read_text(encoding="utf-8"))
-    except Exception:
-        pass
+    # 手机/公网隧道直接使用电脑端同一界面；通过移动端外壳 CSS/JS 做响应式适配。
+    # 电脑界面的手机版 = 默认聊天，点导航可进入实验/工作台。
     page = (BASE_DIR / "frontend" / "index.html").read_text(encoding="utf-8")
     page = page.replace('/static/inworld_tts.js', '/static/local_tts.js?v=20260826-shared-warmup')
     page = page.replace('</head>', '<link rel="stylesheet" href="/static/theme.css"></head>')
+    page = page.replace('</head>', '<link rel="stylesheet" href="/static/mobile-shell.css?v=20260902"></head>')
     # 注入模型设置面板（任何人都能在网页里配置模型）
     page = page.replace('</body>', ('<script src="/static/voice_asr.js?v=20260827-clarification-card"></script>'
                                    '</body>'))
@@ -121,6 +116,7 @@ def home(request: Request):
         '<script src="/static/template_planner.js"></script>'
         '<script src="/static/task_panel.js"></script>'
         '<script src="/static/shell.js?v=20260901-telemetry"></script>'
+        '<script src="/static/mobile_shell.js?v=20260902"></script>'
         '<script src="/static/conversation_list.js?v=20260818"></script>'
         '<script src="/static/run_canvas.js"></script>'
         '<script src="/static/step_cards.js?v=20260827-restore"></script>'
