@@ -18,6 +18,7 @@ class UnifiedDispatchDestination(str, Enum):
     CLARIFICATION_CONTEXT = "clarification_context"
     END_SESSION_EXECUTION = "end_session_execution"
     END_SESSION_CONFIRMATION = "end_session_confirmation"
+    PROTOCOL_NAVIGATION = "protocol_navigation"
     ABSTENTION = "abstention"
     DEGRADED_NOTE = "degraded_note"
 
@@ -31,6 +32,7 @@ class UnifiedDispatchPermission(str, Enum):
         "forward_end_execution_candidate"
     )
     REQUEST_END_CONFIRMATION = "request_end_confirmation"
+    EXECUTE_PROTOCOL_NAVIGATION = "execute_protocol_navigation"
     NO_ACTION = "no_action"
     FORWARD_DEGRADED_NOTE = "forward_degraded_note"
 
@@ -47,6 +49,9 @@ _DESTINATION_PERMISSIONS = {
     ),
     UnifiedDispatchDestination.END_SESSION_CONFIRMATION: (
         UnifiedDispatchPermission.REQUEST_END_CONFIRMATION
+    ),
+    UnifiedDispatchDestination.PROTOCOL_NAVIGATION: (
+        UnifiedDispatchPermission.EXECUTE_PROTOCOL_NAVIGATION
     ),
     UnifiedDispatchDestination.ABSTENTION: (
         UnifiedDispatchPermission.NO_ACTION
@@ -141,6 +146,16 @@ class UnifiedDispatchPlanner:
                 "需要待确认上下文复核，分派器不修改问题状态。",
             )
         if disposition == IntentDisposition.EXECUTE:
+            if (
+                route_result.decision.command_type
+                == InteractionCommandType.NEXT_PROTOCOL_STEP
+                and route_result.exact_command is not None
+            ):
+                return cls._build(
+                    route_result,
+                    UnifiedDispatchDestination.PROTOCOL_NAVIGATION,
+                    "精确下一步命令只授权方案导航边界执行。",
+                )
             if (
                 route_result.decision.command_type
                 != InteractionCommandType.END_SESSION

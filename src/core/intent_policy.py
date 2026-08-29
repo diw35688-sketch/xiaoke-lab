@@ -79,6 +79,13 @@ INTENT_POLICIES = {
         requires_clarification_context=True,
         reversible=True,
     ),
+    InteractionCommandType.NEXT_PROTOCOL_STEP: IntentPolicy(
+        command_type=InteractionCommandType.NEXT_PROTOCOL_STEP,
+        risk=IntentRisk.MEDIUM,
+        changes_session_state=True,
+        requires_clarification_context=False,
+        reversible=True,
+    ),
     InteractionCommandType.DEFER_CURRENT: IntentPolicy(
         command_type=InteractionCommandType.DEFER_CURRENT,
         risk=IntentRisk.MEDIUM,
@@ -162,6 +169,15 @@ class IntentPolicyEvaluator:
                 risk=policy.risk,
                 disposition=disposition,
                 reason="精确规则命中，按该意图的上下文要求处理。",
+            )
+
+        if command_type == InteractionCommandType.NEXT_PROTOCOL_STEP:
+            return IntentDecision(
+                command_type=command_type,
+                evidence=evidence,
+                risk=policy.risk,
+                disposition=IntentDisposition.DO_NOT_EXECUTE,
+                reason="方案切步只接受本地精确命令，语义候选不得执行。",
             )
 
         if policy.risk == IntentRisk.LOW:
