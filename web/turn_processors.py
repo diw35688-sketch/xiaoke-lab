@@ -200,21 +200,20 @@ class ChatProcessor:
                 )
                 cards_list = list(cards.values())
         answer = "".join(text_parts).strip() or "处理完成。"
-        # 如果模型只回“共12个，你要做哪个”，直接把完整列表写进聊天区。
+        # 方案/试剂很多时，聊天只给简短概览，真正的选择交给方案库/配置库页面。
         list_card = next((
             card for card in cards_list
             if card.get("status") == "done"
             and card.get("title") in {"查看可选实验方案", "查看试剂配置库"}
         ), None)
         if list_card:
-            list_lines = [line for line in (list_card.get("lines") or []) if line.strip()]
-            if len(list_lines) > 1:
-                answer = "\n".join(list_lines)
-                _, voice_item = _prepare_chat_spoken_delivery(
-                    turn, "已列出完整内容，请看屏幕选择。"
-                )
+            lines = list_card.get("lines") or []
+            count_line = lines[0] if lines else ""
+            if list_card.get("title") == "查看可选实验方案":
+                answer = f"{count_line}。已打开实验方案库，请在卡片页选择要做的实验。"
             else:
-                answer, voice_item = _prepare_chat_spoken_delivery(turn, answer)
+                answer = f"{count_line}。已打开试剂配置库，请在卡片页选择要配的试剂。"
+            _, voice_item = _prepare_chat_spoken_delivery(turn, answer)
         else:
             answer, voice_item = _prepare_chat_spoken_delivery(turn, answer)
         timing.mark("first_chunk")

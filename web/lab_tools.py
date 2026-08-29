@@ -490,7 +490,7 @@ def _create_protocol_from_text(description):
     "列出所有可选的实验方案，包含方案名称、步骤总数和来源。用户问有哪些实验、想做什么实验时调用。",
     {"type": "object", "properties": {}, "additionalProperties": False},
     kind="search", title="查看可选实验方案",
-    present=lambda a, r: [f"共 {len(r)} 份方案"] + [f"{i}. {x['title']}（{x['total_steps']} 步）" for i, x in enumerate(r, start=1)],
+    present=lambda a, r: [f"共 {len(r)} 份方案，已在方案库展示全部"] + [f"{i}. {x['title']}（{x['total_steps']} 步）" for i, x in enumerate(r[:6], start=1)],
 )
 def _list_protocols():
     return [
@@ -551,8 +551,8 @@ def _create_reagent_prep_from_text(description):
     "列出所有可配制的试剂/缓冲液配方。用户在实验前问“要先配什么”“有什么溶液要准备”时调用。",
     {"type": "object", "properties": {}, "additionalProperties": False},
     kind="search", title="查看试剂配置库", experiment_command=True,
-    present=lambda a, r: [f"共 {len(r['items'])} 条试剂配置"]
-    + [f"{i}. {x['name_zh']}（{x['target_concentration'] or '工作液'}）" for i, x in enumerate(r["items"], start=1)],
+    present=lambda a, r: [f"共 {len(r['items'])} 条试剂配置，已在配置库展示全部"]
+    + [f"{i}. {x['name_zh']}（{x['target_concentration'] or '工作液'}）" for i, x in enumerate(r["items"][:8], start=1)],
 )
 def _list_reagent_preps():
     return {
