@@ -68,7 +68,8 @@
     const row = document.createElement('div');
     row.className = 'message think running';
     row.innerHTML = '<div class="chat-think"><div class="chat-think-head"><span class="ic">☰</span><span class="tt">思考过程</span><span class="st">进行中</span></div><div class="chat-think-body"></div></div>';
-    chat.insertBefore(row, messageRow(reply));
+    var thinkAnchor = messageRow(reply);
+    chat.insertBefore(row, (thinkAnchor && thinkAnchor.parentNode === chat) ? thinkAnchor : null);
     activeThinkRow = row;
     return row;
   }
@@ -93,7 +94,8 @@
       row = document.createElement('div');
       row.className = 'message tool';
       row.innerHTML = '<div class="chat-tool"><div class="chat-tool-head"><span class="ic">⚙</span><span class="tt"></span><span class="st">进行中</span></div><div class="chat-tool-body"></div></div>';
-      chat.insertBefore(row, messageRow(reply));
+      var toolAnchor = messageRow(reply);
+      chat.insertBefore(row, (toolAnchor && toolAnchor.parentNode === chat) ? toolAnchor : null);
       blockRows[block.block_id] = row;
     }
     const state = view.status === 'pending' ? '进行中' : (view.status === 'error' ? '失败' : '完成');
@@ -115,7 +117,8 @@
       row.className = `message block-card tone-${view.tone}`;
       row.dataset.blockId = block.block_id;
       row.innerHTML = '<div class="chat-block"><div class="chat-block-head"><span class="label"></span><span class="title"></span><span class="status"></span></div><div class="chat-block-lines"></div><div class="chat-block-meta"></div></div>';
-      chat.insertBefore(row, messageRow(reply) || null);
+      var cardAnchor = messageRow(reply);
+      chat.insertBefore(row, (cardAnchor && cardAnchor.parentNode === chat) ? cardAnchor : null);
       blockRows[block.block_id] = row;
     }
     row.className = `message block-card tone-${view.tone}`;
