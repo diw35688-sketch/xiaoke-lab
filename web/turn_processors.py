@@ -212,7 +212,7 @@ def _best_reagent_match(text: str) -> dict | None:
 def _looks_like_direct_protocol(text: str) -> bool:
     lowered = (text or "").strip()
     return bool(lowered) and any(keyword in lowered for keyword in (
-        "做", "开始", "选择", "进入", "打开", "用",
+        "做", "开始", "选择", "进入", "用",
     ))
 
 
@@ -221,6 +221,18 @@ def _looks_like_direct_reagent(text: str) -> bool:
     return bool(lowered) and any(keyword in lowered for keyword in (
         "配", "配置", "做", "打开", "查看", "用",
     ))
+
+
+def _is_confident_direct_match(text: str, title: str) -> bool:
+    raw = _normalize_match_text(text)
+    normalized_title = (title or "").lower()
+    if not raw or not normalized_title:
+        return False
+    return (
+        raw in normalized_title
+        or normalized_title in raw
+        or difflib.SequenceMatcher(None, raw, normalized_title).ratio() >= 0.8
+    )
 
 
 class ChatProcessor:
@@ -254,10 +266,32 @@ class ChatProcessor:
         direct_protocol = None
         direct_reagent = None
         # 1) 用户说了具体方案名/试剂名时，直接选择或打开对应卡片页。
-        if not any(card.get("title") == "选择实验方案" or card.get("kind") == "execute"
-                   for card in cards_list) and _looks_like_direct_protocol(turn.raw_text):
+        #    只要名称高度匹配就命中，不一定非要带“配/做/打开”等动词。
+        #    试剂类优先：缓冲液/溶液/直接发名称通常是想打开配方。
+        if not any(card.get("title") == "查看试剂配方" for card in cards_list):
+            reagent_match = _best_reagent_match(turn.raw_text)
+            if reagent_match is not None and (
+                _looks_like_direct_reagent(turn.raw_text)
+                or _is_confident_direct_match(turn.raw_text, reagent_match.get("name_zh") or "")
+            ):
+                outcome = lab_tools.call(
+                    "get_reagent_prep", {"reagent_prep_id": reagent_match["reagent_prep_id"]}
+                )
+                if outcome.get("ok"):
+                    cards["__direct_reagent"] = lab_tools.present_result(
+                        "get_reagent_prep",
+                        {"reagent_prep_id": reagent_match["reagent_prep_id"]},
+                        outcome,
+                    )
+                    cards_list = list(cards.values())
+                    direct_reagent = reagent_match
+        if not direct_reagent and not any(card.get("title") == "选择实验方案" or card.get("kind") == "execute"
+                                          for card in cards_list):
             match = _best_protocol_match(turn.raw_text)
-            if match is not None:
+            if match is not None and (
+                _looks_like_direct_protocol(turn.raw_text)
+                or _is_confident_direct_match(turn.raw_text, match.get("title") or "")
+            ):
                 outcome = lab_tools.call(
                     "select_protocol", {"protocol_id": match["protocol_id"]}
                 )
@@ -269,22 +303,6 @@ class ChatProcessor:
                     )
                     cards_list = list(cards.values())
                     direct_protocol = match
-        if not direct_protocol and not any(card.get("title") == "查看试剂配方"
-                                           for card in cards_list) \
-                and _looks_like_direct_reagent(turn.raw_text):
-            match = _best_reagent_match(turn.raw_text)
-            if match is not None:
-                outcome = lab_tools.call(
-                    "get_reagent_prep", {"reagent_prep_id": match["reagent_prep_id"]}
-                )
-                if outcome.get("ok"):
-                    cards["__direct_reagent"] = lab_tools.present_result(
-                        "get_reagent_prep",
-                        {"reagent_prep_id": match["reagent_prep_id"]},
-                        outcome,
-                    )
-                    cards_list = list(cards.values())
-                    direct_reagent = match
         # 2) 没直接命中时，用户明确要“列方案/选实验/看试剂库”则强制列出概览。
         if not direct_protocol and not direct_reagent:
             if not any(card.get("title") == "查看可选实验方案" for card in cards_list) \
