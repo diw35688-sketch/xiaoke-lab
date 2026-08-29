@@ -1884,3 +1884,11 @@ matched_term 以后存知识库匹配到的标准术语（如 ASR 的"一液枪"
 - 发现：服务端 `TurnTimingRecorder` 已记录完整阶段耗时（`llm_started→llm_completed` 等 `elapsed_ms`）并随 `turn_result` 的 `timing` 字段下发，但前端 `turn_client.js` 未读取、用户看不到。
 - 改动：`web/frontend/turn_client.js` 新增 `summarizeServerTiming`，读取 `event.timing` 并计算"理解 LLM / 理解总 / 落盘 / 总"耗时，输出到 `[turn-timing]` console。`node --check` 语法通过，相邻 JS 测试 `voice_delivery_client`、`turn_reply_surface` 通过。
 - 尚未真实验收：需用户跑一次真实语音，F12 Console 看 `[turn-timing]` 各阶段秒数，据此判断瓶颈是理解 LLM 还是生成回答，再决定是否上「首句流式语音」。
+
+### 2026-08-28 LLM 两种客户端公平对照脚本
+
+- 新增 `scripts/compare_llm_clients.py`：固定同一模型、提示词、温度、JSON 输出格式、thinking 开关和 `max_tokens`，只比较项目直连 HTTP 客户端与 OpenAI SDK 客户端。
+- 默认仅展示计划，不联网；`--run` 才会按 3 个合成输入 × 2 个客户端 × 3 轮发出 18 次请求，并把去除提示词和密钥的计时结果写入 `results/diagnostics/`。
+- 每次响应都用现有 `parse_unified_understanding` 校验，失败不混进成功耗时中；轮次间交换先后顺序，降低先跑/后跑造成的偏差。
+- 自动证据：专项 `4/4`、正式 `.venv` 全量 `1326/1326` 通过；默认 dry-run 已验证不创建外部客户端、不发网络请求。
+- 尚未证明：哪种客户端真实更快。外部 18 次请求未执行，需用户明确授权后再跑；这也是当前唯一下一步。

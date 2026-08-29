@@ -66,7 +66,8 @@ STEP_IMPROVEMENTS_FILE = RESULTS_DIR / "step_improvements.jsonl"
 
 
 def tool(name: str, description: str, parameters: dict,
-         kind: str = "other", title: str = "", present=None):
+         kind: str = "other", title: str = "", present=None,
+         experiment_command: bool = False):
     """把一个函数注册成模型可调用的工具。
 
     参考 deepseek-harness 的 presentCall/presentResult 范式：工具自己声明
@@ -85,6 +86,7 @@ def tool(name: str, description: str, parameters: dict,
             "kind": kind,
             "title": title or name,
             "present": present,
+            "experiment_command": bool(experiment_command),
         }
         return func
     return wrapper
@@ -123,7 +125,7 @@ def present_result(name: str, arguments: dict, outcome: dict) -> dict:
     return view
 
 
-def openai_tools() -> list:
+def openai_tools(*, experiment_commands_only: bool = False) -> list:
     """导出成 OpenAI function-calling 格式。"""
     return [
         {
@@ -135,6 +137,7 @@ def openai_tools() -> list:
             },
         }
         for item in _REGISTRY.values()
+        if not experiment_commands_only or item["experiment_command"]
     ]
 
 
@@ -158,6 +161,31 @@ def call(name: str, arguments: dict) -> dict:
 
 def names() -> list:
     return list(_REGISTRY.keys())
+
+
+def experiment_command_names() -> frozenset[str]:
+    """Return tools that explicitly opt in to addressed experiment commands."""
+
+    return frozenset(
+        name for name, item in _REGISTRY.items()
+        if item["experiment_command"]
+    )
+
+
+def experiment_command_catalog(*, include_catalog_tool: bool = False) -> list[dict]:
+    """Build the user-visible catalog from the same experiment permission facts."""
+
+    return [
+        {
+            "name": name,
+            "title": item["title"],
+            "description": item["description"],
+            "kind": item["kind"],
+        }
+        for name, item in _REGISTRY.items()
+        if item["experiment_command"]
+        and (include_catalog_tool or name != "list_experiment_commands")
+    ]
 
 
 # ---------------- 通用项目/研发调研工具（只读） ----------------
@@ -517,7 +545,7 @@ def _create_reagent_prep_from_text(description):
     "list_reagent_preps",
     "列出所有可配制的试剂/缓冲液配方。用户在实验前问“要先配什么”“有什么溶液要准备”时调用。",
     {"type": "object", "properties": {}, "additionalProperties": False},
-    kind="search", title="查看试剂配置库",
+    kind="search", title="查看试剂配置库", experiment_command=True,
     present=lambda a, r: [f"共 {len(r['items'])} 条试剂配置"]
     + [f"· {x['name_zh']}（{x['target_concentration'] or '工作液'}）" for x in r["items"][:8]],
 )
@@ -537,7 +565,7 @@ def _list_reagent_preps():
         "required": ["reagent_prep_id"],
         "additionalProperties": False,
     },
-    kind="read", title="查看试剂配方 {reagent_prep_id}",
+    kind="read", title="查看试剂配方 {reagent_prep_id}", experiment_command=True,
     present=lambda a, r: [f"配方：{r['name_zh']}", f"目标：{r['target_concentration'] or '未指定'}，溶剂：{r['solvent'] or '未指定'}"]
     + [f"步骤 {i}. {s}" for i, s in enumerate(r["steps"], start=1)]
     + [f"⚠ {s['name']}：{'；'.join(s['statements'][:1])}" for s in r.get("safety", []) if s.get("critical")],
@@ -593,7 +621,7 @@ def _delete_reagent_prep(reagent_prep_id):
     "查看当前所选实验方案在开始前需要准备哪些试剂/缓冲液。"
     "用户问“做这个实验前要先配什么”时调用。",
     {"type": "object", "properties": {}, "additionalProperties": False},
-    kind="read", title="查看实验前准备材料",
+    kind="read", title="查看实验前准备材料", experiment_command=True,
     present=lambda a, r: ([f"方案 {r['protocol_id']} 需要准备："]
                           + [f"· {x['name_zh']}：{x['purpose']}" for x in r["items"]])
     if r["items"] else ["当前没有可用的准备材料清单。"],
@@ -610,7 +638,7 @@ def _get_protocol_prep_requirements():
     "当前状态如何，以及涉及试剂的安全提示。用户问“现在做到哪了”“这步还差什么”，"
     "或用户说“完成了/好了/做完了”时调用——用本工具核对确定性进度，不要自己猜。",
     {"type": "object", "properties": {}, "additionalProperties": False},
-    kind="read", title="查看当前步骤",
+    kind="read", title="查看当前步骤", experiment_command=True,
     present=lambda a, r: ([f"当前为自由记录模式"] if r.get("mode") == "free" else
                           [f"第 {r['step']['number']}/{r['protocol']['total_steps']} 步：{r['step']['title']}",
                            f"现场必测：{'、'.join(r['step']['must_record']) or '无'}"]
@@ -680,7 +708,7 @@ def _navigate_view(view):
         "required": ["protocol_id"],
         "additionalProperties": False,
     },
-    kind="read",
+    kind="read", experiment_command=True,
     title="查看方案 {protocol_id}",
     present=lambda a, r: [f"方案：{r['protocol']['title']}", f"共 {len(r['steps'])} 步"],
 )
@@ -871,7 +899,7 @@ def _record_observation(transcript):
     "get_current_time",
     "获取当前日期和本地时间。用户问现在几点、今天几号、实验时间安排时调用。",
     {"type": "object", "properties": {}, "additionalProperties": False},
-    kind="read", title="查看当前时间",
+    kind="read", title="查看当前时间", experiment_command=True,
     present=lambda a, r: [f"当前时间：{r['now']}（{r['weekday']}）"],
 )
 def _get_current_time():
@@ -897,7 +925,7 @@ def _get_current_time():
         "required": ["duration_seconds"],
         "additionalProperties": False,
     },
-    kind="execute", title="启动计时器 {label}",
+    kind="execute", title="启动计时器 {label}", experiment_command=True,
     present=lambda a, r: [f"计时器已启动：{r['label'] or '未命名'}，{r['duration_seconds']} 秒后结束"],
 )
 def _start_timer(duration_seconds, label=None):
@@ -927,7 +955,7 @@ def _start_timer(duration_seconds, label=None):
         "required": ["timer_id"],
         "additionalProperties": False,
     },
-    kind="read", title="查看计时器",
+    kind="read", title="查看计时器", experiment_command=True,
     present=lambda a, r: [f"计时器 {r['label'] or r['timer_id']}：{r['remaining_seconds']} 秒剩余"],
 )
 def _check_timer(timer_id):
@@ -947,6 +975,21 @@ def _check_timer(timer_id):
             "remaining_seconds": remaining,
             "finished": remaining <= 0,
         }
+
+
+@tool(
+    "list_experiment_commands",
+    "列出实验记录过程中当前允许小科调用的全部工具。用户问“小科你能做什么”、"
+    "“有哪些工具”或“支持什么功能”时调用。清单直接来自工具注册表。",
+    {"type": "object", "properties": {}, "additionalProperties": False},
+    kind="read", title="查看小科当前可用工具", experiment_command=True,
+    present=lambda a, r: [
+        f"{item['title']}：{item['description']}" for item in r["tools"]
+    ] or ["当前没有开放的实验工具。"],
+)
+def _list_experiment_commands():
+    tools = experiment_command_catalog()
+    return {"count": len(tools), "tools": tools}
 
 
 @tool(
@@ -996,7 +1039,7 @@ def _suggest_step_improvement(text):
         "required": ["reagent"],
         "additionalProperties": False,
     },
-    kind="read", title="查询试剂安全：{reagent}",
+    kind="read", title="查询试剂安全：{reagent}", experiment_command=True,
     present=lambda a, r: ([r["message"]] if not r.get("found") else
                           [f"{r['name']}（CAS {r['cas'] or '未获取'}）"]
                           + ([f"⚠ 高危 {'/'.join(r['critical_codes'])}"] if r["critical"] else ["无高危项"])
@@ -1183,7 +1226,7 @@ _REAGENT_ALIASES = {
         "required": ["reagent"],
         "additionalProperties": False,
     },
-    kind="read", title="分子量计算：{reagent}",
+    kind="read", title="分子量计算：{reagent}", experiment_command=True,
     present=lambda a, r: [
         (f"{r['name']}：{r['molecular_weight']}" if r.get("name") else f"{r['formula']}：{r['molecular_weight']}")
         + (" g/mol" if r.get("molecular_weight") else "")
@@ -1268,7 +1311,7 @@ def _calculate_molecular_weight(reagent):
         "required": ["reagent", "molarity", "volume"],
         "additionalProperties": False,
     },
-    kind="read", title="溶液配制：{molarity} mol/L {reagent} {volume}{volume_unit}",
+    kind="read", title="溶液配制：{molarity} mol/L {reagent} {volume}{volume_unit}", experiment_command=True,
     present=lambda a, r: [
         f"{r['name'] or r['formula']} 分子量 {r['molecular_weight']} g/mol",
         f"需称取 {r['mass_g']} g（{r['mass_mg']} mg）",
@@ -1326,7 +1369,7 @@ def _calculate_solution_prep(reagent, molarity, volume, volume_unit="L", purity=
         "required": ["stock_concentration", "final_concentration", "final_volume"],
         "additionalProperties": False,
     },
-    kind="read", title="稀释计算：{final_concentration} 从 {stock_concentration} 配 {final_volume}{volume_unit}",
+    kind="read", title="稀释计算：{final_concentration} 从 {stock_concentration} 配 {final_volume}{volume_unit}", experiment_command=True,
     present=lambda a, r: [
         f"取母液 {r['stock_volume']} {r['volume_unit']}",
         f"再加溶剂定容至 {r['final_volume']} {r['volume_unit']}",

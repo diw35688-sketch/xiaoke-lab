@@ -923,3 +923,10 @@ docs/                 任务清单、交接和学习记录
 - 前端 `turn_client.js` 新增 `summarizeServerTiming`，把服务端已下发但无人读的 `event.timing` 换算成"理解 LLM / 落盘 / 总"耗时，输出到 `[turn-timing]` console。
 - 下一步依赖真实数据：用户跑一次真实语音，F12 Console 看各阶段秒数，判断瓶颈是理解 LLM 还是生成回答。
 - 已初步论证「首句流式语音」是更大的感知提速杠杆（生成一句就送 TTS，而非整段生成完才开口）；「流式理解」收益小（结构化 JSON 必须完整才可靠解析）。待观测数据确认后定下一步。
+
+### 2026-08-28 补充：LLM 客户端公平对照脚本
+
+- 新增 `scripts/compare_llm_clients.py`，用完全相同的模型输入和生成参数，对照直连 HTTP 与 OpenAI SDK；3 个合成输入、每种客户端 3 轮，共 18 次，轮换调用顺序。
+- 默认是安全 dry-run，只打印计划且不联网；真实执行命令为 `.\.venv\Scripts\python.exe -B scripts\compare_llm_clients.py --run`，会写入 `results/diagnostics/llm_client_comparison_*.json`。
+- 结果不保存提示词或 API key，只存耗时、输出长度/哈希、解析状态和错误类型；响应统一经过现有结构解析器。
+- 自动证据：专项 `4/4`、全量 `1326/1326`。外部请求尚未获授权、没有真实快慢结论；下一步只能是授权后执行 18 次对照并解读结果。

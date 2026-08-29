@@ -1,0 +1,539 @@
+ ▐▛███▜▌   Claude Code v2.1.148
+▝▜█████▛▘  deepseek-v4-pro · API Usage Billing
+  ▘▘ ▝▝    ~\Documents\107
+
+❯ "C:\Users\dahli\Documents\107\docs\WEB_UNIFIED_TURN_BEGINNER_LEARNING_GUIDE_2 
+  026-08-26.md"我是新手，需要白话+专业引入，带着我看看这份设计文档，都实现了哪  
+  些功能，对照代码，以及有哪些漏洞                                              
+
+● 我先读这份设计文档，再对照代码逐项核实。先读文档。
+
+  Read 1 file (ctrl+o to expand)
+
+● 文档读完了。这是一份"统一 Turn
+  生产链"的设计文档。现在我需要对照代码核实文档里说的功能是否真的实现了、哪些是"
+  声称"哪些是"实测"。我先确认这些关键文件是否存在。
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● 文档引用的文件全部存在。现在我读核心合同文件和调度服务，核对文档里的每个"声称"
+  是否和代码一致。
+
+  Read 4 files (ctrl+o to expand)
+
+● 核心合同和文档一致。现在读调度服务、处理器和数据库层，这是文档声称"AUTO_OK"的
+  主体部分。
+
+  Read 2 files (ctrl+o to expand)
+
+● 继续读数据库层、ASR 服务和 SSE
+  契约，这些是文档声称"AUTO_OK"的剩余主体，也是漏洞最可能藏身的地方。
+
+  Read 2 files (ctrl+o to expand)
+
+● 数据库和 ASR 层已核实。最后读数据库表结构、SSE 契约和 API
+  入口，重点核实文档里标红的问题(方案实验状态串扰)。
+
+  Read 3 files (ctrl+o to expand)
+
+● 核心代码已全部读完。我做最后两个定点核实：方案实验的 domain.session()
+  是不是全局单例（串扰根源），以及"结束实验后轮换 lab_session_id"到底在哪实现。
+
+  Searched for 2 patterns (ctrl+o to expand)
+
+● 关键发现确认了：web/domain.py:30 有全局单例
+  _session，这是方案实验串扰的根源。轮换逻辑在 turn_client.js 前端。我读一下
+  turn_client.js 的轮换段，把这条讲准。
+
+  Read 1 file (ctrl+o to expand)
+
+● 读完了，代码全部核实过。下面按"结论 → 已实现功能对照 →
+  漏洞清单"三层带你过，每个专业词都配白话。
+
+  ---
+  一、先给结论
+
+  这份文档讲的是一次改造：以前"打字聊天、单次录音、连续通话"各走各的流程（三套代
+  码、三套保存、三套显示），现在把它们在进入业务前汇合成同一种输入（TurnInput）
+  ，再由一个总调度（TurnApplicationService）统一分派、统一写 SQLite、统一通过
+  SSE 推回屏幕和语音。
+
+  打个比方：以前是三家店各自收银各自记账，现在是一个前台收银 + 
+  一个总账本，但点单（Chat/实验）和做菜（语音/文字）还是分开的专业厨房。
+
+  架构一句话（专业术语叫"沙漏结构"）：
+  文字 / 录音 / 通话  →  汇合成 TurnInput（漏斗收口）
+                      →  按模式分流 Chat/Experiment（中间分叉）
+                      →  统一写 SQLite → 统一 SSE 输出（漏斗再收口）
+
+  ---
+  二、都实现了哪些功能（对照代码逐块核实）
+
+  我逐个打开了文档点名的 19 个文件，全部存在，且文档描述和代码基本一致。下面按文
+  档的七个章节对照，每块给"白话 / 专业术语 / 代码位置 / 证据等级"。
+
+  模块: ① Turn 输入合同
+  白话是干什么的: 规定"一次交互必须带齐哪些身份、信不信客户端的转写"
+  专业术语: 不可变数据类 + 不变条件（invariant）
+  代码位置（已核实）: src/core/turn_input.py:22
+  文档自评: AUTO_OK
+  ────────────────────────────────────────
+  模块: ② ASR 服务层
+  白话是干什么的: 只把合法 WAV 变成可信文字，不管这句是聊天还是实验
+  专业术语: 输入适配器（adapter）
+  代码位置（已核实）: web/asr_application_service.py:117
+  文档自评: 真实单录已验
+  ────────────────────────────────────────
+  模块: ③ 总调度
+  白话是干什么的: 管"重复请求不重复存、并发、选处理器、最终提交"
+  专业术语: 幂等（idempotency）+ 编排（orchestration）
+  代码位置（已核实）: web/turn_application_service.py:73
+  文档自评: AUTO_OK
+  ────────────────────────────────────────
+  模块: ④ 业务处理器
+  白话是干什么的: Chat 生成对话，实验生成记录卡/追问/结束
+  专业术语: 策略分派（strategy）
+  代码位置（已核实）: web/turn_processors.py:108,160
+  文档自评: 文字 Chat/实验 REAL_OK
+  ────────────────────────────────────────
+  模块: ⑤ SQLite 主账
+  白话是干什么的: 只有 COMMIT 的数据才算"真发生了"
+  专业术语: 事务边界（transaction boundary）
+  代码位置（已核实）: web/database/turn_store.py:185
+  文档自评: AUTO_OK
+  ────────────────────────────────────────
+  模块: ⑥ SSE + Blocks
+  白话是干什么的: 同一 HTTP 连接持续推阶段进度和结果
+  专业术语: 服务端推送（SSE）
+  代码位置（已核实）: web/api/turn.py:66
+  文档自评: 顺序正确
+  ────────────────────────────────────────
+  模块: ⑦ 计时
+  白话是干什么的: 把"慢"拆成 ASR/LLM/SQLite 几段
+  专业术语: 单调时钟计时
+  代码位置（已核实）: src/core/turn_timing.py:10
+  文档自评: 有真实数据
+
+  几个我亲自核对、确认"文档没吹牛"的关键点：
+
+  - 幂等真做了：turn_store.py:92 用 request_hash
+  比对，同内容重试直接返回已提交结果，不同内容抛
+  TurnRequestConflictError（409）。这确实是文档说的"不会把同一操作存两次"。
+  - ASR 证据真存全了：asr_application_service.py:128 算
+  SHA-256，recognize_upload 里 .pending → 识别 → os.replace 
+  到稳定目录，失败会清理临时文件。
+  - VOICE block 不复制屏幕内容：conversation_turn.py:111-117 强制 VOICE 的
+  payload 必须为空、必须引用同 turn 的非语音
+  block。这就是文档说的"屏幕上显示文字 ≠ 扬声器可以说，播放是单独授权"。
+
+  ---
+  三、漏洞清单（分三层，按严重程度排）
+
+  第一层：文档自己已经承认的（§八 明确写了）
+
+  1. 方案实验串扰（REAL_FAIL） —
+  这是当前最大的已知问题。我找到了代码级根因，比文档更精确：
+    - web/domain.py:30 有一个全局单例 _session。ExperimentProcessor.prepare() 在
+   turn_processors.py:191 调 domain.step_view(domain.session())，读的是进程级全
+  局，跟"哪个用户哪个会话"无关。
+    - web/database/db.py:129-137 的 experiment_session_state 表，主键只有
+  (conversation_id, lab_session_id)，没有 experiment_context 列 → free 和
+  protocol 两种模式共用同一份"待确认问题"状态。
+    - turn_processors.py:247 的 "deviations": []
+  是硬编码空数组，方案偏差评价还没接。
+
+  白话：切到"按实验方案走"后，系统还在问 free 模式的问题，而且不知道当前到第几步
+  了，因为方案的"当前步骤"存在一个全进程共享的变量里，谁都能改谁都能读到。
+  2. 结束连续通话只修了代码、没真实验收 — 文档 §八.2
+  老实写了"最后一次真实运行还是修复前的旧进程"。
+  3. 旧接口不能删（/asr/transcribe、/chat、/record 等还在兼容期）。
+  4. 提速没开始 — 计时只是"体检"，不是"治疗"。
+
+  第二层：文档标"已完成"，但失败边界没守住
+
+  5. "结束实验后轮换新 lab_session_id"完全靠前端 — 我在后端没找到轮换逻辑，它在
+  web/frontend/turn_client.js:34-46 的 beginNextLabSession()，由浏览器收到
+  session_ended=true 后改 localStorage 触发。
+
+  5. 漏洞：如果用户说完"结束实验记录"后立刻刷新页面、或 SSE 断连，session_ended
+  没送达前端，localStorage 里的 lab_session_id
+  不会轮换，下一句话会继续写进刚结束的旧会话。文档把这条归为"已完成"，但它的断连
+  /刷新边界没有被任何测试覆盖——这正是文档自己 §十二 第 2 句警告的"模式标签正确 ≠
+   输出已全部接通"的反面案例。
+
+  第三层：我从代码里发现、文档完全没写的真问题
+
+  6. 线程执行器泄漏（中等，长期运行必炸） — turn_application_service.py:84 的
+  _experiment_executors 字典 + _executor_for()（161-169 行）：每出现一个新的
+  (conversation_id, lab_session_id)，就 new 
+  ThreadPoolExecutor(max_workers=1)，只有 close() 才回收。而 _forget()（255
+  行）只清理 _submissions 字典，不清这个执行器字典。
+
+  6. 白话：每开一个新的实验会话，就雇一个"永不辞退的工人"。文档说 _forget
+  防止内存"无限增长"，但那只管了一半——请求记录清了，线程还在。服务器跑久了、用户
+  多开几个实验，线程和内存会一直涨。这是文档没提到的真漏洞。
+  7. first_chunk 计时名不副实 — turn_processors.py:122 的
+  timing.mark("first_chunk") 在 self._generate(...)
+  完整返回之后才打点，实际含义是"整段 LLM 完成"，不是"第一个 token 到达"。文档
+  §七.5 承认了这点，但代码里还叫 first_chunk，后续有人照着 timing
+  数据做"首字延迟"优化会被误导。
+  8. 接口无鉴权（demo 边界未做，需明说） —
+  /turn/text、/turn/audio、删除接口都没有身份校验，turn.py:54 还允许
+  conversation_id 传空自动 uuid4()
+  新建会话。配合无鉴权，等于任何人都能无限建会话、写库、删别人的数据。demo
+  阶段能接受，但这是"边界没做"，不是"设计如此"，文档一个字没提。
+
+  ---
+  四、一句话总结这次带读
+
+  实现了什么：统一输入合同、幂等调度、SQLite 事务主账、SSE
+  输出、分层计时——这五块代码质量高、测试齐全，文档描述基本属实。
+
+  漏洞在哪：真正的病根集中在方案实验的状态隔离（全局单例 + 缺 experiment_context
+   维度），外加两个文档没写的工程隐患（执行器线程泄漏、计时字段名误导）和一个前
+  端单点风险（会话轮换依赖 SSE 送达）。
+
+  ---
+  要不要我下一步带你单挑某一个漏洞深挖？我建议从两个里选一个：
+  - 方案实验串扰（第一层问题 1）——这是文档自己标 REAL_FAIL
+  的核心，修起来要动状态表结构，最能练"数据隔离"设计；
+  - 线程执行器泄漏（第三层问题 6）——最小、最好修、最能看到"资源生命周期"这个软件
+  工程概念，适合作为第一个动手的修复。
+
+  你告诉我选哪个，或者先就上面哪块"白话还没讲透"提问，我再展开。
+
+✻ Cooked for 2m 20s
+
+※ recap: 带你读完了统一 Turn 设计文档并对照了代码：七块功能基本属实，漏洞集中在方案实验状态隔离和几个工程隐患。下一步等你选一个漏洞深挖——我建议从线程执行器泄漏或方案实验串扰入手。 (disable recaps in /config)
+
+❯ 这个粒度不够细                                                                
+
+● 明白，你要的是更细——不是结论式的表格，而是真正打开文件、贴原文、一行一行讲清楚
+  。在动手前我确认一下"细"的方向，因为三条路成本和产出差别很大。
+
+● User answered Claude's questions:
+  ⎿  · 你希望我从哪个方向开始细讲这份文档和代码？ → 按文档逐章展开
+
+● 好，按文档逐章展开。这一轮先讲第 1 章：统一 Turn 到底是什么，代码落在
+  src/core/turn_input.py。我会贴原文、标行号、逐行讲，每出现一个专业词先解释它本
+  身。讲完这章停下等你确认。
+
+  ---
+  第 1 章 统一 Turn 到底是什么
+
+  1.1 这一章解决什么真实问题
+
+  以前"打字"和"录音"是两套不同格式的数据进系统，聊天和实验又是两套保存逻辑。结果
+  就是：同一件事（用户说了一句话），有 4 种表示方式，后端要写 4 份判断。
+
+  这一章干的事：定义一个统一的数据结构 TurnInput，规定"不管用户是打字还是说话、
+  是聊天还是实验，进入业务前都必须先装进这个同一个模子"。模子上还有验票口（不变
+  条件），不合格的直接拦在外面，不进入业务。
+
+  在讲代码前，必须先补 5 个前置概念，否则下面每行都看不懂。
+
+  ---
+  1.2 先补 5 个前置概念（零基础必须懂）
+
+  概念 1：dataclass（数据类）
+
+  白话：想象你要填一张表，表上有"姓名、电话、地址"几个栏目。普通写法，你得手写一
+  个 __init__ 方法把这三个值一个个塞进去，还要手写 __eq__
+  才能比较两张表是否一样。@dataclass
+  这个装饰器就是让你只声明"有哪些栏目"，Python 自动帮你生成这些样板方法。
+
+  术语：装饰器（decorator）+
+  数据类（dataclass）。装饰器可以理解为"给函数/类加一层自动加工"。
+
+  反例：不用它，下面这个类你要手写 8 行 self.xxx = xxx，容易漏。
+
+  概念 2：frozen=True（冻结 / 不可变）
+
+  白话：frozen=True
+  表示这个对象建好之后就不能再改，像被冻住了。想改任何一个字段都会报错。
+
+  为什么这里要用：TurnInput
+  是"用户当时说了什么"的证据快照。如果中途能被改，就会出现"数据库存的是
+  A，业务读到的是 B"这种对不上的账。冻结 = 证据不会被偷偷篡改。
+
+  术语：不可变对象（immutable object）。
+
+  概念 3：Enum（枚举）
+
+  白话：枚举就是"只能从几个固定的选项里挑一个"的取值方式。比如"星期"只能是周一到
+  周日这 7
+  个值，不能填"星期八"。用枚举，编译器/运行时就能帮你挡住"手滑写错的值"。
+
+  反例：如果用普通字符串 mode: str，有人可能写
+  "caht"（拼错了），系统认不出来也不报错，一路传到后面才炸。枚举在入口就拦住。
+
+  概念 4：__post_init__（初始化后的验票口）
+
+  白话：dataclass 会自动生成 __init__（把值塞进字段）。__post_init__
+  是在塞完值之后、对象正式交给别人用之前，自动跑一次的检查函数——像进火车站前的验
+  票口，票不合格就当场拦下。
+
+  术语：不变条件校验（invariant validation）。不变条件 =
+  这个对象从头到尾都必须成立的规矩。
+
+  概念 5：str | None（联合类型 / 可空）
+
+  白话：lab_session_id: str | None
+  意思是"这个字段要么是一个字符串，要么是空（None）"。竖线 | 表示"或"。
+
+  为什么这么写：实验模式必须有 lab_session_id，但聊天模式没有实验会话，所以允许
+  它是空的。类型标注里先声明"可能为空"，真正"什么时候必须非空"由 __post_init__
+  判断。
+
+  ---
+  1.3 先看三组枚举（TurnInput 靠它们限定取值）
+
+  代码在 src/core/conversation_turn.py 第 17–31 行：
+
+  17  class InteractionMode(str, Enum):
+  18      CHAT = "chat"
+  19      EXPERIMENT = "experiment"
+  20
+  21
+  22  class ExperimentContext(str, Enum):
+  23      NONE = "none"
+  24      FREE = "free"
+  25      PROTOCOL = "protocol"
+  26
+  27
+  28  class InputSource(str, Enum):
+  29      TEXT = "text"
+  30      SINGLE_RECORDING = "single_recording"
+  31      CONTINUOUS_CALL = "continuous_call"
+
+  逐行讲：
+
+  - 第 17 行 InteractionMode(str, 
+  Enum)：这是文档说的"业务模式"维度，只有两个值——chat（聊天）或
+  experiment（实验）。括号里的 str 表示它同时是个字符串，方便存库和序列化。
+  - 第 22 行 ExperimentContext：文档说的"实验上下文"维度。三个值：
+    - NONE = 没有实验上下文（聊天就是这种）
+    - FREE = 自由实验（用户随口说，不按方案步骤）
+    - PROTOCOL = 方案实验（严格按某个实验方案一步步走）
+  - 第 28 行 InputSource：文档说的"输入方式"维度。三个值：
+    - TEXT = 打字
+    - SINGLE_RECORDING = 单次录音
+    - CONTINUOUS_CALL = 连续通话（VAD 自动切段）
+
+  关键点（这章的核心思想）：这三个维度是互相独立、可以自由组合的。语音不等于必须
+  播报，文字也能记录实验。文档第 4
+  节说的"沙漏结构"和"三个维度分开"，就是这个意思。
+
+  ---
+  1.4 逐字段讲 TurnInput 的 10 个字段
+
+  代码在 src/core/turn_input.py 第 22–35 行：
+
+  22  @dataclass(frozen=True)
+  23  class TurnInput:
+  24      """One immutable request with a frozen mode and truthful source 
+  evidence."""
+  25
+  26      conversation_id: str
+  27      request_id: str
+  28      turn_id: str
+  29      lab_session_id: str | None
+  30      interaction_mode: InteractionMode
+  31      experiment_context: ExperimentContext
+  32      mode_version: int
+  33      input_source: InputSource
+  34      raw_text: str
+  35      asr_result: ASRResult | None = None
+
+  逐个字段白话解释（这是"一次交互"需要带的全部身份）：
+
+  ┌─────────────┬─────────────────────────────────┬───────┬────────────────┐
+  │    字段     │              白话               │ 谁来  │      举例      │
+  │             │                                 │ 提供  │                │
+  ├─────────────┼─────────────────────────────────┼───────┼────────────────┤
+  │ conversatio │ 这次对话的编号，一个对话里有多  │ 前端  │ "web-17877..." │
+  │ n_id (26)   │ 轮                              │       │                │
+  ├─────────────┼─────────────────────────────────┼───────┼────────────────┤
+  │ request_id  │ 这一次提交的编号，用来做幂等（  │ 前端  │ "web-178775567 │
+  │ (27)        │ 重试不重复存）                  │       │ 3861-7"        │
+  ├─────────────┼─────────────────────────────────┼───────┼────────────────┤
+  │ turn_id     │ 这一轮的编号，对应一个          │ 前端  │ "turn-xxx"     │
+  │ (28)        │ ConversationTurn                │       │                │
+  ├─────────────┼─────────────────────────────────┼───────┼────────────────┤
+  │ lab_session │ 实验会话编号，聊天时为 None     │ 前端  │ "lab-xxx"      │
+  │ _id (29)    │                                 │       │                │
+  ├─────────────┼─────────────────────────────────┼───────┼────────────────┤
+  │ interaction │ 业务模式：chat 还是 experiment  │ 前端  │ InteractionMod │
+  │ _mode (30)  │                                 │       │ e.CHAT         │
+  ├─────────────┼─────────────────────────────────┼───────┼────────────────┤
+  │ experiment_ │                                 │       │ ExperimentCont │
+  │ context     │ 实验上下文：none/free/protocol  │ 前端  │ ext.FREE       │
+  │ (31)        │                                 │       │                │
+  ├─────────────┼─────────────────────────────────┼───────┼────────────────┤
+  │ mode_versio │ 模式版本号，用来检测"模式中途被 │ 前端  │ 1              │
+  │ n (32)      │ 换过"                           │       │                │
+  ├─────────────┼─────────────────────────────────┼───────┼────────────────┤
+  │ input_sourc │ 输入方式：text/单录/连续通话    │ 前端  │ InputSource.TE │
+  │ e (33)      │                                 │       │ XT             │
+  ├─────────────┼─────────────────────────────────┼───────┼────────────────┤
+  │ raw_text    │ 用户的原话（文字输入的原文字，  │ 前端/ │ "加入5毫升缓冲 │
+  │ (34)        │ 或语音的转写结果）              │ ASR   │ 液"            │
+  ├─────────────┼─────────────────────────────────┼───────┼────────────────┤
+  │ asr_result  │ ASR 完整结果，文字输入为 None   │ ASR   │ ASRResult(...) │
+  │ (35)        │                                 │ 服务  │                │
+  └─────────────┴─────────────────────────────────┴───────┴────────────────┘
+
+  注意第 35 行的 = None：这是"默认值"。意思是文字输入时可以不传
+  asr_result，它默认就是空。这也解释了概念 5 里"联合类型 + 默认空"的搭配。
+
+  ---
+  1.5 逐段讲 __post_init__（验票口），对应文档 4 条失败场景
+
+  代码在 turn_input.py 第 37–81 行。我按顺序逐段讲，每段标注它对应文档第 6 
+  节哪条失败场景。
+
+  第一段：三个 ID 必须是非空字符串（第 38–40 行）
+
+  38      for field_name in ("conversation_id", "request_id", "turn_id"):
+  39          _require_non_blank(getattr(self, field_name), field_name)
+  40      _require_non_blank(self.raw_text, "raw_text")
+
+  _require_non_blank 在文件第 15–19 行，它干两件事：不是字符串就抛
+  TypeError，是字符串但去空格后为空就抛 ValueError。
+
+  白话：conversation/request/turn 三个 ID 和原话，不能是空的、不能只塞一个空格。
+  少了它们，后面连"这条数据属于谁、是什么"都说不清。
+
+  第二段：类型必须是枚举（第 42–45 行）
+
+  42      if not isinstance(self.interaction_mode, InteractionMode):
+  43          raise TypeError("interaction_mode 必须是 InteractionMode。")
+  44      if not isinstance(self.experiment_context, ExperimentContext):
+  45          raise TypeError("experiment_context 必须是 ExperimentContext。")
+
+  白话：这两个字段不能传个 "chat" 字符串或 123
+  糊弄，必须是真正的枚举对象。这对应概念 3 说的"入口就拦住手滑值"。
+
+  第三段：模式与上下文的配对规则（第 46–57 行）—— 对应失败场景"Chat 
+  带实验上下文，或实验未选 free/protocol"
+
+  46      if self.interaction_mode == InteractionMode.CHAT:
+  47          if self.experiment_context != ExperimentContext.NONE:
+  48              raise ValueError("chat 模式的 experiment_context 必须是 
+  none。")
+  49          if self.lab_session_id is not None:
+  50              raise ValueError("chat 模式不能携带 lab_session_id。")
+  51      else:
+  52          if self.experiment_context not in {
+  53              ExperimentContext.FREE,
+  54              ExperimentContext.PROTOCOL,
+  55          }:
+  56              raise ValueError("实验模式必须选择 free 或 protocol 上下文。")
+  57          _require_non_blank(self.lab_session_id, "lab_session_id")
+
+  白话：这是"身份一致性"检查。
+  - 如果模式是 chat：实验上下文必须是 NONE，且不能带
+  lab_session_id（聊天没有实验会话）。
+  - 否则（experiment）：实验上下文必须在 free 或 protocol 里选一个（不能是
+  NONE），且 lab_session_id 必须有值。
+
+  反例（不知道会怎样）：如果没有第 49–50 行，就可能出现"聊天却带了个实验会话
+  ID"，后端把它写进实验表，聊天和实验数据串在一起。
+
+  第四段：mode_version 必须是正整数（第 59–64 行）
+
+  59      if not isinstance(self.mode_version, int) or isinstance(
+  60          self.mode_version, bool
+  61      ):
+  62          raise TypeError("mode_version 必须是正整数。")
+  63      if self.mode_version <= 0:
+  64          raise ValueError("mode_version 必须是正整数。")
+
+  注意第 59–60 行有个细节：isinstance(True, int) 在 Python 里是成立的（因为 bool
+   是 int 的子类）。所以代码特意把 bool 也排除掉，防止有人传 True/False
+  冒充整数。这是很容易漏的坑。
+
+  第五段：输入来源与 ASR 证据的配对（第 66–81 行）—— 对应其余 3 条失败场景
+
+  66      if not isinstance(self.input_source, InputSource):
+  67          raise TypeError("input_source 必须是 InputSource。")
+  68      if self.asr_result is not None and not isinstance(
+  69          self.asr_result, ASRResult
+  70      ):
+  71          raise TypeError("asr_result 必须是 ASRResult 或 None。")
+  72
+  73      if self.input_source == InputSource.TEXT:
+  74          if self.asr_result is not None:
+  75              raise ValueError("文字输入不能携带 ASR 证据。")
+  76          return
+  77      if self.asr_result is None:
+  78          raise ValueError("语音输入必须携带 ASR 证据。")
+  79      if not self.asr_result.is_final:
+  80          raise ValueError("语音输入必须携带最终 ASR 证据。")
+  81      if self.raw_text != self.asr_result.asr_transcript:
+  82          raise ValueError("语音 raw_text 必须与 ASR 忠实转写一致。")
+
+  这段对应文档第 6 节的 4 条失败场景，我逐条对上：
+
+  - 第 73–75 行 → "文字 Turn 上传 ASRResult：拒绝"。打字还带 ASR
+  结果？说明客户端在伪造证据，直接拒绝。
+  - 第 77–78 行 → "语音 Turn 没有最终 ASRResult：不进入业务处理"。语音必须有 ASR
+   结果，没有就说明识别还没完成，不能进业务。
+  - 第 79–80 行 → 语音的 ASR 结果必须是 is_final（最终版）。ASR
+  有时会先返回"临时结果"再返回"最终结果"，这里只要最终的。
+  - 第 81–82 行 → "ASR 文字与 raw_text
+  不一致：拒绝"。这是最关键的防篡改规则：语音输入的 raw_text 必须等于 ASR
+  的忠实转写。防止客户端自己把 raw_text 改成别的（比如把"加 5 毫升"改成"加 50
+  毫升"）来覆盖模型的真实识别。
+
+  这就是整个 TurnInput 的核心价值：语音路径里，raw_text 不是客户端说了算，而是被
+   ASR 转写锁死的（术语叫"源可信 / source-truthful"）。
+
+  ---
+  1.6 to_wire() 是干什么的（第 83–99 行）
+
+  83  def to_wire(self) -> dict[str, object]:
+  84      return {
+  85          "conversation_id": self.conversation_id,
+  ...
+  90          "input_source": self.input_source.value,
+  ...
+  95          "asr_result": (
+  96              self.asr_result.to_dict() if self.asr_result is not None else
+  None
+  97          ),
+  98      }
+
+  白话：to_wire 是"把对象转成能传上网络/存库的普通字典"。注意它把枚举转成了
+  .value（字符串），把 asr_result 转成了
+  to_dict()。因为网络上和数据库里不能直接存 Python 对象，只能存字符串和数字。
+
+  术语：序列化（serialization）。后面你会在 turn_store.py
+  里看到，canonical_request_hash(turn.to_wire())
+  就是先序列化成字典、再算哈希做幂等——第 1 章的 to_wire 正是那个哈希的输入。
+
+  ---
+  1.7 本章小结（白话收口）
+
+  - TurnInput 是什么：一次交互的"统一模子"，10
+  个字段装下"谁、哪次、什么模式、怎么输入、说了什么、ASR 证据"。
+  - 它靠什么保证可信：frozen=True（不可改）+ __post_init__ 里 5
+  段不变条件（验票口）。
+  - 它最大的功劳：语音路径下，raw_text 被 ASR 转写锁死，客户端不能偷偷篡改。
+
+  这一章里，你看到的软件工程概念有：dataclass、不可变对象、枚举、不变条件、序列
+  化、联合类型、源可信。
+
+  ---
+  确认点：这一章有哪里不清楚的吗？我特别想确认两点——①__post_init__ 和
+  frozen=True
+  的分工（一个管"建好后不能改"，一个管"建好时验票"）你分清楚了吗？②第 81–82
+  行"语音 raw_text 必须等于 ASR
+  转写"这条防篡改，值不值得我再举一个更具体的攻击例子？
+
+  你回复"清楚"或指出哪块，我就进第 2 章 ASRApplicationService（讲 WAV
+  怎么校验、怎么算哈希、怎么从 .pending 移到稳定目录）。
+
+✻ Sautéed for 2m 4s
+
+※ recap: 我们在逐章带读 Web 统一 Turn 设计文档，已讲完第 1 章（TurnInput 统一输入合同），等你确认是否清楚。下一步是确认后进入第 2 章 ASRApplicationService。 (disable recaps in /config)

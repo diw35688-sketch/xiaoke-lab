@@ -9,7 +9,13 @@ from typing import Callable, Mapping, Protocol
 import domain
 import llm_bridge
 import settings_store
-from agent.core import refine_chat_answer, run_agent, run_storage_agent, run_template_agent
+from agent.core import (
+    refine_chat_answer,
+    run_agent,
+    run_experiment_tool_agent,
+    run_storage_agent,
+    run_template_agent,
+)
 from database.crud import get_recent_messages
 from database.turn_store import TurnStore
 from src.core.clarification_executor import ClarificationExecutor
@@ -21,6 +27,7 @@ from src.core.conversation_turn import (
 )
 from src.core.clarification_acceptance import ClarificationActionType
 from src.core.experiment_acceptance import ExperimentAcceptanceKind
+from src.core.experiment_tool_command import ExperimentToolCommandParser
 from src.core.protocol_completion_policy import (
     ProtocolStepFactState,
     resolve_protocol_completion,
@@ -265,9 +272,11 @@ class ExperimentProcessor:
         store: TurnStore,
         *,
         observer_factory: Callable[[], UnifiedObserver] | None = None,
+        tool_runner=run_experiment_tool_agent,
     ) -> None:
         self._store = store
         self._observer_factory = observer_factory
+        self._tool_runner = tool_runner
 
     def _observer(self) -> UnifiedObserver:
         if self._observer_factory is not None:
@@ -279,6 +288,9 @@ class ExperimentProcessor:
     def prepare(self, turn: TurnInput, timing: TurnTimingRecorder) -> PreparedTurn:
         if turn.lab_session_id is None:
             raise ValueError("实验 Turn 缺少 lab_session_id。")
+        tool_command = ExperimentToolCommandParser.parse(turn.raw_text)
+        if tool_command.matched:
+            return self._prepare_tool_turn(turn, timing, tool_command.command_text or "")
         stored = self._store.load_experiment_state(
             turn.conversation_id, turn.lab_session_id
         )
@@ -771,6 +783,65 @@ class ExperimentProcessor:
             experiment_events=events,
             session_state=session_state,
             voice_items=voice_items,
+        )
+
+    def _prepare_tool_turn(
+        self, turn: TurnInput, timing: TurnTimingRecorder, command_text: str
+    ) -> PreparedTurn:
+        """Execute an addressed tool command without adopting experiment facts."""
+
+        timing.mark("understanding_started")
+        timing.mark("llm_started")
+        outcome = self._tool_runner(
+            command_text, turn.conversation_id, turn.lab_session_id
+        )
+        timing.mark("first_chunk")
+        timing.mark("llm_completed")
+        timing.mark("understanding_completed")
+
+        user = _text_block(turn, "user", turn.raw_text, assistant=False)
+        blocks = [user]
+        for index, view in enumerate(outcome.tool_views, start=1):
+            blocks.append(ConversationBlock(
+                block_id=f"{turn.turn_id}:tool:{index}",
+                type=BlockType.TOOL_CARD,
+                payload=dict(view),
+            ))
+        assistant = _text_block(
+            turn, "spoken", outcome.answer, assistant=True
+        )
+        blocks.append(assistant)
+        voice = ConversationBlock(
+            block_id=f"{turn.turn_id}:voice",
+            type=BlockType.VOICE,
+            payload={},
+            source_block_id=assistant.block_id,
+            intent_id=f"{turn.turn_id}:voice",
+            priority=MessagePriority.REVIEW,
+        )
+        blocks.append(voice)
+        conversation_turn = ConversationTurn(
+            turn.conversation_id, turn.request_id, turn.turn_id,
+            turn.interaction_mode, turn.experiment_context, turn.mode_version,
+            turn.input_source, tuple(blocks),
+        )
+        voice_item = VoiceDeliveryItem(
+            intent_id=f"{turn.turn_id}:voice",
+            kind=MessageKind.ASSISTANT_REPLY,
+            priority=MessagePriority.REVIEW,
+            voice_text=outcome.answer,
+            source_block_id=assistant.block_id,
+            max_chars=max(80, len(outcome.answer)),
+            speech_rate=settings_store.current().tts_speed,
+        )
+        return PreparedTurn(
+            turn=conversation_turn,
+            business={
+                "kind": "experiment_tool",
+                "called_tools": list(outcome.called_tools),
+                "segment_id": None,
+            },
+            voice_items=(voice_item,),
         )
 
     @staticmethod

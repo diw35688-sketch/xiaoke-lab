@@ -1,0 +1,690 @@
+ ▐▛███▜▌   Claude Code v2.1.148
+▝▜█████▛▘  deepseek-v4-pro · API Usage Billing
+  ▘▘ ▝▝    ~\Documents\107\docs
+
+❯ 我是想把这个项目放到简历里的，可是你看，本身我在"C:\Users\dahli\Desktop\asr_d 
+  emo"里工作区很整齐，现在这个项目是组长把组员的工作揉在了一起，太混乱了，那怎  
+  么是好，如果我能把它的文件分类、整理好、数据流理清楚，是不是本身也算一种能力  
+  ？                                                                            
+
+● 这是个好问题，而且你的直觉是对的。先给你结论，再展开讲清楚，最后有一个需要你拍
+  板的方向。
+
+  在回答的同时，我想把你这个背景记到我的长期记忆里（你要把这个项目放简历、把"整
+  理混乱代码"当能力来练），这样以后我帮你解释和安排工作时会更有针对性。先做这一
+  步。
+
+  Recalled 1 memory, wrote 2 memories (ctrl+o to expand)
+
+● 记好了。下面是正式回答。
+
+  结论
+
+  算，而且是有正式名字、招聘里真会考的能力。但它的价值不在"把文件挪整齐"，而在"
+  把别人揉成一团的系统讲清楚"。
+
+  这个能力叫什么
+
+  - 代码考古 / 逆向理解（codebase archaeology）——拿到一份没说明书、多人拼凑的代
+  码，靠读代码反推它原本该怎么跑。白话：像考古学家对着残片还原一座城。
+  - 模块化 / 职责梳理（modularization，关注点分离 separation of
+  concerns）——把"什么代码管什么"划清边界。
+  - 架构文档化（architecture
+  documentation）——把梳理结果写成别人照着能上手的东西。
+  - 技术债治理（technical
+  debt）——多人代码融合就是典型的技术债，理清它就是"还债"。
+
+  一个关键区分（别踩的坑）
+
+  只"移动文件、重命名"本身不值钱，甚至有害——挪坏 import、丢掉 git
+  历史，等于把组员的工作改坏。值钱的是两件事：
+
+  1. 你能说清数据流：用户说一句话 → 经过哪些模块 → 变成什么输出。
+  2. 你能证明别人照你的文档能上手，而不只是你自己懂。
+
+  你其实已经在做了，只是没意识到
+
+  你现在这份仓库里已经有的 PROJECT_ARCHITECTURE.md、PROJECT_TASK_CHECKLIST.md、L
+  EARNING_REVIEW_FROM_DEVELOPMENT.md、NEXT_SESSION_HANDOFF——这些就是你这项能力的
+  产出物。组长揉乱的只是代码，你已经在反过头给它建秩序了。
+
+  怎么把"整理"翻译成简历价值
+
+  别写"整理文件"，写：
+
+  ▎ 对一个多人协作融合的语音交互系统做架构逆向与模块梳理，厘清理解/执行/呈现三层
+  ▎ 数据流，产出架构文档与职责迁移对照表，识别出 N 处职责重叠与能力降级风险。
+
+  面试官读到的是："这个人能进一个陌生又混乱的代码库、把它读懂并讲明白"——这恰恰是
+  新人最稀缺的能力。
+
+  下一步需要你拍板一件事
+
+  与其"重新整理一遍文件"，我更建议把已有文档补成能当简历附件的两张图：一张数据流
+  图（声音→理解→执行→呈现），一张模块职责表。
+
+  但动手前必须先确认一个核心问题：你要整理的"对象"到底是哪个？
+
+  - 是 Desktop\asr_demo 那个干净、权威的真实项目？
+  - 还是当前 Documents\107\docs 这个组长揉乱的版本？
+
+  因为这直接决定"整理"的意义：如果干净版才是最终要交付的，那"整理混乱版"的价值就
+  在于读懂它、把它的功能逐条对照回干净版（看哪些是重复、哪些是组员新加的、哪些能
+  力降级了），而不是把它本身变漂亮。你先告诉我这个，我再给你具体方案。
+
+✻ Cogitated for 1m 30s
+
+❯ 是杂糅的那一版                                                                
+
+● 明白了，对象锁定杂糅版（Documents\107 这份）。
+
+  那我先把我的建议说清楚，再动手做一件事（只读、不改任何东西），这样你看到的是基
+  于真实情况给的方案，而不是我拍脑袋。
+
+  我的建议方向：整理杂糅版，分两层——
+
+  1. 先"理解+文档化"，不动代码。这一步安全、可逆，而且恰好就是简历要展示的能力（
+  "我能读懂一个陌生混乱系统并讲清楚"）。产出物是：一份清晰架构图 + 一张数据流图
+  + 一张模块职责表。
+  2. 物理重构（真的挪文件、删重复代码）放后面。这一步风险大，可能改坏组员的工作
+  、丢历史，等第 1 步把"谁管什么"理清后再决定要不要做、做多少。
+
+  现在我先只读地看一眼这份杂糅版真实长什么样——目录结构 + 你已有的架构文档 +
+  最近那份迁移计划（它可能就是"乱"的根源线索）。这一步不改任何文件。
+
+  Read 2 files, listed 1 directory (ctrl+o to expand)
+
+● 读完了，先给你一个反直觉但关键的发现——它会影响"整理"到底该怎么整。
+
+  这份杂糅版，其实不是"没整理"，而是三种乱叠在一起
+
+  1. 过程文档爆炸（最显眼的那种"乱"）
+
+  docs/ 里三份文档巨大：LEARNING_REVIEW 344KB、PROJECT_TASK_CHECKLIST
+  205KB、NEXT_SESSION_HANDOFF 55KB。这些是你一路累积的开发日志，价值很高，但它们
+  是"给维护者看的流水账"，不是"给陌生人看的地图"。加上根目录散落的十几个
+  .bat、home_dump.html、一个 69KB 的抓包
+  txt、check_vad_mode.py——新同学第一眼就被吓退。
+
+  2. 两套并行"大脑"（真正的"乱"的根源）
+
+  src/  ← CLI 统一理解链（main.py + core/ + asr/ + llm/ + storage/）
+  web/  ← 网页 agent 链（app.py + agent/ + planner/ + tools/ + voice/ + tts/）
+
+  你那份 VOICE_WEB_MIGRATION_PLAN_2026-08-20.md 写得很清楚：web 是产品、CLI 
+  降为兜底，正在把统一链迁进 web（卡在"第 1 步 C5 语音输出受控"）。也就是说，这
+  份代码库现在天然处于"过渡期中间态"——两套东西并行、一半迁完一半没迁，谁看都乱。
+
+  3. 文档其实已经很好了
+
+  PROJECT_ARCHITECTURE.md（38KB）已经是份很完整的架构文档，数据流图、模块职责、
+  设计取舍全都有。
+
+  所以"整理"的正确动作
+
+  不是重写（会重复造轮子，而且你的架构文档已经很好），而是加一层"面向陌生人/面试
+  官的地图"——把已有文档的精华抽成一张"3 分钟讲清这个系统"的东西。这才是简历要的
+  那项能力：把一个处于过渡期的双轨系统，讲到别人一听就懂。
+
+  推荐产出一份简历附件级的东西，包含三件：
+
+  - 一张仓库地图：这个仓库里 src/ 管什么、web/ 管什么、docs/
+  里哪份是"当前真相"、哪些是历史日志；
+  - 一张数据流图：两条线（CLI 兜底线 + web 产品线），声音→ASR→理解→执行→呈现；
+  - 一张双轨对照表：统一链 vs web agent，谁管什么、迁到哪一步、卡在哪。
+
+  在动手前，我想确认你要的"整理"最终落在哪一层——这决定我怎么下手、以及会不会碰代
+  码。
+
+● User answered Claude's questions:
+  ⎿  · 这一轮"整理杂糅版"，你想先产出哪种结果？ → 
+     一定要无比详细，告诉我你的方法论，怎么从一堆代码中定位我们想要的，怎么把数
+     据流梳理出来，src文件夹下基本上是我原来的代码我比较了解，跟web相关的都不是
+     我在做。先不要改动，就分析，我们要彻底理清
+
+● 收到，方向很清楚了：这一轮只分析、不改动，重点是教我方法论 + 把 web 
+  这边（组员做的、你不熟的那部分）彻底理清。src
+  是你熟的部分，正好当"锚点"来对照。
+
+  我现在做的第一件事：只读地打开 web 的入口和几个关键文件，边读边给你讲"我凭什么
+  先读这几个、而不是按字母顺序从头读"。全程不改任何文件。
+
+  先建个任务清单跟踪这次分析，然后读文件。
+
+  Read 4 files, listed 1 directory (ctrl+o to expand)
+
+● 入口和 /record 链路已经清楚了。再补读四个文件，把"记录链"的后半段（降级生产者
+  、渲染器、确定性判断）和"对话链"的入口（/chat）看完，就够我给你画出 web
+  侧完整的数据流了。
+
+  Read 4 files (ctrl+o to expand)
+● 读完了。web 侧的核心链路我已经全部追通。下面分两部分给你：先讲方法论（你要练的
+  能力本身），再把我刚才实际在 web 上做的每一步"回放"给你看——这样方法不是空话，
+  你能看到我每个动作"读了哪个文件、为什么读它、读出了什么"。
+
+  ---
+  一、方法论：怎么从一堆代码里理清数据流
+
+  这是你要练进简历的能力，我给它起个正式名字，再拆成 5
+  步。核心心法一句话：不要"读完所有文件"，要"追一条请求"。
+
+  第 0 步：心态——别做"全量阅读"，做"入口驱动"
+
+  - 白话：进一座陌生城市，你不会背整张地图，你会先找到地铁站（入口），坐一趟地铁
+  把一条线走通，再逐步扩展。看代码同理。
+  - 专业术语：这叫 入口驱动探索（entry-point-driven exploration），对立面是
+  全量阅读（full-file reading）。
+  - 反面例子：src/core/ 有 26 个文件、web/ 有 20+
+  个文件。如果按字母顺序挨个读，你读三小时也答不出"用户说一句话，到底经过哪些代
+  码"。因为大部分文件只在某条特定路径上跑，甚至有的是死代码。
+
+  第 1 步：找入口（entry point）
+
+  - 白话：每个能跑的程序一定有个"起点"。web 的起点就是
+  app.py——框架从这启动、在这注册所有 URL。
+  - 专业术语：入口文件 / 组合根（composition root）。FastAPI 里就是 app = 
+  FastAPI(...) 那个文件。
+  - 项目体现：web/app.py 第 24 行 app = FastAPI(...)，第 145-155 行
+  app.include_router(...) 挂了 11 个路由。
+  - 关键技巧：路由表就是"入口地图"。@app.route('/xxx') 或 include_router 一行就
+  是一扇门。先扫一遍路由，你就知道这个系统对外提供了哪些"门"，再决定进哪扇。
+
+  第 2 步：追一条请求（trace one request）
+
+  - 白话：别问"这项目有哪些功能"，要问"用户点一下/说一句话，代码按什么顺序跑过哪
+  些函数"。挑最典型的一条动作，从头追到尾。
+  - 专业术语：请求追踪 / 调用链（call path）。
+  - 项目体现：web 最典型的动作是"用户语音口述做实验"→ 我挑了 POST /record
+  追，追出下面一整条链。
+  - 反面例子：如果你先从 web/tools/calculator.py 这种叶子文件读起，你会读到一个
+  孤立的四则运算函数，完全不知道它被谁、在什么时机调用。
+
+  第 3 步：认数据合同（data contract）
+
+  - 白话：模块之间"交接"的东西长什么样——是一个 dict？一个 dataclass？JSON
+  字段名叫什么？合同就是数据流的"节点"，把节点连起来就是数据流图。
+  - 专业术语：数据结构 / 契约（contract）。你 src 侧全是 frozen=True
+  dataclass（ASRResult、UnifiedUnderstandingResult），web 侧靠
+  domain.py、llm_bridge.py 里的字典结构交接。
+  - 反面例子：如果只看函数名不看它返回什么结构，你会把"返回 {"events": 
+  [...]}"和"返回 {"answer": "..."}"两个不同东西混成一团，图就画断了。
+
+  第 4 步：分"大脑"和"手"（brain vs hands）
+
+  - 白话：代码分两类——"想"的（判断意图、抽实体、调
+  LLM）和**"做"的**（写库、改状态、返回页面）。理数据流时先把这两类分开，会发现"
+  想"的那条链短而集中，"做"的链多但简单。
+  - 专业术语：纯逻辑 vs 副作用（pure logic vs side effects），也就是理解层 vs 
+  执行层。
+  - 项目体现：你那份迁移计划"契约
+  6"已经点破了这句话：统一链管理解、工具管执行。这是整个项目最值钱的一条边界线。
+
+  第 5 步：画图验证（draw to verify）
+
+  -
+  白话：把追出的链路画成箭头图。画不出来、箭头断掉的地方，就是你还没理清的地方。
+   图不是"结果"，图是"检验理解对不对"的工具。
+  - 专业术语：数据流图（data flow diagram）。
+  - 项目体现：最终产物就是那张"声音→ASR→理解→执行→呈现"的图，也是你要放简历的东
+  西。
+
+  ▎ 确认点：这 5 步里，"追一条请求"（第 2 步）是最关键的，其余四步都是在给它铺路
+  ▎ 和收尾。这里有没有不清楚的？没有的话我接着回放我在 web 上是怎么用这 5 步的。
+
+  ---
+  二、现场回放：这 5 步用在 web 上，我读出了什么
+
+  第 1 步结果：web 有 11 扇门
+
+  web/app.py 挂了 11 个路由（第 145-155 行）。按业务分，真正重要的就两类：
+
+  门: POST /record
+  文件: api/record.py
+  干什么: 语音口述 → 结构化记录（核心）
+  ────────────────────────────────────────
+  门: POST /chat、/chat/stream
+  文件: api/chat.py
+  干什么: 文字聊天/通话 → 对话与命令
+  ────────────────────────────────────────
+  门: /record/history /reset
+  文件: api/record.py
+  干什么: 历史、开新会话
+  ────────────────────────────────────────
+  门: POST /tts 等
+  文件: api/tts.py
+  干什么: 语音合成（"嘴"）
+  ────────────────────────────────────────
+  门: /protocols /templates /experiments /memories /tasks /settings /network
+  /asr
+  文件: 各自 api
+  干什么: 方案、模板、实验、记忆、任务、设置等辅助
+
+  第 2 步结果：追 POST /record，追出完整链路
+
+  这是 web 最核心的一条线，我从头追到底，代码顺序如下（箭头 = 谁调用谁）：
+
+  前端录音（voice_asr.js）→ ASR 转录出文字
+    → POST /record {transcript}
+    → record.py 第 69 行 record()：
+        ① llm_bridge.extract() ──→ 调 src 统一理解链
+  UnifiedUnderstandingProcessor 抽实体
+        ② extract_entities() ────→ 规则兜底（数量/单位/温度，LLM
+  失败或没抽到才用）
+        ③ domain.evaluate() ─────→ 确定性判断：缺什么字段、有没有偏离方案【不调
+  LLM】
+        ④ degraded_producer ─────→ 把判断结果翻译成 UnifiedObservation
+        ⑤ messages_for_observation → 投影成 PresentationIntent 列表
+        ⑥ WebRenderer.render() ──→ 每条意图变 dict（kind/text/voice_text）
+        ⑦ save_record() ────────→ 写 SQLite
+    → 返回 {item, messages} → 前端只"画"和"念"，不再做判断
+
+  这条链最值钱的一句话（record.py 顶部注释自己写的）："LLM 只负责抽实体；缺什么
+  字段、有没有偏离方案，由程序按方案算（确定性，不可漂移）。"
+  这就是你那个"语音受控是根本目的"在代码里的落地。
+
+  第 3 步结果：发现"三个桥"——这是本次最大的收获
+
+  追数据合同时，我发现 web 这边有 三个文件，专门负责"复用你的 src 
+  代码"，像三座桥：
+
+  你的 src（理解层权威，frozen dataclass + 严格校验，你有测试覆盖）
+      ▲              ▲                    ▲
+      │              │                    │
+    llm_bridge.py  domain.py   degraded_producer.py + web_renderer.py
+   （复用统一理解）（复用方案评估/安全）（复用呈现层三件套）
+      │              │                    │
+      └──────────────┴────────────────────┘
+                   web 组员写的部分
+
+  - llm_bridge.py（第 20-25
+  行）明确写着："不重写提示词与解析……这里只提供一个符合 LLMClient 
+  协议的客户端"。它把 src 的 UnifiedUnderstandingProcessor 原样搬进 web。
+  - domain.py（第 2-6 行）写着："复用 src/ 
+  里已验证的方案与安全逻辑……只负责装配与转译"。它把
+  evaluate_segment、select_protocol、HazmatStore 搬过来。
+  - degraded_producer.py + web_renderer.py：把 src
+  的"降级生产者→投影→渲染"三层呈现链，翻译成 web 前端能吃的 JSON。
+
+  第 4 步结果：web 里其实有两个大脑
+
+  这是"双轨"的真正含义——web 侧内部就有两条不同的"想"的路径：
+
+  ┌──────────┬──────────────────────┬───────────────────────────────────────┐
+  │          │    记录链 /record    │             对话链 /chat              │
+  ├──────────┼──────────────────────┼───────────────────────────────────────┤
+  │ 大脑     │ 你的统一理解链（经   │ 组员的 tool-calling                   │
+  │          │ llm_bridge）         │ agent（agent/core.py）                │
+  ├──────────┼──────────────────────┼───────────────────────────────────────┤
+  │ 怎么"想" │ 一次 LLM             │ 模型自己决定调哪个工具，≤6 轮循环     │
+  │          │ 抽实体，判断靠规则   │                                       │
+  ├──────────┼──────────────────────┼───────────────────────────────────────┤
+  │          │ domain.evaluate +    │ calculate / list_experiments /        │
+  │ 谁在"做" │ save_record          │ check_conflicts / propose_experiment  │
+  │          │                      │ / propose_memory + lab_tools          │
+  ├──────────┼──────────────────────┼───────────────────────────────────────┤
+  │ 话术     │ 后端 copy            │ 模型自己生成                          │
+  │          │ 层（web_renderer）   │                                       │
+  └──────────┴──────────────────────┴───────────────────────────────────────┘
+
+  agent/core.py 的 INSTRUCTIONS（第 11 行起）是一大段中文提示词，指挥模型调用
+  record_observation、check_conflicts、propose_experiment 等工具——这是组员搭的**
+  "执行工具层"，跟你的"理解层"目前是并行的两套**，还没完全合成一条。
+
+  ---
+  三、核心结论
+
+  web 不是"乱"，它是一个清晰的"桥 + 新增"结构：
+
+  1. 组员做的部分，一直在复用你的 src 核心，靠三个桥文件（llm_bridge / domain /
+  degraded_producer +
+  web_renderer）。你的代码是"理解权威"，组员的代码是"执行工具 + 前端"。
+  2. 真正属于组员新增的：agent/core.py（tool-calling 大脑）、tools/、lab_tools.p
+  y、planner/、tasks/、database/、frontend/*.js、tts/、voice/。
+  3. "乱"的根源：web 内部还留着"两个大脑"（/record 用统一链、/chat 用
+  agent），迁移计划（Phase D）的目标正是把它们收敛成"统一链管理解、工具管执行"。
+
+  到这里，任务清单里 2、3、4 三项（入口、record 链、agent
+  链）已经追完。下一步我打算去读 frontend/ 那几个
+  JS，把最后一段"前端只画只念"也追实——但先停在这里，你确认一下：
+
+  上面这个"两个大脑 + 三个桥"的画面，跟你印象里的 src 对得上吗？
+  有没有哪块你想让我先深挖（比如 lab_tools.py 到底封装了哪些工具、或者前端
+  voice_asr.js 怎么把录音送进 /record）？你说继续我再往下一步。
+
+✻ Sautéed for 5m 50s
+
+❯ 对得上。都深挖一下吧。到底是怎样让llm调用工具和知识库的，后端的产出是怎么弄到 
+  前端里的，为什么前端的入口有的散落在各处                                      
+
+● 三个问题都很好，正好把 web
+  的"神经末梢"（工具调用）、"输出通道"（后端→前端）和"入口布局"（为什么散）讲透
+  。我先补齐几块还没读的代码：工具实现、知识库目录、前端 JS
+  和任务队列，然后一次性回答。
+
+  Read 11 files, listed 1 directory (ctrl+o to expand)
+
+● 前端 JS 我路径写错了一级（它们在 web/frontend/，不是
+  web/），补读正确路径，另外确认一下"知识库"目录里到底有什么（刚才看到
+  knowledge/ 只有一个 README，很关键）。
+
+  Read 7 files (ctrl+o to expand)
+
+● 三块都追完了。先更新任务状态，然后逐个深挖。
+
+● 深挖一：LLM 到底怎么调用"工具"和"知识库"
+
+  1.1 工具调用：OpenAI 的 function calling
+
+  - 白话：LLM 本身只能"吐字"，不能"干活"。你告诉它"有一堆工具可以用，每个工具叫
+  什么、要什么参数"，它就在回复里不再吐普通文字，而是吐一个 
+  JSON：我要调用某个工具，参数是这些。你的代码把这个 JSON
+  接住、真正去执行、再把执行结果塞回给它，它再决定下一步。
+  - 专业术语：这叫 function calling / tool calling，多轮循环叫 agentic 
+  loop（代理循环）。
+  - 项目体现：web/agent/core.py 的 run_agent（第 78-101
+  行）就是这段循环，我把它拆给你看：
+
+  # core.py 第 82-94 行（简化）
+  for _ in range(6):                                        # 最多转 6 轮
+      response = client.chat.completions.create(
+          model=..., messages=messages, tools=TOOLS)         # 
+  关键：把工具清单传给模型
+      assistant = response.choices[0].message
+      calls = assistant.tool_calls or []                     # 
+  模型吐出的"要调哪个工具+参数"
+      if not calls:
+          return assistant.content                            # 没工具要调了 → 
+  直接返回文字
+      messages.append(assistant)
+      for call in calls:
+          result = run_tool(call.function.name,              # 真正执行工具
+                            json.loads(call.function.arguments),
+  conversation_id)
+          messages.append({"role":"tool", "tool_call_id":call.id,
+                           "content":json.dumps(result)})     # 
+  结果塞回对话，再进下一轮
+
+  一句话：工具清单是"菜单"，tool_calls 是模型点菜，run_tool 
+  是后厨做菜，结果回桌让模型继续点。
+
+  1.2 工具分两层：硬编码 + 插件注册表
+
+  web 侧工具不是写死在一处的，有两层：
+
+  第一层：硬编码在 agent/core.py 的 TOOLS 列表（第 23-31
+  行）——calculate（计算）、list_experiments（列实验）、check_conflicts（查冲突）
+  、propose_experiment/confirm_create_experiment（两步建实验）、propose_memory/c
+  onfirm_save_memory（两步存记忆）。
+
+  第二层：lab_tools.py 的插件注册表（组员参考 deepseek-harness 的"everything is
+  a plugin"范式）：
+
+  - 白话：每个工具用 @tool(...) 装饰器自描述、自注册。新增一个能力，只需在
+  lab_tools.py 加一个 @tool，不用去改 run_tool 的分发逻辑。
+  - 专业术语：注册表模式（registry） + 装饰器（decorator）。
+  - 项目体现：lab_tools.py 第 38-60 行的 tool() 装饰器把函数塞进 _REGISTRY
+  字典；第 93-105 行 openai_tools() 把所有注册项导出成 OpenAI 格式；第 108-116
+  行 call() 按名字分发。
+  - 它注册了 9 个工具：list_protocols、select_protocol、get_current_step、move_s
+  tep、record_observation（记录实验口述）、get_current_time、start_timer/check_t
+  imer（计时）、suggest_step_improvement、check_reagent_safety（查试剂安全）。
+
+  每个工具还带一个 present 函数（第 38-48
+  行注释），决定"这次调用在界面上长成什么卡片"，前端按统一词汇渲染，不为每个工具
+  写特例——这就是你迁移计划里说的"薄字典"的另一半。
+
+  1.3 "知识库"的真相：目前没有 RAG，只有三类"本地知识"
+
+  这是这次深挖最重要的发现，要诚实告诉你：
+
+  - web/knowledge/ 目录里只有一个 README.md（130 字节），web/memory/ 里也只有
+  README。没有向量库、没有检索器。
+  - agent/core.py 的提示词（第 19 行）自己写着："当前没有 SOP 
+  知识库，不要假装查询过 PDF、论文或实验记录。"
+
+  那"知识"到底从哪来？三处，都叫不上"知识库"：
+
+  ┌────────────┬────────────────────────┬───────────────────────────────────┐
+  │    来源    │          在哪          │              怎么用               │
+  ├────────────┼────────────────────────┼───────────────────────────────────┤
+  │            │                        │ _memory_context()（core.py 第     │
+  │ 长期记忆   │ SQLite memories 表     │ 60-64 行）读出来，拼进 system     │
+  │            │                        │ prompt 最前面                     │
+  ├────────────┼────────────────────────┼───────────────────────────────────┤
+  │            │ src 的                 │ check_reagent_safety 工具调       │
+  │ 试剂安全库 │ HazmatStore（PubChem   │ domain.hazmat() 查 CAS/危险性     │
+  │            │ 数据）                 │                                   │
+  ├────────────┼────────────────────────┼───────────────────────────────────┤
+  │ 实验方案库 │ data/protocols/*.json  │ list_protocols/select_protocol    │
+  │            │                        │ 工具调 domain.protocols()         │
+  └────────────┴────────────────────────┴───────────────────────────────────┘
+
+  - 白话：这个项目的"知识"= 用户确认过的长期记忆 +
+  本地结构化数据（试剂表、方案表），都是"查表"，不是"检索文档"。真正的
+  RAG（检索增强生成）是你 PROJECT_ARCHITECTURE.md
+  第九节里规划的未来能力，KnowledgeBase 协议已经留了接口，但没实现。
+  - 反面例子：如果有人以为 web/knowledge/
+  里有知识库、去里面找代码，会扑空——那只是个空壳 README。"目录名叫 knowledge ≠ 
+  有知识库"，这正是"不能靠文件名/目录名猜功能"的活例子。
+
+  ---
+  深挖二：后端产出怎么到前端
+
+  有四条通道，别混：
+
+  通道 A：普通 JSON（请求→响应）
+
+  - 白话：前端 fetch 一个地址，后端返回一坨 JSON，前端拿字段渲染。
+  - /record 这条：返回 {item, messages}。messages 是 WebRenderer
+  渲染好的数组，每条长这样：{kind, screen_target, priority, text, voice_text}。
+  - 前端接法（voice_asr.js 第 156-158 行）：
+  if (window.labRender) window.labRender(d);              // 画实体 + 回执
+  if (window.labSpeakMessages) window.labSpeakMessages(d.messages || []); // 念
+    lab_panel.js 的 labRender 按 kind
+  上样式（clarification→蓝色追问框，record_ack→绿色"已记录"），speak.js 的
+  labSpeakMessages 只念 voice_text。
+  - 关键契约（你迁移计划的契约 4/5）：前端只按 kind/screen_target 上样式、只念 
+  text/voice_text，判断"要不要问"、措辞都在后端。
+
+  通道 B：SSE 流式（Server-Sent Events）
+
+  - 白话：后端不一次性返回，而是像水管一样持续往出挤字，前端边收边显示——打字机效
+  果。
+  - 专业术语：SSE（Server-Sent Events，服务器推送事件），单向流。
+  - 项目体现：api/chat.py 的 chat_stream 返回
+  StreamingResponse(media_type="text/event-stream")，逐段 yield "data: 
+  {...}\n\n"。agent/core.py 的 stream_agent 用两个特殊标记夹带信息：
+    - [[LABTHINK]] → 推理模型的心路历程，前端渲染成可折叠的"思考"行
+    - [[LABCARD]] → 工具卡片的 JSON（调用前 pending、调用后 done）
+
+  通道 C：后台任务 + 轮询
+
+  - 白话：有些请求（"帮我创建明天的实验"）要跑很久，不能让用户干等，就先回一句"
+  我交给后台了"，让用户继续聊，跑完再通知。
+  - 项目体现：realtime/routing.py 的 requires_background_task()
+  用正则判断——闲聊走实时、排期/查询/创建走后台。走后台时
+  task_manager.submit()（task_manager.py 第 24-27 行）扔进 ThreadPoolExecutor（2
+   线程），前端轮询 /tasks 查状态。
+
+  通道 D：TTS（后端文字 → 前端声音）
+
+  - 白话：前端把要念的文字 POST 给 /tts，后端合成音频，前端拿回音频 blob 播放。
+  - 项目体现：local_tts.js 的 window.speak(text)：fetch('/tts', {body:{text}}) →
+   拿 blob → new Audio(url).play()。带队列 + 打断（jobId 递增 + AbortController
+  + stopSpeech），/tts 挂了就退回浏览器内置 speechSynthesis（browserFallback，第
+   40-48 行）。
+
+  ▎ 一个小技巧帮你记：问"数据怎么从前端到后端"就看 fetch 的 method 和 
+  ▎ body；问"怎么从后端回前端"就看是 return（一次性 JSON）还是 
+  ▎ StreamingResponse（流）还是 task_manager（异步）。
+
+  ---
+  深挖三：为什么前端入口散落各处
+
+  一句话根因：这个前端没有构建工具、没有模块系统，是"服务端字符串拼装 + 每个 JS 
+  自己画按钮"。
+
+  3.1 没有打包器，没有模块
+
+  - 白话：现代前端（React/Vue）会用 webpack/vite 把几十个文件打包成一个
+  bundle，入口统一。这个项目没有——它就是一堆 (function(){...})()
+  的独立脚本，靠浏览器按 <script> 顺序一个个加载到全局。
+  - 专业术语：IIFE（立即执行函数） 隔离作用域，无模块化（no bundler / no ES 
+  modules）。
+  - 项目体现：voice_asr.js、lab_panel.js、composer.js 每个都是 (function(){ ... 
+  })()，各自 document.createElement('div') 创建自己的 DOM，自己 appendChild 到
+  body，自己绑自己的 fetch。
+
+  3.2 服务端字符串拼装注入脚本
+
+  - 项目体现：app.py 的 home()（第 47-74 行）读 index.html，然后用
+  page.replace('</body>', scripts) 把 20 个 <script src> 
+  平铺塞进去。这就是"组装"，不是"构建"。
+
+  3.3 每个脚本各画各的按钮 → 入口自然散落
+
+  ┌───────────────┬───────────────────────────────────────┐
+  │     脚本      │               画的入口                │
+  ├───────────────┼───────────────────────────────────────┤
+  │ voice_asr.js  │ #asr-btn（开始录音）                  │
+  ├───────────────┼───────────────────────────────────────┤
+  │ lab_panel.js  │ #lab-toggle（实验方案面板）           │
+  ├───────────────┼───────────────────────────────────────┤
+  │ composer.js   │ #cp-mic（语音记录）/ #cp-send（发送） │
+  ├───────────────┼───────────────────────────────────────┤
+  │ phone_call.js │ #sh-call（通话）                      │
+  ├───────────────┼───────────────────────────────────────┤
+  │ avatar.js     │ 头像（点击进通话）                    │
+  └───────────────┴───────────────────────────────────────┘
+
+  而 index.html 本身还内联了一个巨型 <script>（第 24-30
+  行），塞了日历、实验清单、聊天、浏览器语音识别、浏览器 TTS
+  全套。于是同一页里既有 index.html 的内联聊天，又有 composer.js 
+  画的输入区——composer.js 第 142-147 行甚至专门写了代码去"隐藏原来的
+  .chat-form/.voice-row/#asr-bar"。
+
+  3.4 这直接造成了 bug（你的迁移计划 VOICE-ENTRY-01 已经记了）
+
+  - 两个冗余"对话"入口：vad_mode.js 的「语音对话」按钮 和 avatar.js
+  头像点击，都触发连续对话，两套实现职责重叠。
+  - phone_call.js 的 $('#sh-call') 永远取不到元素：它的 $ 被封装成
+  getElementById，而 getElementById 不认 # 前缀，所以 $('#sh-call') 恒为
+  null，通话按钮 onclick 从没接上。
+
+  这正是"入口散落"的代价：没有一处统一的"入口清单"，谁加了新功能就往自己的脚本里
+  塞个按钮，加着加着就重复、冲突、失灵。
+
+  ---
+  收个尾
+
+  你问的三个问题，落到一句可写进简历的话是：
+
+  ▎ 我能讲清这个系统"LLM 怎么通过 function calling 调工具、为什么它其实没有 RAG 
+  ▎ 只有本地查表、后端产出走哪四条通道到前端、以及无构建前端导致入口散落的架构债
+  ▎ "——这等于我能对一个陌生系统做逆向理解 + 数据流梳理。
+
+  下一步：任务清单 1-5 项（方法论 + 入口 + record 链 + agent 链 +
+  前端呈现链）已全部完成，只剩第 6 项——把前面这些结论固化成一张"双轨对照表 + 
+  数据流图"（简历附件）。不过那会写一个新文件，属于"改动"，所以按你的要求我先停
+  ，等你发话。
+
+  你想让我现在就把这张图/表做出来（写成一个 md
+  文件给你），还是先继续深挖某个点（比如 lab_tools.record_observation 和 /record
+   两条记录路径的关系、或者 avatar.js/phone_call.js 的通话链路）？
+
+✻ Baked for 3m 10s
+
+※ recap: We're analyzing the messy merged project to map its data flow for your resume. I've finished tracing the web side's five core areas. Next: build the two-track comparison table plus data-flow diagram, once you confirm. (disable recaps in /config)
+
+❯ 能不能记录一下现在文件夹中的代码状态                                          
+
+● 好，这一步是"固化现状"——把我们这几轮分析到的代码结构、双轨状态、数据流、以及
+  git 里改了什么/没跟踪什么，写成一份快照文档，作为以后整理或做简历的基线。
+
+  我先取一份最新的 git 状态（会话开头那份是快照，可能已经变了），再落盘。
+
+  Ran 1 shell command (ctrl+o to expand)
+
+❯ 然后把前面的梳理结论固化产出 
+
+● git 状态已拿到。现在我把两块都落盘成文档：
+
+  1. docs/CODE_STATE_SNAPSHOT_2026-08-20.md — 记录现状：目录结构 + git
+  改了/没跟踪什么 + 根目录散落文件 + "乱"的三个来源（纯事实，不做判断）。
+  2. docs/ARCHITECTURE_MAP_2026-08-20.md — 固化梳理结论：双轨对照表 + 数据流图 +
+   三个桥 + 四通道 + 工具调用机制（这份是简历素材）。
+
+  两份都写进 docs/，互相链接。
+
+● Write(CODE_STATE_SNAPSHOT_2026-08-20.md)
+  ⎿  Wrote 151 lines to CODE_STATE_SNAPSHOT_2026-08-20.md
+       1 # 代码现状快照（2026-08-20）
+       2 
+       3 > 目的：记录"杂糅版"（`C:\Users\dahli\Documents\107`）在 2026-08
+       4 > 本文件只记录**现状是什么**，不做价值判断；理解性结论见 [`ARCHI
+         TECTURE_MAP_2026-08-20.md`](ARCHITECTURE_MAP_2026-08-20.md)。
+       5 
+       6 ---
+       7 
+       9 
+      10 | 项 | 值 |
+     … +164 lines (ctrl+o to expand)
+● Write(ARCHITECTURE_MAP_2026-08-20.md)
+  ⎿  Wrote 119 lines to ARCHITECTURE_MAP_2026-08-20.md
+       1 # 架构梳理结论（2026-08-20）
+       3 > 把"杂糅版"彻底理清后的**地图**：两套大脑、三个桥、两条数据流、
+         四条前后端通道、工具调用机制。
+       4 > 可作为简历/面试的素材。现状快照见 [`CODE_STATE_SNAPSHOT_2026-0
+       5 
+       6 ---
+       8 ## 1. 一句话总览
+       9 
+      10 **实验助手**：语音/文字驱动的实验室记录与规划助手。实验者口述操
+         落库。**web 是产品，CLI 是兜底。**
+     … +155 lines (ctrl+o to expand)
+
+  Wrote 1 memory (ctrl+o to expand)
+
+● 两份文档已落盘，梳理工作本轮闭环。
+
+  结论
+
+  在 docs/ 下新建了两份互相链接的文档：
+
+  文件: CODE_STATE_SNAPSHOT_2026-08-20.md
+  内容: 目录结构 + git 改了/没跟踪的 40 个文件 + 根目录散落杂物 + "乱"的三个来源
+  用途: 现状基线，以后整理的对照底稿
+  ────────────────────────────────────────
+  文件: ARCHITECTURE_MAP_2026-08-20.md
+  内容: 双轨对照表 + 两条数据流图 + 三个桥 + 四通道 + 工具调用机制 +
+  前端散落根因
+    + 迁移进度
+  用途: 简历/面试素材
+
+  理由
+
+  - 把"现状是什么"和"我理解成了什么"分成两份：快照只记事实，地图记结论，避免混在
+  一起以后分不清哪句是观察、哪句是推断。
+  - 地图那份直接按"能 3 分钟讲清"组织，面试前扫一眼就能讲。
+
+  关键发现（都写进文档了）
+
+  - 三个桥：组员的 web/ 一直在复用你 src/ 的核心，靠 llm_bridge.py / domain.py /
+   degraded_producer.py+web_renderer.py。
+  - 没有 RAG：knowledge/ 目录是空壳，所谓"知识库"其实是长期记忆 +
+  本地查表（试剂/方案）。
+  - 迁移进行到一半：新增的 degraded_producer.py/web_renderer.py 和 4
+  个测试都还没 git add，正是"过渡中间态"的直接证据。
+
+  未做（如实说明）
+
+  本轮只写文档、没改任何代码，所以没有跑测试（测试基线不变，无需跑）。git
+  工作区保持原样，唯一新增是这两个 .md 文件。
+
+  下一步
+
+  你可以先打开这两份文档核对一下，看有没有我记错/漏记的地方。之后两条路你挑：A
+  把 ARCHITECTURE_MAP 再打磨成一页纸的正式简历附件（配一张更漂亮的数据流图）；B
+  继续深挖某个还没吃透的点。你定。
+
+✻ Churned for 3m 23s

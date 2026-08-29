@@ -1,0 +1,3400 @@
+ ▐▛███▜▌   Claude Code v2.1.148
+▝▜█████▛▘  deepseek-v4-pro · API Usage Billing
+  ▘▘ ▝▝    ~\Documents\107
+
+❯ 让我们来把方案实验记录的统一理解链路加入并修复一下，先读读代码，确认一下现状  
+  ，之前的交接文档可供参考"C:\Users\dahli\Documents\107\docs\HANDOFF_WEB_UNIFIE 
+  D_CHAIN_2026-08-26.md"                                                        
+
+● 我先读交接文档和相关记忆，确认现状后再决定怎么动。
+
+  Read 1 file, recalled 3 memories (ctrl+o to expand)
+
+● 交接文档已读完。现状是：统一 Turn 生产链的核心（TurnInput →
+  TurnApplicationService → ExperimentProcessor → SQLite → SSE）已搭好并
+  AUTO_OK，但"方案实验记录"（experiment/protocol）的统一理解链路还没真实验收，用
+  户也没验收过。
+
+  我先摸清"统一理解链路"现在到底有哪些文件、改到哪一步了。先看源码目录和相关交接
+  文档。
+
+  Searched for 4 patterns, ran 1 shell command (ctrl+o to expand)
+
+❯ 先不要动手，给一个计划 
+
+● 收到 —— 先不动手，只做调查并给计划。我已经摸清文件清单了，接下来读"统一理解链
+  路"相关的核心源码和最近一份交接文档，把现状和缺口确认清楚。
+
+  Read 4 files (ctrl+o to expand)
+
+● 现状已经清晰了：方案实验（experiment/protocol）是当前唯一
+  REAL_FAIL，交接文档二.1 已经写清了三个根因，四.A 也给出了"下一步单独修复方案实
+  验"。我现在把这三个根因对应的代码逐处读一遍，确认现状再出计划。
+
+  Read 3 files (ctrl+o to expand)
+
+● 三个根因里，前两个我已经定位到代码了（ExperimentProcessor.prepare 的 step_view
+   只取不评价、experiment_runtime_sessions 按 (conversation_id, lab_session_id)
+  建 key）。现在要确认第三块：旧 RecordService 的确定性方案评价 evaluate
+  到底接在哪、step_view 长什么样、SQLite 里 experiment_session_state 怎么存。
+
+  Searched for 3 patterns, read 4 files (ctrl+o to expand)
+
+● 最后确认两块：experiment_session_state 表结构（能不能加
+  protocol_id）和确定性方案评价 evaluate_segment 长什么样、依赖什么状态。
+
+  Searched for 2 patterns, read 3 files (ctrl+o to expand)
+
+● 我已经把三个根因对应的代码全部定位并核对完了。最后确认一下 TurnInput 里有没有
+  protocol_id、以及 turn_requests 表怎么存 lab_session_id，这样计划里"状态绑定
+  protocol_id"的改动能说准。
+
+  Read 2 files (ctrl+o to expand)
+
+❯ 以及用户看不到方案怎么加入展示界面，另外后续的统一输出在方案实验这里怎么样 
+
+● 调查完成，现状和缺口都核对清楚了。先给你一份计划，不动代码。
+
+  ---
+  一、现状：方案实验为什么 REAL_FAIL（三个根因，已定位到代码）
+
+  根因 1 —— 待确认状态没有按方案隔离（free/protocol 串味）
+
+  - web/database/db.py:129-137：experiment_session_state 表主键是
+  (conversation_id, lab_session_id)，没有 protocol_id 列。
+  - web/database/turn_store.py:340-369：load_experiment_state() 只按这两个键恢复
+   ReplyCoordinator（待确认追问）和 SessionContext。
+  - web/turn_processors.py:188-194：ExperimentProcessor.prepare()
+  用同一对键恢复。你在 free 模式追问过的问题，切到 protocol 后被原样捞回来 →
+  就是"模型还在追问自由实验留下的问题"。
+
+  根因 2 —— 最终 Turn 没带方案上下文 Block，步骤卡提交后就消失
+
+  - web/frontend/conversation_context_blocks.js:20-44：publishProtocolContextBlo
+  cks() 提交前临时 upsert protocol_card / step_card / safety_alert。
+  - web/frontend/conversation_turn_store.js:69-82：acceptCommittedTurn()
+  用服务器返回的最终 Turn 整体替换临时 Turn。
+  - web/turn_processors.py:295-309：最终 blocks 只有 user / record_card / 
+  confirmation_card / assistant / voice，没有那三类方案 
+  Block。所以提交后步骤卡消失。
+
+  根因 3 —— 方案确定性评价没接回统一 Turn，deviations 恒为空
+
+  - web/turn_processors.py:196-201：只做了 step = 
+  domain.step_view(domain.session())，没调 domain.evaluate()。
+  - web/turn_processors.py:249-255：evaluation.deviations 硬编码
+  []，missing_fields 来自 LLM（observation.missing_fields），不是确定性评价。
+  - 旧路 web/record_service.py:178 接的是
+  domain.evaluate（web/lab_tools.py:262），它走
+  evaluate_segment（src/core/protocol_segment_evaluation.py），能算出
+  missing_fields / deviations / follow_up_question。
+
+  ---
+  二、修复计划（四个工作块）
+
+  块 1：待确认状态按方案隔离
+  - db.py 给 experiment_session_state 加 protocol_id（free 用哨兵值 '' 或
+  'free'），主键改为 (conversation_id, lab_session_id, 
+  protocol_id)，需要一次存量表迁移（现有库文件要 ALTER/重建，不重写历史业务
+  JSON）。
+  - turn_store.py：load_experiment_state() 增加 protocol_id 参数；commit
+  写状态时带上 protocol_id（从 TurnInput 之外传入——见块 3，protocol_id 来自
+  step_view 里的 protocol.id）。
+  - 补 free -> protocol -> free 的隔离/恢复测试。
+
+  块 2：最终 Turn 带上方案 Block（回答你的"用户看不到方案"）
+  - ExperimentProcessor.prepare() 在 experiment_context == PROTOCOL 时，从
+  domain.step_view/safety_for 构造并追加三类
+  Block：protocol_card、step_card、safety_alert（字段形状对齐前端
+  conversation_block_view.js:12-15 已有的渲染分支）。
+  - 前端 conversation_context_blocks.js 的 publishProtocolContextBlocks()
+  降级为"提交前占位预览"，服务器最终 Turn 是权威来源——不再依赖临时 UI Block
+  存活。
+
+  块 3：把确定性方案评价接回（回答你的"统一输出怎么样"）
+  - 在 prepare() 里把 analysis.events 的实体聚成
+  entities_dict（turn_processors.py:230-234 已有），protocol 模式下调
+  domain.evaluate(entities_dict) 得到确定性的 missing_fields / deviations / 
+  follow_up_question / follow_up_required。
+  - 用它覆盖 lab_record["evaluation"]（不再 deviations: []），并让 _reply_text
+  的追问走确定性
+  follow-up（方案已知值不算缺失、只有现场必记缺失或真实偏差才追问——这是旧
+  evaluate_segment 的既有语义）。
+  - 复用旧 record_service.py:243 的 _select_effective_evaluation 决策：free 保留
+   LLM 语义追问，protocol 确定性评价权威。
+
+  块 4：测试 + 收尾三份文档 + 真实验收
+  - 自动测试：块 1/2/3 各配专项 + 相邻回归，最后全量（.\.venv\Scripts\python.exe
+   -B -m unittest discover）。
+  - 真实验收：文字方案实验 → 桌面单录方案实验，核对 SSE 顺序、SQLite 的
+  lab_records.evaluation.deviations、屏幕步骤卡、收尾语音。
+
+  ---
+  三、需要你拍板的三个决策点
+
+  1. 全局方案会话单例：web/domain.py:29-55 的 session()
+  是进程级单例，意味着"当前在第几步"是所有会话共享的（旧 RecordService
+  也这样）。本轮我建议只修三个根因，不动这个全局单例，把它作为已知限制记录在文档
+  里；彻底改成 per-conversation 是更大的改动。你同意吗？
+  2. protocol_id 迁移方式：用哨兵值（free 存 'free'）还是可空列 +
+  重建表。我倾向哨兵值（SQLite 对 NULL 主键不保证唯一）。
+  3. "已知值不算缺失"是否需改判定规则：我判断 evaluate_segment 的
+  compute_missing_fields/detect_protocol_deviations
+  已是这个语义，接回即可，不用改规则。但你如果实测发现仍把方案已知值当缺失，块 3
+   需要额外改这两个模块——要我现在先读一下确认吗？
+
+  你先定这三点（尤其第 1 点，决定本轮范围），我就按这个计划动手。
+
+✻ Cooked for 3m 46s
+
+❯ 但是你光列出来这些文件名我也不知道里面都实现了什么                            
+
+● 明白，是我没讲清楚——只给文件清单等于没讲。我补读几个"待确认状态"和"统一理解"的
+  核心文件，然后按数据流顺序把每个文件里到底实现了什么讲成大白话。
+
+  Read 4 files (ctrl+o to expand)
+
+● 读完了。这次我按一次方案实验记录从输入到显示的真实路径，把每个文件里"到底装了
+  什么东西、干哪件事"讲清楚。先给主线，再逐站拆。
+
+  ---
+  一句话主线
+
+  用户说一句话 → 服务端把它交给一条"统一理解链"判断这是实验记录 / 控制指令 / 
+  弃权 → 如果是实验记录，就提取实体 → 对照当前方案步骤判断缺啥/有没有偏差 → 
+  生成追问 → 存 SQLite → 拼成屏幕块 + 短语音 → 前端显示。
+
+  下面按"站"讲，每站标出文件 + 它里面有什么。
+
+  ---
+  站 1：输入合同 —— src/core/turn_input.py
+
+  里面只有一个类 TurnInput（一个
+  @dataclass，就是"一组带校验的字段"）。它规定了用户这一次提交必须长什么样：
+
+  - 身份：conversation_id / request_id / turn_id / lab_session_id
+  - 模式快照：interaction_mode（chat/experiment）、experiment_context（none/free
+  /protocol）、mode_version
+  - 来源：input_source（text/single_recording/continuous_call）、raw_text、asr_r
+  esult
+
+  __post_init__ 里是一堆硬校验：文字不能带 ASR、语音必须有最终 ASR 且 raw_text
+  必须等于转写原文。它的作用是让下游不用再猜"这是文字还是语音、文字有没有伪造
+  ASR"。
+
+  ---
+  站 2：统一理解（判断这句话是啥）—— src/core/ 四个文件串成一条链
+
+  这是你已经比较熟的 src 侧，我快速过，重点是它们怎么接力：
+
+  - unified_understanding.py：定义"理解结果"的数据合同。核心类是 UnifiedUndersta
+  ndingResult，它规定一句话被理解后只能三选一：experiment（实验事实）/
+  control（控制指令）/ uncertain（弃权）。还有个严格解析器
+  parse_unified_understanding()——LLM 吐回来的 JSON
+  必须字段一个不多一个不少，否则整体拒绝（这是"语音受控靠确定性格式化器而非
+  prompt"那个原则的落点之一）。
+  - unified_dispatch.py：UnifiedDispatchPlanner.plan()，纯规则、零 
+  LLM。把上一步的理解结果翻译成"下一站去哪"（6 个目的地：实验管线 / 澄清上下文 /
+   结束执行 / 结束确认 / 弃权 / 降级 NOTE），并校验"目的地 ↔ 最小权限"必须匹配。
+  - unified_acceptance_bypass.py：UnifiedAcceptanceBypass.inspect()，把"路由 →
+  分派 → 采用"三件事串成一个无副作用的旁路。它只产出只读计划，不改任何状态。
+  - unified_observer.py：UnifiedObserver.observe()，这是给主流程（ExperimentProc
+  essor）用的唯一入口。它把 ReplyCoordinator 的当前待确认状态打包成快照，喂给
+  bypass，返回一个
+  UnifiedObservation（成功/失败的摘要对象）。主流程只跟它说话，不直接碰 LLM。
+
+  ▎ 这四层就是交接文档里说的"泛化理解、校验、动作规划"。LLM 
+  ▎ 只在这里出现一次，输出被严格校验后变成结构化结果。
+
+  ---
+  站 3：会话状态（记忆"待确认问题"和"最近上下文"）—— 两个账本
+
+  这两个是根因 1 的主角，重点讲：
+
+  - src/core/reply_coordinator.py 里的
+  ReplyCoordinator："待确认问题"的账本。里面维护一个列表
+  _clarifications，每一条是一个 PendingClarification（一个还没回答的问题，带编号
+   display_number、缺哪些字段 missing_fields、状态 active/deferred）。它能做的事
+  ：新建问题、暂缓、回答、确认、按编号查找。关键：它有两个方法 to_snapshot() /
+  from_snapshot()，能把整个账本序列化成 JSON 存进 SQLite、再原样恢复回来。
+  - src/core/session_context.py 里的
+  SessionContext："最近说了啥"的短期记忆。就是个 deque（最多 8
+  段），把最近几段口述转成短文本，喂给下一轮 LLM 当提示词。同样有 to_snapshot /
+  from_snapshot。
+
+  根因 1 就藏在这里：experiment_session_state 表只按 (conversation_id, 
+  lab_session_id) 存这一个账本。你在 free 模式追问过的问题存在这个账本里，切到
+  protocol 后，ExperimentProcessor 还是用同一对 key 把它 from_snapshot()
+  恢复出来 → 于是"模型还在追问自由实验留下的问题"。因为账本没分 free 和 protocol
+   两份。
+
+  ---
+  站 4：方案 + 确定性评价（"对照步骤判断缺啥/偏差"）—— src/core/ 三个文件
+
+  这是根因 3 里"没接回"的能力，也是方案实验区别于自由实验的核心：
+
+  - protocol_session.py：ProtocolSessionState，一个会话的"选了哪个方案 +
+  当前在第几步"。free 模式游标是 None；protocol 模式游标指向 current_step()。
+  - protocol_segment_evaluation.py：evaluate_segment(state, 
+  entities)，确定性方案评价。拿"当前步骤" +
+  "用户口述提取出的实体"，算出四样东西：
+    - missing_fields：当前步骤规定必须记、但用户没说的字段
+    - deviations：用户说的值和方案规定值不一致（偏差）
+    - follow_up_question：拼出来的追问（"请补充现场记录：温度"）
+    - follow_up_required：到底要不要追问
+
+  全是规则计算，不碰 
+  LLM——这就是"方案已知值不算缺失、只有现场必记缺失或真实偏差才追问"的落点。
+  - 还有配套的 protocol_missing_fields.py（算缺失）、protocol_deviations.py（算
+  偏差）、protocol.py（方案步骤数据结构）——这些我只看到被 import，还没读正文。
+
+  ---
+  站 5：web 桥接层 —— web/domain.py（组员写的，讲细）
+
+  这个文件的作用一句话：把 src/ 里那套方案逻辑翻译成 web 能用的函数。它开头用
+  sys.path.insert 把仓库根目录加进搜索路径，然后 import src
+  的东西。里面的关键函数：
+
+  - session() → 返回全局唯一的方案会话状态（注意：_session 是模块级变量，进程内
+  所有会话共享"当前在第几步"，这就是我之前说的"全局单例"问题）。
+  - step_view(state) → 把方案会话状态转成前端能直接渲染的 dict：mode / 
+  protocol（id、title、总步数）/ 
+  step（第几步、标题、instruction、must_record、protocol_values）/ 
+  safety（高危试剂）。
+  - evaluate(entities_dict) → 内部调 evaluate_segment，把确定性评价结果转成
+  dict（含 deviations）。
+  - safety_for(step) → 查当前步骤涉及的高危试剂。
+
+  根因 3 的现状：ExperimentProcessor 现在只调了
+  step_view（拿"当前步骤"显示用），没调 evaluate。所以
+  lab_record["evaluation"]["deviations"] 只能硬编码成 []——偏差判断等于没接。
+
+  ---
+  站 6：web 主流程 —— web/turn_processors.py（核心中的核心）
+
+  里面有两个处理器类：
+
+  - ChatProcessor.prepare()：聊天，调 run_agent 生成回答，拼
+  user/assistant/voice 三个块。不写 lab_records。
+  - ExperimentProcessor.prepare()：实验主流程，就是方案实验真正干活的地方。它的
+  步骤是：
+
+    a. store.load_experiment_state() 从 SQLite 恢复 ReplyCoordinator +
+  SessionContext（站 3 的账本）
+    b. 调 self._observer().observe() 走站 2 的统一理解链，拿到 observation
+    c. 如果 observation.accepted_analysis 非空 → 把 LLM 分析结果物化成
+  analysis、提取实体、拼 lab_record
+    d. 这里就是根因 3 的缺口：lab_record["evaluation"] 里 "deviations": []
+  写死，missing_fields 用的是 LLM 的（observation.missing_fields），不是站 4
+  的确定性评价
+    e. _reply_text() 根据观察结果决定回复文案（追问 / "已记录" / 结束摘要）
+    f. 拼 Blocks（user / record_card / confirmation_card / assistant / 
+  voice）——这里就是根因 2 的缺口：没有 protocol_card / step_card / safety_alert
+    g. 返回 PreparedTurn，交给外层写 SQLite + 发 SSE
+
+  ---
+  站 7：旧路参照物 —— web/record_service.py + web/lab_tools.py
+
+  - web/record_service.py 的
+  SharedRecordService.record()：这是迁移前的老路，但它里面有一块是我们要"接回"的
+  宝贝——_select_effective_evaluation()。它规定了关键决策：
+    - free 模式 → 用 LLM 的语义追问
+    - protocol 模式 → 用 domain.evaluate 的确定性评价（权威）
+
+  新路 ExperimentProcessor 目前只做了 free 那半（用 LLM 追问），protocol
+  那半（确定性评价）没接。
+  - web/lab_tools.py（我只 grep 到行号）：装配 SharedRecordService 的地方，第
+  262 行 evaluate=domain.evaluate 就是把确定性评价接进去的那根线。
+
+  ---
+  站 8：存储 —— web/database/db.py + web/database/turn_store.py
+
+  - db.py：建表。experiment_session_state
+  表（db.py:129-137）就三列业务数据：conversation_id、lab_session_id、revision +
+   两个 JSON 列（reply_coordinator_json、session_context_json）。主键是 
+  (conversation_id, lab_session_id)，没有 protocol_id → 这就是根因 1
+  要动的地方。
+  - turn_store.py：SQLite 的读写函数。load_experiment_state()（读账本，340-369）
+  、commit()（写记录+账本，事务提交）、delete_*、recover_processing 等。根因 1 
+  修复时，load_experiment_state 和 commit 都要加 protocol_id 这个维度。
+
+  ---
+  站 9：前端 —— 三个 js 文件
+
+  - conversation_turn_store.js：前端"唯一事实源"，只存当前 Turn + 它的
+  Blocks。三个关键函数：beginTurn（开一个新
+  Turn）、upsertBlock（增/改一个块）、acceptCommittedTurn（用服务器最终 Turn 
+  整体替换当前 Turn）。根因 2 就在这：acceptCommittedTurn 一替换，提交前临时塞的
+   protocol_card/step_card 就没了。
+  - conversation_context_blocks.js：publishProtocolContextBlocks()，提交前临时拉
+   /protocols/session/steps，往 store 里塞
+  protocol_card/step_card/safety_alert（临时预览，提交后就丢）。
+  - conversation_block_view.js（只 grep 到行号，没读正文）：把每种 Block
+  类型渲染成 DOM 的视图层，已经认识 protocol_card/step_card/safety_alert
+  这三种类型。
+
+  ---
+  把三个根因对应回这些文件
+
+  ┌───────────┬─────────────────────┬───────────────────────────────────────┐
+  │   根因    │    出问题的文件     │              现在缺什么               │
+  ├───────────┼─────────────────────┼───────────────────────────────────────┤
+  │ 1. free/p │ db.py +             │ 账本没按方案隔离，load/commit 没      │
+  │ rotocol   │ turn_store.py +     │ protocol_id 维度                      │
+  │ 串味      │ turn_processors.py  │                                       │
+  ├───────────┼─────────────────────┼───────────────────────────────────────┤
+  │ 2. 步骤卡 │ turn_processors.py  │ 服务器最终 Turn 不产 protocol_card/st │
+  │ 消失      │ + conversation_turn │ ep_card/safety_alert，前端替换时丢    │
+  │           │ _store.js           │                                       │
+  ├───────────┼─────────────────────┼───────────────────────────────────────┤
+  │ 3. 偏差恒 │ turn_processors.py  │ 只调了 step_view 没调                 │
+  │ 为空      │ （对照              │ domain.evaluate，deviations 写死 []   │
+  │           │ record_service.py） │                                       │
+  └───────────┴─────────────────────┴───────────────────────────────────────┘
+
+  ---
+  我这次读过的：上面列的文件我都读了全文或关键段；没读正文只 grep 到行号的是
+  conversation_block_view.js、web/api/protocols.py、web/lab_tools.py、protocol_m
+  issing_fields.py、protocol_deviations.py、protocol.py。
+
+  现在你清楚每个文件装的是什么了吗？如果哪个站还想让我再往深讲（比如
+  ReplyCoordinator 的暂缓/确认具体怎么改状态，或者 _select_effective_evaluation
+  的 free/protocol 分流细节），我可以展开；否则我们就回到那三个决策点定方案。
+
+✻ Brewed for 1m 55s
+
+※ recap: 目标是修复方案实验记录的统一理解链路。已定位三个根因（状态未按方案隔离、最终Turn缺方案块、确定性评价没接回）并讲清各文件职责。下一步：等你拍板三个决策点，尤其本轮是否动全局方案会话单例。 (disable recaps in /config)
+
+❯ 相当于protocol下要丢掉llm原本产生的missing_fields等，那产生追问会不会第二次调 
+  用llm？加入protocol_id，那自由实验怎么填？                                    
+● 这两个问题都问到点子上了，我不猜，读代码确认。核心要搞清楚两件事：(1)
+  追问文本到底是从哪条路径、调几次 LLM 产生的；(2) free 模式下 lab_session_id 和
+   protocol_id 到底怎么生成/区分。
+
+  Read 3 files (ctrl+o to expand)
+
+● 追问产生路径和 LLM 调用次数我彻底搞清楚了。最后确认一件事：lab_session_id
+  前端怎么生成的、free/protocol 切换时它变不变——这决定 protocol_id
+  哨兵方案对不对。
+
+  Searched for 2 patterns, read 2 files (ctrl+o to expand)
+
+● 两个问题都问到了命门上，我读了代码，现在能精确回答了。
+
+  ---
+  问题 1：protocol 下丢掉 LLM 的 missing_fields，追问会第二次调 LLM 吗？
+
+  不会。整条链从头到尾只调 1 次 LLM，追问是纯规则拼出来的。
+
+  我用代码证据把"LLM 在哪调、追问文本从哪来"这条链给你钉死：
+
+  ① LLM 只在"统一理解"这一步调一次。 入口是 ExperimentProcessor.prepare() 里的
+  self._observer().observe(...)（turn_processors.py:204）。它往下一层层走到
+  UnifiedAcceptanceBypass.inspect()，里面只有一行真正碰模型：
+
+  unified_acceptance_bypass.py:114-116
+  route = self._router.route(bypass_input.to_understanding_input())
+
+  这一步 LLM 一次性吐出"这句话是什么 + 提取的实体 + 它觉得缺啥 +
+  追问文案"，打包成 analysis。
+
+  ② 之后全是"重新解析 + 纯规则 + 纯内存"，没有任何一次新 LLM 调用：
+
+  - materialize_analysis()（experiment_acceptance.py:76-84）注释原文："从不可变
+  快照严格生成新的旧链路分析对象"，本质是 parse_analysis(json) 把上一步的 JSON
+  再解析一遍，不是一次新的模型调用。
+  - ClarificationActionPlanner.from_experiment()（clarification_acceptance.py:34
+  1-378）把追问文本 question = analysis.follow_up_question
+  从上面那份结果里抄出来，不调 LLM。
+  -
+  ClarificationExecutor._execute_create()（clarification_executor.py:144-165）调
+   coordinator.register_clarification(question=...)，纯内存改账本，不调 LLM。
+
+  ③ 我要换进去的确定性评价本身也是纯规则。 evaluate_segment（protocol_segment_ev
+  aluation.py:30-61）做的三件事——compute_missing_fields（对照步骤算缺啥）、detec
+  t_protocol_deviations（算偏差）、_build_follow_up_question（拼追问）——全是不碰
+   LLM 的规则计算。追问文案甚至用的是方案里预设的模板：
+
+  protocol_segment_evaluation.py:16
+  _NO_PROMPT_FALLBACK = "请补充现场记录：{field_name}。"
+
+  所以结论：protocol 下把 LLM 的 missing_fields 
+  换成确定性评价，追问文案来自模板，不会触发第二次 LLM。 代价只有一个：那一次
+  LLM 算出来的 missing_fields / follow_up_question / should_ask_follow_up 会被丢
+  掉，只保留它提取的实体（analysis.events[*].entities），拿实体去喂确定性评价。
+
+  ▎ 顺带点破一层：这其实暴露了 protocol 模式下 LLM 正在"白算"——它费力判断"缺啥、
+  ▎ 问啥"，结果都被丢。旧路（record_service.py）本来就是这个设计：LLM 
+  ▎ 只管提取实体，缺啥/追问交给确定性评价。新路现在让 LLM"一把抓"，protocol 
+  ▎ 下才需要拆回原样。真正的优化是"protocol 下让 LLM 别算追问"，但那是改 
+  ▎ prompt/输出合同的大动作，本轮先用"覆盖"兜住。
+
+  ---
+  问题 2：加 protocol_id，自由实验填什么？
+
+  先给你一个关键事实（这是根因 1 的根子），我刚从代码确认的：
+
+  lab_session_id 只跟"是不是实验"挂钩，跟 free/protocol 
+  无关。看前端提交时怎么填：
+
+  turn_client.js:54
+  lab_session_id: experiment ? (await labSessionReady, localLabSessionId()) :
+  null,
+
+  这里 experiment = interaction_mode === 'experiment'。而 free 和 protocol 的
+  interaction_mode 都是 experiment（interaction_mode_state.js:5-6），所以你从 
+  free 切到 protocol，lab_session_id 一个字都不变——于是 SQLite 里
+  (conversation_id, lab_session_id) 这一行，free 留下的待确认状态被 protocol
+  原样捞回来。
+
+  所以 free 填什么：填一个哨兵值，我建议空字符串 ''。 三个理由：
+
+  1. 不能用 NULL。SQLite 里主键/UNIQUE 含 NULL 时，两个 NULL
+  被视为"不相等"——如果 free 存 NULL，那每次读 free
+  状态都会读不到（永远匹配不上），账本直接失效。
+  2. '' 跟现有代码风格一致。turn_application_service.py:164 已经这么干了：key = 
+  (turn.conversation_id, turn.lab_session_id or "")。
+  3. '' 永远不等于任何真实 protocol_id，天然隔离。protocol 填真实
+  id（domain.step_view 里的 protocol.id），free 填 ''，两者在 key 里天然分开。
+
+  这样主键变成 (conversation_id, lab_session_id, protocol_id)：
+
+  ┌────────────────────┬────────────────┬─────────────┐
+  │        场景        │ lab_session_id │ protocol_id │
+  ├────────────────────┼────────────────┼─────────────┤
+  │ 自由实验           │ 同一个 lab-xxx │ ''          │
+  ├────────────────────┼────────────────┼─────────────┤
+  │ 方案实验（方案 A） │ 同一个 lab-xxx │ A 的 id     │
+  ├────────────────────┼────────────────┼─────────────┤
+  │ 切到方案 B         │ 同一个 lab-xxx │ B 的 id     │
+  └────────────────────┴────────────────┴─────────────┘
+
+  既隔离了 free↔protocol，也隔离了方案 A↔方案 B（这正好是交接文档"protocol
+  状态绑定 protocol_id"要的）。
+
+  ---
+  但这里有一个必须跟你摊牌的依赖
+
+  protocol_id 现在只能从 domain.step_view(domain.session())["protocol"]["id"]
+  拿，而 domain.session() 是进程级全局单例（domain.py:29-55 的 _session
+  是模块变量）。也就是说，protocol_id 的值本质是"整个进程当前选中的那个方案"。
+
+  后果是：
+  - 本轮加 protocol_id 维度，能解决 free↔protocol 串味（'' vs 真实 id 不同了）。
+  - 但**"两个不同会话之间共享同一个方案步骤游标"这个全局单例问题，本轮解决不了**
+  ——那需要把方案会话也改成 per-conversation，是更大的一块。
+
+  这就绕回了我上次列的决策点 1：你是想本轮只修三个根因（全局单例作为已知限制记进
+  文档），还是连方案会话的全局单例也一起改？
+
+  ---
+  所以现在三个决策点里，决策点 2（free 
+  填什么）已经定了：空串哨兵。剩下要你拍板的还是这两个：
+
+  1. 全局单例动不动？（不动 → protocol_id 从全局 session 拿；动 → 方案会话要
+  per-conversation，范围大很多）
+  2. **protocol 下 LLM"白算追问"**要不要本轮就优化（让 LLM
+  只提取实体、不判缺啥），还是先用"覆盖"兜住、后续再优化？
+
+  你定这两点，我就能把方案敲死、开始动手。
+
+✻ Sautéed for 2m 39s
+
+❯ 我感觉方案实验下设定的已经很死了，我们的自由模式下追问、查看待确认问题、错词  
+  询问、结束记录、补充问题答案的能力似乎不一定完全照搬，还是应该做一点调整的。  
+  或者说，方案实验下最终会有哪些能力？                                          
+
+● 这是个好问题，而且你抓到了本质：方案实验"死"在方案上，所以 free 那套"靠 LLM
+  灵活猜缺啥"的路子在 protocol 下不该照搬。我先从代码里把 free
+  现在到底有哪些能力列全，再逐个说 protocol 下怎么办。
+
+  一、free 模式现在的能力，从代码里扒出来
+
+  这些能力藏在两处：ClarificationActionType（clarification_acceptance.py:24-31，
+  待确认问题的动作）和
+  InteractionCommandType（控制指令）。合并起来是这么一张清单：
+
+  ┌────────────┬──────────────────┬────────────────────┬──────────────────┐
+  │    能力    │       触发       │      底层动作      │    靠什么判断    │
+  ├────────────┼──────────────────┼────────────────────┼──────────────────┤
+  │ 提取实体   │ 说一段实验内容   │ 记录 lab_record    │ LLM 语义         │
+  ├────────────┼──────────────────┼────────────────────┼──────────────────┤
+  │ 追问       │ LLM 觉得缺字段   │ CREATE 待确认问题  │ LLM 猜           │
+  ├────────────┼──────────────────┼────────────────────┼──────────────────┤
+  │ 查看待确认 │ "查看问题"       │ REVIEW（只读）     │ 规则             │
+  ├────────────┼──────────────────┼────────────────────┼──────────────────┤
+  │ 暂缓问题   │ "跳过/暂缓"      │ DEFER              │ 规则             │
+  ├────────────┼──────────────────┼────────────────────┼──────────────────┤
+  │ 回答问题   │ "问题 2 是 50ml" │ ANSWER             │ 规则             │
+  ├────────────┼──────────────────┼────────────────────┼──────────────────┤
+  │ 确认/否定  │ "是/不是"        │ CONFIRM / REJECT   │ 规则             │
+  ├────────────┼──────────────────┼────────────────────┼──────────────────┤
+  │ 错词询问   │ ASR 不确定听对没 │ needs_confirmation │ LLM + ASR 置信   │
+  ├────────────┼──────────────────┼────────────────────┼──────────────────┤
+  │ 结束记录   │ "结束实验"       │ END_SESSION        │ 规则（精确匹配） │
+  └────────────┴──────────────────┴────────────────────┴──────────────────┘
+
+  注意这张表里有一个关键分界线："追问"靠 LLM 猜，其余七个动作全是规则。
+  这正是你说的"protocol 下已经定死了"的切入点。
+
+  二、protocol 下逐个能力怎么处理
+
+  我的结论是：保留所有"账本操作"，换掉"追问的产生"，新增三类方案能力。
+
+  保留（跟模式无关，因为操作的是同一个账本）
+
+  查看、暂缓、回答、确认、结束——这五个是"会话管理"动作。用户不管在 free 还是
+  protocol
+  下，都需要"看看还有哪些问题没答、暂缓一个、回答一个、结束实验"。它们操作的是
+  ReplyCoordinator 这个账本，而账本本身不知道也不关心你是 free 还是 
+  protocol。所以照搬，不用动。
+
+  调整（"追问"的来源换掉）
+
+  追问：free 是"LLM 语义判断这句话缺啥"（analysis.missing_fields +
+  follow_up_question，纯 LLM 产物）；protocol 应该换成"对照方案这一步的 
+  must_record（现场必记项），确定性算出缺哪些、拼追问"（evaluate_segment）。追问
+  这个动作还在，但"问什么"从 LLM 猜变成规则算。
+
+  调整（"错词询问"要跟"偏差"厘清关系）
+
+  错词询问（ASR 听没听对）在 protocol 下不能丢——ASR 听错跟模式无关。但它会和
+  protocol 新加的"偏差"撞车，见下面。
+
+  新增（free 没有、protocol 独有）
+
+  ┌──────────┬──────┬──────────┬─────────────────────────────────────────────┐
+  │   能力   │ free │ protocol │                   从哪来                    │
+  ├──────────┼──────┼──────────┼─────────────────────────────────────────────┤
+  │ 偏差提示 │ ❌   │ ✅       │ detect_protocol_deviations：用户说的值 ≠    │
+  │          │      │          │ 方案已知值（方案说 50ml，你说 80ml）        │
+  ├──────────┼──────┼──────────┼─────────────────────────────────────────────┤
+  │ 步骤推进 │ ❌   │ ✅       │ ProtocolSessionState 的                     │
+  │          │      │          │ next/prev/jump，用户"下一步"                │
+  ├──────────┼──────┼──────────┼─────────────────────────────────────────────┤
+  │ 安全提示 │ ❌   │ ✅       │ safety_for(step)：当前这一步的高危试剂      │
+  └──────────┴──────┴──────────┴─────────────────────────────────────────────┘
+
+  三、一个必须跟你厘清的边界：错词 vs 偏差
+
+  这是 protocol 模式特有的麻烦，free 模式没有：
+
+  - 错词询问：ASR 不确定把"50ml"听成了什么，问用户"你刚才说的是不是 50ml？"
+  - 偏差提示：用户清清楚楚说了"80ml"，但方案规定是"50ml"，提示"你偏离了方案"。
+
+  问题在于：在 protocol 下，这两个会重叠。如果 ASR
+  把方案已知值"50ml"听成"80ml"，那系统该问"是不是听错了"（错词），还是提示"你偏
+  离了"（偏差）？这在代码里目前是两条独立路径（needs_confirmation vs
+  detect_protocol_deviations），还没人对它们做过合并判断。
+
+  我建议：本轮先不解决这个合并，只把它记成"protocol 
+  待厘清项"。因为本轮的目标是把方案实验从 REAL_FAIL
+  修到能跑，先把"确定性评价接回 + 状态隔离 +
+  步骤卡上屏"这三件做通，错词/偏差的合并判断是下一层的事。
+
+  ---
+  四、所以方案实验最终的能力边界（我提议的版本）
+
+  保留（账本操作，模式无关）：
+    查看待确认 / 暂缓 / 回答 / 确认否定 / 结束记录
+
+  调整（来源换掉）：
+    追问 —— LLM 语义 → 确定性对照 must_record
+    错词询问 —— 保留，但和偏差的合并判断留到下一轮
+
+  新增（protocol 独有）：
+    偏差提示 / 步骤推进 / 安全提示
+
+  移除（protocol 不适用）：
+    无 —— free 的"自由提取"在 protocol 下收敛成"对照方案提取"，不产生新问题
+
+  一句话概括：protocol 不砍掉 free 的会话管理能力，只把"理解/追问"从 LLM 
+  猜改成规则算，并补上方案特有的偏差/步骤/安全。
+
+  这个边界你认不认？认的话，本轮就按"三个根因 +
+  这个能力边界"来定稿；错词/偏差的合并判断单独记一个待办，不塞进本轮。
+
+✻ Cooked for 1m 4s
+
+❯ 那方案实验下的追问是怎么拼出来的                                              
+
+● 这个问题我读过一半（_build_follow_up_question 在
+  protocol_segment_evaluation.py:64-75），但"缺哪些字段"是从
+  compute_missing_fields
+  算的、追问文案模板存在哪，我还没读全。我把这几个源头读掉再讲。
+
+  Read 3 files (ctrl+o to expand)
+
+● 追问的拼接逻辑全齐了。最后看一眼真实方案文件里 must_record 和 field_prompts
+  长什么样，好给你一个具体例子。
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+● 追问不是 LLM 写的，是三步纯规则拼出来的。用真实方案文件里的第 1
+  步"称量磷酸盐"给你走一遍。
+
+  先看方案步骤里埋了什么（undergraduate_basic_protocols.json 第 1 步）
+
+  "protocol_values": {              // 方案写死的已知值 —— 永不追问
+    "action": "称量", "object": "磷酸二氢盐和磷酸氢二盐",
+    "amount_unit": "g", "amount_value": "3.58"
+  },
+  "must_record": ["amount_value"],  // 现场必测字段 —— 缺失才追问
+  "field_prompts": {                // 每个必测字段的追问话术
+    "amount_value": "实际称了多少克磷酸盐？"
+  }
+
+  三个字段各司其职：protocol_values 是"方案早就定死的"，must_record
+  是"只有你现场做才知道的"，field_prompts 是"缺了该问啥"。
+
+  第 1 步：算缺哪些字段 —— compute_missing_fields
+
+  protocol_missing_fields.py:23-25
+  return tuple(
+      field_name for field_name in step.must_record if field_name not in
+  provided_fields
+  )
+
+  逻辑就一句：遍历 
+  must_record，看用户口述提取出的实体里有没有这个字段；有就不缺，没有就缺。
+
+  - 你说"我称了磷酸盐"（没提重量）→ 实体里 amount_value 是空的 → 缺
+  ["amount_value"]
+  - 你说"我称了 3.6 克" → 实体里 amount_value = "3.6" → 不缺 → 不追问
+
+  关键：它只对照 must_record，根本不看 protocol_values。所以方案已知值（比如
+  object=磷酸二氢盐）永远不会被当成"缺失"来追问——这就是交接文档里"方案已知值不当
+  作缺失项"的代码落点，protocol.py:120-121 注释写得明明白白。
+
+  第 2 步：给每个缺字段找话术 —— _build_follow_up_question
+
+  protocol_segment_evaluation.py:66-69
+  prompts = [
+      step.field_prompts.get(field_name,
+  _NO_PROMPT_FALLBACK.format(field_name=field_name))
+      for field_name in missing_fields
+  ]
+
+  对每个缺的字段，先去 field_prompts 里找方案作者写好的问题；没写就用兜底模板：
+
+  protocol_segment_evaluation.py:16
+  _NO_PROMPT_FALLBACK = "请补充现场记录：{field_name}。"
+
+  第 3 步：拼接 —— 还是同一个函数
+
+  protocol_segment_evaluation.py:73-75
+  if len(prompts) == 1:
+      return prompts[0]
+  return " ".join(prompts)
+
+  - 缺 1 个字段 → 直接返回那句话
+  - 缺多个字段 → 用空格把几句拼成一句
+
+  走一遍真实例子
+
+  你说 "我称了磷酸盐"（没提重量）：
+
+  1. must_record = ["amount_value"]，你实体里没有 → 缺 ["amount_value"]
+  2. field_prompts["amount_value"] = "实际称了多少克磷酸盐？" → 取到定制话术
+  3. 只缺 1 个 → 追问 = "实际称了多少克磷酸盐？"
+
+  对比方案第 5 步"混匀标记"，must_record 是 ["observation", 
+  ...]。如果你两个必测字段都没说，prompts 就有两句，最后用空格拼成一句多问。
+
+  ---
+  三个值得记住的设计点
+
+  1. 已知值永不追问：field_prompts 有硬约束（protocol.py:66-70），它的 key
+  必须同时出现在 must_record 里，protocol_values
+  字段不允许配追问话术。这是从数据合同层面就堵死了"拿方案已知值去烦用户"。
+  2. 话术是方案作者写的，不是模型生成的：追问语气、内容完全由 field_prompts
+  决定，所以"语音受控"是硬保证，不靠 prompt 求 LLM。
+  3. 一个体验瑕疵（顺带提醒，不是本轮要修）：如果方案作者忘了给某个 must_record
+  字段写 field_prompts，兜底模板会用英文字段名拼成"请补充现场记录：amount_value
+  。"——用户会看到英文。这属于方案数据质量问题，不在本轮三个根因里，但值得记一笔
+  。
+
+  到这里，追问的完整拼法你应该清楚了。要我把这套确定性评价（compute_missing_fiel
+  ds / detect_protocol_deviations / _build_follow_up_question）怎么接进 
+  ExperimentProcessor.prepare() 
+  的具体改法画出来吗？还是先回到那两个没定的决策点？
+
+✻ Worked for 58s
+
+❯ 全局单例先不动（但我还没有看出来会有什么问题），protocol下llm追问先覆盖住但不 
+  要影响free模式，保留（账本操作，模式无关）：                                  
+    查看待确认 / 暂缓 / 回答 / 确认否定 / 结束记录                              
+                                                                                
+  调整（来源换掉）：                                                            
+    追问 —— LLM 语义 → 确定性对照 must_record                                   
+    错词询问 —— 保留，但和偏差的合并判断留到下一轮                              
+                                                                                
+  新增（protocol 独有）：                                                       
+    偏差提示 / 步骤推进 / 安全提示                                              
+                                                                                
+  移除（protocol 不适用）：                                                     
+    无 —— free 的"自由提取"在 protocol 下收敛成"对照方案提取"，不产生新问题     
+                                                                                
+  一句话概括：protocol 不砍掉 free 的会话管理能力，只把"理解/追问"从 LLM        
+  猜改成规则算，并补上方案特有的偏差/步骤/安全。                                
+  应该是可以的                                                                  
+
+● 好，决策收齐了。但你说"还没看出来全局单例会有什么问题"——这个我得先补上，否则"
+  先不动"这个决定你是蒙着做的。讲清楚之后你再判断这个取舍成不成立。
+
+  一、全局单例到底会有什么问题
+
+  问题出在 web/domain.py 这几行——_session 是模块级变量（整个进程只有一份）：
+
+  domain.py:29-30
+  _session: ProtocolSessionState | None = None   # 进程全局，不是"每个会话一份"
+
+  domain.py:49-55
+  def session():
+      global _session
+      if _session is None:
+          _session = ProtocolSessionState.start(select_protocol(protocols(),
+  None))  # 默认自由模式
+      return _session
+
+  它存的是"选了哪个方案 + 当前在第几步"。因为只有一份，所以有三个具体后果：
+
+  1. "当前第几步"是所有会话共享的。
+  假设浏览器开两个标签页，两个对话同时做方案实验。A 这边 move('next') 推进到第 3
+   步，B 那边也跟着"变到第 3 步"——因为 session() 返回的是同一个 _session
+  对象。谁推进一下，全进程都跟着走。
+
+  2. 重启后步骤游标清零。 _session 是内存变量，进程一重启就变回 None，下次
+  session() 惰性初始化成"自由模式、无方案"。也就是说，重启后哪怕 SQLite 里
+  lab_records 还写着"你在做方案 X 第 3 步"，全局 _session
+  已经忘了，得靠前端重新调 /protocols/session/start 选一次方案才恢复。
+
+  3. 会和 SQLite 状态不同步。 本轮修复 1 要把 protocol_id 存进
+  SQLite，但"当前第几步"这个游标还在全局内存里。于是可能出现"SQLite 说你在做方案
+   X，全局 _session 却说你在自由模式"——尤其是重启后。
+
+  为什么本轮可以先不动： 这三个问题都需要"多会话"或"重启后自动恢复进度"才暴露。
+  我们本轮的目标是单用户、单浏览器、单会话下把方案实验从 REAL_FAIL
+  修到能跑通验收，这个场景里只有一个会话在操作，游标不会串；重启后用户手动重选方
+  案即可，不指望自动恢复步骤。
+
+  未来要还的债： 真要做多用户，或"重启后自动回到上次的实验步骤"，就得把
+  ProtocolSessionState（方案 + 第几步）也像 ReplyCoordinator/SessionContext
+  那样按会话存进 SQLite，把全局单例拆成
+  per-conversation。这是一块独立的中等改动，我们记进文档、本轮不碰。
+
+  所以"先不动"成立的前提是：你接受"步骤游标是全局的、重启不自动恢复"这个现状。单
+  会话验收不受影响。
+
+  ---
+  二、方案定稿（我复述一遍，确认没跑偏）
+
+  - 能力边界：保留账本操作（查看/暂缓/回答/确认/结束）；追问来源换掉（protocol
+  确定性、free 保持 LLM
+  语义不变）；错词询问保留、合并判断留到下轮；新增偏差/步骤/安全；无移除。
+  - 全局单例：本轮不动，记入已知限制。
+  - protocol 覆盖 LLM 追问：只覆盖 protocol，free 一行不改。
+
+  三、实施计划（四块）
+
+  1. 状态隔离：db.py 给 experiment_session_state 加 protocol_id（默认 ''
+  哨兵），主键改 (conversation_id, lab_session_id, protocol_id)；turn_store.py
+  的 load/commit 加这个维度；ExperimentProcessor 里 free 填 ''、protocol 填
+  step_view 的 protocol.id。
+  2. 方案 Block 上屏：protocol 下从 step_view/safety_for 构造
+  protocol_card/step_card/safety_alert，写进最终 Turn。
+  3. 确定性评价接回：protocol 下 domain.evaluate(entities_dict) 覆盖
+  lab_record["evaluation"]（deviations 不再 []）和追问文本；free 分支原样不动。
+  4. 测试 + 文档 + 真实验收：专项 +
+  全量测试，更新三份文档，最后真实浏览器验收方案实验。
+
+  ---
+  一个确认点：全局单例那三个后果你现在清楚了，"先不动 + 
+  记入文档"这个决定成立吗？ 成立的话，我就按上面四块开始动手（先从改动最小、最独
+  立的"状态隔离"入手，每做完一块停一下给你看）。
+
+✻ Baked for 1m 11s
+
+❯ 但是问题的生命周期是一个会话？                                                
+
+● 这个问题问到根子上了——我之前"加 protocol_id 维度"的方案，其实偷偷藏了一个没跟
+  你对齐的假设。先把"会话"这个词拆开，你就能看出问题在哪。
+
+  一、三个"会话"不是一回事
+
+  代码里其实有三个不同粒度的"会话"，生命周期完全不同：
+
+  ┌────────────────────┬──────────────────────┬────────────┬───────────────┐
+  │        名字        │       前端存哪       │ 什么时候变 │   代码位置    │
+  ├────────────────────┼──────────────────────┼────────────┼───────────────┤
+  │ conversation（对话 │ lab-agent-conversati │ 换对话才变 │ turn_client.j │
+  │ ）                 │ on-id                │            │ s:3           │
+  ├────────────────────┼──────────────────────┼────────────┼───────────────┤
+  │ lab_session（实验  │ lab-agent-lab-sessio │ 结束实验才 │ turn_client.j │
+  │ 会话）             │ n-id                 │ 换         │ s:4           │
+  ├────────────────────┼──────────────────────┼────────────┼───────────────┤
+  │ protocol session（ │ 无，全局内存         │ 选方案/切  │ domain.py:29- │
+  │ 方案会话）         │ _session             │ 步骤       │ 30            │
+  └────────────────────┴──────────────────────┴────────────┴───────────────┘
+
+  我之前说"全局单例的问题"用的是conversation
+  这个粒度；而待确认问题现在绑的是lab_session
+  这个粒度。这是两码事，我确实没讲清。
+
+  二、现状：待确认问题的生命周期 = 一个 lab_session
+
+  ReplyCoordinator（待确认问题账本）现在存在 experiment_session_state 表，主键
+  (conversation_id, lab_session_id)（db.py:136）。所以一条问题的生命边界是：
+
+  - 结束实验 → 前端 beginNextLabSession() 换新的
+  lab_session_id（turn_client.js:34-46）→ 旧账本不再被读，等于"翻篇"
+  - free ↔ protocol 切换 → lab_session_id 不变（turn_client.js:54 只看是不是
+  experiment，不看 free/protocol）→ 账本原样保留 → 这就是根因 1
+
+  三、但你这一问，戳破了我的隐藏假设
+
+  我说"加 protocol_id 维度，free 填空串、protocol 填真实
+  id"，这等于默认了：待确认问题的生命周期 = 一个 lab_session + 一个模式/方案。
+
+  可问题是——待确认问题不是铁板一块，它至少有两类，生命周期可能根本不该一样：
+
+  1. 缺失字段追问（missing_fields）：free 下"LLM 觉得你缺了啥"，protocol
+  下"这一步 must_record 你缺了啥"。这类是模式相关的——free 的"温度是多少"和
+  protocol 的"称了多少克"语义不同，混在一起就是污染。
+  2. 错词确认（needs_confirmation，ASR 听没听对）："你刚才说的是不是
+  50ml？"这类是模式无关的——不管 free 还是 protocol，ASR 都可能听错。
+
+  我"整个账本按 protocol_id 隔离"的方案，会把第 2 类（错词确认）也一起隔离掉。这
+  对不对，取决于你怎么看：切模式时，之前没处理完的"ASR 听错确认"该不该跟着作废？
+
+  四、所以真正要你拍板的是这个语义
+
+  待确认问题到底该活多久？三个候选：
+
+  - 候选 A（我之前的方案）：问题绑 (lab_session + protocol_id)，free
+  一个账本、每个方案一个账本，互不干扰。切模式 =
+  换账本，旧问题还躺在库里（切回来还在）。
+  - 候选 B（更简单）：问题就绑 lab_session，free↔protocol
+  切换时主动清空账本（切模式 = 旧问题作废）。不用加 protocol_id
+  维度，改动更小，但来回切换会丢信息。
+  - 候选 C（分层，最精细）：缺失追问按模式隔离，错词确认跨模式保留。语义最准，但
+  要拆账本、改动最大。
+
+  我上一轮直接跳到了候选 A，没把 B 和 C 摆给你——这是我的疏漏。
+
+  我的倾向：本轮用候选 A，把"错词确认 vs
+  缺失追问"的分层问题，和之前说的"错词/偏差合并判断"一起，留到下一轮统一处理（那
+  轮本来就要碰错词确认的语义）。这样本轮不扩大范围，也不会把候选 C
+  的复杂度提前引进来。
+
+  你更认哪个？ 这个定了，"加 protocol_id
+  维度"到底对不对、要不要改成"切换清空"，才真正落得下来。
+
+✻ Cogitated for 1m 48s
+
+❯ 那我能不能在口述的过程中看到方案实验当下的步骤该做什么，如果不行，怎么让我能  
+  看到                                                                          
+
+● 这个问题正好落在根因 2 上，但我要先确认一件事：步骤卡现在是"口述中能看到、提交
+  后消失"，还是"口述中也看不到"。我读前端渲染和调用时机确认。
+
+  Read 3 files (ctrl+o to expand)
+
+● 我发现了比预想更严重的情况——先确认前端有没有独立的"步骤面板"，再回答你。
+
+  Searched for 2 patterns, read 2 files (ctrl+o to expand)
+● 关键发现来了：前端其实有两条独立的"看步骤"路径，状态完全不同。我再确认最后一块
+  ——常驻步骤面板的 DOM 现在到底挂没挂上。
+
+  Searched for 1 pattern, read 2 files (ctrl+o to expand)
+
+● 查清楚了，答案比预想的重要——你现在口述时看不到步骤，而且不是一处问题，是两条显
+  示路径都断了。 其中一条是全新的发现，之前的根因 2 只覆盖了一半。
+
+  一、前端其实有两条"看步骤"的路径，都不通
+
+  路径 1：常驻步骤面板 —— 本该是"口述中随时看到"的正解，但它断链了
+
+  step_cards.js 本来的设计是一条独立横条（#steps-rail）：把方案的每一步做成可左
+  右滑动的卡片，当前步高亮，点卡片跳转，而且每 4 秒自动刷新一次：
+
+  step_cards.js:83
+  setInterval(load, 4000);   // 每 4 秒自动拉 /protocols/session/steps 刷新
+
+  这才是"你口述时，屏幕上一眼看到当前步骤该做什么"该有的东西——它不依赖你提交，是
+  持续刷新的。
+
+  但它现在失效了。 看这两行：
+
+  step_cards.js:86-88
+  // 步骤时间线已并入中间工作画布顶部，不再单独渲染。
+  void init;
+
+  void init; 这行没有调用 init()（只是求值后丢弃），所以 init()
+  从来没跑过，#steps-rail 这个 DOM 压根没被创建。而 render() 里第一句就
+  el('steps-rail') 拿到 null，接着 rail.classList 直接抛错——被 load() 末尾的
+  .catch(function(){}) 静默吞掉。
+
+  我核对过：#steps-rail 全仓库只在 step_cards.js 里创建，而 shell.js
+  的聊天主视图（#sh-chat）和管理画布（#sh-center）里都没有它。注释说"已并入顶部"
+  ，实际是并入到一半断在那里了。所以每次 labStepsReload()
+  被调用（views.js:65、streaming_chat_v2.js:279、voice_asr.js:195
+  都在调），都静默失败。
+
+  路径 2：对话流内嵌的 step_card —— 语音口述根本不出现
+
+  - 语音新路径（voice_asr.js 的 turnClient 分支）在口述前/口述中不调
+  publishProtocolContextBlocks，对话流里没有临时步骤卡。
+  - 提交后服务器最终 Turn 不带 step_card（这就是根因 2），acceptCommittedTurn
+  替换时也没有。
+
+  ---
+  二、所以"怎么让我能看到"——两条路径要分开补，它们是互补的
+
+  ┌──────────────────┬────────────────────┬─────────┬──────────────────────┐
+  │       诉求       │      对应路径      │  现状   │        怎么修        │
+  ├──────────────────┼────────────────────┼─────────┼──────────────────────┤
+  │ 口述中随时看到当 │ 常驻面板（step_car │ 断链失  │ 恢复 init() /        │
+  │ 前步骤           │ ds.js）            │ 效      │ 把横条真正接进聊天主 │
+  │                  │                    │         │ 视图顶部             │
+  ├──────────────────┼────────────────────┼─────────┼──────────────────────┤
+  │ 提交后这次 Turn  │ 内嵌               │         │ 让                   │
+  │ 里看到"这一步 +  │ step_card（根因    │ 服务器  │ ExperimentProcessor  │
+  │ 记录结果"        │ 2）                │ 不产    │ 把 step_card         │
+  │                  │                    │         │ 写进最终 Turn        │
+  └──────────────────┴────────────────────┴─────────┴──────────────────────┘
+
+  关键区分，我之前没说清："口述中看到"依赖的是常驻面板，不是根因 2 
+  的内嵌卡。根因 2 只解决"提交后对话流里有步骤卡"，但口述中你还没提交、没有
+  turn，内嵌卡帮不上忙。
+
+  ---
+  三、我要向你认一个错，并更新方案
+
+  我之前把"用户看不到方案步骤"整个归给了根因
+  2，漏了常驻面板断链这个独立根因。真实情况是：即使把根因 2 修好（服务器带
+  step_card），你口述的过程中还是看不到步骤，因为常驻面板那个横条根本没接上。
+
+  所以方案要加一块，变成五块：
+
+  1. 状态隔离（加 protocol_id 维度）
+  2. 常驻步骤面板恢复（把 step_cards.js
+  的横条重新接进聊天主视图顶部）——新增，解决"口述中看到"
+  3. 方案 Block 上屏（服务器最终 Turn 带
+  protocol_card/step_card/safety_alert）——原根因 2，解决"提交后看到"
+  4. 确定性评价接回（protocol 覆盖 LLM 追问，free 不动）
+  5. 测试 + 文档 + 真实验收
+
+  ---
+  一个确认点："恢复常驻步骤面板"这块（第 2 块）要不要纳入本轮？
+  我的建议是要——因为不接它，"口述中看不到步骤"这个你真正关心的问题就解决不了，第
+   3
+  块（服务器带卡）只解决提交后的半截。但如果你想先把数据链路（1、3、4）做通、UI
+  的常驻面板单独下一轮，也成立。你定。
+
+✻ Churned for 2m 44s
+
+❯ 我突然感觉咱们对方案和自由的统一是不是有点过度了？方案实验下难道不应该单独一  
+  个lab_session吗？但是我还想转回自由实验再回到原来的lab_session                
+
+● 你这个直觉是对的，而且戳中了我方案里一个绕远的地方——我之前其实是在"同一个
+  lab_session 内部再分一层"，而更自然的做法就是你说的：free 和 protocol 各是一个
+   lab_session。
+
+  一、你点破的本质：lab_session 的粒度错了
+
+  现在 lab_session_id 是按"是不是 
+  experiment"这个大粒度分的（turn_client.js:54）：
+
+  lab_session_id: experiment ? localLabSessionId() : null
+
+  experiment 只看 interaction_mode === 'experiment'，所以 free 和 protocol
+  被硬塞进同一个 lab_session。这就是"过度统一"——统一 Turn
+  链（输入统一、输出统一）是对的，但会话状态不该统一到"experiment"这么粗。
+
+  正确的粒度是：lab_session 对齐"业务模式"（free 一个、每个 protocol
+  一个）。这跟你之前的直觉、也跟交接文档里"输入方式 / 业务模式 /
+  输出方式三个维度独立"是一脉相承的。
+
+  二、你的方案具体化：前端按模式维护多个 lab_session，不动 SQLite
+
+  不用改 experiment_session_state 表结构。改成前端维护一张"模式 →
+  lab_session"的映射：
+
+  localStorage["lab-agent-sessions"] = {
+    "free":            "lab-free-xxx",
+    "protocol:A方案":   "lab-proto-A-xxx",
+    "protocol:B方案":   "lab-proto-B-xxx"
+  }
+
+  提交 turn 时，metadata() 根据 experiment_context（和 protocol 下的当前
+  protocol_id）取对应的 lab_session_id：
+
+  - 切到 free → 用 sessions["free"]
+  - 切到方案 A → 用 sessions["protocol:A"]
+  - 切回 free → 还是原来那个 sessions["free"]（状态还在）
+  - 切回方案 A → 还是原来那个（状态还在）
+
+  因为 lab_session_id 不同，experiment_session_state 现有主键 (conversation_id, 
+  lab_session_id) 自然就隔离了，待确认状态不串味，表不用动。
+
+  这比我之前"加 protocol_id 维度 + 迁移表"简洁得多——我那是绕了远路。
+
+  三、但这个方案有三个连带后果，得一起想清楚
+
+  1. "结束实验"现在结束的是哪个？
+
+  现在 turn_client.js:86-88 在 session_ended 时 beginNextLabSession() 换一个
+  lab_session。分模式后，得改成"只换当前模式的 lab_session"——你在方案 A
+  下说"结束实验"，应该换掉 sessions["protocol:A"] 开新的，不能动
+  sessions["free"]。
+
+  2. "本次记录"视图会分开显示
+
+  lab_records 按 session_id 查。分模式后，free 的记录和 protocol 的记录落在不同
+  session_id 下，segment_id 也各自从 1 编号。所以"本次记录"页会变成"只显示当前模
+  式的记录"。这个你得确认符不符合预期——是"切到 free 就只看 free
+  的记录"（合理），还是你希望一个视图里混着看全部（那就要按 conversation
+  查，而不是按 session）。
+
+  3. 前端要拿得到 protocol_id
+
+  提交时要用 protocol:A 这个 key 定位 lab_session，前端就得知道"当前选中的方案
+  id"。现在 metadata() 只有 experiment_context（free/protocol），没有
+  protocol_id。得在前端选方案时把 protocol_id 存进 localStorage（选方案的地方在
+  views.js:60，已经能拿到 card.dataset.id）。
+
+  四、还有一件事没变：全局单例依然在
+
+  lab_session 分得再清，"选了哪个方案 +
+  当前第几步"（domain._session）还是全局单例——这个你上轮决定先不动，我不重复，只
+  提醒一句：这个方案的隔离是"状态账本"层面的，方案游标那个全局单例问题照旧。
+
+  ---
+  五、更新后的方案（修复 1 从"加列"改成"分 lab_session"）
+
+  1. 状态隔离：前端按模式维护多个 lab_session_id（free + 每个 protocol
+  各一），提交时按模式取用；turn_store / 后端不动表。
+  2. 常驻步骤面板恢复（step_cards.js 断链）
+  3. 方案 Block 上屏（服务器最终 Turn 带卡）
+  4. 确定性评价接回（protocol 覆盖 LLM 追问，free 不动）
+  5. 测试 + 文档 + 真实验收
+
+  ---
+  两个要你拍板的点，都跟"分 lab_session"直接相关：
+
+  1. "结束实验"是结束当前模式，还是结束整个对话？ 我倾向"结束当前模式"（跟分
+  lab_session 一致）。
+  2. "本次记录"视图，你希望按当前模式分开显示，还是按对话混着显示全部？
+
+  这两个定了，"分 lab_session"这个方向就能落成具体改法。你认这个方向吗？
+
+✻ Churned for 1m 32s
+
+❯ 结束当前模式；本次记录先按照session查吧。那哪种操作可以在一个conversation切换 
+  session，另外conversation结束session会不会跟着结束？                          
+
+● 这两个问题问的是 lab_session 和 conversation
+  的生命周期关系，我不猜，从代码里把"切 session"和"删对话"的操作全找出来。
+
+  Searched for 2 patterns, read 2 files (ctrl+o to expand)
+
+❯ 都有哪些操作可以切换session 
+
+● 我把"切换"相关的代码全找齐了，给你一张完整的生命周期操作图。先直接回答你追加的
+  问题。
+
+  一、都有哪些操作能"切换 lab_session"
+
+  现状里，只有 1 个操作会切换 lab_session：
+
+  操作: 结束实验
+  触发: 精确口述"结束实验记录"（END_SESSION）
+  代码: turn_client.js:86-88
+  做了什么: beginNextLabSession() 生成新的 lab_session_id 存进
+    localStorage，下次实验用新的
+
+  分 lab_session 之后，会新增 1 个：
+
+  操作: 切换模式（free ↔ protocol）
+  触发: 点"实验方案"页选方案/自由记录
+  代码: views.js:58-66 的 interactionModeState.select()
+  改成什么: 现在只改 experiment_context，不动 lab_session；分 lab_session
+    后要切到对应模式的 lab_session
+
+  所以分完 lab_session，"切换"就两个入口：结束实验（换当前模式的新会话） +
+  切换模式（切到那个模式原有的会话）。前者是"翻篇"，后者是"来回切、状态保留"。
+
+  二、conversation 结束，session 会不会跟着结束？
+
+  要分清"结束对话"的两种含义，行为完全不同：
+
+  含义 1：前端"新对话"按钮 —— 不会，数据变孤儿
+
+  streaming_chat_v2.js:192-194
+  localStorage.removeItem(conversationKey);   // 只清前端 conversation_id
+  turnStore.clear();
+
+  "新对话"按钮只删前端 conversation_id，下次提交由服务器分配新 id。它不碰 
+  lab_session 的 localStorage、不删后端任何数据。结果：
+
+  - 旧 conversation 的 lab_records、待确认状态还躺在 SQLite 里，挂着旧
+  conversation_id → 变成孤儿数据。
+  - 更坑的是：lab_session_id 的 localStorage 没被清，新对话里做实验会拿"旧
+  lab_session_id + 新 conversation_id"这个组合。后端按 (conversation_id, 
+  lab_session_id) 查，这个组合查不到旧状态（旧状态挂在旧 conversation
+  下），所以表面是"白纸"，但 lab_session 字符串是复用的。
+
+  含义 2：后端显式删除 conversation —— 会，级联删
+
+  turn.py:193-196  →  turn_store.delete_conversation_turn_data(conversation_id)
+
+  这个会级联删掉该 conversation 下的
+  turn_requests、lab_records、experiment_session_state（即所有 lab_session
+  的待确认状态）、messages。这才是"conversation 结束 → session 
+  数据跟着删"。另外还有 DELETE .../experiment-sessions/{lab_session_id}（turn.py
+  :199-206）单独删一个实验会话。
+
+  ---
+  三、这对"分 lab_session"方案意味着什么
+
+  有个必须一起处理的坑：现在"新对话"不清 lab_session，导致新对话复用旧
+  lab_session 字符串。分 lab_session 后，这个坑会放大——因为 lab_session
+  从一个值变成一张"模式 → lab_session"的映射表。
+
+  所以分 lab_session 时，"新对话"按钮要连 lab_session 映射一起清（否则新对话里
+  free/protocol 还会指向旧对话的 lab_session 字符串）。
+
+  四、完整的生命周期操作清单（分 lab_session 之后的目标态）
+
+  ┌────────────────────┬───────────────┬────────────────┬──────────────────┐
+  │        操作        │      切       │      切        │     数据去向     │
+  │                    │ conversation? │  lab_session?  │                  │
+  ├────────────────────┼───────────────┼────────────────┼──────────────────┤
+  │ 切模式（free↔proto │ 否            │ 是（切到该模式 │ 各自状态保留     │
+  │ col）              │               │ 原有 session） │                  │
+  ├────────────────────┼───────────────┼────────────────┼──────────────────┤
+  │ 结束实验           │ 否            │ 是（当前模式换 │ 旧 session 数据  │
+  │                    │               │ 新）           │ 保留（可查历史） │
+  ├────────────────────┼───────────────┼────────────────┼──────────────────┤
+  │                    │ 是（清前端    │ 应清空映射（要 │                  │
+  │ 新对话按钮         │ id，下次分配  │ 修）           │ 旧数据变孤儿     │
+  │                    │ 新）          │                │                  │
+  ├────────────────────┼───────────────┼────────────────┼──────────────────┤
+  │ 删对话（DELETE     │ 是            │ 级联删全部     │ 真删             │
+  │ API）              │               │                │                  │
+  ├────────────────────┼───────────────┼────────────────┼──────────────────┤
+  │ 删单个实验会话（DE │ 否            │ 删该           │ 真删             │
+  │ LETE API）         │               │ lab_session    │                  │
+  └────────────────────┴───────────────┴────────────────┴──────────────────┘
+
+  ---
+  一个要你确认的连带决定："新对话"按钮要不要连 lab_session 映射一起清空？
+  我建议要清——因为不清的话，新对话会复用旧 lab_session 字符串，跟"分 lab_session
+   是为了状态干净隔离"这个目标冲突。你认的话，这块就并进"分
+  lab_session"的改动里。
+
+✻ Churned for 1m 51s
+
+❯ 没讲清conversation的前后端操作                                                
+
+● 我上一轮把 conversation 和 lab_session 混着讲了，抱歉。我把 conversation
+  的前后端操作单独拆开，读代码确认后给你一张清楚的表。
+
+  Read 2 files (ctrl+o to expand)
+
+● 清楚了。conversation
+  这个东西，前后端是两个完全不同的存在，我用代码证据把它俩拆开讲。
+
+  一、conversation 是什么
+
+  - 后端：conversations 表（db.py:36-38），就三列：id（主键）+ created_at +
+  updated_at。没有状态字段、没有"结束"标志——它就是个"id + 时间戳"的空壳。
+  - 前端：localStorage 里一个字符串，key 是 lab-agent-conversation-id。
+
+  两者靠 SSE 回传同步：前端提交时带上 id（或 null），后端处理完把最终 id 塞进
+  SSE 事件返回，前端 setItem 存下来。
+
+  二、前端对 conversation 的操作
+
+  操作: 读
+  触发: 提交 turn / 加载历史
+  代码: localStorage.getItem('lab-agent-conversation-id')
+  效果: 拿到当前对话 id
+  ────────────────────────────────────────
+  操作: 写
+  触发: SSE 事件带回 id
+  代码:
+  turn_client.js:81-82（turn_accepted）、streaming_chat_v2.js:169/266/380/389
+  效果: setItem 存下后端分配的 id
+  ────────────────────────────────────────
+  操作: 删
+  触发: 点"新对话"
+  代码: streaming_chat_v2.js:192 localStorage.removeItem(...)
+  效果: 只清前端字符串，后端毫不知情
+
+  关键：前端写 id 只有一条路——后端 SSE 回传。前端自己从不生成
+  conversation_id（提交时传的是 ... || null）。
+
+  三、后端对 conversation 的操作
+
+  操作: 创建
+  函数/API: ensure_conversation(id)
+  代码: crud.py:109-113
+  效果: id 为空则 uuid.uuid4()，INSERT OR IGNORE。唯一创建入口
+  ────────────────────────────────────────
+  操作: 读历史
+  函数/API: get_messages / get_recent_messages / latest_conversation
+  代码: crud.py:132-155
+  效果: 按 id 读消息、取最近对话
+  ────────────────────────────────────────
+  操作: 删 turn 数据
+  函数/API: DELETE /conversations/{id}
+  代码: turn.py:193-196 → turn_store.delete_conversation_turn_data
+  效果: 删 turn_requests、lab_records、experiment_session_state、messages
+  ────────────────────────────────────────
+  操作: 查存在
+  函数/API: conversation_exists
+  代码: crud.py:116-123
+  效果: 只查不建
+
+  四、两个你必须知道的关键点
+
+  1. conversation 没有"结束"这个概念。 conversations 表没有 status
+  列，所以"结束对话"在系统里不存在——只有两种近似操作：前端"新对话"（清
+  localStorage，后端不知道），或后端 DELETE（删 turn
+  数据）。这就是为什么你问"conversation 结束 session
+  会不会跟着结束"这么难答——因为 conversation 压根不会"结束"。
+
+  2. 后端 DELETE 不删 conversations 行本身。
+  delete_conversation_turn_data（turn_store.py:418-441）删的是 turn_requests /
+  lab_records / experiment_session_state / messages，没删 conversations 表。所以
+   conversations 表是只增不减的（append-only）：即使你删了对话的所有 turn
+  数据，那个 conversations.id 行还留着。全仓库也没有 DELETE FROM conversations。
+
+  五、所以完整的对应关系
+
+  前端 localStorage "lab-agent-conversation-id"
+          │  提交 turn 时带上（或 null）
+          ▼
+  后端 ensure_conversation(id) ── INSERT OR IGNORE conversations(id)
+          │
+          │  SSE 事件回传 conversation_id
+          ▼
+  前端 setItem 存下 ←── 之后每次提交都用它，命中同一行
+
+  "新对话"按钮 = 前端 removeItem → 下次提交传 null → 后端 uuid 开新行 →
+  旧行的数据留在库里没人引用（孤儿）。
+
+  ---
+  这就把 conversation
+  的前后端操作讲透了。现在回到你上一轮的疑问，答案就清楚了："conversation 
+  结束"本身不是系统里的一等操作，所以"session 跟着结束"只能由"后端显式 DELETE
+  conversation"触发（级联删 session
+  数据），前端"新对话"按钮不会（数据变孤儿）。你还需要我往下补哪一块？
+
+✻ Worked for 52s
+
+❯ 那我们的conversation_id有什么用？                                             
+
+● 好问题，这正好逼我们把"它到底值不值存在"讲清楚。答案一句话：conversation_id 
+  是"一次对话"的身份标识，唯一作用是当外键边界——把同一次对话产生的所有数据串在一
+  起。 它撑起来三件具体的事。
+
+  一、它串起了哪些数据（外键）
+
+  代码里，凡是"这次对话产生的"数据，都挂 conversation_id：
+
+  ┌───────────────────────────────────────┬─────────────────────────┐
+  │                  表                   │       挂的是什么        │
+  ├───────────────────────────────────────┼─────────────────────────┤
+  │ messages（db.py:40）                  │ 聊天消息                │
+  ├───────────────────────────────────────┼─────────────────────────┤
+  │ turn_requests（db.py:91）             │ 每次 Turn 请求          │
+  ├───────────────────────────────────────┼─────────────────────────┤
+  │ lab_records                           │ 实验记录                │
+  ├───────────────────────────────────────┼─────────────────────────┤
+  │ experiment_session_state（db.py:130） │ 待确认状态 + 会话上下文 │
+  ├───────────────────────────────────────┼─────────────────────────┤
+  │ agent_tasks（db.py:50）               │ 后台任务                │
+  └───────────────────────────────────────┴─────────────────────────┘
+
+  这些表全部 FOREIGN KEY(conversation_id) REFERENCES conversations(id)。所以
+  conversation 表本身是空壳，但它是一个挂点——所有数据靠它归到"这一次对话"下。
+
+  二、它撑起来的三件事
+
+  1. 多轮对话上下文（这是最实的价值）
+
+  Chat 处理器生成回答前，要"记得之前聊了什么"：
+
+  turn_processors.py:122
+  history = list(self._history(turn.conversation_id))   # _history =
+  get_recent_messages
+
+  get_recent_messages(conversation_id, limit=20)（crud.py:132）按
+  conversation_id 捞出最近 20 条，喂给 LLM。没有 conversation_id，刷新后 LLM 
+  就忘了前面聊过啥，Chat 退化成"一问一答、互不相干"。
+
+  2. 按对话查询/恢复
+
+  - 前端刷新后，loadHistory() 调 /chat/history?conversation_id=xxx（streaming_ch
+  at_v2.js:160-163）恢复聊天记录。
+  - "本次记录"等视图按 conversation 查实验记录。
+
+  3. 按对话批量删除
+
+  delete_conversation_turn_data(conversation_id) 一次删掉这个对话的
+  turn、实验记录、待确认状态、消息——删除边界就是 conversation_id。
+
+  三、但它和 lab_session 的分工，可能才是你纠结的点
+
+  ┌────────────────┬────────────────────────────────┬───────────────────────┐
+  │                │          conversation          │      lab_session      │
+  ├────────────────┼────────────────────────────────┼───────────────────────┤
+  │ 语义           │ 一次对话（聊天上下文 +         │ 一次实验活动（记录 +  │
+  │                │ 实验的容器）                   │ 待确认状态）          │
+  ├────────────────┼────────────────────────────────┼───────────────────────┤
+  │ 一个           │ 可能有很多个                   │                       │
+  │ conversation   │ lab_session（结束实验就换）    │                       │
+  │ 里             │                                │                       │
+  ├────────────────┼────────────────────────────────┼───────────────────────┤
+  │ 一个           │ 一定属于一个 conversation      │                       │
+  │ lab_session 里 │                                │                       │
+  └────────────────┴────────────────────────────────┴───────────────────────┘
+
+  所以 conversation 是"外层容器"，lab_session
+  是"内层实验活动"。你之前问"conversation 结束 session
+  跟不跟着结束"——答案就是：lab_session 挂在 conversation 下，所以删 conversation
+   会级联删 lab_session，这正是 conversation_id 作为"外键边界"的意义。
+
+  四、诚实的判断：在单用户 demo 里，它有一半价值是"虚"的
+
+  conversation_id 有两个传统用途：隔离（多用户数据不串）和归组（对话上下文 +
+  查询 + 删除）。
+
+  在当前这个单用户、单浏览器的 demo 里：
+  - 隔离价值很弱——就一个用户，没有"A 用户的数据不能混进 B
+  用户"的问题（这也是为什么 domain._session
+  敢用全局单例，项目整体就是单用户假设）。
+  - 归组价值是实的——尤其"Chat 多轮上下文"（get_recent_messages 喂
+  LLM）和"实验数据按对话查询/删除"，这俩是它真正干活的地方。
+
+  所以结论：conversation_id 不是多余的，但它的价值集中在"对话上下文"和"数据归组/
+  删除"，而不是"多用户隔离"。
+  等你以后要把它做成多用户、或多台设备同步时，它的"隔离"这一半才真正派上用场。
+
+  ---
+  顺着这个思路，你上一个问题其实可以反过来问：既然 conversation_id 
+  的隔离价值在单用户里是虚的，那我们给 lab_session 分 free/protocol 
+  两份，是不是也该用同样标准审一遍——它到底是为了"隔离正确"，还是为了"数据不丢、
+  来回切换不串味"？ 你想往哪个方向继续挖，我陪你。
+
+✻ Brewed for 48s
+
+❯ 现在面板上似乎没有所谓的删除操作？不过暂时是不是不用补？                      
+
+● 我先确认前端到底有没有删除入口，再给判断。
+
+  Searched for 2 patterns (ctrl+o to expand)
+
+● 确认了，你的观察对。而且这里有个容易混淆的点，我先拆清楚。
+
+  一、面板上"有"的删除，和"没有"的删除
+
+  前端有删除按钮的，是另外两套数据：
+
+  ┌─────────┬────────────────────┬────────────┬────────────────────────────┐
+  │  面板   │       删什么       │   对应表   │            代码            │
+  ├─────────┼────────────────────┼────────────┼────────────────────────────┤
+  │ 历史记  │ 旧版"实验任务/历史 │ experiment │ history_panel.js:24（DELET │
+  │ 录      │ "                  │ s 表       │ E /experiments/history/{id │
+  │         │                    │            │ }）                        │
+  ├─────────┼────────────────────┼────────────┼────────────────────────────┤
+  │ 记忆    │ 长期记忆           │ memories   │ memory_panel.js:24（DELETE │
+  │         │                    │ 表         │  /memories/{id}）          │
+  └─────────┴────────────────────┴────────────┴────────────────────────────┘
+
+  注意：experiments 表是旧的实验任务模型，跟统一 Turn 链的
+  lab_records（实验记录）不是一套东西。所以"删历史记录"删不到你做实验产生的
+  lab_records。
+
+  前端没有删除入口的，正是我们这几轮讨论的那两样：
+
+  ┌────────────────────────────────────────────────────────────────┬────────┐
+  │                       后端 API（已存在）                       │ 前端入 │
+  │                                                                │   口   │
+  ├────────────────────────────────────────────────────────────────┼────────┤
+  │ DELETE /conversations/{id}（turn.py:193）                      │ ❌ 无  │
+  ├────────────────────────────────────────────────────────────────┼────────┤
+  │ DELETE /conversations/{id}/experiment-sessions/{lab_session_id │ ❌ 无  │
+  │ }（turn.py:199）                                               │        │
+  └────────────────────────────────────────────────────────────────┴────────┘
+
+  所以结论：后端删除能力已经写好，前端没接按钮。
+
+  二、暂时不用补，我的判断和理由
+
+  不用补。 四个理由：
+
+  1. 非阻塞。当前目标是修方案实验（REAL_FAIL → 跑通），删除入口不挡这个目标。
+  2. 数据不丢原则（CLAUDE.md 明文）。删除是反着来的、不可逆操作，demo
+  阶段"宁可留孤儿数据，也不让用户手滑删了实验记录"。要做就得配确认弹窗、不可恢复
+  提示、删后刷新状态——这些 UX 细节 demo 阶段不值得投。
+  3. "新对话"按钮已经是软切换。它不清数据、只切走（清前端
+  conversation_id），旧数据变孤儿但没丢。而所有查询都按"当前
+  conversation_id"查，孤儿数据不干扰当前使用。
+  4. 后端 API 已有，随时能补。真要补就是加个按钮 + confirm + 调
+  API，成本低，但没有即时需求就没必要提前做。
+
+  唯一的隐患（要记一笔，不是现在补）：孤儿数据会累积——真实验收会产生 web/data/
+  音频 + SQLite 记录。但这可以用运维手段解决（手动删 SQLite 文件 / 清
+  web/data），不需要 UI 入口。
+
+  什么时候才值得补：当"数据清理"变成真实需求——比如你反复真实验收后数据库明显变大
+  、或者以后要做多用户要清理测试数据——那时候再加一个带确认弹窗的"删除对话"按钮。
+
+  ---
+  所以这块我记进"本轮不做的边界"清单里，不塞进方案。你还有别的要确认的，还是我们
+  把"分 lab_session + 四块修复"的方案最终敲定、开始动手？
+
+✻ Cogitated for 51s
+
+❯ 要不我们把conversation_id的前后端行为统一并规范一下？就是建立新对话就也能有正 
+  确的conversation_id切换                                                       
+● 这个提议好——它正好把之前散的几个问题（新对话不清 lab_session、孤儿数据、惰性创
+  建）收敛成一个明确规范。我先把"新对话"按钮现在的完整行为读全，再给你规范草案。
+
+  Read 2 files (ctrl+o to expand)
+
+● 读全了。现状的"新对话"按钮就这几行（streaming_chat_v2.js:189-196）：
+
+  localStorage.removeItem(conversationKey);   // 只清 conversation_id
+  activeThinkRow = null; blockRows = {};
+  turnStore.clear();
+  clearChat();
+
+  它清了 conversation_id 和前端显示，但没清 
+  lab_session。这就是"切换不彻底"的根子。
+
+  一、先明确一个关键事实：两个 id 的权威来源不一样
+
+  ┌───────────┬───────────────────────────────────────┬─────────────┬──────┐
+  │           │                谁生成                 │    代码     │ 前端 │
+  │           │                                       │             │ 角色 │
+  ├───────────┼───────────────────────────────────────┼─────────────┼──────┤
+  │ conversat │ 后端 ensure_conversation（crud.py:109 │ 前端只缓存  │ 不生 │
+  │ ion_id    │ -113，uuid.uuid4()）                  │ 、只清除    │ 成   │
+  ├───────────┼───────────────────────────────────────┼─────────────┼──────┤
+  │ lab_sessi │ 前端 localLabSessionId()（turn_client │ 后端只按它  │ 拥有 │
+  │ on_id     │ .js:11-18，identity('lab')）          │ 存状态      │ 者   │
+  └───────────┴───────────────────────────────────────┴─────────────┴──────┘
+
+  这个不对称是合理的：conversation 是后端要建行的（conversations 表），所以 id
+  后端定；lab_session 是"前端拥有的实验会话概念"，后端只是挂账。规范时不用强行统
+  一，但要各自明确权威。
+
+  二、规范草案（三条）
+
+  1. conversation_id：后端权威，前端只缓存/清除/不生成
+
+  - 提交时读 localStorage，没有就传 null，后端 ensure_conversation 生成新
+  id，SSE 回传，前端 setItem 缓存。
+  - 前端唯一"生成"过 conversation_id 的地方是 voice_startup_ui.js:59 的
+  startup-pending-${Date.now()}，但那是临时占位（SSE
+  回传后就被替换），不算正式生成。规范后这条保持不变即可。
+
+  2. "新对话"按钮 = 清空本地全部会话状态
+
+  清 conversation_id       （已有）
+  清 lab_session（映射表）  （要补 ← 就是这次的缺口）
+  清 turn store + 聊天显示 （已有）
+
+  不通知后端。下次任何提交，conversation_id 为 null → 后端生成新 id；lab_session
+   为空 → 前端惰性生成新 id。一次"新对话" = 前后端干净地翻篇。
+
+  3. lab_session 跟 conversation 绑定，conversation 内按模式分
+
+  - 新对话 → lab_session 重置。
+  - 同一个 conversation 内，free / 每个 protocol 各一个
+  lab_session（这就是前面定的"分 lab_session"）。
+
+  三、我的建议：把它和"分 lab_session"合并成一块
+
+  你提的"统一 conversation_id"和之前定的"分 lab_session"，动的是同一个地方——前端
+   turn_client.js + streaming_chat_v2.js 的 localStorage
+  会话管理层。分开改会互相踩，合并成一块"前端会话状态管理规范"最顺：
+
+  块 1（原"状态隔离"改名"会话状态管理"）：
+     - conversation_id：后端权威，新对话清空本地
+     - lab_session：前端权威，按模式分（free + 每个 protocol），新对话重置
+     - "新对话"按钮补齐清 lab_session
+
+  这样方案还是五块，只是第 1 块的边界更完整了：
+
+  1. 会话状态管理（conversation_id 统一 + 分 lab_session）
+  2. 常驻步骤面板恢复（step_cards.js 断链）
+  3. 方案 Block 上屏（服务器最终 Turn 带卡）
+  4. 确定性评价接回（protocol 覆盖 LLM 追问，free 不动）
+  5. 测试 + 文档 + 真实验收
+
+  ---
+  一个确认点：这个规范三条你认不认？尤其第 2 
+  条"新对话不清空旧数据、只清本地"——也就是旧 conversation
+  的数据继续留库里变孤儿（跟之前"删除暂不补"一致），你接受吗？认了，我就把这份规
+  范写进方案定稿，开始从第 1 块动手。
+
+✻ Worked for 1m 34s
+
+❯ 为什么会成孤儿，有什么后果，要不要给他找一个依赖，或者就当作归档              
+
+● 好问题，这逼我们把"孤儿"这个词说精确——它其实不是"数据丢了"，而是"前端丢了入口"
+  。
+
+  一、为什么会成"孤儿"：前端只握一个引用，后端只增不删
+
+  - 前端：localStorage 里只有一个
+  lab-agent-conversation-id，永远指向"当前对话"。它没有"所有对话"的列表。
+  - 后端：conversations 表是 append-only（前面查过，全仓库没有 DELETE FROM 
+  conversations）。
+
+  "新对话" = 前端 removeItem 清掉这个唯一引用。于是旧 conversation
+  的数据（messages / lab_records / 待确认状态）在后端物理还在、外键还完整（不是
+  dangling，不是 NULL），但前端没有任何一条 UI 路径能再指向它。
+
+  所以准确说法是：后端数据不孤儿（有归属、可被 DELETE API 按 id 
+  找到），孤儿的是"前端的访问入口"。
+
+  二、后果：三条，一条是立刻会咬人的
+
+  1. 旧对话找不回。聊天记录、实验记录，用户"新对话"后就从界面上消失了，也没法切
+  回去看。
+  2. 数据只增不减。每次新对话留一批"界面不可见"的数据，SQLite（尤其 web/data/
+  音频 + turn 记录）越积越大。
+  3. 一个真实的边界 bug：loadHistory() 在没找到 id 时，后端会走
+  latest_conversation()（crud.py:149-155 按 updated_at 取最近）兜底：
+
+  streaming_chat_v2.js:161-163
+  const id = localStorage.getItem(conversationKey);
+  const url = id ? `/chat/history?conversation_id=${id}` : '/chat/history';   //
+   没 id 就无参 → latest_conversation
+
+  所以**"新对话 → 还没提交任何东西 → 刷新页面"，旧对话的历史又会被加载回来**。新
+  对话"切不干净"。这是"孤儿"最直接的代价。
+
+  三、三个处置选项
+
+  ┌────────────┬──────────────────────────────────┬─────────────────────────┐
+  │    选项    │               做法               │          取舍           │
+  ├────────────┼──────────────────────────────────┼─────────────────────────┤
+  │            │ 后端 conversations 加个          │ 数据整齐躺着、latest    │
+  │ A. 当归档  │ archived_at（或                  │ 隐患修掉；但用户仍找不  │
+  │ （低成本） │ status），新对话标记旧对话归档； │ 回旧对话                │
+  │            │ latest_conversation 排除归档     │                         │
+  ├────────────┼──────────────────────────────────┼─────────────────────────┤
+  │ B. 找依赖  │ 后端 GET /conversations          │ 旧对话可找回、可切换（C │
+  │ = 对话列表 │ 列所有对话 +                     │ hatGPT 式）；改动大，是 │
+  │ （根治）   │ 前端"历史对话"入口，可切回       │ 产品级功能              │
+  ├────────────┼──────────────────────────────────┼─────────────────────────┤
+  │ C.         │ 新对话直接删旧数据               │ 违反"数据不丢"，你之前  │
+  │ 级联删除   │                                  │ 也说删除暂不补          │
+  └────────────┴──────────────────────────────────┴─────────────────────────┘
+
+  四、我的建议：分清"本轮"和"未来"
+
+  关键判断：这个"孤儿/归档"问题，跟"修方案实验"是正交的——方案实验能不能跑通，不
+  取决于旧对话数据是不是孤儿。我们现在的范围已经扩了好几轮（三根因 → 分
+  lab_session → 统一 conversation_id），再往"对话列表"扩就失控了。
+
+  所以建议：
+
+  - 本轮：按选项 A 的最小版处理——只修掉 latest_conversation 那个边界 bug（新对话
+  后刷新误加载旧对话），旧数据就当"归档"躺着，不删、不膨胀式管理。这跟"分
+  lab_session + 统一 conversation_id"的改动同在一个文件，顺手就做。
+  - 未来：真要做多轮对话产品时，再做选项 B 
+  对话列表，让旧对话可找回——那才是"给孤儿找依赖"的正解，值得单独一轮。
+
+  这样既回答了"要不要找依赖/当归档"，又守住了本轮范围。
+
+  ---
+  你倾向哪个？如果同意"本轮 A 最小版 + 未来 B"，我就把这个决定记进方案，跟"会话
+  状态管理"那块并在一起，然后就可以开始动手了。
+
+✻ Crunched for 1m 12s
+
+❯ A吧，B不着急                                                                  
+
+● A 定了，方案所有决策点都收敛了。我先给你一份定稿，然后建任务清单开始动手。
+
+  方案定稿（五块）
+
+  ┌─────┬──────────────────┬────────────────────────────────────────────────┐
+  │  #  │        块        │                    关键决策                    │
+  ├─────┼──────────────────┼────────────────────────────────────────────────┤
+  │     │                  │ conversation_id 后端权威；lab_session          │
+  │ 1   │ 会话状态管理     │ 前端权威、按模式分（free +                     │
+  │     │                  │ 每方案）；新对话清空本地；latest 隐患用 A      │
+  │     │                  │ 最小版修掉                                     │
+  ├─────┼──────────────────┼────────────────────────────────────────────────┤
+  │ 2   │ 常驻步骤面板恢复 │ step_cards.js 的 void init                     │
+  │     │                  │ 断链，重接进聊天主视图                         │
+  ├─────┼──────────────────┼────────────────────────────────────────────────┤
+  │ 3   │ 方案 Block 上屏  │ protocol 下最终 Turn 带 protocol_card /        │
+  │     │                  │ step_card / safety_alert                       │
+  ├─────┼──────────────────┼────────────────────────────────────────────────┤
+  │ 4   │ 确定性评价接回   │ protocol 覆盖 LLM 追问（deviations             │
+  │     │                  │ 不再空），free 一行不动                        │
+  ├─────┼──────────────────┼────────────────────────────────────────────────┤
+  │ 5   │ 测试 + 三份文档  │ 专项 +                                         │
+  │     │ + 真实验收       │ 全量，更新清单/学习/交接，真实浏览器验收       │
+  └─────┴──────────────────┴────────────────────────────────────────────────┘
+
+  本轮明确不做：全局单例改造、错词/偏差合并判断、对话列表（B）、前端删除入口、文
+  字/语音提速。
+
+  现在建任务清单。
+
+● 任务建好了。现在开始第 1 
+  块的第一步（最小、最独立的部分）：修"新对话切不干净"——新对话按钮补齐清
+  lab_session，并用一个 fresh 标志修掉 latest_conversation 误加载旧对话的边界
+  bug。
+
+  这一步只动两个前端文件，我先改 turn_client.js（会话状态的
+  owner，把"清会话"收拢成一个函数），再改 streaming_chat_v2.js（新对话按钮和
+  loadHistory 调它）。
+
+● Update(web\frontend\turn_client.js)
+  ⎿  Added 1 line
+      2  (() => {
+      3    const CONVERSATION_KEY = 'lab-agent-conversation-id';
+      4    const LAB_SESSION_KEY = 'lab-agent-lab-session-id';
+      5 +  const FRESH_CHAT_KEY = 'lab-agent-fresh-chat';                
+      6  
+      7    function identity(prefix) {
+      8      if (window.crypto?.randomUUID) return `${prefix}-${window.cr
+         ypto.randomUUID()}`;
+
+● Update(web\frontend\turn_client.js)
+  ⎿  Added 6 lines
+      32      return localLabSessionId();
+      33    }).catch(() => localLabSessionId());
+      34  
+      35 +  function clearSession() {                                    
+      36 +    localStorage.removeItem(CONVERSATION_KEY);                 
+      37 +    localStorage.removeItem(LAB_SESSION_KEY);                  
+      38 +    localStorage.setItem(FRESH_CHAT_KEY, '1');                 
+      39 +  }                                                            
+      40 +                                                               
+      41    function beginNextLabSession(completedEvent) {
+      42      const previous = localLabSessionId();
+      43      const next = identity('lab');
+
+● Update(web\frontend\turn_client.js)
+  ⎿  Added 1 line, removed 1 line
+      134      return consume(response, options.onEvent);
+      135    }
+      136  
+      137 -  window.turnClient = {submitText, submitAudio, identity, labS
+          -essionId: localLabSessionId};                                 
+      137 +  window.turnClient = {submitText, submitAudio, identity, labS
+          +essionId: localLabSessionId, clearSession};                   
+      138  })();
+
+  Read 1 file (ctrl+o to expand)
+
+● Update(web\frontend\streaming_chat_v2.js)
+  ⎿  Added 2 lines, removed 1 line
+       4  (() => {
+       5    const $ = id => document.getElementById(id);
+       6    const form = $('form'), input = $('message'), send = $('send'
+          ), mic = $('mic'), chat = $('chat'),
+       7 -        conversationKey = 'lab-agent-conversation-id';         
+       7 +        conversationKey = 'lab-agent-conversation-id',         
+       8 +        freshChatKey = 'lab-agent-fresh-chat';                 
+       9    const avatar = state => window.dispatchAvatarState?.(state);
+      10    let activeController = null, activeReply = null, requestId = 
+          0;
+      11    let activeThinkRow = null, blockRows = {};
+
+● Update(web\frontend\streaming_chat_v2.js)
+  ⎿  Added 4 lines
+      159    }
+      160  
+      161    function loadHistory() {
+      162 +    if (localStorage.getItem(freshChatKey)) {                 
+      163 +      localStorage.removeItem(freshChatKey);                  
+      164 +      return;                                                 
+      165 +    }                                                         
+      166      const id = localStorage.getItem(conversationKey);
+      167      const url = id
+      168        ? `/chat/history?conversation_id=${encodeURIComponent(id
+           )}`
+● Update(web\frontend\streaming_chat_v2.js)
+  ⎿  Added 5 lines, removed 1 line
+      194    document.addEventListener('click', event => {
+      195      const button = event.target.closest('#sh-new-chat');
+      196      if (!button) return;
+      197 -    localStorage.removeItem(conversationKey);                 
+      197 +    if (window.turnClient?.clearSession) {                    
+      198 +      window.turnClient.clearSession();                       
+      199 +    } else {                                                  
+      200 +      localStorage.removeItem(conversationKey);               
+      201 +    }                                                         
+      202      activeThinkRow = null; blockRows = {};
+      203      turnStore.clear();
+      204      clearChat();
+
+● 第一小步改完，我用 node --check 验证两个文件的语法。
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● 发现一个我刚引入的边界问题，要先修掉：fresh
+  标志如果只在"新对话"时设、只在"刷新时"清，那用户"新对话后直接发消息（不刷新）"
+  时，标志会残留，导致之后再刷新又跳过加载。正确的时机是一旦前端拿到新的 
+  conversation_id（SSE 回传），fresh 标志就失效。
+
+● Update(web\frontend\turn_client.js)
+  ⎿  Added 1 line
+      87          const event = JSON.parse(line.slice(6));
+      88          if (event.type === 'turn_accepted' && event.conversatio
+          n_id) {
+      89            localStorage.setItem(CONVERSATION_KEY, event.conversa
+          tion_id);
+      90 +          localStorage.removeItem(FRESH_CHAT_KEY);             
+      91            browserTiming.accepted = performance.now();
+      92          } else if (event.type === 'turn_result') {
+      93            browserTiming.screen_published = performance.now();
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● 第一小步完成。停下来给你汇报。
+
+  这一小步做了什么（块 1 的一部分：新对话切干净）
+
+  改了两个文件，核心是把"清会话"收拢成一个动作，并补上 lab_session 的清空 +
+  fresh 标志修边界 bug。
+
+  turn_client.js（会话状态的 owner）
+  - 加 clearSession()：一次清 conversation_id + lab_session_id + 设 fresh-chat
+  标志，并暴露到 window.turnClient。
+  - 关键修正：turn_accepted 回传新 conversation_id 时，顺手清掉 fresh 
+  标志——因为一旦前端拿到新 id，"新对话"已经落实，标志就该失效。
+
+  streaming_chat_v2.js
+  - loadHistory() 开头：读到 fresh 标志就清掉并直接返回（不加载历史），堵住
+  latest_conversation 兜底误加载旧对话的漏洞。
+  - "新对话"按钮：改调 turnClient.clearSession()（带 fallback，turnClient
+  没加载时退回旧的 removeItem）。
+
+  效果
+
+  ┌────────────────┬──────────────────┬─────────────────────────────────────┐
+  │      操作      │       之前       │                现在                 │
+  ├────────────────┼──────────────────┼─────────────────────────────────────┤
+  │ 新对话 → 刷新  │ 误加载旧对话历史 │ 空白（fresh 标志拦截）              │
+  ├────────────────┼──────────────────┼─────────────────────────────────────┤
+  │ 新对话 →       │                  │ 正常加载新对话历史（turn_accepted   │
+  │ 直接发消息 →   │ ——               │ 已清标志）                          │
+  │ 刷新           │                  │                                     │
+  ├────────────────┼──────────────────┼─────────────────────────────────────┤
+  │ 新对话时       │ 残留复用旧字符串 │ 一并清掉                            │
+  │ lab_session    │                  │                                     │
+  └────────────────┴──────────────────┴─────────────────────────────────────┘
+
+  证据边界（老实说）
+
+  - ✅ 已验证：node --check 两个文件语法通过。
+  - ❌ 未验证：浏览器里真实走"新对话→刷新""新对话→发消息→刷新"这两条路径，我没跑
+  （需要起服务 + 浏览器）。这块留给你真实验收时验，或我现在起服务验。
+
+  下一步
+
+  块 1 还剩核心：分 lab_session——把 lab_session 从"一个值"改成"按模式分（free +
+  每个方案各一）"，涉及 interaction_mode_state.js 加 protocol_id、views.js
+  选方案时存 protocol_id、turn_client.js 的 localLabSessionId 改成按模式取。
+
+  这一步改动比刚才大，而且牵涉"protocol_id 怎么从前端选方案传到提交 turn"这个设
+  计点。我先停在这里，你确认刚才这一小步没问题（或让我起服务验一下），我再继续分
+   lab_session。
+
+✻ Churned for 4m 0s
+
+※ recap: 目标是修好方案实验的统一理解链路。刚完成"新对话切干净"（清 lab_session + 修刷新误加载旧对话），JS 语法已通过。下一步做分 lab_session（按 free/方案各存一个 lab_session），等你确认后继续。 (disable recaps in /config)
+
+❯ 按照计划继续吧，我待会再核验，不过工作要透明，解释清楚你的行为                
+
+● 好，继续。分 lab_session 是核心改动，影响面比刚才大，我先把所有相关调用点摸清
+  楚，再动手——避免改坏签名或漏掉某个入口。
+
+  Searched for 2 patterns, read 1 file (ctrl+o to expand)
+
+● 分 lab_session 前，先说清一个刚确认的关键事实，它决定了改动范围：
+
+  前端现在根本没存 protocol_id。 两个切方案的入口（views.js 选方案、composer.js
+  切协议模式）都把 protocol_id 只传给了后端
+  /protocols/session，interactionModeState 里只有 experiment_context: 
+  'protocol'，不知道具体是哪个方案。
+
+  所以"按方案分 lab_session"必须先把 protocol_id 补进前端状态。改动涉及 4
+  个文件：
+
+  ┌───────────────────────────┬──────────────────────────────────────────────┐
+  │           文件            │                    改什么                    │
+  ├───────────────────────────┼──────────────────────────────────────────────┤
+  │ interaction_mode_state.js │ current()/capture() 加 protocol_id，select() │
+  │                           │  加参数                                      │
+  ├───────────────────────────┼──────────────────────────────────────────────┤
+  │ views.js / composer.js    │ 切协议模式时把 protocol_id 传给 select       │
+  ├───────────────────────────┼──────────────────────────────────────────────┤
+  │ turn_client.js            │ lab_session 从"单个值"改成"按模式            │
+  │                           │ map"，结束实验只换当前模式                   │
+  └───────────────────────────┴──────────────────────────────────────────────┘
+
+  先改第一个：interaction_mode_state.js（协议 id 状态源）。
+
+● Update(web\frontend\interaction_mode_state.js)
+  ⎿  Added 9 lines, removed 4 lines
+       9  
+      10    function createInteractionModeState() {
+      11      var selected = 'chat';
+      12 +    var protocolId = null;                                     
+      13      var version = 1;
+      14      var listeners = [];
+      15  
+     ...
+      17        return Object.freeze({
+      18          interaction_mode: MODES[selected].interaction_mode,
+      19          experiment_context: MODES[selected].experiment_context,
+      19 -        mode_version: version                                  
+      20 +        mode_version: version,                                 
+      21 +        protocol_id: protocolId                                
+      22        });
+      23      }
+      22 -    function select(name) {                                    
+      24 +    function select(name, protocolIdValue) {                   
+      25        if (!MODES[name]) throw new Error('未知交互模式：' + name
+          );
+      24 -      if (name === selected) return current();                 
+      26 +      var nextProtocolId = name === 'protocol' ? (protocolIdVal
+         +ue || null) : null;                                            
+      27 +      if (name === selected && nextProtocolId === protocolId) r
+         +eturn current();                                               
+      28        selected = name;
+      29 +      protocolId = nextProtocolId;                             
+      30        version += 1;
+      31        var value = current();
+      32        listeners.slice().forEach(function (listener) { listener(
+          value); });
+     ...
+      39          interaction_mode: mode.interaction_mode,
+      40          experiment_context: mode.experiment_context,
+      41          mode_version: mode.mode_version,
+      38 -        input_source: inputSource                              
+      42 +        input_source: inputSource,                             
+      43 +        protocol_id: mode.protocol_id                          
+      44        });
+      45      }
+      46      function subscribe(listener) {
+
+❯ 记得先列出影响/得失再动手，对应到代码里 
+
+● 收到，我停一下——刚才已经动了 interaction_mode_state.js，现在把"分
+  lab_session"这块的影响/得失完整列出来（对应到代码），你看完再决定继续。
+
+  已动：interaction_mode_state.js（加 protocol_id）
+
+  改了三处：select(name) → select(name, protocolIdValue)，current() 和 capture()
+   返回值多一个 protocol_id 字段。
+
+  得失：
+
+  ┌─────────────────────┬─────────────────────┬─────────────────────────────┐
+  │         项          │         得          │             失              │
+  ├─────────────────────┼─────────────────────┼─────────────────────────────┤
+  │ select 签名变了     │ 前端终于能存        │ 4                           │
+  │                     │ protocol_id         │ 个调用点要连锁同步（见下）  │
+  ├─────────────────────┼─────────────────────┼─────────────────────────────┤
+  │ current/capture     │ 下游能拿到          │ 消费方要确认不拒绝多余字段  │
+  │ 多字段              │ protocol_id         │                             │
+  └─────────────────────┴─────────────────────┴─────────────────────────────┘
+
+  关键风险点——当前是"半改"状态：select 签名已经变了，但调用点还没同步。现在
+  views.js:61 的 select('protocol') 和 composer.js:174 的 select('protocol')
+  都不带第二参数，会导致 protocol 模式的 protocol_id 恒为 null → 分 lab_session
+  时 protocol 的 key 会退化成 protocol:null，方案之间还是分不开。所以这 4
+  个调用点必须跟着改，否则这块是坏的。
+
+  待动：4 个调用点连锁
+
+  ┌──────────────┬────────────────────┬──────────────────┬─────────────────┐
+  │   文件:行    │       现调用       │     必须改成     │     为什么      │
+  ├──────────────┼────────────────────┼──────────────────┼─────────────────┤
+  │              │ select(card.datase │ 加第二参数       │ 选方案时把      │
+  │ views.js:61  │ t.id ? 'protocol'  │ card.dataset.id  │ protocol_id     │
+  │              │ : 'free')          │ || null          │ 存进状态        │
+  ├──────────────┼────────────────────┼──────────────────┼─────────────────┤
+  │ composer.js: │                    │ select('protocol │ 这里已经 GET 到 │
+  │ 174          │ select('protocol') │ ', session.proto │  session.protoc │
+  │              │                    │ col.id)          │ ol.id 了，白拿  │
+  ├──────────────┼────────────────────┼──────────────────┼─────────────────┤
+  │ composer.js: │                    │                  │ free 模式       │
+  │ 153          │ select('free')     │ 不改             │ protocol_id     │
+  │              │                    │                  │ 本就该 null     │
+  ├──────────────┼────────────────────┼──────────────────┼─────────────────┤
+  │ composer.js: │ select(mode)（chat │ 不改             │ chat 模式无关   │
+  │ 163          │ ）                 │                  │                 │
+  └──────────────┴────────────────────┴──────────────────┴─────────────────┘
+
+  待动：turn_client.js（改动最大，得失最需要你拍板）
+
+  改动: lab_session 从单个 key 改成 map（free / protocol:{id} 各一个）
+  得: 按模式隔离、切换保留
+  失/代价: 旧的单个 lab_session 值作废（localStorage 里 lab-agent-lab-session-id
+
+    这个旧值不再被读，等于弃用）
+  ────────────────────────────────────────
+  改动: localLabSessionId() → localLabSessionId(modeKey)
+  得: 按 key 取/生成
+  失/代价: 内部所有调用点要改
+  ────────────────────────────────────────
+  改动: 删掉 labSessionReady（从 /record/history 迁移旧 session 的逻辑）
+  得: metadata 变简单、去掉一次多余的异步请求
+  失/代价: 放弃"从旧接口迁移 session"——但旧接口本就要废弃，迁移已无意义
+  ────────────────────────────────────────
+  改动: beginNextLabSession 改成只换当前模式的 session
+  得: 结束实验不误伤别的模式
+  失/代价: 需要 consume() 加 modeSnapshot 参数，才能知道"当前是哪个模式"
+  ────────────────────────────────────────
+  改动: metadata 用 snapshot.protocol_id 拼 key
+  得: ——
+  失/代价: 依赖 interaction_mode_state.js 已改好
+
+  我的判断（得失总评）
+
+  - 得：真正解决根因 1（free/protocol 串味），且不用动 SQLite 表。
+  - 失：前端状态管理改动面从 1 个文件扩到 4 个文件；旧 lab_session 值弃用（但
+  demo 阶段无真实数据损失）；labSessionReady 迁移逻辑删除（旧接口本就要废弃）。
+
+  有一个需要你确认的取舍：我上面假设"按 protocol_id 分"（方案 A → 方案 B
+  也隔离）。但用户你的原话是"方案实验 vs 自由实验"隔离，没明说"方案 A vs 方案 
+  B"也要隔离。如果只按 free/protocol 分（不按 protocol_id），那
+  interaction_mode_state.js 刚加的 protocol_id 就白加了，改动能砍掉一半。
+
+  你确认两点，我再继续：
+  1. 隔离粒度：free/protocol 就够，还是要"每个方案（protocol_id）各一个"？
+  2. 上面这套得失（尤其删 labSessionReady、旧 lab_session 弃用）你认不认？
+
+✻ Cooked for 3m 35s
+
+❯ 每个方案（protocol_id）各一个,另一个没看懂                                    
+
+● 好，粒度定了：每个方案（protocol_id）各一个 lab_session——那我刚加的
+  protocol_id 方向就对，4 个调用点连锁改动是必要的。
+
+  第二个问题你卡住的"删 labSessionReady、旧 lab_session
+  弃用"，我用大白话拆开讲。
+
+  一、labSessionReady 是什么、为什么删
+
+  它是 turn_client.js 里一段"搬家后回旧家拿东西"的过渡代码（第 20-33 行）：
+
+  const initialLabSessionId = localStorage.getItem(LAB_SESSION_KEY);
+  const labSessionReady = fetch('/record/history').then(...).then(data => {
+      if (!initialLabSessionId && data.session_id) {
+          localStorage.setItem(LAB_SESSION_KEY, data.session_id);  // 从旧接口把
+   session 拿回来存本地
+      }
+      return localLabSessionId();
+  })
+
+  它现在干的活：页面第一次打开时，如果本地还没有 lab_session，就调旧接口
+  /record/history，把后端之前管的"全局实验会话 id"拿回来存到 localStorage。
+
+  为什么分 lab_session 后要删它：旧接口 /record/history 只能给你一个 session
+  id（一个字符串）。但我们现在要"free 一个、每个方案一个"的多个 session。这个旧
+  id 该归到 free 还是归到方案 A？分不清。而且旧 /record 系列接口本来就是要废弃的
+  。所以"回旧家拿东西"这个动作失去意义，删掉，直接本地生成新的。
+
+  二、"旧 lab_session 弃用"是什么后果
+
+  现在 lab_session 存在 localStorage 一个固定格子里：
+
+  lab-agent-lab-session-id  =  "lab-abc123"   （一个字符串）
+
+  分 lab_session 后，改成存在一个柜子里，柜子有好几个格子：
+
+  lab-agent-lab-sessions  =  {
+    "free":        "lab-free-xxx",
+    "protocol:A方案": "lab-proto-A-xxx",
+    "protocol:B方案": "lab-proto-B-xxx"
+  }
+
+  所以旧的固定格子 lab-agent-lab-session-id 就不再被读了（弃用）。
+
+  后果：如果你之前那个固定格子里已经有值（lab-abc123），改完后前端不再读它，改用
+  柜子里的新值（本地重新生成）。而 lab-abc123 对应的待确认问题还在后端 SQLite
+  里（挂在 (conversation_id, lab-abc123) 下），前端用新 id 查不到——变成"孤儿"。
+
+  但这个后果 demo 阶段无所谓：① 数据量小；②
+  反正是要重新做实验的，旧的待确认问题不接回来也不影响。所以"弃用旧格子"不是丢数
+  据，只是"旧的引用不再用、旧数据躺在那不碍事"。
+
+  ---
+  一句话总结这两个点：删 labSessionReady = 不再从旧接口迁数据，本地直接生成；旧 
+  lab_session 弃用 = 旧格子不再读，旧的后端数据变孤儿躺着，demo 阶段无所谓。
+
+  这样讲清楚了吗？如果清楚，我就按"每个方案一个 lab_session"继续，把剩下 3
+  个文件（views.js、composer.js、turn_client.js）改完，每个改动前我会先报一句改
+  哪、得失是什么。
+
+✻ Sautéed for 38s
+
+❯ 可以的，继续吧                                                                
+
+● 继续。先改两个简单的调用点，把 protocol_id 传进 select。
+
+  views.js：选方案时把 card.dataset.id（协议 id）传给 select，这样 protocol
+  模式的 protocol_id 就不再是 null。
+
+● Update(web\frontend\views.js)
+  ⎿  Added 1 line, removed 1 line
+      58        Array.prototype.forEach.call(host.querySelectorAll('.p-ca
+          rd'), function (card) {
+      59          card.onclick = function () {
+      60            api('/protocols/session', 'POST', { protocol_id: card
+          .dataset.id || null }).then(function () {
+      61 -            window.interactionModeState.select(card.dataset.id 
+         -? 'protocol' : 'free');                                        
+      61 +            window.interactionModeState.select(card.dataset.id 
+         +? 'protocol' : 'free', card.dataset.id || null);               
+      62              refreshStatus();
+      63              window.shellShow('chat');
+      64              if (window.composerRefresh) window.composerRefresh(
+          );
+
+● composer.js：切协议模式时，GET /protocols/session 已经返回了
+  session.protocol.id，把它传给 select（白拿的，之前没用）。
+
+● Update(web\frontend\composer.js)  ⎿  Added 1 line, removed 1 line
+      171          if (window.shellShow) window.shellShow('protocols');
+      172          return false;
+      173        }
+      174 -      window.interactionModeState.select('protocol');         
+      174 +      window.interactionModeState.select('protocol', session.p
+          +rotocol.id);                                                  
+      175        return true;
+      176      }).catch(function () {
+      177        if (window.shellShow) window.shellShow('protocols');
+
+● 两个调用点改完。现在改 turn_client.js 的核心——lab_session 从单个值改成按模式的
+   map。这是改动最大的部分，我先读当前完整内容（前面已改过几处，要确认精确状态）
+  。
+
+  Read 1 file (ctrl+o to expand)
+
+● 现在改 turn_client.js 核心。我把 lab_session 从"单个值"改成"按模式 map"，删掉
+  labSessionReady
+  迁移逻辑，结束实验改成"只换当前模式"。改动点都已定位，逐个替换。
+
+● Update(web\frontend\turn_client.js)
+  ⎿  Added 24 lines, removed 19 lines
+      1  // Unified Web Turn transport. Input adapters provide text or WA
+         V; business mode stays orthogonal.
+      2  (() => {
+      3    const CONVERSATION_KEY = 'lab-agent-conversation-id';
+      4 -  const LAB_SESSION_KEY = 'lab-agent-lab-session-id';           
+      4 +  const LAB_SESSIONS_KEY = 'lab-agent-lab-sessions';            
+      5    const FRESH_CHAT_KEY = 'lab-agent-fresh-chat';
+      6  
+      7    function identity(prefix) {
+     ...
+       9      return `${prefix}-${Date.now()}-${Math.random().toString(16
+          ).slice(2)}`;
+      10    }
+      11  
+      12 -  function localLabSessionId() {                               
+      13 -    let value = localStorage.getItem(LAB_SESSION_KEY);         
+      14 -    if (!value) {                                              
+      15 -      value = identity('lab');                                 
+      16 -      localStorage.setItem(LAB_SESSION_KEY, value);            
+      12 +  function readSessions() {                                    
+      13 +    try {                                                      
+      14 +      const raw = localStorage.getItem(LAB_SESSIONS_KEY);      
+      15 +      return raw ? JSON.parse(raw) : {};                       
+      16 +    } catch (_) {                                              
+      17 +      return {};                                               
+      18      }
+      18 -    return value;                                              
+      19    }
+      20  
+      21 -  const initialLabSessionId = localStorage.getItem(LAB_SESSION_
+         -KEY);                                                          
+      22 -  const labSessionReady = fetch('/record/history').then(respons
+         -e => {                                                         
+      23 -    if (!response.ok) throw new Error('无法读取当前实验会话'); 
+      24 -    return response.json();                                    
+      25 -  }).then(data => {                                            
+      26 -    // Unified Turn sessions are browser-owned after the first 
+         -migration load.                                                
+      27 -    // Do not overwrite a newer locally persisted session with 
+         -the legacy                                                     
+      28 -    // /record/history global session when the page is refreshe
+         -d.                                                             
+      29 -    if (!initialLabSessionId && data.session_id) {             
+      30 -      localStorage.setItem(LAB_SESSION_KEY, data.session_id);  
+      21 +  function writeSessions(map) {                                
+      22 +    localStorage.setItem(LAB_SESSIONS_KEY, JSON.stringify(map))
+         +;                                                              
+      23 +  }                                                            
+      24 +                                                               
+      25 +  function labSessionKey(snapshot) {                           
+      26 +    return snapshot.experiment_context === 'protocol'          
+      27 +      ? `protocol:${snapshot.protocol_id || ''}`               
+      28 +      : snapshot.experiment_context;                           
+      29 +  }                                                            
+      30 +                                                               
+      31 +  function localLabSessionId(modeKey) {                        
+      32 +    const sessions = readSessions();                           
+      33 +    if (!sessions[modeKey]) {                                  
+      34 +      sessions[modeKey] = identity('lab');                     
+      35 +      writeSessions(sessions);                                 
+      36      }
+      32 -    return localLabSessionId();                                
+      33 -  }).catch(() => localLabSessionId());                         
+      37 +    return sessions[modeKey];                                  
+      38 +  }                                                            
+      39  
+      40    function clearSession() {
+      41      localStorage.removeItem(CONVERSATION_KEY);
+
+● Update(web\frontend\turn_client.js)
+  ⎿  Added 8 lines, removed 5 lines
+      39  
+      40    function clearSession() {
+      41      localStorage.removeItem(CONVERSATION_KEY);
+      42 -    localStorage.removeItem(LAB_SESSION_KEY);                  
+      42 +    localStorage.removeItem(LAB_SESSIONS_KEY);                 
+      43      localStorage.setItem(FRESH_CHAT_KEY, '1');
+      44    }
+      45  
+      46 -  function beginNextLabSession(completedEvent) {               
+      47 -    const previous = localLabSessionId();                      
+      46 +  function beginNextLabSession(completedEvent, modeSnapshot) { 
+      47 +    const modeKey = labSessionKey(modeSnapshot);               
+      48 +    const previous = localLabSessionId(modeKey);               
+      49      const next = identity('lab');
+      49 -    localStorage.setItem(LAB_SESSION_KEY, next);               
+      50 +    const sessions = readSessions();                           
+      51 +    sessions[modeKey] = next;                                  
+      52 +    writeSessions(sessions);                                   
+      53      window.dispatchEvent(new CustomEvent('turn-experiment-sessi
+          on-ended', {
+      54        detail: {
+      55          previous_lab_session_id: previous,
+     ...
+      66        conversation_id: localStorage.getItem(CONVERSATION_KEY) |
+          | null,
+      67        request_id: ids.request_id,
+      68        turn_id: ids.turn_id,
+      66 -      lab_session_id: experiment ? (await labSessionReady, loca
+         -lLabSessionId()) : null,                                       
+      69 +      lab_session_id: experiment ? localLabSessionId(labSession
+         +Key(snapshot)) : null,                                         
+      70        interaction_mode: snapshot.interaction_mode,
+      71        experiment_context: snapshot.experiment_context,
+      72        mode_version: snapshot.mode_version,
+
+● Update(web\frontend\turn_client.js)
+  ⎿  Added 1 line, removed 1 line
+      73      };
+      74    }
+      75  
+      76 -  async function consume(response, onEvent) {                  
+      76 +  async function consume(response, onEvent, modeSnapshot) {    
+      77      if (!response.ok) {
+      78        const failure = await response.json().catch(() => ({}));
+      79        throw new Error(failure.detail || `Turn 请求失败（${respo
+          nse.status}）`);
+
+● Update(web\frontend\turn_client.js)
+  ⎿  Added 1 line, removed 1 line
+      100          } else if (event.type === 'turn_result') {
+      101            browserTiming.screen_published = performance.now();
+      102            if (event.business?.session_ended === true && !event
+           .replayed) {
+      103 -            beginNextLabSession(event);                       
+      103 +            beginNextLabSession(event, modeSnapshot);         
+      104            }
+      105          } else if (event.type === 'voice_delivery') {
+      106            browserTiming.voice_delivery_received = performance.
+           now();
+
+● Update(web\frontend\turn_client.js)
+  ⎿  Added 2 lines, removed 2 lines
+      122        method: 'POST', headers: {'Content-Type': 'application/j
+           son'},
+      123        body: JSON.stringify(body), signal: options.signal,
+      124      });
+      125 -    return consume(response, options.onEvent);                
+      125 +    return consume(response, options.onEvent, options.modeSnap
+          +shot);                                                        
+      126    }
+      127  
+      128    async function submitAudio(blob, options) {
+     ...
+      140      const response = await fetch('/turn/audio', {
+      141        method: 'POST', body: form, signal: options.signal,
+      142      });
+      143 -    return consume(response, options.onEvent);                
+      143 +    return consume(response, options.onEvent, options.modeSnap
+          +shot);                                                        
+      144    }
+      145  
+      146    window.turnClient = {submitText, submitAudio, identity, labS
+           essionId: localLabSessionId, clearSession};
+
+● Update(web\frontend\turn_client.js)
+  ⎿  Added 1 line, removed 1 line
+      143      return consume(response, options.onEvent, options.modeSnap
+           shot);
+      144    }
+      145  
+      146 -  window.turnClient = {submitText, submitAudio, identity, labS
+          -essionId: localLabSessionId, clearSession};                   
+      146 +  window.turnClient = {submitText, submitAudio, identity, clea
+          +rSession};                                                    
+      147  })();
+
+● 核心改动完成。先验证语法，同时检查 phone_call.js（连续通话）是否独立处理了
+  session_ended——它可能不受 turn_client 的 beginNextLabSession 覆盖。
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+● phone_call.js 走的是 turnClient.submitAudio，会进 consume → 
+  beginNextLabSession，所以它自动按模式换，不用单独改。现在确认没有残留引用旧
+  key，也没有外部调用我删掉的 labSessionId 暴露。
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● 块 1 完成。旧 key、旧暴露、旧常量都没有残留，语法全通过。
+
+● 块 1 完成：会话状态管理
+
+  改了 5 个文件，把 lab_session 从"一个值"改成"按模式 map"，并统一了 
+  conversation_id 的切换。
+
+  文件: interaction_mode_state.js
+  改动: 加 protocol_id 状态，select/current/capture 都带上
+  ────────────────────────────────────────
+  文件: views.js / composer.js
+  改动: 切方案时把 protocol_id 传给 select
+  ────────────────────────────────────────
+  文件: turn_client.js
+  改动: lab_session 存成 map（free / protocol:{id} 各一个）；删掉
+  labSessionReady
+    迁移逻辑；beginNextLabSession 改成只换当前模式；metadata 用 protocol_id 拼
+    key
+  ────────────────────────────────────────
+  文件: streaming_chat_v2.js
+  改动: 新对话清 lab_session + fresh 标志修 latest 隐患（上一小步做的）
+
+  效果：
+
+  - free 和每个方案各有一个独立 lab_session，切换模式 = 切
+  session，状态各自保留（根因 1 解决，且不动 SQLite 表）。
+  - 结束实验只换当前模式的 session，不误伤别的模式。
+  - 新对话切干净：conversation_id + lab_session 一起清，刷新不误加载旧对话。
+
+  证据边界：
+
+  - ✅ node --check 5 个文件语法通过；旧 key lab-agent-lab-session-id、删掉的
+  labSessionId 暴露、旧常量 LAB_SESSION_KEY 全仓库无残留。
+  - ❌ 浏览器实际行为未验证（切模式、结束实验、新对话、刷新这几条路径）。前端没
+  有对应的单元测试，只能靠后面真实验收。
+
+  一个边界（记一笔，不阻塞）：如果 protocol 模式在某种异常路径下 protocol_id 为
+  null，labSessionKey 会退化成 protocol:（空 key），所有"无 id 的
+  protocol"共用同一个 session。正常路径（views/composer 两个入口都传了
+  id）不会触发。
+
+  ---
+  块 1 到这。下一步是块 2：恢复常驻步骤面板（step_cards.js 的 void init
+  断链，把步骤横条重接进聊天主视图顶部）。
+
+  你要先核验块 1，还是我继续块 2？
+
+✻ Crunched for 3m 44s
+
+❯ 继续                                                                          
+
+● 继续块 2。先搞清楚 step_cards.js 的脚本加载顺序和 shell.js 的 DOM
+  创建时机——因为步骤 rail 要接到 #sh-chat（聊天主视图），而它是 shell.js
+  动态创建的，加载顺序错了就接不上。
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+● 这个 index.html 是旧的，只引入了 inworld_tts.js，没引入
+  shell.js/step_cards.js。说明这些脚本是后端动态注入的。我查一下加载机制，确认
+  step_cards.js 和 shell.js 的加载顺序——这决定 init 恢复时 DOM 是否就绪。
+
+  Searched for 1 pattern (ctrl+o to expand)
+● 关键发现：app.py 的脚本加载列表里根本没有 
+  step_cards.js——这就是步骤面板彻底消失的根因（不只是 void 
+  init，整个文件都没被引入）。我读一下 app.py 的注入格式，确认怎么加回。
+
+  Read 1 file (ctrl+o to expand)
+
+● 现在清楚了完整根因：step_cards.js 不但 init 被 void init
+  禁用，整个文件压根没被 app.py 加载（加载列表里没有它）。所以步骤横条从 DOM
+  到逻辑全断了。
+
+  块 2 的得失：
+
+  ┌────────────────────┬─────────────────────────────────────┬─────────────┐
+  │        改动        │                 得                  │     失      │
+  ├────────────────────┼─────────────────────────────────────┼─────────────┤
+  │ app.py 把          │                                     │             │
+  │ step_cards.js 加回 │ 横条逻辑重新生效，labStepsReload    │ 多加载一个  │
+  │ 加载列表（shell.js │ 有定义                              │ 脚本        │
+  │  之后）            │                                     │             │
+  ├────────────────────┼─────────────────────────────────────┼─────────────┤
+  │ step_cards.js 恢复 │                                     │ 要处理      │
+  │  init，append      │ 横条出现在聊天主视图顶部，口述时能  │ #sh-chat 未 │
+  │ 目标从 sh-center   │ 看到步骤                            │ 就绪的时序  │
+  │ 改成 sh-chat       │                                     │             │
+  └────────────────────┴─────────────────────────────────────┴─────────────┘
+
+  先改 step_cards.js（恢复 init + 改挂载点）。
+
+● Update(web\frontend\step_cards.js)
+  ⎿  Added 7 lines, removed 1 line
+      78      var rail = document.createElement('div');
+      79      rail.id = 'steps-rail';
+      80      rail.innerHTML = '<div id="steps-head"></div><div id="steps
+          -inner"></div>';
+      81 -    (document.getElementById('sh-center') || document.body).app
+         -endChild(rail);                                                
+      81 +    var chat = document.getElementById('sh-chat');             
+      82 +    var head = document.getElementById('sh-chat-head');        
+      83 +    if (chat && head) {                                        
+      84 +      chat.insertBefore(rail, head.nextSibling);               
+      85 +    } else {                                                   
+      86 +      (document.getElementById('sh-center') || document.body).a
+         +ppendChild(rail);                                              
+      87 +    }                                                          
+      88      load();
+      89      setInterval(load, 4000);
+      90    }
+
+● Update(web\frontend\step_cards.js)
+  ⎿  Added 13 lines, removed 2 lines
+       89      setInterval(load, 4000);
+       90    }
+       91  
+       92 -  // 步骤时间线已并入中间工作画布顶部，不再单独渲染。         
+       93 -  void init;                                                  
+       92 +  function ensureInit() {                                     
+       93 +    if (document.getElementById('sh-chat')) {                 
+       94 +      init();                                                 
+       95 +      return;                                                 
+       96 +    }                                                         
+       97 +    document.addEventListener('shell-ready', ensureInit, {once
+          +: true});                                                     
+       98 +  }                                                           
+       99 +                                                              
+      100 +  if (document.readyState === 'loading') {                    
+      101 +    document.addEventListener('DOMContentLoaded', ensureInit);
+      102 +  } else {                                                    
+      103 +    ensureInit();                                             
+      104 +  }                                                           
+      105  })();
+
+● step_cards.js 改完。现在把 app.py 加载列表补上 step_cards.js（加在 shell.js
+  之后，确保 #sh-chat 已就绪，也让 views.js 调用的 labStepsReload 有定义）。
+
+● Update(web\app.py)
+  ⎿  Added 1 line
+      78          '<script src="/static/template_planner.js"></script>'
+      79          '<script src="/static/task_panel.js"></script>'
+      80          '<script src="/static/shell.js?v=20260825-one-mic"></sc
+          ript>'
+      81 +        '<script src="/static/step_cards.js?v=20260827-restore"
+         +></script>'                                                    
+      82          '<script src="/static/views.js?v=20260825-protocol-sync
+          "></script>'
+      83          '<script src="/static/protocol_editor.js"></script>'
+      84          '<script src="/static/composer.js?v=20260825-mode-sync"
+          ></script>'
+
+● 验证 step_cards.js 语法和 app.py 语法。
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● 块 2 完成。
+
+● 块 2 完成：恢复常驻步骤面板
+
+  根因比预想的更深一层：不只是 step_cards.js 的 void init
+  断链，而是整个文件都没被 app.py 加载（加载列表里根本没有它）。所以步骤横条从
+  DOM 到逻辑全断了，所有 labStepsReload 调用都是空操作。
+
+  改了两处：
+
+  ┌───────────────┬──────────────────────────────────────────────────────────┐
+  │     文件      │                           改动                           │
+  ├───────────────┼──────────────────────────────────────────────────────────┤
+  │ app.py        │ 把 step_cards.js 加回加载列表（shell.js 之后、views.js   │
+  │               │ 之前）                                                   │
+  ├───────────────┼──────────────────────────────────────────────────────────┤
+  │               │ 恢复 init（删掉 void init），挂载点从 sh-center 改成     │
+  │ step_cards.js │ sh-chat 顶部（sh-chat-head 之后），用 ensureInit 处理    │
+  │               │ shell 未就绪的时序                                       │
+  └───────────────┴──────────────────────────────────────────────────────────┘
+
+  效果： 聊天主视图（口述的那个界面）顶部会重新出现步骤横条——所有步骤卡片、当前
+  步高亮、每 4 秒自动刷新、点卡片跳转。
+
+  顺带说清一个之前没注意的点： 顶栏的 sh-status（"第 N/M 步"）在 chat-view
+  时是隐藏的（它在 sh-center 里，而 chat-view 时 sh-center 整个
+  display:none）。所以之前你口述时连"第几步"都看不到。现在横条直接接进
+  #sh-chat，口述界面能看到完整步骤。
+
+  证据边界：
+
+  - ✅ node --check step_cards.js + python -m py_compile app.py 通过。
+  - ❌ 浏览器实际渲染未验证（横条是否真出现在聊天顶部、高亮、点跳转、自动刷新）—
+  —留给真实验收。
+
+  ---
+  下一步是块 3：方案 Block 上屏（服务器最终 Turn 带
+  protocol_card/step_card/safety_alert，解决"提交后步骤卡消失"）。这是后端
+  turn_processors.py 的改动，我会先列得失再动手。继续吗？
+
+✻ Brewed for 3m 23s
+
+❯ 先列出来                                                                      
+
+● 块 3 动手前，我先读两个关键文件确认现状——因为服务器要产出
+  protocol_card/step_card/safety_alert 三种 block，得先确认后端的 BlockType
+  枚举里有没有这三种、以及序列化成前端字符串的机制。
+
+  Read 1 file (ctrl+o to expand)
+
+● 读完了，有个好消息先讲：后端 BlockType 枚举已经有
+  PROTOCOL_CARD、STEP_CARD、SAFETY_ALERT
+  三种类型（conversation_turn.py:37-39），所以块 3 不用加枚举，纯粹是在
+  ExperimentProcessor.prepare() 里把这三类 block 拼进最终 Turn。
+
+  块 3 得失（对应代码）
+
+  现状（turn_processors.py:295-309 拼 blocks 的地方）：protocol 模式下最终 Turn
+  只有 user → record_card → clarification_card → assistant → voice，没有方案
+  block，所以提交后 acceptCommittedTurn 替换时步骤卡消失。
+
+  改动：在 blocks = [user] 之后，protocol 模式下追加三类 block（数据都从已有的
+  step 变量取，它是 domain.step_view(domain.session()) 的完整结果）：
+
+  ┌────────────────────────┬────────────────┬───────────────────────────────┐
+  │                        │                │    payload 字段（对齐前端     │
+  │         block          │    数据来源    │  conversation_block_view.js   │
+  │                        │                │          渲染分支）           │
+  ├────────────────────────┼────────────────┼───────────────────────────────┤
+  │ protocol_card          │ step["protocol │ title / summary（"共N步"）/   │
+  │                        │ "]             │ status                        │
+  ├────────────────────────┼────────────────┼───────────────────────────────┤
+  │                        │                │ number / title / instruction  │
+  │ step_card              │ step["step"]   │ / lines（子步骤）/ meta（方案 │
+  │                        │                │ 已知N项、现场必测N项）        │
+  ├────────────────────────┼────────────────┼───────────────────────────────┤
+  │ safety_alert（每项一个 │ step["safety"] │ 直接展开 item + 补 note:      │
+  │ ）                     │                │ step["safety_note"]           │
+  └────────────────────────┴────────────────┴───────────────────────────────┘
+
+  得：
+
+  1. 根因 2 解决——提交后步骤卡不消失，方案上下文（标题/当前步/安全）成为服务器权
+  威下发，前端不用再靠提交前临时塞的 publishProtocolContextBlocks。
+  2. BlockType 不用动（枚举已备好）。
+
+  失 / 代价：
+
+  ┌───────────────────────┬─────────────────────────────────────────────────┐
+  │         代价          │                      说明                       │
+  ├───────────────────────┼─────────────────────────────────────────────────┤
+  │ Turn payload 变大     │ protocol 每个 turn 多 2~4 个 block（protocol +  │
+  │                       │ step + 若干 safety）                            │
+  ├───────────────────────┼─────────────────────────────────────────────────┤
+  │                       │ test_turn_processors.py 等若断言了 protocol     │
+  │ 现有测试可能被打破    │ 模式 blocks 数量/内容，会失败，要同步改（这个我 │
+  │                       │ 要动手后跑测试确认，先标注）                    │
+  ├───────────────────────┼─────────────────────────────────────────────────┤
+  │ 前端 publishProtocolC │ 提交前临时塞的 block 与服务器下发重复；暂时保留 │
+  │ ontextBlocks 变冗余   │ （作提交前预览），后续再清理                    │
+  └───────────────────────┴─────────────────────────────────────────────────┘
+
+  一个待你确认的取舍：publishProtocolContextBlocks（conversation_context_blocks.
+  js:20-44）提交前临时塞 protocol/step/safety
+  的这段，服务器权威下发后它就成双份了。我建议本轮先保留（它管的是"提交前预览"，
+  服务器管"提交后权威"，二者不冲突，且删它要连带动 beginRecordSurface 等），等块
+   3 + 真实验收跑通后再清理。
+
+  ---
+  这套得失你认不认？认的话我就动手改 turn_processors.py（一处插入），改完立刻跑
+  test_turn_processors.py 看有没有被打破。
+
+✻ Brewed for 1m 17s
+
+❯ 什么是临时塞的publishProtocolContextBlocks,现在在用吗                         
+
+● 我用大白话把这个概念讲清楚，并确认它现在的使用状态。
+
+  一、publishProtocolContextBlocks 是什么
+
+  它是 conversation_context_blocks.js 里定义的一个前端函数（第 20-44
+  行）。干的事就一件：
+
+  在你按下"发送"之后、服务器返回结果之前，前端自己主动调一次 
+  /protocols/session/steps，把"方案标题 + 当前步骤 + 
+  安全提示"塞进聊天界面，让你先看到步骤卡。
+
+  相当于一个"预加载/占位"动作——它不等服务器，自己先拉方案信息填进界面。
+
+  二、"临时塞"是什么意思
+
+  关键在这个"临时"：这些 block 是前端自己加的，不是服务器权威结果的一部分。
+
+  前端有个 ConversationTurnStore（唯一事实源），提交前它 upsertBlock 把
+  protocol_card/step_card/safety_alert 塞进去。但等服务器处理完、返回最终 Turn
+  时，acceptCommittedTurn() 会用服务器结果整体替换整个 turn——这些前端临时塞的
+  block 就被冲掉了（因为服务器最终 Turn 里没有它们）。
+
+  这就是"临时塞"：提交前能看见，提交后被替换掉、消失。
+
+  三、现在还在用吗？——分路径，一半在用一半废弃
+
+  ┌───────────────────────────┬──────────────────────────────────┬──────────┐
+  │           路径            │             调不调               │   状态   │
+  │                           │   publishProtocolContextBlocks   │          │
+  ├───────────────────────────┼──────────────────────────────────┼──────────┤
+  │ 文字实验（打字提交）      │ 调（streaming_chat_v2.js:244）   │ 还在用   │
+  ├───────────────────────────┼──────────────────────────────────┼──────────┤
+  │ 语音新路径（桌面单录走    │ 不调（voice_asr.js:171 的        │          │
+  │ /turn/audio）             │ turnClient 分支直接              │ 不用     │
+  │                           │ submitAudio）                    │          │
+  ├───────────────────────────┼──────────────────────────────────┼──────────┤
+  │ 语音旧路径（upload        │ 调，但这条分支只在 turnClient    │          │
+  │ 回退，voice_asr.js:234    │ 不存在时才走                     │ 基本废弃 │
+  │ 通过 beginRecordSurface） │                                  │          │
+  └───────────────────────────┴──────────────────────────────────┴──────────┘
+
+  所以结论：它现在只在"文字实验"这一条路还活着，语音口述那条新路根本不用它——这也
+  是为什么之前"口述时看不到步骤卡"（语音新路既不临时塞、服务器又不发，两头都空）
+  。
+
+  四、它跟块 3 的关系
+
+  块 3 做的是"让服务器最终 Turn 带上步骤卡"。做完之后：
+
+  - 提交前：publishProtocolContextBlocks 临时塞 → 预览
+  - 提交后：服务器权威 block 替换 → 步骤卡还在（不再消失）
+
+  两者是"接力"关系，不冲突。所以我上一条说"本轮先保留它、以后清理"——因为它还管着
+  "文字实验提交前的预览"这一段，删早了文字实验的预览会消失。
+
+  这样讲清楚了吗？清楚的话，块 3 那套得失（上一条列的）你确认一下，我就动手改
+  turn_processors.py。
+
+✻ Cooked for 40s
+
+❯ 为什么一直强调服务器权威                                                      
+
+● 好问题，这戳到了"为什么非要多一步让服务器发"的核心。我用大白话讲。
+
+  一、"服务器权威"是什么
+
+  先给这个词一个定义：谁持有"事实的真相"，谁就是权威。（英文叫
+  server-authoritative，游戏/协作系统里的常用概念）
+
+  在这个场景里，"事实"是：这次口述，到底对照方案的第几步在评价？
+
+  这个事实的真相，在服务器端，不在浏览器端。因为步骤游标（domain.session()）是服
+  务器进程里的全局变量，浏览器只是"看到"它，不是"拥有"它。
+
+  二、为什么真相在服务器，不在前端
+
+  看代码，这条链是：
+
+  服务器 domain.session()  ← 全局唯一的"当前第几步"
+          ↓
+  domain.step_view(session())  ← 生成 step（当前步骤内容）
+          ↓
+  存进 SQLite 的 lab_record["step"]  ← 这次记录对照哪一步，以这个为准
+
+  所以"这次口述按第 3 步还是第 4 步评价"，决定权在服务器的 
+  domain.session()。前端没法替它决定，前端能做的只是"去问一下现在是第几步"。
+
+  三、前端临时塞的问题在哪（反面例子）
+
+  前端临时塞的步骤卡，是它提交前那一刻 fetch
+  到的快照。这个快照可能和服务器处理时的状态脱节：
+
+  - 你在第 3 步"称量磷酸盐"，口述"称了 3.6 克"。
+  - 提交瞬间，服务器端的步骤游标其实已经到第 4
+  步"溶解试剂"了（比如你之前点了步骤卡跳转，前端还没同步）。
+  - 服务器按第 4 步评价 → 追问"溶解现象是什么？"
+  - 但前端界面还显示"第 3 步：称量磷酸盐"。
+
+  结果：你看到的是第 3 步，系统按第 4 步记录、按第 4 步追问。界面和系统脱节了。
+
+  四、"服务器权威"要保证什么
+
+  就是三样东西来自同一个源头，不脱节：
+
+  界面上显示的步骤卡  ┐
+  服务器评价用的步骤   ├─ 都来自 domain.session() 这一个真相
+  SQLite 存的 step     ┘
+
+  所以最终 Turn 里的 step_card，不是"随便给你看一眼"，而是**"这次记录确实对照了
+  这一步"的凭证**——它能和 SQLite 里的 lab_record["step"] 对上，可追溯。
+
+  五、诚实的边界
+
+  在这个项目里，因为 domain.session()
+  是单用户、单会话的全局单例，时序脱节的风险其实很小（你不可能在同一瞬间一边提交
+  一边切步骤）。所以"服务器权威"在这里不是救急的 bug 修复，而是：
+
+  1. 一致性原则——显示 = 评价 = 存储，同源，这是实验记录"可追溯"的地基；
+  2. 为将来留余地——哪天真做多会话/并发，这个"快照可能过期"的坑会立刻咬人，现在就
+  把"权威在服务器"钉死，将来不用返工。
+
+  所以我不是在强调"服务器比前端厉害"，而是在强调"事实的真相只有一份，谁持有它，
+  谁负责把它原样传下去，别让两边各说各话"。
+
+  这样解释，你理解"服务器权威"为什么被我反复提了吗？
+
+✻ Cooked for 53s
+
+❯ 可以的，保留这个计划，不过先做一下确定性评价接回的方案分析                    
+● 好，块 3 计划先挂起。现在做块
+  4（确定性评价接回）的方案分析。我把现状、改动点、难点、得失全列清楚，不动手。
+
+  一、目标（一句话）
+
+  protocol 模式下，把"缺什么字段、要不要追问、追问什么"从 LLM 语义判断换成对照 
+  must_record 的确定性规则；free 模式一行不动。
+
+  二、现状：追问的"三件套"全来自 LLM
+
+  一次 observe() 里 LLM
+  一次性吐出实验分析，追问的决策和文本都从这里来（turn_processors.py:203-213）：
+
+  ┌─────────┬─────────────────────────────────┬─────────────────────────────┐
+  │ 追问要  │           现在从哪来            │          代码位置           │
+  │   素    │                                 │                             │
+  ├─────────┼─────────────────────────────────┼─────────────────────────────┤
+  │ 要不要  │ analysis.should_ask_follow_up（ │ clarification_acceptance.py │
+  │ 追问    │ LLM）                           │ :351 → 决定 CREATE 还是     │
+  │         │                                 │ NO_ACTION                   │
+  ├─────────┼─────────────────────────────────┼─────────────────────────────┤
+  │ 缺哪些  │ analysis.events[*].missing_fiel │ clarification_acceptance.py │
+  │ 字段    │ ds（LLM）                       │ :359-364                    │
+  ├─────────┼─────────────────────────────────┼─────────────────────────────┤
+  │ 追问什  │ analysis.follow_up_question（LL │ clarification_acceptance.py │
+  │ 么      │ M）                             │ :356                        │
+  └─────────┴─────────────────────────────────┴─────────────────────────────┘
+
+  这些值在 observe() 时就已经固化进 observation.pending_action（CREATE 或
+  NO_ACTION），后续 ClarificationExecutor 执行 CREATE 时用 LLM 的 question 建
+  coordinator 问题，_reply_text 也用 LLM 的 follow_up_question。
+
+  三、要改什么：4 个覆盖点
+
+  覆盖点 1：算确定性评价。 protocol 模式下，用已聚合的
+  entities_dict（turn_processors.py:230-234 现成）调
+  domain.evaluate(entities_dict)，得到确定性的 missing_fields / deviations / 
+  follow_up_question / follow_up_required。
+
+  覆盖点 2：lab_record 的 evaluation（turn_processors.py:249-254）。现在
+  deviations: [] 写死、missing_fields 用 LLM 的。改成用 protocol_eval 的值。
+
+  覆盖点 3：追问动作（pending_action）。这是最难的一处，见下。
+
+  覆盖点 4：_reply_text 的追问文本（turn_processors.py:418-436）。现在
+  analysis.follow_up_question，protocol 下换成确定性 follow_up_question。
+
+  四、三个难点（tricky 点，必须讲清楚）
+
+  难点 1：不只是"换文本"，是"换决策"。 LLM
+  判断"不需要追问"（NO_ACTION）时，确定性评价对照 must_record
+  可能发现"还缺字段"。要真正做到"确定性权威"，就得两个方向都覆盖：
+
+  ┌───────────┬──────────────┬──────────────────────────────────────────────┐
+  │ LLM 决定  │  确定性评价  │                     结果                     │
+  ├───────────┼──────────────┼──────────────────────────────────────────────┤
+  │ CREATE    │ 不缺 →       │ 要改成 NO_ACTION                             │
+  │           │ 不追问       │                                              │
+  ├───────────┼──────────────┼──────────────────────────────────────────────┤
+  │ NO_ACTION │ 缺 → 追问    │ 要改成                                       │
+  │           │              │ CREATE（不是换文本，是凭空造一个追问）       │
+  └───────────┴──────────────┴──────────────────────────────────────────────┘
+
+  第二个方向最麻烦——得用 accepted 的身份字段重新构造一个
+  ClarificationAction(CREATE)。
+
+  难点 2：降级 NOTE 要排除。 accepted.kind == DEGRADED_EVIDENCE_NOTE（LLM
+  失败降级）时不该追问，确定性评价对它没意义。所以覆盖只针对
+  STRUCTURED_EXPERIMENT（正常实验），降级 NOTE 保持 NO_ACTION。
+
+  难点 3：执行顺序要调。 现在 execution 在 analysis
+  物化之前执行（turn_processors.py:217-221 vs 227），而 entities_dict
+  要物化后才能聚合。要覆盖 pending_action，得先把 analysis 物化 + 聚合
+  entities，再覆盖，再 execute——顺序要重排。
+
+  五、得失
+
+  得：
+  - 方案实验的追问真正"确定性"（对照 must_record，不靠 LLM 猜），deviations
+  不再恒空（根因 3 解决）。
+  - free 模式零改动，LLM 语义追问照旧。
+
+  失 / 代价：
+  - 改动集中在 prepare() 一个方法，但涉及 frozen dataclass
+  重建（ClarificationAction 要 dataclasses.replace 或重造），约 30-40 行新代码。
+  - 现有测试会破：test_turn_processors.py 里 protocol 模式的追问断言（如果按 LLM
+   语义写的）要改成确定性语义。
+  - 依赖 domain.evaluate 的全局单例 session()——这跟之前"全局单例不动"的决定一致
+  ，但意味着确定性评价用的"当前步骤"还是全局那份。
+
+  六、一个要你拍板的决策点
+
+  "要不要追问"这个决策，protocol 下到底听谁的？
+
+  - 选项 A（完整覆盖，我倾向）：听确定性评价。LLM 说不用问但 must_record
+  缺了，也照样问（难点 1 的两个方向都覆盖）。改动较大，但"确定性权威"名副其实。
+  - 选项 B（只换文本）：LLM 说"要问"才问，只是把问的内容换成确定性的。LLM
+  说"不问"就不问。改动小，但"要不要追问"还是 LLM 说了算，确定性只负责"问什么"。
+
+  这直接决定难点 1 要不要做、改动量差一倍。你之前能力边界写的是"追问 LLM 语义 →
+  确定性对照 must_record"，我理解是选项 A。你确认 A 还是 B？
+
+  确认后我再决定块 3、块 4 的动手顺序。
+
+✻ Sautéed for 2m 35s
+
+❯ 先按照刚才的设计做块3                                                         
+
+● 块 3 得失已确认，动手。标记任务 3 进行中，然后在 turn_processors.py 的 blocks 
+  = [user] 之后插入方案 block。
+
+● Update(web\turn_processors.py)
+  ⎿  Added 34 lines
+      293                  },
+      294              )
+      295          blocks = [user]
+      296 +        if turn.experiment_context == ExperimentContext.PROTOC
+          +OL:                                                           
+      297 +            protocol_info = step["protocol"]                  
+      298 +            current_step = step["step"]                       
+      299 +            blocks.append(ConversationBlock(                  
+      300 +                block_id=f"{turn.turn_id}:protocol",          
+      301 +                type=BlockType.PROTOCOL_CARD,                 
+      302 +                payload={                                     
+      303 +                    "title": protocol_info["title"],          
+      304 +                    "summary": f"共 {protocol_info['total_step
+          +s']} 步",                                                     
+      305 +                    "status": "protocol",                     
+      306 +                },                                            
+      307 +            ))                                                
+      308 +            blocks.append(ConversationBlock(                  
+      309 +                block_id=f"{turn.turn_id}:step:{current_step['
+          +number']}",                                                   
+      310 +                type=BlockType.STEP_CARD,                     
+      311 +                payload={                                     
+      312 +                    "number": current_step["number"],         
+      313 +                    "title": current_step["title"],           
+      314 +                    "instruction": current_step["instruction"]
+          +,                                                             
+      315 +                    "lines": [                                
+      316 +                        sub["text"] for sub in current_step.ge
+          +t("substeps", [])                                             
+      317 +                    ],                                        
+      318 +                    "meta": [                                 
+      319 +                        f"方案已知 {len(current_step.get('prot
+          +ocol_values', {}))} 项",                                      
+      320 +                        f"现场必测 {len(current_step.get('must
+          +_record', []))} 项",                                          
+      321 +                    ],                                        
+      322 +                },                                            
+      323 +            ))                                                
+      324 +            for index, item in enumerate(step.get("safety", []
+          +)):                                                           
+      325 +                blocks.append(ConversationBlock(              
+      326 +                    block_id=f"{turn.turn_id}:safety:{item.get
+          +('cas') or item.get('name') or index}",                       
+      327 +                    type=BlockType.SAFETY_ALERT,              
+      328 +                    payload={**item, "note": step.get("safety_
+          +note")},                                                      
+      329 +                ))                                            
+      330          if lab_record is not None:
+      331              blocks.append(ConversationBlock(
+      332                  block_id=f"{turn.turn_id}:record:{segment_id}"
+           ,
+
+● 改完。先验证语法，再跑 test_turn_processors.py 专项看有没有被打破。
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● 6 个测试全通过，没被打破。但这几个测试名字里没有一个是"protocol 模式产
+  block"的，所以我的新行为还没被测试覆盖。我 grep 一下其他测试有没有覆盖
+  protocol 的 block 断言，确认影响面。
+
+  Searched for 2 patterns (ctrl+o to expand)
+
+● test_chat_first_surface.py 里 grep 到了
+  protocol_card/step_card/safety_alert，我看一下它测什么、会不会受块 3 影响。
+
+  Read 1 file (ctrl+o to expand)
+
+● test_chat_first_surface.py 是读前端源码字符串的测试（含读 app.py），块 2 改过
+  app.py，可能影响它。我跑一下它 + test_turn_application_service（块 3
+  改动经它走），确认没有回归。
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● 14 个测试全通过，块 3 没打破任何现有测试。但新行为（protocol 产
+  block）还没测试覆盖。我看一下 test_turn_processors.py 的 mock
+  结构，评估补测试的难度。
+
+  Read 1 file (ctrl+o to expand)
+
+● 测试结构清楚了：现有测试全用 FREE 模式，没有 protocol 的。块 3
+  是新行为，我补一个 protocol 模式的测试（用 mock.patch 假造 domain.session /
+  domain.step_view），验证最终 Turn 真的带三种方案 block。
+
+● Update(tests\test_turn_processors.py)
+  ⎿  Added 1 line
+      1  import sys
+      2  import unittest
+      3  from pathlib import Path
+      4 +from unittest import mock                                       
+      5  
+      6  WEB = Path(__file__).resolve().parent.parent / "web"
+      7  if str(WEB) not in sys.path:
+
+● Update(tests\test_turn_processors.py)
+  ⎿  Added 65 lines
+      292          self.assertIsNone(uncertain.session_state)
+      293          self.assertIn("无法确定", uncertain.turn.blocks[1].pay
+           load["text"])
+      294  
+      295 +    def test_protocol_turn_carries_protocol_step_and_safety_bl
+          +ocks(self):                                                   
+      296 +        step_view = {                                         
+      297 +            "mode": "protocol",                               
+      298 +            "protocol": {                                     
+      299 +                "id": "p1", "title": "磷酸缓冲液配制", "source
+          +": "教学示例",                                                
+      300 +                "version": "1.0", "total_steps": 5,           
+      301 +            },                                                
+      302 +            "step": {                                         
+      303 +                "number": 1, "title": "称量磷酸盐",           
+      304 +                "instruction": "称取方案规定质量的磷酸盐",    
+      305 +                "protocol_values": {"action": "称量", "amount_
+          +value": "3.58"},                                              
+      306 +                "must_record": ["amount_value"],              
+      307 +                "hazard_note": None,                          
+      308 +                "terms": [],                                  
+      309 +                "substeps": [{"order": 1, "text": "打开分析天 
+          +平", "note": None}],                                          
+      310 +            },                                                
+      311 +            "safety": [{                                      
+      312 +                "name": "磷酸盐", "cas": "CAS-1", "critical": 
+          +True,                                                         
+      313 +                "codes": [], "statements": ["避免吸入"], "sour
+          +ce_url": "",                                                  
+      314 +            }],                                               
+      315 +            "safety_note": "注意实验安全",                    
+      316 +        }                                                     
+      317 +        processor = ExperimentProcessor(                      
+      318 +            _StateStore(),                                    
+      319 +            observer_factory=lambda: UnifiedObserver(UnifiedAc
+          +ceptanceBypass(                                               
+      320 +                UnifiedUnderstandingRouter(_FixedLLM())       
+      321 +            )),                                               
+      322 +        )                                                     
+      323 +        with mock.patch("turn_processors.domain.session", retu
+          +rn_value=None), \                                             
+      324 +             mock.patch("turn_processors.domain.step_view", re
+          +turn_value=step_view):                                        
+      325 +            result = processor.prepare(                       
+      326 +                _text(                                        
+      327 +                    InteractionMode.EXPERIMENT, ExperimentCont
+          +ext.PROTOCOL,                                                 
+      328 +                    "称了 3.6 克磷酸盐", lab="lab1",          
+      329 +                ),                                            
+      330 +                TurnTimingRecorder(),                         
+      331 +            )                                                 
+      332  
+      333 +        types = [block.type.value for block in result.turn.blo
+          +cks]                                                          
+      334 +        self.assertIn("protocol_card", types)                 
+      335 +        self.assertIn("step_card", types)                     
+      336 +        self.assertIn("safety_alert", types)                  
+      337 +                                                              
+      338 +        protocol_card = next(                                 
+      339 +            block for block in result.turn.blocks             
+      340 +            if block.type.value == "protocol_card"            
+      341 +        )                                                     
+      342 +        self.assertEqual(protocol_card.payload["title"], "磷酸
+          +缓冲液配制")                                                  
+      343 +        self.assertEqual(protocol_card.payload["summary"], "共
+          + 5 步")                                                       
+      344 +                                                              
+      345 +        step_card = next(                                     
+      346 +            block for block in result.turn.blocks             
+      347 +            if block.type.value == "step_card"                
+      348 +        )                                                     
+      349 +        self.assertEqual(step_card.payload["number"], 1)      
+      350 +        self.assertEqual(step_card.payload["instruction"], "称
+          +取方案规定质量的磷酸盐")                                      
+      351 +        self.assertEqual(step_card.payload["lines"], ["打开分 
+          +析天平"])                                                     
+      352 +                                                              
+      353 +        safety = next(                                        
+      354 +            block for block in result.turn.blocks             
+      355 +            if block.type.value == "safety_alert"             
+      356 +        )                                                     
+      357 +        self.assertEqual(safety.payload["critical"], True)    
+      358 +        self.assertEqual(safety.payload["note"], "注意实验安全
+          +")                                                            
+      359 +                                                              
+      360 +                                                              
+      361  if __name__ == "__main__":
+      362      unittest.main()
+
+● 跑测试验证新测试通过。
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● 测试暴露了一个真实细节：ConversationBlock.__post_init__ 的 _freeze_payload
+  会把 list 冻结成 tuple（conversation_turn.py:75-79），所以 lines 实际是
+  tuple，不是 list。这是预期的正确行为（不可变契约），我的断言写错了。修正断言。
+
+● Update(tests\test_turn_processors.py)
+  ⎿  Added 1 line, removed 1 line
+      348          )
+      349          self.assertEqual(step_card.payload["number"], 1)
+      350          self.assertEqual(step_card.payload["instruction"], "称
+           取方案规定质量的磷酸盐")
+      351 -        self.assertEqual(step_card.payload["lines"], ["打开分 
+          -析天平"])                                                     
+      351 +        self.assertEqual(step_card.payload["lines"], ("打开分 
+          +析天平",))                                                    
+      352  
+      353          safety = next(
+      354              block for block in result.turn.blocks
+  Ran 1 shell command (ctrl+o to expand)
+
+● 块 3 完成，7 个测试全通过（含新增的 protocol block 测试）。
+
+● 块 3 完成：方案 Block 上屏
+
+  改动： turn_processors.py 的 prepare() 里，protocol 模式下在 user 之后追加三类
+   block——protocol_card（方案标题 + 共 N 步）、step_card（当前步编号/标题/instru
+  ction/子步骤/方案已知与现场必测项数）、safety_alert（每个高危试剂一项，带
+  note）。
+
+  测试： 新增 test_protocol_turn_carries_protocol_step_and_safety_blocks，用
+  mock.patch 假造 domain.session / domain.step_view，断言最终 Turn 真的带三种
+  block 且字段正确。
+
+  过程中发现的一个契约细节：ConversationBlock 的 _freeze_payload 会把 list
+  冻结成 tuple（conversation_turn.py:75-79），所以 step_card.payload["lines"]
+  实际是 tuple 不是
+  list——这是不可变契约的正确行为，我修正了测试断言（第一版断言写错成
+  list，测试立刻抓到）。
+
+  证据边界：
+
+  - ✅ py_compile 通过；test_turn_processors 7
+  个测试全过（含新增）；test_chat_first_surface + test_turn_application_service
+  14 个测试全过。
+  - ❌ 浏览器实际渲染未验证（三种卡是否真显示、字段形状跟
+  conversation_block_view.js 对齐）——留给真实验收。
+
+  ---
+  当前进度
+
+  ┌──────────────────────────┬──────────────────────────────────┐
+  │            块            │               状态               │
+  ├──────────────────────────┼──────────────────────────────────┤
+  │ 1 会话状态管理           │ ✅                               │
+  ├──────────────────────────┼──────────────────────────────────┤
+  │ 2 常驻步骤面板           │ ✅                               │
+  ├──────────────────────────┼──────────────────────────────────┤
+  │ 3 方案 Block 上屏        │ ✅                               │
+  ├──────────────────────────┼──────────────────────────────────┤
+  │ 4 确定性评价接回         │ ⏸ 方案分析已出，等你确认选项 A/B │
+  ├──────────────────────────┼──────────────────────────────────┤
+  │ 5 测试 + 文档 + 真实验收 │ 待做                             │
+  └──────────────────────────┴──────────────────────────────────┘
+
+  块 4 的症结还在那个决策点："要不要追问"protocol 下听谁的——选项
+  A（完全交给确定性评价，改动大，难点 1 两个方向都覆盖）还是选项
+  B（只换文本，LLM 说了算要不要问，改动小）。
+
+  你定了 A 还是 B，我再决定块 4 怎么动手。
+
+✻ Crunched for 4m 10s
+
+※ recap: 我们在修方案实验的统一理解链路，前 3 块已完成。现在卡在块 4 确定性评价接回：请定"要不要追问"听谁的——选项 A 完全听确定性评价，还是 B 只换文本。 (disable recaps in /config)
+
+❯ 结论：选 A，但不要把它实现成 `prepare()` 里到处覆盖 LLM                       
+  字段的“补丁”。也不要开一条绕过统一理解的旁路。                                
+                                                                                
+  更合适的设计是：                                                              
+                                                                                
+  > 统一理解负责“识别事实”；protocol policy                                     
+  负责“根据事实作决定”；ClarificationExecutor 只执行最终动作。                  
+                                                                                
+  你感觉复杂，不是因为“统一理解天然不适合确定性方案”，而是当前 `observation`    
+  同时混入了两类职责：                                                          
+                                                                                
+  - LLM 产出的事实：events、entities、assistant_reply。                         
+  - LLM 作出的策略决定：should_ask_follow_up、missing_fields、question、pending 
+  _action。                                                                     
+                                                                                
+  现在要把后半部分交还给确定性规则，才会出现“先生成错误动作，再覆盖动作”的别扭  
+  。                                                                            
+                                                                                
+  ## 不建议开旁路                                                               
+                                                                                
+  旁路可能短期少改几行，但会形成两套实验处理链：                                
+                                                                                
+  ```text                                                                       
+  free     → UnifiedObserver → ClarificationExecutor                            
+  protocol → 另一条规则链    → ClarificationExecutor                            
+  ```                                                                           
+                                                                                
+  以后以下能力都要维护两份接入：                                                
+                                                                                
+  - 回答已有追问                                                                
+  - 确认、暂缓、回看                                                            
+  - 结束实验                                                                    
+  - evidence persistence                                                        
+  - ReplyCoordinator 编号与 revision                                            
+  - session FIFO 和重试一致性                                                   
+  - Web 展示和语音授权                                                          
+                                                                                
+  这比当前 30～40 行覆盖代码的长期代价更大，而且容易重新出现“旁路创建的问题无法 
+  被统一链回答”的状态割裂。                                                     
+                                                                                
+  ## 推荐结构：主链内增加一个明确的 Policy 阶段                                 
+                                                                                
+  理想数据流是：                                                                
+                                                                                
+  ```text                                                                       
+  UnifiedObserver                                                               
+    │                                                                           
+    ├─ 路由、控制命令、已有追问回答                                             
+    └─ accepted_analysis：LLM 提取出的实验事实                                  
+                       │                                                        
+                       ▼                                                        
+          ExperimentClarificationPolicy                                         
+          ├─ free     → 沿用 LLM 追问语义                                       
+          ├─ protocol → domain.evaluate(entities)                               
+          └─ degraded → NO_ACTION                                               
+                       │                                                        
+                       ▼                                                        
+              final ClarificationAction                                         
+                       │                                                        
+                       ▼                                                        
+             ClarificationExecutor                                              
+  ```                                                                           
+                                                                                
+  这个阶段可以先做成 `turn_processors.py`                                       
+  附近的纯函数，不必立刻大重构，例如概念上：                                    
+                                                                                
+  ```python                                                                     
+  resolved = resolve_experiment_policy(                                         
+      experiment_context=turn.experiment_context,                               
+      accepted=observation.accepted_analysis,                                   
+      analysis=analysis,                                                        
+      llm_action=observation.pending_action,                                    
+  )                                                                             
+  ```                                                                           
+                                                                                
+  返回一个小而完整的结果：                                                      
+                                                                                
+  ```python                                                                     
+  @dataclass(frozen=True)                                                       
+  class ResolvedExperimentPolicy:                                               
+      missing_fields: tuple[str, ...]                                           
+      deviations: tuple[...]                                                    
+      follow_up_required: bool                                                  
+      follow_up_question: str | None                                            
+      pending_action: ClarificationAction | None                                
+  ```                                                                           
+                                                                                
+  后面所有消费者只读这一个结果：                                                
+                                                                                
+  - `ClarificationExecutor.execute(resolved.pending_action)`                    
+  - `lab_record["evaluation"]`                                                  
+  - `_reply_text(...)`                                                          
+  - clarification card                                                          
+  - `created_clarification`                                                     
+                                                                                
+  这样不会发生“四处分别判断 protocol”的漂移。                                   
+                                                                                
+  ## 顺序确实应该调整                                                           
+                                                                                
+  建议顺序固定为：                                                              
+                                                                                
+  1. `observe()`                                                                
+  2. 校验 observation                                                           
+  3. `materialize_analysis()`                                                   
+  4. 聚合 entities                                                              
+  5. 解析最终 policy                                                            
+  6. 执行最终 `pending_action`                                                  
+  7. 构造 lab record                                                            
+  8. 构造 reply/card/voice                                                      
+  9. 保存状态                                                                   
+                                                                                
+  这不是为了迁就某个补丁，而是在恢复正确的因果顺序：                            
+                                                                                
+  > 先得到事实，后做策略判断，最后执行状态变更。                                
+                                                                                
+  当前在 analysis 物化前执行 action，本身就说明 `pending_action` 过早固化了。   
+                                                                                
+  ## A 的两个方向都必须覆盖                                                     
+                                                                                
+  否则“确定性权威”只是名义上的。                                                
+                                                                                
+  | LLM 初始动作 | protocol 评价 | 最终动作 |                                   
+  |---|---|---|                                                                 
+  | CREATE | 不缺字段 | NO_ACTION |                                             
+  | NO_ACTION | 缺字段 | CREATE |                                               
+  | CREATE | 缺字段 | CREATE，但替换 question 和 missing_fields |               
+  | NO_ACTION | 不缺字段 | NO_ACTION |                                          
+                                                                                
+  其中 `NO_ACTION → CREATE` 不需要复制一堆身份拼装代码到                        
+  processor。最好给核心对象增加一个明确构造入口，例如：                         
+                                                                                
+  ```python                                                                     
+  ClarificationAction.from_protocol_evaluation(                                 
+      accepted,                                                                 
+      protocol_eval,                                                            
+  )                                                                             
+  ```                                                                           
+                                                                                
+  这个 factory 负责：                                                           
+                                                                                
+  - 从 `accepted` 继承 request/session/segment/transcript 身份；                
+  - 设置正确的 `PREPARE_CREATE`；                                               
+  - 使用确定性的 question、missing_fields；                                     
+  - 保留 evidence persistence 约束。                                            
+                                                                                
+  这样 frozen dataclass                                                         
+  不是问题，反而能保证动作不会被半修改。`dataclasses.replace()` 可以用于        
+  `CREATE → CREATE`，但从 `NO_ACTION → CREATE` 时字段语义变化太多，显式 factory 
+   更安全。                                                                     
+                                                                                
+  ## DEGRADED NOTE 的边界                                                       
+                                                                                
+  你的判断正确：                                                                
+                                                                                
+  ```text                                                                       
+  accepted.kind == DEGRADED_EVIDENCE_NOTE                                       
+  → 不执行 protocol evaluate                                                    
+  → 保持 NO_ACTION                                                              
+  ```                                                                           
+                                                                                
+  更准确地说，它没有可信的结构化实体，不能把“LLM 提取失败”解释成“用户漏报了     
+  must_record”。否则系统会在根本没听懂时机械追问全部字段。                      
+                                                                                
+  建议优先级写死为：                                                            
+                                                                                
+  1. 控制命令和已有 clarification 操作，不受 protocol 覆盖；                    
+  2. degraded note → NO_ACTION；                                                
+  3. structured experiment + protocol → 确定性 policy；                         
+  4. structured experiment + free → 原 LLM policy 原样保留。                    
+                                                                                
+  ## 还要警惕一个更深的问题                                                     
+                                                                                
+  目前 `domain.evaluate(entities_dict)` 只评价“这一轮 analysis 聚合出的         
+  entities”。                                                                   
+                                                                                
+  如果 `must_record` 的含义是：                                                 
+                                                                                
+  > 当前方案步骤截至目前累计还缺哪些现场字段                                    
+                                                                                
+  那么只评价本轮实体会产生错误：                                                
+                                                                                
+  - 第一轮报了温度；                                                            
+  - 第二轮报了体积；                                                            
+  - 第二轮评价只看到体积；                                                      
+  - 系统又把温度判为缺失。                                                      
+                                                                                
+  所以接入前必须确认规则语义：                                                  
+                                                                                
+  - 若 must_record 要求“一句话必须报全”，当前按段评价成立；                     
+  - 若允许多轮逐步补齐，就必须评价“当前步骤已持久化实体 + 本轮实体”的合并快照。 
+                                                                                
+  从实验助手实际交互看，我更倾向后者。确定性判断的输入应当是当前步骤的累计已知  
+  事实，而不仅是一次 LLM 输出。否则 A                                           
+  虽然完成了“权威切换”，却可能得到稳定但错误的追问。                            
+                                                                                
+  ## 全局 `domain.session()` 是真正需要留下接口缝的位置                         
+                                                                                
+  本轮可以遵守“全局单例先不动”，但不要让新的 policy                             
+  直接依赖隐藏全局状态。至少让 resolver 接收已经取得的                          
+  evaluation，或者未来接收明确的 protocol state：                               
+                                                                                
+  ```python                                                                     
+  protocol_eval = domain.evaluate(entities_dict)                                
+  resolved = resolve_experiment_policy(..., protocol_eval=protocol_eval)        
+  ```                                                                           
+                                                                                
+  这样以后把全局 session 换成 `(conversation_id, lab_session_id)` 所属 session  
+  时，不需要再改追问策略。                                                      
+                                                                                
+  ## 这一步合理的交付边界                                                       
+                                                                                
+  这次只完成一个完整能力：                                                      
+                                                                                
+  > protocol 下，正常结构化实验的 lab evaluation、CREATE/NO_ACTION、问题文本和  
+  clarification card 全部由同一个确定性 evaluation                              
+  驱动；free、degraded、控制命令、已有追问操作保持原行为。                      
+                                                                                
+  建议同时补四组核心矩阵测试：                                                  
+                                                                                
+  - LLM CREATE + protocol 不缺 → 不创建。                                       
+  - LLM NO_ACTION + protocol 缺失 → 创建确定性问题。                            
+  - LLM CREATE + protocol 缺失 → 字段和文本使用确定性结果。                     
+  - degraded + protocol 缺失 → 仍不创建。                                       
+                                                                                
+  另外补一组 free 回归，证明 LLM 原决策和原文本一行逻辑未变。                   
+                                                                                
+  所以最终拍板是：**选 A；留在统一主链；新增一个主链内的确定性 policy           
+  归一化阶段，不做平行旁路，也不要让四个消费点各自覆盖。** 当前复杂性可以避免大 
+  半，但前提是把“事实提取”和“追问决策”正式拆开，而不是继续让                    
+  `observation.pending_action` 同时代表 LLM 草案和最终权威动作。                
+                                                                                
+  以上判断结合了当前工作区代码；工作树已有多项未提交修改，其中包含              
+  `web/turn_processors.py`，如果下一步实施，需要保留并基于现有改动做最小增量。  
+
+● 这个设计我完全认同——它把我原来"四处覆盖"的别扭，变成了"事实提取"和"追问决策"在
+   observation 里正式分家。ResolvedExperimentPolicy
+  作为唯一下游事实源、ClarificationAction.from_protocol_evaluation 处理
+  NO_ACTION→CREATE、优先级写死、protocol_eval 作为参数缝，这些都是对的。我不重复
+  方案，只就你点出的最深那个点给结论，因为它决定本轮的实现边界。
+
+  你提的"累计语义"——我调研了，现状是"本轮"语义
+
+  代码证据：
+
+  - compute_missing_fields(step, 
+  entities)（protocol_missing_fields.py:12-25）只接受 step + 本轮 entities，对照
+   must_record 算本轮缺啥。没有"历史累计实体"这个输入。
+  - materialize_field_values(step, 
+  entities)（protocol.py:187-216）也只合并"本轮实体 + 方案默认值"。
+  - SessionContext（session_context.py）只存最近几段文本（喂 LLM
+  提示词），不累计实体。
+
+  所以你的质疑成立：如果按"本轮"评价，第二轮口述只看到第二轮的实体，会把第一轮已
+  报的字段又判成缺失。
+
+  但现状其实有两条"补齐"路径，要先分清
+
+  路径: 追问-回答（用户缺字段→系统追问→用户"回答"）
+  机制: control/ANSWER 走
+    coordinator.supply_fields（reply_coordinator.py:323-352）fill missing_fields
+  是否已实现: ✅ 已有，且是累计的（fill 后下一轮不再追问）
+  ────────────────────────────────────────
+  路径: 持续口述（用户不回答追问，直接口述新 experiment 记录补齐）
+  机制: 需要读 lab_records 历史实体 + 按当前步骤聚合
+  是否已实现: ❌ 没有
+
+  所以"累计语义"的真正缺口，只在这条**"不回答追问、继续口述"**的路径上。
+
+  我的建议：本轮先按"本轮"语义做通，累计记成已知限制
+
+  理由：
+
+  1. "累计"是独立的数据源改动：要读 lab_records 里"当前步骤"的历史记录、按
+  step.number 聚合 entities、再合并本轮。这需要 TurnStore
+  加一个读历史实体的方法，且"按步骤过滤"要在 Python 里解析 step 字段的
+  JSON。它会让本轮显著变大。
+  2. 现状"追问-回答"已覆盖主场景：缺字段→追问→用户回答，这条是累计的。
+  3. 本轮的目标是"权威切换"，不是"精度"：先把 Policy 阶段 +
+  ResolvedExperimentPolicy + 四组矩阵测试做对，让 protocol
+  的追问确实由确定性评价驱动。累计是"评价输入应该用合并快照"这个下一层精度问题，
+  不该和"权威切换"捆在一起做，否则一次验证两个变量。
+
+  所以我建议本轮的边界钉在：policy 的确定性评价输入 = 本轮 entities（现状 
+  compute_missing_fields 的语义）；"累计已知事实"作为已知限制写进文档，真实验收
+  时观察你是否真的"持续口述不回答追问"，如果真需要再单独做。
+
+  ---
+  这个边界你认不认？认的话，我就按你的设计动手——顺序是：先加
+  ResolvedExperimentPolicy + resolve_experiment_policy() 纯函数 +
+  ClarificationAction.from_protocol_evaluation() factory，再改 prepare()
+  的因果顺序，最后补四组矩阵测试 + free 回归。
+
+✻ Crunched for 2m 32s
+
+❯ 这么说，已经可以分多次回答了吗                                                
+
+● 要分两条路看，答案不一样。
+
+  路 1：显式"回答追问"——已经可以分多次
+
+  现状的机制是：你缺字段 → 系统追问 → 你显式回答 → 
+  把缺的字段填上。这一步是累计的。
+
+  具体例子（第 5 步 must_record = ["observation", "condition"]）：
+
+  1. 你口述"倒转混匀，溶液透明"→ 提取 observation=透明 → 确定性评价发现缺
+  condition → 追问"保存条件是什么？"（问题 1，缺 condition）
+  2. 你回答 "问题 1 是室温保存"（或"室温保存"被识别为对问题 1 的回答）→
+  coordinator.supply_fields 把 condition 填上 → 问题 1 resolved ✅
+
+  这条路是通的，而且支持"一个追问分几次回答、每次填一部分"——因为 missing_fields
+  是一个列表，supply_fields 一次填几个都行，填空了才 resolved。
+
+  但有两个前提，都是未经验证的：
+
+  - 你必须显式表达"我在回答问题 N"（说"问题 1 是
+  XX"，或者说"是/对"针对当前问题）。你不能只说"室温保存"——那会被 LLM
+  当成一条新的实验记录。
+  - 依赖 LLM 准确判断"这句话是回答，不是新记录"。
+
+  路 2：自然"持续口述"——还不支持，这就是累计语义的缺口
+
+  如果你不显式回答追问，而是继续自然口述新的实验事实：
+
+  1. 口述"倒转混匀，溶液透明"→ 缺 condition → 追问"保存条件？"
+  2. 你不回答，继续口述"室温保存"→ 被 LLM 判成新的 experiment 记录 →
+  本轮评价只看 condition=室温 → 发现 observation 缺失 → 又追问"观察现象？" ❌
+
+  observation 你第一轮明明报过了，但第二轮评价只看到第二轮的实体，于是重复追问。
+  这就是我说的"本轮语义"的坑。
+
+  所以结论
+
+  - "分多次显式回答追问"：已经可以（路 1）。
+  - "分多次自然持续口述"：还不行（路 2），这正是"累计语义"要解决的。
+
+  我之前建议"本轮先按本轮语义做通、累计记已知限制"，等于默认了：你现在主要靠"显
+  式回答追问"来补齐字段，而"自然持续口述"这个缺口先放着。
+
+  但这里有个真问题要你拍板：你实际做实验时，是倾向于"系统追问 → 
+  我回答"，还是"我自顾自一句句往下说、系统自己累计判断"？
+
+  - 如果是前者，那路 1 够用，累计语义可以安心延后。
+  - 如果是后者（更自然的交互），那"累计语义"其实是本轮就该解决的，不能只记已知限
+  制。
+
+  你的实际使用习惯是哪种？这决定"累计"到底算不算本轮范围。
+
+✻ Baked for 59s
