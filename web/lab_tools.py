@@ -167,6 +167,87 @@ _SKIP_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".wav", ".mp3", ".on
 _SKIP_FILES = {"page_dump.html", "restart_web.bat"}
 
 
+
+
+def _upload_dir() -> Path:
+    d = REPO_ROOT / "uploads"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+@tool(
+    "read_uploaded_file",
+    "读取用户通过对话框上传的文件内容（文本类）；PDF/图片会提示走 MinerU/OCR 识别。只读。",
+    {"type": "object", "properties": {"file_id": {"type": "string", "description": "上传返回的 file_id 或文件名片段"}},
+     "required": ["file_id"], "additionalProperties": False},
+    kind="read", title="读取上传文件：{file_id}",
+    present=lambda a, r: [f"文件：{r['name']}", f"大小：{r['size']} 字节", r.get("preview") or r.get("note") or ""],
+)
+def _read_uploaded_file(file_id: str):
+    import re
+    directory = _upload_dir()
+    key = str(file_id or "").strip()
+    if not key:
+        raise ValueError("file_id 不能为空")
+    matches = [p for p in directory.iterdir() if key in p.name]
+    if not matches:
+        raise ValueError("没有找到该上传文件，请重新上传")
+    target = matches[0]
+    if target.suffix.lower() in {".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx"}:
+        return {
+            "name": target.name, "size": target.stat().st_size,
+            "note": "这是二进制/文档文件，建议调用文档解析（MinerU/OCR）接口识别内容。",
+        }
+    try:
+        text = target.read_text(encoding="utf-8", errors="replace")
+    except OSError as error:
+        raise ValueError("读取失败：" + str(error))
+    preview = text[:1200]
+    return {"name": target.name, "size": target.stat().st_size, "preview": preview}
+
+
+def _sandbox_dir() -> Path:
+    d = REPO_ROOT / "sandbox"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+@tool(
+    "run_bash",
+    "在受限沙箱中执行 shell 命令（只读项目资源，超时 10 秒），用于处理文件、查看环境、运行简单脚本。",
+    {"type": "object", "properties": {"command": {"type": "string", "description": "要执行的 shell 命令"}},
+     "required": ["command"], "additionalProperties": False},
+    kind="execute", title="沙箱执行：{command}",
+    present=lambda a, r: r.get("stdout", "").splitlines()[-5:],
+)
+def _run_bash(command: str):
+    import subprocess
+    cmd = str(command or "").strip()
+    if not cmd:
+        raise ValueError("命令不能为空")
+    if len(cmd) > 2000:
+        raise ValueError("命令过长")
+    try:
+        result = subprocess.run(
+            cmd,
+            shell=True,
+            cwd=str(_sandbox_dir()),
+            timeout=10,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+    except subprocess.TimeoutExpired:
+        return {"exit_code": -1, "stdout": "", "stderr": "命令执行超过 10 秒，已终止。"}
+    except Exception as error:
+        return {"exit_code": -1, "stdout": "", "stderr": f"{type(error).__name__}: {error}"}
+    return {
+        "exit_code": result.returncode,
+        "stdout": (result.stdout or "")[:8000],
+        "stderr": (result.stderr or "")[:4000],
+    }
+
 def _safe_project_path(rel: str) -> Path:
     root = REPO_ROOT.resolve()
     if not rel or rel == ".":

@@ -135,6 +135,7 @@
   function show(view) {
     var previous = current;
     current = view;
+    if (window.logAction) window.logAction('view', { view: view });
     var shell = el('shell');
     var isChat = view === 'chat';
     shell.classList.toggle('chat-view', isChat);

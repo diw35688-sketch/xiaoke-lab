@@ -478,19 +478,22 @@
     });
   }
 
-  // 对话记忆：后端按 conversation_id 记住上下文；不带它就会每句"失忆"。
+  // 对话记忆：手机端不保存自己的会话，统一使用电脑端/服务端的最新会话。
   function convId() {
-    var id = null;
-    try { id = localStorage.getItem('mobileConversationId'); } catch (e) {}
-    return id || null;
+    return null;
   }
-  function saveConvId(id) {
-    if (!id) return;
-    try { localStorage.setItem('mobileConversationId', id); } catch (e) {}
+  function saveConvId(_id) {
+    // 手机端不写本地会话，始终跟随电脑端最新会话。
+  }
+  // 与电脑端共用对话：每次直接从服务端取最新会话。
+  function resolveConvId() {
+    return fetch('/chat/conversations').then(function (r) { return r.json(); }).then(function (d) {
+      var items = (d && d.items) || [];
+      return (items[0] && items[0].conversation_id) || null;
+    }).catch(function () { return null; });
   }
   function resetConversation() {
-    try { localStorage.removeItem('mobileConversationId'); } catch (e) {}
-    setVoiceSoon('idle', '对话记忆已重置（下一句开始全新上下文）', 1800);
+    setVoiceSoon('idle', '手机端不保存独立会话，重置无效；请到电脑端新建/切换会话', 1800);
   }
 
   // 语音文本 → /chat → 大模型工具调用（record_observation / move_step）→ 状态机判定
@@ -516,12 +519,14 @@
   function submitTranscript(text) {
     setVoice('thinking', 'AI 正在理解…');
     hideAiBubble();
-    return fetch('/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text, conversation_id: convId() }),
-    }).then(function (r) {
-      return r.json().then(function (d) { return { ok: r.ok, d: d }; });
+    return resolveConvId().then(function (conversationId) {
+      return fetch('/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, conversation_id: conversationId }),
+      }).then(function (r) {
+        return r.json().then(function (d) { return { ok: r.ok, d: d }; });
+      });
     }).then(function (res) {
       if (!res.ok) {
         var err = (res.d && res.d.detail) || '未知错误';
@@ -533,6 +538,7 @@
       var answer = (res.d && res.d.answer) || '';
       setVoice('speaking', 'AI：' + String(answer).slice(0, 40));
       showAiBubble(answer);          // 完整回复进气泡，不再截断
+      appendChatLog('assistant', answer);
       loadReal();
     }).catch(function (e) {
       setVoice('idle', '网络错误');
@@ -541,8 +547,7 @@
   }
 
   // ---------- 8. 实验方案选择（真实数据源） ----------
-  function populateProtocols() {
-    var sel = el('protocol-select');
+  function bindProtocolSelect(sel) {
     if (!sel) return;
     fetch('/protocols').then(function (r) { return r.json(); }).then(function (d) {
       var items = d.protocols || [];
@@ -563,6 +568,32 @@
         setVoiceSoon('idle', '选择方案失败', 1500);
       });
     };
+  }
+
+  function populateProtocols() {
+    bindProtocolSelect(el('protocol-select'));
+    bindProtocolSelect(el('m-protocol-select'));
+  }
+
+  function appendChatLog(role, text) {
+    var log = el('m-chat-log');
+    if (!log || !text) return;
+    var div = document.createElement('div');
+    div.className = 'm-msg ' + role;
+    div.innerHTML = '<span class="m-msg-name">' + (role === 'user' ? '我' : '小科') + '</span><span class="m-msg-text"></span>';
+    div.querySelector('.m-msg-text').textContent = text;
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function submitTextChat(inputId) {
+    var input = el(inputId || 'm-chat-input');
+    var text = input ? input.value.trim() : '';
+    if (!text) return;
+    if (input) input.value = '';
+    if (window.logAction) window.logAction('mobile_chat_send', { text: text.slice(0, 80) });
+    appendChatLog('user', text);
+    submitTranscript(text);
   }
 
   // ---------- 9. 数据源切换 ----------
@@ -752,6 +783,18 @@
   }
 
   // ---------- 12. 绑定 ----------
+  function showChatView() {
+    var chat = el('chat-view'), card = el('card-view');
+    if (chat) chat.style.display = 'block';
+    if (card) card.style.display = 'none';
+  }
+  function showCardView() {
+    var chat = el('chat-view'), card = el('card-view');
+    if (chat) chat.style.display = 'none';
+    if (card) card.style.display = 'block';
+    loadReal();
+  }
+
   function bind() {
     var prev = el('btn-prev'), next = el('btn-next');
     if (prev) prev.onclick = gesturePrev;
@@ -792,7 +835,26 @@
     renderThemeButtons();
     restoreBgImage();
     bindBgControls();
+    var chatInput = el('m-chat-input'), chatSend = el('m-chat-send');
+    if (chatInput && chatSend) {
+      chatSend.onclick = function () { submitTextChat('m-chat-input'); };
+      chatInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); submitTextChat('m-chat-input'); }
+      });
+    }
+    var cardInput = el('m-chat-card-input'), cardSend = el('m-chat-card-send');
+    if (cardInput && cardSend) {
+      cardSend.onclick = function () { submitTextChat('m-chat-card-input'); };
+      cardInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); submitTextChat('m-chat-card-input'); }
+      });
+    }
+    var startBtn = el('m-start-experiment');
+    if (startBtn) startBtn.onclick = showCardView;
+    var backBtn = el('m-back-chat');
+    if (backBtn) backBtn.onclick = showChatView;
     populateProtocols();
+    showChatView();   // 默认进入聊天，用户点“开始实验”后才进流程卡片
     // 预加载 AI 形象立绘，切状态不闪
     Object.keys(AVATAR).forEach(function (k) {
       var preload = new Image();
@@ -814,6 +876,7 @@
     setVoice: setVoice,
     setTheme: setTheme,
     submitTranscript: submitTranscript,
+    submitTextChat: submitTextChat,
     resetConversation: resetConversation,
     isReal: function () { return dataSource === 'real'; },
     MOCK_CARDS: MOCK_CARDS,

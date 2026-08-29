@@ -165,9 +165,119 @@
 
   const WELCOME_TEXT = '你好！我是实验助手。你可以让我记录实验口述、查询试剂安全、推进实验步骤，或安排实验。';
 
+  function ensureNewChatStyles() {
+    if (document.getElementById('new-chat-options-style')) return;
+    var style = document.createElement('style');
+    style.id = 'new-chat-options-style';
+    style.textContent = [
+      '.new-chat-options{display:flex;gap:10px;flex-wrap:wrap;padding:6px 0 12px}',
+      '.nco-card{flex:1 1 180px;max-width:260px;background:#fff;border:1px solid #e5e8f0;border-radius:14px;padding:12px 14px;cursor:pointer;transition:box-shadow .15s,transform .15s}',
+      '.nco-card:hover{box-shadow:0 6px 18px rgba(15,23,42,.08);transform:translateY(-2px)}',
+      '.nco-ic{font-size:20px}',
+      '.nco-title{font-weight:700;color:#0f172a;margin:4px 0 2px;font-size:14px}',
+      '.nco-desc{color:#64748b;font-size:12px;line-height:1.5}',
+      '.mode-intro{background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:12px 15px;margin:6px 0 12px}',
+      '.mi-title{font-weight:700;color:#0f172a;font-size:14px}',
+      '.mi-desc{color:#64748b;font-size:12px;line-height:1.6;margin:4px 0 8px}',
+      '.mi-actions{display:flex;gap:6px;flex-wrap:wrap}',
+      '.mi-btn{padding:5px 10px;border:1px solid #cbd5e1;background:#fff;border-radius:8px;cursor:pointer;font-size:12px;font-family:inherit}',
+      '.mi-btn.primary{background:#2563eb;border-color:#2563eb;color:#fff}',
+      '.mi-btn.ghost{background:#f8fafc}'
+    ].join('\n');
+    document.head.appendChild(style);
+  }
+
+  function openMode(mode) {
+    if (window.logAction) window.logAction('new_chat_mode', { mode: mode });
+    window.interactionModeState.select(mode === 'free' ? 'free' : mode);
+    var opt = chat.querySelector('.new-chat-options');
+    if (opt) opt.remove();
+    var input = document.getElementById('message');
+    if (mode === 'free') {
+      // 自由模式留在聊天区，并显示预设提示
+      var intro = chat.querySelector('.mode-intro');
+      if (intro) intro.remove();
+      var div = document.createElement('div');
+      div.className = 'mode-intro';
+      div.innerHTML = '<div class="mi-title">🧪 自由模式已开启</div>'
+        + '<div class="mi-desc">可以自由聊天、记录实验，不绑定方案。说一句即可开始。</div>';
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+      if (input) input.focus();
+      return;
+    }
+    if (mode === 'template') {
+      // 制作模板：跳转到实验方案页（支持 PDF/图片 OCR 生成规范模板）
+      if (window.shellShow) window.shellShow('protocols');
+      return;
+    }
+    if (mode === 'storage') {
+      // 制作储存库：跳转到储存库页面
+      if (window.shellShow) window.shellShow('storage');
+    }
+  }
+
+  function showNewChatOptions() {
+    ensureNewChatStyles();
+    if (chat.querySelector('.new-chat-options')) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'new-chat-options';
+    wrap.innerHTML = [
+      '<div class="nco-card" data-mode="free"><div class="nco-ic">🧪</div><div class="nco-title">自由模式</div><div class="nco-desc">记录/聊天，不绑定方案</div></div>',
+      '<div class="nco-card" data-mode="template"><div class="nco-ic">📄</div><div class="nco-title">制作模板</div><div class="nco-desc">把配方/方案做成规范模板</div></div>',
+      '<div class="nco-card" data-mode="storage"><div class="nco-ic">🗃</div><div class="nco-title">制作储存库</div><div class="nco-desc">登记位置/物品/库存</div></div>'
+    ].join('');
+    Array.prototype.forEach.call(wrap.querySelectorAll('.nco-card'), function (card) {
+      card.onclick = function () {
+        openMode(card.getAttribute('data-mode'));
+      };
+    });
+    chat.appendChild(wrap);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
   function clearChat() {
     chat.textContent = '';
     add(WELCOME_TEXT, 'assistant');
+    showNewChatOptions();
+  }
+
+  function renderTurnHistory(result) {
+    const turnData = result?.turn || result || {};
+    const blocks = turnData.blocks || result?.blocks || [];
+    let reply = null;
+    blocks.forEach(block => {
+      const payload = block.payload || {};
+      if (block.type === 'user_text') {
+        add(payload.text || '', 'user');
+        return;
+      }
+      if (block.type === 'assistant_text') {
+        if (!reply) reply = add(payload.text || '', 'assistant');
+        else if (reply.parentElement) reply.textContent = payload.text || '';
+        return;
+      }
+      if (block.type === 'system_status' && payload.kind === 'think') {
+        if (!reply) reply = add('', 'assistant');
+        activeThinkRow = null;
+        ensureThinkRow(reply);
+        updateThink(reply, payload.text || '', Boolean(payload.running));
+        activeThinkRow = null;
+        return;
+      }
+      if (block.type === 'tool_card') {
+        if (!reply) reply = add('', 'assistant');
+        ensureToolRow(block, reply);
+        return;
+      }
+      if (block.type !== 'user_text') {
+        if (!reply) reply = add('', 'assistant');
+        ensureCardRow(block, reply);
+      }
+    });
+    if (reply && reply.parentElement && !reply.textContent.trim()) {
+      // 只有工具/思考卡片的回合保留空白气泡不太好，但保留结构可读
+    }
   }
 
   function loadHistory(conversationId) {
@@ -175,6 +285,27 @@
       localStorage.removeItem(freshChatKey);
       return;
     }
+    const id = conversationId || localStorage.getItem(conversationKey);
+    if (id) {
+      fetch(`/turn/history?conversation_id=${encodeURIComponent(id)}`).then(response => {
+        if (!response.ok) throw new Error('读取 Turn 历史失败');
+        return response.json();
+      }).then(data => {
+        const turns = data.turns || [];
+        if (!turns.length) return loadFlatHistory(id);
+        chat.textContent = '';
+        add(WELCOME_TEXT, 'assistant');
+        activeThinkRow = null;
+        blockRows = {};
+        turns.forEach((turn) => renderTurnHistory(turn.result));
+        chat.scrollTop = chat.scrollHeight;
+      }).catch(() => loadFlatHistory(id));
+    } else {
+      loadFlatHistory(null);
+    }
+  }
+
+  function loadFlatHistory(conversationId) {
     const id = conversationId || localStorage.getItem(conversationKey);
     const url = id
       ? `/chat/history?conversation_id=${encodeURIComponent(id)}`
@@ -188,16 +319,20 @@
         document.dispatchEvent(new CustomEvent('conversation-changed'));
       }
       const messages = data.messages || [];
-      if (!messages.length) return;   // 没有历史时保留初始欢迎语
+      if (!messages.length) {
+        chat.textContent = '';
+        add(WELCOME_TEXT, 'assistant');
+        showNewChatOptions();
+        return;
+      }
       chat.textContent = '';
+      add(WELCOME_TEXT, 'assistant');
       messages.forEach(item => {
-          const clean = String(item.content || '').replace(/\[\[LABTHINK\]\]|\[\[LABCARD\]\]/g, '');
-          add(clean, item.role === 'user' ? 'user' : 'assistant');
-        });
+        const clean = String(item.content || '').replace(/\[\[LABTHINK\]\]|\[\[LABCARD\]\]/g, '');
+        add(clean, item.role === 'user' ? 'user' : 'assistant');
+      });
       chat.scrollTop = chat.scrollHeight;
-    }).catch(() => {
-      /* 服务端没有历史或接口失败时，保留当前欢迎语即可。 */
-    });
+    }).catch(() => {});
   }
 
   window.switchConversation = function (id) {

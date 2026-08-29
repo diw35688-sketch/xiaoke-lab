@@ -40,6 +40,7 @@ PROVIDERS = [
         "needs_key": True, "server_side": True,
         "default_base_url": "https://api.openai.com/v1",
         "default_model": "tts-1",
+        "api_url": "https://platform.openai.com/api_keys",
         "note": "填入任何兼容 OpenAI 的网关地址即可，和配置对话模型同一种方式。",
         "voices": [
             {"id": "alloy", "label": "alloy"}, {"id": "nova", "label": "nova"},
@@ -52,6 +53,7 @@ PROVIDERS = [
         "needs_key": True, "server_side": True,
         "default_base_url": "https://dashscope.aliyuncs.com/api/v1",
         "default_model": "cosyvoice-v2",
+        "api_url": "https://bailian.console.aliyun.com/?tab=apiKey",
         "note": "国内访问快；密钥在阿里云百炼控制台获取。",
         "voices": [
             {"id": "longxiaochun_v2", "label": "龙小淳（女）"},
@@ -71,6 +73,7 @@ PROVIDERS = [
         "needs_key": True, "server_side": True,
         "default_base_url": "https://openspeech.bytedance.com/api/v1/tts",
         "default_model": "volcano_tts",
+        "api_url": "https://console.volcengine.com/speech/app",
         "note": "密钥填 appid:access_token（冒号分隔）。「合成模型」框填控制台 cluster（默认 volcano_tts）。音色为火山官方中文女声/童声（免费21款内为主），可自由切换试听。",
         "voices": [
             {"id": "BV001_streaming", "label": "通用女声（亲切，12种情感）"},
