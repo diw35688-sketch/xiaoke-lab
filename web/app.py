@@ -93,7 +93,7 @@ def home(request: Request):
     page = (BASE_DIR / "frontend" / "index.html").read_text(encoding="utf-8")
     page = page.replace('/static/inworld_tts.js', '/static/local_tts.js?v=20260826-shared-warmup')
     page = page.replace('</head>', '<link rel="stylesheet" href="/static/theme.css"></head>')
-    page = page.replace('</head>', '<link rel="stylesheet" href="/static/mobile-shell.css?v=20260902"></head>')
+    page = page.replace('</head>', '<link rel="stylesheet" href="/static/mobile-shell.css?v=20260902-height-fix"></head>')
     # 注入模型设置面板（任何人都能在网页里配置模型）
     page = page.replace('</body>', ('<script src="/static/voice_asr.js?v=20260827-clarification-card"></script>'
                                    '</body>'))
