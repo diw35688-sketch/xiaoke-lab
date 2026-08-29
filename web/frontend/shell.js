@@ -136,6 +136,8 @@
     var previous = current;
     current = view;
     if (window.logAction) window.logAction('view', { view: view });
+    document.body.classList.toggle('mobile-mode-chat', view === 'chat');
+    document.body.classList.toggle('mobile-mode-work', view !== 'chat');
     var shell = el('shell');
     var isChat = view === 'chat';
     shell.classList.toggle('chat-view', isChat);

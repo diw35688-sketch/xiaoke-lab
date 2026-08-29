@@ -88,17 +88,12 @@ def _is_mobile(user_agent: str) -> bool:
 
 @app.get("/", include_in_schema=False)
 def home(request: Request):
-    if _is_mobile(request.headers.get("user-agent", "")):
-        return HTMLResponse((BASE_DIR / "frontend" / "mobile.html").read_text(encoding="utf-8"))
-    # 公网隧道默认打开移动端流程卡片，方便手机/外部访问
-    try:
-        if network_mode.status().get("mode") == "tunnel":
-            return HTMLResponse((BASE_DIR / "frontend" / "mobile.html").read_text(encoding="utf-8"))
-    except Exception:
-        pass
+    # 手机/公网隧道直接使用电脑端同一界面；通过移动端外壳 CSS/JS 做响应式适配。
+    # 电脑界面的手机版 = 默认聊天，点导航可进入实验/工作台。
     page = (BASE_DIR / "frontend" / "index.html").read_text(encoding="utf-8")
     page = page.replace('/static/inworld_tts.js', '/static/local_tts.js?v=20260826-shared-warmup')
     page = page.replace('</head>', '<link rel="stylesheet" href="/static/theme.css"></head>')
+    page = page.replace('</head>', '<link rel="stylesheet" href="/static/mobile-shell.css?v=20260902-turn-cards"></head>')
     scripts = (
         '<script src="/static/debug_log.js?v=20260901"></script>'
         '<script src="/static/experiment_confirmation.js"></script>'
@@ -115,13 +110,14 @@ def home(request: Request):
         '<script src="/static/interaction_mode_state.js?v=20260829-storage"></script>'
         '<script src="/static/voice_asr.js?v=20260827-clarification-card"></script>'
         '<script src="/static/turn_client.js?v=20260827-timing"></script>'
-        '<script src="/static/streaming_chat_v2.js?v=20260829-explicit-modes"></script>'
+        '<script src="/static/streaming_chat_v2.js?v=20260902-tool-cards-explicit-modes"></script>'
         '<script src="/static/template_planner.js"></script>'
         '<script src="/static/task_panel.js"></script>'
         '<script src="/static/shell.js?v=20260901-telemetry"></script>'
+        '<script src="/static/mobile_shell.js?v=20260902"></script>'
         '<script src="/static/conversation_list.js?v=20260818"></script>'
         '<script src="/static/run_canvas.js"></script>'
-        '<script src="/static/step_cards.js?v=20260827-restore"></script>'
+        '<script src="/static/step_cards.js?v=20260902-shell-fix"></script>'
         '<script src="/static/record_ledger_view.js?v=20260827-deviation-values"></script>'
         '<script src="/static/settings.js?v=20260901-hidden"></script>'
         '<script src="/static/tts_settings.js?v=20260901-volcano-fields"></script>'
@@ -132,7 +128,7 @@ def home(request: Request):
         '<script src="/static/storage.js?v=20260821"></script>'
         '<script src="/static/community.js?v=20260901-telemetry"></script>'
         '<script src="/static/notifications.js?v=20260821"></script>'
-        '<script src="/static/composer.js?v=20260901-telemetry"></script>'
+        '<script src="/static/composer.js?v=20260902-svg-icons"></script>'
           '<script src="/static/voice_startup_ui.js?v=20260826"></script>'
           '<script src="/static/call_silero_vad.js?v=20260826-visible-progress"></script>'
         '<script src="/static/phone_call.js?v=20260827-clarification-card"></script>'
@@ -158,8 +154,8 @@ def phone_access_page(request: Request):
     """手机访问入口页：桌面端打开本页，手机扫二维码即可访问。"""
     status = network_mode.status()
     url = status.get("public_url") or status.get("lan_url") or phone_access.phone_url(request)
-    # 二维码固定指向手机专用页，扫码直接进大按钮版本
-    url = url.rstrip("/") + "/m"
+    # 二维码指向电脑界面的手机版（聊天默认，实验开始后进入工作台卡片）
+    url = url.rstrip("/") + "/"
     svg = phone_access.qr_svg(url)
     qr_block = svg if svg else f"<pre>{url}</pre>"
     mode_label = "公网隧道" if status.get("mode") == "tunnel" else "局域网"

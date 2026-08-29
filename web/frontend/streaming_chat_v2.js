@@ -8,7 +8,7 @@
         freshChatKey = 'lab-agent-fresh-chat';
   const avatar = state => window.dispatchAvatarState?.(state);
   let activeController = null, activeReply = null, requestId = 0;
-  let activeThinkRow = null, blockRows = {};
+  let activeThinkRow = null, blockRows = {}, appliedToolUi = {};
   const turnStore = window.conversationTurnStore;
   const blockView = window.conversationBlockView;
   if (!turnStore) throw new Error('ConversationTurnStore 未加载');
@@ -68,7 +68,8 @@
     const row = document.createElement('div');
     row.className = 'message think running';
     row.innerHTML = '<div class="chat-think"><div class="chat-think-head"><span class="ic">☰</span><span class="tt">思考过程</span><span class="st">进行中</span></div><div class="chat-think-body"></div></div>';
-    chat.insertBefore(row, messageRow(reply));
+    var thinkAnchor = messageRow(reply);
+    chat.insertBefore(row, (thinkAnchor && thinkAnchor.parentNode === chat) ? thinkAnchor : null);
     activeThinkRow = row;
     return row;
   }
@@ -93,7 +94,8 @@
       row = document.createElement('div');
       row.className = 'message tool';
       row.innerHTML = '<div class="chat-tool"><div class="chat-tool-head"><span class="ic">⚙</span><span class="tt"></span><span class="st">进行中</span></div><div class="chat-tool-body"></div></div>';
-      chat.insertBefore(row, messageRow(reply));
+      var toolAnchor = messageRow(reply);
+      chat.insertBefore(row, (toolAnchor && toolAnchor.parentNode === chat) ? toolAnchor : null);
       blockRows[block.block_id] = row;
     }
     const state = view.status === 'pending' ? '进行中' : (view.status === 'error' ? '失败' : '完成');
@@ -115,7 +117,8 @@
       row.className = `message block-card tone-${view.tone}`;
       row.dataset.blockId = block.block_id;
       row.innerHTML = '<div class="chat-block"><div class="chat-block-head"><span class="label"></span><span class="title"></span><span class="status"></span></div><div class="chat-block-lines"></div><div class="chat-block-meta"></div></div>';
-      chat.insertBefore(row, messageRow(reply) || null);
+      var cardAnchor = messageRow(reply);
+      chat.insertBefore(row, (cardAnchor && cardAnchor.parentNode === chat) ? cardAnchor : null);
       blockRows[block.block_id] = row;
     }
     row.className = `message block-card tone-${view.tone}`;
@@ -149,6 +152,11 @@
         updateThink(activeReply, block.payload.text, block.payload.running);
       } else if (block.type === 'tool_card' && activeReply) {
         ensureToolRow(block, activeReply);
+        const action = block.payload?.ui_action;
+        if (action && !appliedToolUi[block.block_id]) {
+          appliedToolUi[block.block_id] = true;
+          if (window.appApplyUiAction) window.appApplyUiAction(action);
+        }
       } else if (block.type === 'assistant_text' && activeReply) {
         if (block.payload.presentation === 'clarification_card') {
           const row = messageRow(activeReply);
@@ -173,9 +181,10 @@
       '.new-chat-options{display:flex;gap:10px;flex-wrap:wrap;padding:6px 0 12px}',
       '.nco-card{flex:1 1 180px;max-width:260px;background:#fff;border:1px solid #e5e8f0;border-radius:14px;padding:12px 14px;cursor:pointer;transition:box-shadow .15s,transform .15s}',
       '.nco-card:hover{box-shadow:0 6px 18px rgba(15,23,42,.08);transform:translateY(-2px)}',
-      '.nco-ic{font-size:20px}',
-      '.nco-title{font-weight:700;color:#0f172a;margin:4px 0 2px;font-size:14px}',
-      '.nco-desc{color:#64748b;font-size:12px;line-height:1.5}',
+      '.nco-ic{color:#64748b;margin-bottom:7px;display:flex}',
+      '.nco-card:hover .nco-ic{color:#2563eb}',
+      '.nco-title{font-weight:700;color:#0f172a;font-size:14px}',
+      '.nco-desc{color:#64748b;font-size:12px;line-height:1.5;margin-top:3px}',
       '.mode-intro{background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:12px 15px;margin:6px 0 12px}',
       '.mi-title{font-weight:700;color:#0f172a;font-size:14px}',
       '.mi-desc{color:#64748b;font-size:12px;line-height:1.6;margin:4px 0 8px}',
@@ -241,14 +250,21 @@
   function showNewChatOptions() {
     ensureNewChatStyles();
     if (chat.querySelector('.new-chat-options')) return;
+    var MODE_ICONS = {
+      chat: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>',
+      free: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>',
+      protocol: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5h6"/><path d="M9 9h6"/><path d="M9 13h4"/><rect x="5" y="2" width="14" height="20" rx="2"/></svg>',
+      template: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
+      storage: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>'
+    };
     var wrap = document.createElement('div');
     wrap.className = 'new-chat-options';
     wrap.innerHTML = [
-      '<div class="nco-card" data-mode="chat"><div class="nco-ic">💬</div><div class="nco-title">自由聊天</div><div class="nco-desc">问答和讨论，不保存实验记录</div></div>',
-      '<div class="nco-card" data-mode="free"><div class="nco-ic">🧪</div><div class="nco-title">自由实验记录</div><div class="nco-desc">记录操作和数据，不绑定方案</div></div>',
-      '<div class="nco-card" data-mode="protocol"><div class="nco-ic">📋</div><div class="nco-title">方案实验</div><div class="nco-desc">进入方案页，查看或选择方案后开始</div></div>',
-      '<div class="nco-card" data-mode="template"><div class="nco-ic">✨</div><div class="nco-title">AI制作方案/配方</div><div class="nco-desc">对话创建或修改；PDF/图片请到方案页导入</div></div>',
-      '<div class="nco-card" data-mode="storage"><div class="nco-ic">🗃</div><div class="nco-title">制作储存库</div><div class="nco-desc">登记位置/物品/库存</div></div>'
+      '<div class="nco-card" data-mode="chat"><div class="nco-ic">' + MODE_ICONS.chat + '</div><div class="nco-title">自由聊天</div><div class="nco-desc">问答和讨论，不保存实验记录</div></div>',
+      '<div class="nco-card" data-mode="free"><div class="nco-ic">' + MODE_ICONS.free + '</div><div class="nco-title">自由实验记录</div><div class="nco-desc">记录操作和数据，不绑定方案</div></div>',
+      '<div class="nco-card" data-mode="protocol"><div class="nco-ic">' + MODE_ICONS.protocol + '</div><div class="nco-title">方案实验</div><div class="nco-desc">进入方案页，查看或选择方案后开始</div></div>',
+      '<div class="nco-card" data-mode="template"><div class="nco-ic">' + MODE_ICONS.template + '</div><div class="nco-title">AI制作方案/配方</div><div class="nco-desc">对话创建或修改；PDF/图片请到方案页导入</div></div>',
+      '<div class="nco-card" data-mode="storage"><div class="nco-ic">' + MODE_ICONS.storage + '</div><div class="nco-title">制作储存库</div><div class="nco-desc">登记位置/物品/库存</div></div>'
     ].join('');
     Array.prototype.forEach.call(wrap.querySelectorAll('.nco-card'), function (card) {
       card.onclick = function () {
