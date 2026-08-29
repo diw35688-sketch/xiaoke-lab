@@ -278,11 +278,17 @@ class ChatProcessor:
                     "get_reagent_prep", {"reagent_prep_id": reagent_match["reagent_prep_id"]}
                 )
                 if outcome.get("ok"):
-                    cards["__direct_reagent"] = lab_tools.present_result(
+                    direct_card = lab_tools.present_result(
                         "get_reagent_prep",
                         {"reagent_prep_id": reagent_match["reagent_prep_id"]},
                         outcome,
                     )
+                    if "开始" in turn.raw_text or "配" in turn.raw_text:
+                        direct_card["ui_action"] = {
+                            "type": "start_reagent_prep_flow",
+                            "id": reagent_match["reagent_prep_id"],
+                        }
+                    cards["__direct_reagent"] = direct_card
                     cards_list = list(cards.values())
                     direct_reagent = reagent_match
         if not direct_reagent and not any(card.get("title") == "选择实验方案" or card.get("kind") == "execute"
@@ -315,6 +321,12 @@ class ChatProcessor:
                 first_line = (reagent_card.get("lines") or [""])[0]
                 name_zh = first_line.split("：", 1)[1].strip() if "：" in first_line else first_line.strip()
                 direct_reagent = {"name_zh": name_zh or "该试剂"}
+                if ("开始" in turn.raw_text or "配" in turn.raw_text) \
+                        and (reagent_card.get("ui_action") or {}).get("type") == "open_reagent_prep":
+                    reagent_card["ui_action"] = {
+                        "type": "start_reagent_prep_flow",
+                        "id": (reagent_card.get("ui_action") or {}).get("id"),
+                    }
         if not direct_protocol:
             protocol_card = next((
                 card for card in cards_list
@@ -350,7 +362,14 @@ class ChatProcessor:
         if direct_protocol:
             answer = f"已进入「{direct_protocol['title']}」，开始实验。"
         elif direct_reagent:
-            answer = f"已找到「{direct_reagent['name_zh']}」并打开试剂配置库。"
+            flow_action = any(
+                (card.get("ui_action") or {}).get("type") == "start_reagent_prep_flow"
+                for card in cards_list
+            )
+            if flow_action:
+                answer = f"已开始配置「{direct_reagent['name_zh']}」，正在进入配置流程。"
+            else:
+                answer = f"已找到「{direct_reagent['name_zh']}」并打开试剂配置库。"
         # 方案/试剂很多时，聊天只给简短概览，真正的选择交给方案库/配置库页面。
         list_card = next((
             card for card in cards_list

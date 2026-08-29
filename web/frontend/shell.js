@@ -8,18 +8,21 @@
 
   var CSS = [
     'body.shell{margin:0;overflow:hidden}',
-    '#shell{position:fixed;inset:0;display:flex;background:var(--n-60);font-family:-apple-system,"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;font-size:var(--fs-md);color:var(--n-900)}',
+    '#shell{position:fixed;inset:0;display:flex;background:var(--n-60);font-family:var(--font-ui);font-size:var(--fs-md);color:var(--n-900)}',
     // 左侧栏：浅色，不再是深蓝黑
-    '#sh-side{flex:0 0 216px;background:var(--n-50);border-right:1px solid var(--bd-2);display:flex;flex-direction:column;transition:flex-basis .18s}',
-    '#shell.side-collapsed #sh-side{flex-basis:50px}',
-    '#sh-brand{padding:14px 16px;font-size:var(--fs-md);font-weight:600;color:var(--n-900);display:flex;align-items:center;gap:8px;white-space:nowrap;overflow:hidden}',
-    '#sh-brand span.dot{width:7px;height:7px;border-radius:50%;background:var(--green-500);flex:0 0 7px}',
+    '#sh-side{flex:0 0 220px;background:var(--n-50);border-right:1px solid var(--bd-2);display:flex;flex-direction:column;transition:flex-basis .18s}',
+    '#shell.side-collapsed #sh-side{flex-basis:54px}',
+    '#sh-brand{padding:16px 14px 12px;font-size:var(--fs-md);font-weight:600;color:var(--n-900);display:flex;align-items:center;gap:10px;white-space:nowrap;overflow:hidden}',
+    '#sh-brand .mark{display:grid;place-items:center;width:28px;height:28px;border-radius:9px;background:var(--brand);color:#fff;flex:0 0 28px;box-shadow:var(--sh-1)}',
+    '#sh-brand .mark svg{display:block}',
     '.sh-nav{padding:4px 8px;flex:1;overflow:auto}',
-    '.sh-item{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:var(--r-md);cursor:pointer;font-size:var(--fs-md);color:var(--n-700);white-space:nowrap;overflow:hidden;margin-bottom:1px}',
+    '.sh-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--r-md);cursor:pointer;font-size:var(--fs-md);color:var(--n-700);white-space:nowrap;overflow:hidden;margin-bottom:1px;transition:background .12s}',
     '.sh-item:hover{background:var(--n-100)}',
     '.sh-item.active{background:var(--brand-50);color:var(--brand-strong);font-weight:500}',
-    '.sh-ico{flex:0 0 16px;text-align:center;font-size:12px;opacity:.75}',
-    '.sh-sec{font-size:var(--fs-xs);color:var(--n-500);padding:12px 10px 4px;white-space:nowrap;overflow:hidden}',
+    '.sh-ico{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;flex:0 0 18px;opacity:.8}',
+    '.sh-ico svg{display:block}',
+    '.sh-item.active .sh-ico{opacity:1}',
+    '.sh-sec{font-size:var(--fs-xs);color:var(--n-500);padding:14px 10px 5px;letter-spacing:.02em;white-space:nowrap;overflow:hidden}',
     '#shell.side-collapsed .sh-label,#shell.side-collapsed .sh-sec,#shell.side-collapsed #sh-brand b{display:none}',
     '#sh-foot{padding:8px;border-top:1px solid var(--bd-1)}',
     // 管理画布与聊天互斥显示，不再左右并排。
@@ -27,7 +30,8 @@
     '#sh-top{height:44px;flex:0 0 44px;background:var(--n-00);border-bottom:1px solid var(--bd-2);display:flex;align-items:center;padding:0 14px;gap:10px}',
     '#sh-title{font-size:var(--fs-md);font-weight:600;color:var(--n-900)}',
     '#sh-status{font-size:var(--fs-sm);color:var(--n-600);margin-left:auto;display:flex;align-items:center;gap:6px}',
-    '#sh-notify{position:relative;margin-left:auto;padding:4px 9px;font-size:14px}',
+    '#sh-notify{position:relative;margin-left:auto;padding:5px 9px;display:inline-flex;align-items:center;color:var(--n-600)}',
+    '#sh-notify svg{display:block}',
     '#sh-notify-badge{position:absolute;top:-4px;right:-4px;min-width:15px;height:15px;border-radius:999px;background:#ef4444;color:#fff;font-size:9px;display:none;align-items:center;justify-content:center;padding:0 3px}',
     '#sh-notify.has-unread #sh-notify-badge{display:flex}',
     '.sh-pill{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:var(--r-sm);background:var(--n-75);font-size:var(--fs-xs);color:var(--n-700)}',
@@ -86,26 +90,44 @@
 
   ].join('');
 
+  // 图标：与 composer 同一套语言（24 网格、1.7 细线、currentColor），
+  // 取代此前几何字符与彩色 emoji 的混排图标。
+  function ico(paths, size) {
+    var s = size || 16;
+    return '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + paths + '</svg>';
+  }
+  var I = {
+    flask: ico('<path d="M10 2v6.3L4.6 17.8A2 2 0 0 0 6.4 21h11.2a2 2 0 0 0 1.8-3.2L14 8.3V2"/><path d="M8.5 2h7"/><path d="M7.2 15h9.6"/>'),
+    calc: ico('<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8"/><path d="M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01"/>'),
+    clipboard: ico('<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4M12 16h4M8 11h.01M8 16h.01"/>'),
+    tube: ico('<path d="M14.5 2v17.5a2.5 2.5 0 0 1-5 0V2"/><path d="M8.5 2h7"/><path d="M14.5 16h-5"/>'),
+    box: ico('<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="M3.3 7l8.7 5 8.7-5"/><path d="M12 22V12"/>'),
+    globe: ico('<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>'),
+    file: ico('<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M16 13H8M16 17H8M10 9H8"/>'),
+    gear: ico('<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>'),
+    bell: ico('<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>')
+  };
+
   var HTML = [
     '<div id="sh-side">',
-    '  <div id="sh-brand"><span class="dot"></span><b>实验语音助手</b></div>',
+    '  <div id="sh-brand"><span class="mark">' + ico('<path d="M10 2v6.3L4.6 17.8A2 2 0 0 0 6.4 21h11.2a2 2 0 0 0 1.8-3.2L14 8.3V2"/><path d="M8.5 2h7"/><path d="M7.2 15h9.6"/>', 15) + '</span><b>小科 · 实验助手</b></div>',
     '  <div class="sh-nav">',
     '    <div class="sh-sec">工作台</div>',
-    '    <div class="sh-item active" data-view="run"><span class="sh-ico">◈</span><span class="sh-label">实验进行中</span></div>',
-    '    <div class="sh-item" data-view="calculator"><span class="sh-ico">∑</span><span class="sh-label">分子量计算</span></div>',
-    '    <div class="sh-item" data-view="protocols"><span class="sh-ico">☰</span><span class="sh-label">实验方案</span></div>',
-    '    <div class="sh-item" data-view="reagent_prep"><span class="sh-ico">🧪</span><span class="sh-label">试剂配置库</span></div>',
-    '    <div class="sh-item" data-view="storage"><span class="sh-ico">▣</span><span class="sh-label">储存库</span></div>',
-    '    <div class="sh-item" data-view="community"><span class="sh-ico">🌐</span><span class="sh-label">社区</span></div>',
-    '    <div class="sh-item" data-view="records"><span class="sh-ico">▤</span><span class="sh-label">本次记录</span></div>',
+    '    <div class="sh-item active" data-view="run"><span class="sh-ico">' + I.flask + '</span><span class="sh-label">实验进行中</span></div>',
+    '    <div class="sh-item" data-view="calculator"><span class="sh-ico">' + I.calc + '</span><span class="sh-label">分子量计算</span></div>',
+    '    <div class="sh-item" data-view="protocols"><span class="sh-ico">' + I.clipboard + '</span><span class="sh-label">实验方案</span></div>',
+    '    <div class="sh-item" data-view="reagent_prep"><span class="sh-ico">' + I.tube + '</span><span class="sh-label">试剂配置库</span></div>',
+    '    <div class="sh-item" data-view="storage"><span class="sh-ico">' + I.box + '</span><span class="sh-label">储存库</span></div>',
+    '    <div class="sh-item" data-view="community"><span class="sh-ico">' + I.globe + '</span><span class="sh-label">社区</span></div>',
+    '    <div class="sh-item" data-view="records"><span class="sh-ico">' + I.file + '</span><span class="sh-label">本次记录</span></div>',
     '    <div class="sh-sec">配置</div>',
-    '    <div class="sh-item" data-view="settings"><span class="sh-ico">⚙</span><span class="sh-label">设置</span></div>',
+    '    <div class="sh-item" data-view="settings"><span class="sh-ico">' + I.gear + '</span><span class="sh-label">设置</span></div>',
     '  </div>',
     '  <div id="sh-foot"><button class="sh-btn" id="sh-collapse" style="width:100%">收起侧栏</button></div>',
     '</div>',
     '<div id="sh-center">',
     '  <div id="sh-top"><span id="sh-title">实验进行中</span>',
-    '    <button class="sh-btn" id="sh-notify" type="button" title="消息通知">🔔<span id="sh-notify-badge">0</span></button>',
+    '    <button class="sh-btn" id="sh-notify" type="button" title="消息通知">' + I.bell + '<span id="sh-notify-badge">0</span></button>',
     '    <div id="sh-status"></div>',
     '  </div>',
     '  <div id="sh-canvas"></div>',
@@ -180,6 +202,11 @@
     }
     if (action.type === 'open_reagent_prep' && action.id) {
       if (window.prepOpenDetail) window.prepOpenDetail(action.id);
+      else show('reagent_prep');
+      return;
+    }
+    if (action.type === 'start_reagent_prep_flow' && action.id) {
+      if (window.prepStartFlow) window.prepStartFlow(action.id);
       else show('reagent_prep');
       return;
     }
