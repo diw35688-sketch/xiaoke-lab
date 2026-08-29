@@ -73,6 +73,13 @@ def initialize_database():
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(session_id, segment_id))""")
         connection.execute("CREATE INDEX IF NOT EXISTS idx_lab_records_session ON lab_records(session_id, segment_id)")
+        connection.execute("""CREATE TABLE IF NOT EXISTS reagent_prep_flows (
+            conversation_id TEXT PRIMARY KEY,
+            prep_id TEXT NOT NULL,
+            current_index INTEGER NOT NULL DEFAULT 0,
+            status TEXT NOT NULL DEFAULT 'running',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
         # 储存库：全局存储位置与存储物品资产库
         connection.execute("""CREATE TABLE IF NOT EXISTS storage_locations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

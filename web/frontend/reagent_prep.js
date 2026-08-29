@@ -40,7 +40,7 @@
       var badge = badgeHtml(prep.review_status);
       host.innerHTML = '<div class="prep-detail">'
         + '<div style="display:flex;gap:8px;justify-content:space-between;align-items:center"><button class="sh-btn" id="prep-back">← 返回配置列表</button>'
-        + '<div><button class="sh-btn" id="prep-edit">编辑此配方</button><button class="sh-btn" id="prep-del" style="color:#b91c1c;margin-left:6px">删除配方</button></div></div>'
+        + '<div><button class="sh-btn primary" id="prep-start">开始配置</button><button class="sh-btn" id="prep-edit" style="margin-left:6px">编辑</button><button class="sh-btn" id="prep-del" style="color:#b91c1c;margin-left:6px">删除</button></div></div>'
         + '<div class="prep-detail-title">' + esc(prep.name_zh) + '</div>'
         + '<div class="prep-detail-sub">' + esc(prep.purpose) + ' · ' + badge + '</div>'
         + '<div class="prep-detail-box">'
@@ -56,6 +56,7 @@
         + '<div class="prep-source">来源：' + esc(prep.source || '未注明') + (prep.source_url ? ' · <a href="' + esc(prep.source_url) + '" target="_blank">查看来源</a>' : '') + '</div>'
         + '</div>';
       host.querySelector('#prep-back').onclick = function () { window.shellShow('reagent_prep'); };
+      host.querySelector('#prep-start').onclick = function () { showPrepFlow(host, prep); };
       host.querySelector('#prep-edit').onclick = function () { showEdit(); };
       host.querySelector('#prep-del').onclick = function () {
         if (!confirm('确定删除这个配方？')) return;
@@ -178,6 +179,112 @@
 
     render();
   }
+
+  function flowCid() {
+    return localStorage.getItem('lab-agent-conversation-id') || 'reagent-flow-default';
+  }
+
+  function flowApi(path, method, payload) {
+    return fetch(path, {
+      method: method,
+      headers: {'Content-Type': 'application/json'},
+      body: payload ? JSON.stringify(payload) : undefined,
+    }).then(function (r) {
+      if (!r.ok) {
+        return r.json().catch(function () { return {}; }).then(function (d) {
+          throw new Error(d.detail || ('配置流程请求失败：' + r.status));
+        });
+      }
+      return r.json();
+    });
+  }
+
+  function showPrepFlow(host, prep) {
+    var cid = flowCid();
+    var prepId = prep.reagent_prep_id;
+    var steps = (prep.steps || []).filter(Boolean);
+    var index = 0;
+    var status = 'running';
+    var flowMsg = '';
+
+    function render() {
+      if (status === 'completed') {
+        host.innerHTML = '<div class="prep-detail">'
+          + '<button class="sh-btn" id="prep-flow-back">← 返回配置列表</button>'
+          + '<div class="prep-detail-title">配置完成：' + esc(prep.name_zh) + '</div>'
+          + '<div class="prep-detail-sub">全部步骤已走完，可返回列表查看或继续编辑。</div></div>';
+        host.querySelector('#prep-flow-back').onclick = function () { window.shellShow('reagent_prep'); };
+        return;
+      }
+      if (!steps.length) {
+        host.innerHTML = '<div class="prep-detail">'
+          + '<button class="sh-btn" id="prep-flow-back">← 返回</button>'
+          + '<div class="prep-detail-title">开始配置：' + esc(prep.name_zh) + '</div>'
+          + '<div class="prep-detail-sub">该配方暂无配制步骤，请先编辑配方补充步骤。</div></div>';
+        host.querySelector('#prep-flow-back').onclick = function () { window.shellShow('reagent_prep'); };
+        return;
+      }
+      var step = steps[index];
+      var progress = Math.round(((index + 1) / steps.length) * 100);
+      host.innerHTML = '<div class="prep-detail">'
+        + '<div style="display:flex;gap:8px;justify-content:space-between;align-items:center"><button class="sh-btn" id="prep-flow-back">← 退出配置</button>'
+        + '<span style="font-size:12px;color:#64748b">第 ' + (index + 1) + ' / ' + steps.length + ' 步</span></div>'
+        + '<div class="prep-detail-title">开始配置：' + esc(prep.name_zh) + '</div>'
+        + '<div class="prep-detail-sub">' + esc(prep.purpose || '') + ' · 目标：' + esc(prep.target_concentration || '未指定') + ' · 体积：' + esc(prep.target_volume || '按需') + '</div>'
+        + '<div class="rc-progress"><div class="rc-progress-bar" style="width:' + progress + '%"></div></div>'
+        + '<div class="prep-flow-step" style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px 18px;margin-bottom:12px">'
+        + '<div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:8px">第 ' + (index + 1) + ' 步</div>'
+        + '<div style="font-size:15px;color:#1f2937;line-height:1.8;white-space:pre-wrap">' + esc(step) + '</div>'
+        + '</div>'
+        + (prep.safety && prep.safety.length
+            ? '<div class="prep-detail-box prep-safety-box"><div class="prep-section-title">本步安全提醒</div>'
+              + prep.safety.map(function (s) { return '<div class="prep-safety">⚠ ' + esc(s.name) + '：' + esc((s.statements || []).join('；')) + '</div>'; }).join('')
+              + '</div>'
+            : '')
+        + (flowMsg ? '<div style="color:#c2410c;font-size:12px;margin-bottom:8px">' + esc(flowMsg) + '</div>' : '')
+        + '<div style="display:flex;gap:8px;margin-top:4px">'
+        + '<button class="sh-btn" id="prep-flow-prev"' + (index === 0 ? ' disabled' : '') + '>上一步</button>'
+        + '<button class="sh-btn primary" id="prep-flow-next"' + (index === steps.length - 1 ? ' disabled' : '') + '>下一步</button>'
+        + (index === steps.length - 1 ? '<button class="sh-btn" id="prep-flow-done">完成配置</button>' : '')
+        + '</div></div>';
+      host.querySelector('#prep-flow-back').onclick = function () { window.shellShow('reagent_prep'); };
+      host.querySelector('#prep-flow-prev').onclick = function () { move('prev'); };
+      var next = host.querySelector('#prep-flow-next');
+      if (next) next.onclick = function () { move('next'); };
+      var done = host.querySelector('#prep-flow-done');
+      if (done) done.onclick = function () {
+        if (confirm('确认完成「' + prep.name_zh + '」的配置流程？')) move('complete');
+      };
+    }
+
+    function move(action) {
+      flowMsg = '';
+      flowApi('/reagent-prep/flow/move', 'POST', {conversation_id: cid, action: action})
+        .then(function (state) {
+          index = state.current_index;
+          status = state.status;
+          steps = state.steps || [];
+          render();
+        })
+        .catch(function (err) { flowMsg = err.message; render(); });
+    }
+
+    flowApi('/reagent-prep/flow/start', 'POST', {conversation_id: cid, reagent_prep_id: prepId})
+      .then(function (state) {
+        index = state.current_index;
+        status = state.status;
+        steps = state.steps || [];
+        render();
+      })
+      .catch(function (err) {
+        flowMsg = err.message;
+        render();
+      });
+  }
+  window.prepStartFlow = function (id) {
+    window.__pendingPrepFlowId = id;
+    if (window.shellShow) window.shellShow('reagent_prep');
+  };
 
   function ensureStyles(host) {
     if (document.getElementById('prep-grid-style')) return;
@@ -341,6 +448,12 @@
           };
         } else {
           moreBox.innerHTML = '';
+        }
+        var pendingFlowId = window.__pendingPrepFlowId;
+        if (pendingFlowId) {
+          var flowItem = (d.items || []).filter(function (x) { return x.reagent_prep_id === pendingFlowId; })[0];
+          if (flowItem) showPrepFlow(host, flowItem);
+          window.__pendingPrepFlowId = null;
         }
         var pendingId = window.__pendingPrepDetailId;
         if (pendingId) {
