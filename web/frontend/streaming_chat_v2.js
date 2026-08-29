@@ -189,29 +189,50 @@
 
   function openMode(mode) {
     if (window.logAction) window.logAction('new_chat_mode', { mode: mode });
-    window.interactionModeState.select(mode === 'free' ? 'free' : mode);
-    var opt = chat.querySelector('.new-chat-options');
-    if (opt) opt.remove();
     var input = document.getElementById('message');
-    if (mode === 'free') {
-      // 自由模式留在聊天区，并显示预设提示
+    function showIntro(icon, title, description) {
+      var opt = chat.querySelector('.new-chat-options');
+      if (opt) opt.remove();
       var intro = chat.querySelector('.mode-intro');
       if (intro) intro.remove();
       var div = document.createElement('div');
       div.className = 'mode-intro';
-      div.innerHTML = '<div class="mi-title">🧪 自由模式已开启</div>'
-        + '<div class="mi-desc">可以自由聊天、记录实验，不绑定方案。说一句即可开始。</div>';
+      div.innerHTML = '<div class="mi-title">' + icon + ' ' + title + '</div>'
+        + '<div class="mi-desc">' + description + '</div>';
       chat.appendChild(div);
       chat.scrollTop = chat.scrollHeight;
       if (input) input.focus();
+    }
+    if (mode === 'chat') {
+      window.selectComposerMode('chat').then(function () {
+        showIntro('💬', '自由聊天已开启', '用于问答和讨论，不会保存为实验记录。');
+      });
       return;
     }
-    if (mode === 'template') {
-      // 制作模板：跳转到实验方案页（支持 PDF/图片 OCR 生成规范模板）
+    if (mode === 'free') {
+      window.selectComposerMode('free').then(function (selected) {
+        if (selected) {
+          showIntro('🧪', '自由实验记录已开启', '记录实际操作和测量数据，不绑定实验方案。');
+        }
+      });
+      return;
+    }
+    if (mode === 'protocol') {
+      // 方案实验入口始终先打开方案页；是否沿用或更换当前方案由用户明确选择。
       if (window.shellShow) window.shellShow('protocols');
       return;
     }
+    if (mode === 'template') {
+      window.interactionModeState.select('template');
+      showIntro(
+        '✨',
+        'AI制作方案/配方已开启',
+        '通过对话创建或修改实验方案、试剂配方；可上传文本文件，PDF或图片请到方案页导入。'
+      );
+      return;
+    }
     if (mode === 'storage') {
+      window.interactionModeState.select('storage');
       // 制作储存库：跳转到储存库页面
       if (window.shellShow) window.shellShow('storage');
     }
@@ -223,8 +244,10 @@
     var wrap = document.createElement('div');
     wrap.className = 'new-chat-options';
     wrap.innerHTML = [
-      '<div class="nco-card" data-mode="free"><div class="nco-ic">🧪</div><div class="nco-title">自由模式</div><div class="nco-desc">记录/聊天，不绑定方案</div></div>',
-      '<div class="nco-card" data-mode="template"><div class="nco-ic">📄</div><div class="nco-title">制作模板</div><div class="nco-desc">把配方/方案做成规范模板</div></div>',
+      '<div class="nco-card" data-mode="chat"><div class="nco-ic">💬</div><div class="nco-title">自由聊天</div><div class="nco-desc">问答和讨论，不保存实验记录</div></div>',
+      '<div class="nco-card" data-mode="free"><div class="nco-ic">🧪</div><div class="nco-title">自由实验记录</div><div class="nco-desc">记录操作和数据，不绑定方案</div></div>',
+      '<div class="nco-card" data-mode="protocol"><div class="nco-ic">📋</div><div class="nco-title">方案实验</div><div class="nco-desc">进入方案页，查看或选择方案后开始</div></div>',
+      '<div class="nco-card" data-mode="template"><div class="nco-ic">✨</div><div class="nco-title">AI制作方案/配方</div><div class="nco-desc">对话创建或修改；PDF/图片请到方案页导入</div></div>',
       '<div class="nco-card" data-mode="storage"><div class="nco-ic">🗃</div><div class="nco-title">制作储存库</div><div class="nco-desc">登记位置/物品/库存</div></div>'
     ].join('');
     Array.prototype.forEach.call(wrap.querySelectorAll('.nco-card'), function (card) {

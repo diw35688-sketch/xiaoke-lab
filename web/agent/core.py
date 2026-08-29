@@ -1,5 +1,7 @@
 import json
 import httpx
+from dataclasses import dataclass
+import threading
 from openai import APIConnectionError, APIStatusError, APITimeoutError, OpenAI
 import settings_store
 from database.crud import list_memories
@@ -41,6 +43,18 @@ CHAT_POLICY_FULL = """当前请求是自由聊天。请给出自然、完整且�
 CHAT_REFINEMENT_POLICY = """把下面的助手回答重新生成成一句自然、完整、可独立理解的中文短回复。最多{max_chars}个字符（标点也计数），不得使用Markdown、标题、列表、链接、表情或称呼前缀；保留原意和关键结论，不得只截取前半句，不得解释你的改写过程。只输出改写后的正文：\n\n{answer}"""
 
 EXPERIMENT_RECORD_POLICY = """当前请求属于实验记录。用户描述刚完成的操作或实测事实时，必须调用 record_observation 并传递原始 transcript；只有工具返回成功后才能声称已记录，失败必须如实说明未保存。"""
+
+EXPERIMENT_TOOL_POLICY = """当前处于实验记录过程中，用户已用“小科”明确发出工具指令。只能从提供的工具中选择；不得保存本句话为实验记录，不得结束实验、修改方案或删除数据。需要工具时必须调用工具，只有工具返回成功后才能声称已经执行。用户询问“你能做什么”“有哪些工具”“支持什么功能”时，必须调用 list_experiment_commands，不得凭记忆手写清单。若没有合适工具，简短说明本次实验模式暂不支持。回答简短、直接、口语化。"""
+
+@dataclass(frozen=True)
+class ExperimentToolAgentResult:
+    answer: str
+    tool_views: tuple[dict, ...]
+    called_tools: tuple[str, ...]
+
+
+_latest_experiment_timer: dict[tuple[str, str], str] = {}
+_latest_experiment_timer_lock = threading.Lock()
 
 TOOLS = [
     {"type":"function","function":{"name":"calculate","description":"执行基础数学计算。","parameters":{"type":"object","properties":{"expression":{"type":"string"}},"required":["expression"],"additionalProperties":False}}},
@@ -158,6 +172,144 @@ def _tools_for_mode(interaction_mode=None):
     if interaction_mode != InteractionMode.CHAT:
         return TOOLS
     return [tool for tool in TOOLS if tool["function"]["name"] != "record_observation"]
+
+
+def _experiment_tools():
+    tools = []
+    for tool in lab_tools.openai_tools(experiment_commands_only=True):
+        copied = json.loads(json.dumps(tool, ensure_ascii=False))
+        if copied["function"]["name"] == "check_timer":
+            copied["function"]["parameters"]["properties"] = {}
+            copied["function"]["parameters"]["required"] = []
+            copied["function"]["description"] += (
+                " 查询当前实验会话最近启动的计时器。"
+            )
+        if copied["function"]["name"] == "get_protocol_detail":
+            copied["function"]["parameters"]["properties"] = {}
+            copied["function"]["parameters"]["required"] = []
+            copied["function"]["description"] = "查看当前实验已选择方案的完整详情。"
+        tools.append(copied)
+    return tools
+
+
+def _execute_experiment_tool(name, args, conversation_id, lab_session_id):
+    if name not in lab_tools.experiment_command_names():
+        raise PermissionError(f"实验模式不允许调用工具：{name}")
+    safe_args = dict(args or {})
+    if name == "check_timer":
+        with _latest_experiment_timer_lock:
+            timer_id = _latest_experiment_timer.get(
+                (conversation_id, lab_session_id)
+            )
+        if timer_id is None:
+            return {"found": False, "message": "本次实验会话还没有启动计时器。"}
+        safe_args = {"timer_id": timer_id}
+    if name == "get_protocol_detail":
+        state = lab_tools.domain.session()
+        protocol = state.selection.protocol
+        if protocol is None:
+            return {"found": False, "message": "当前没有选择实验方案。"}
+        safe_args = {"protocol_id": protocol.protocol_id}
+    outcome = lab_tools.call(name, safe_args)
+    if not outcome["ok"]:
+        raise RuntimeError(outcome["error"])
+    result = outcome["result"]
+    if name == "start_timer" and isinstance(result, dict) and result.get("timer_id"):
+        with _latest_experiment_timer_lock:
+            _latest_experiment_timer[(conversation_id, lab_session_id)] = str(
+                result["timer_id"]
+            )
+    return result
+
+
+def _is_experiment_capability_query(command_text):
+    normalized = "".join(
+        char for char in str(command_text or "").strip()
+        if char not in " \t\r\n，,。.!！?？:：、"
+    )
+    return normalized in {
+        "你能做什么",
+        "你现在能做什么",
+        "有哪些工具",
+        "现在有哪些工具",
+        "支持什么功能",
+        "现在支持什么功能",
+    }
+
+
+def run_experiment_tool_agent(command_text, conversation_id, lab_session_id):
+    """Run a bounded standard function-calling loop for an addressed command."""
+
+    if _is_experiment_capability_query(command_text):
+        name = "list_experiment_commands"
+        result = _execute_experiment_tool(
+            name, {}, conversation_id, lab_session_id
+        )
+        outcome = {"ok": True, "result": result}
+        view = dict(lab_tools.present_result(name, {}, outcome))
+        view["tool_call_id"] = "local:experiment-command-catalog"
+        titles = [item["title"] for item in result["tools"]]
+        answer = (
+            "当前可以" + "、".join(titles) + "。"
+            if titles else "当前没有开放的实验工具。"
+        )
+        return ExperimentToolAgentResult(answer, (view,), (name,))
+
+    client = _client()
+    messages = [
+        {"role": "system", "content": EXPERIMENT_TOOL_POLICY},
+        {"role": "user", "content": command_text},
+    ]
+    tool_views = []
+    called_tools = []
+    try:
+        for _ in range(4):
+            response = client.chat.completions.create(
+                model=settings_store.current().model_name,
+                messages=messages,
+                tools=_experiment_tools(),
+                extra_body=_extra_body(),
+            )
+            assistant = response.choices[0].message
+            calls = assistant.tool_calls or []
+            if not calls:
+                answer = (assistant.content or "本次实验模式暂不支持这个工具指令。").strip()
+                return ExperimentToolAgentResult(
+                    answer, tuple(tool_views), tuple(called_tools)
+                )
+            messages.append(assistant)
+            for call in calls:
+                name = call.function.name
+                args = {}
+                try:
+                    args = json.loads(call.function.arguments or "{}")
+                    result = _execute_experiment_tool(
+                        name, args, conversation_id, lab_session_id
+                    )
+                    outcome = {"ok": True, "result": result}
+                except Exception as error:
+                    result = {"error": str(error)}
+                    outcome = {"ok": False, "error": str(error)}
+                view = dict(lab_tools.present_result(name, args, outcome))
+                view["tool_call_id"] = call.id
+                tool_views.append(view)
+                called_tools.append(name)
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": call.id,
+                    "content": json.dumps(result, ensure_ascii=False),
+                })
+    except APITimeoutError as error:
+        raise ModelServiceError("实验工具判断超时，请重试。", 504) from error
+    except APIConnectionError as error:
+        raise ModelServiceError("无法连接实验工具模型，请检查网络后重试。", 502) from error
+    except APIStatusError as error:
+        raise ModelServiceError(
+            f"实验工具模型返回异常（状态码 {error.status_code}）。", 502
+        ) from error
+    return ExperimentToolAgentResult(
+        "工具调用次数过多，已停止本次请求。", tuple(tool_views), tuple(called_tools)
+    )
 
 
 def _execute_tool(name, args, conversation_id, interaction_mode=None):

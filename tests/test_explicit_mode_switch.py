@@ -54,12 +54,35 @@ class ExplicitModeSwitchTests(unittest.TestCase):
         self.assertLess(mode, source.index("streaming_chat_v2.js"))
         self.assertLess(mode, source.index("composer.js"))
 
-    def test_composer_has_three_explicit_modes_and_captures_before_submit(self):
-        source = (FRONTEND / "composer.js").read_text(encoding="utf-8")
+    def test_new_chat_has_three_explicit_modes_and_captures_before_submit(self):
+        source = (FRONTEND / "streaming_chat_v2.js").read_text(encoding="utf-8")
         for name in ("chat", "free", "protocol"):
             self.assertIn(f'data-mode="{name}"', source)
-        self.assertIn("captureComposerModeSnapshot", source)
-        self.assertLess(source.index("captureComposerModeSnapshot"), source.index("form.requestSubmit"))
+        self.assertIn("window.selectComposerMode('chat')", source)
+        self.assertIn("window.selectComposerMode('free')", source)
+        protocol_branch = source[
+            source.index("if (mode === 'protocol')"):
+            source.index("if (mode === 'template')")
+        ]
+        self.assertIn("window.shellShow('protocols')", protocol_branch)
+        self.assertNotIn("selectComposerMode", protocol_branch)
+        self.assertEqual(source.count('data-mode="template"'), 1)
+        template_branch = source[
+            source.index("if (mode === 'template')"):
+            source.index("if (mode === 'storage')")
+        ]
+        self.assertIn("interactionModeState.select('template')", template_branch)
+        self.assertIn("showIntro", template_branch)
+        self.assertNotIn("shellShow('protocols')", template_branch)
+        self.assertIn("AI制作方案/配方", source)
+        self.assertIn("可上传文本文件，PDF或图片请到方案页导入", source)
+        self.assertIn("方案实验", source)
+        composer = (FRONTEND / "composer.js").read_text(encoding="utf-8")
+        self.assertIn("captureComposerModeSnapshot", composer)
+        self.assertLess(
+            composer.index("captureComposerModeSnapshot"),
+            composer.index("form.requestSubmit"),
+        )
 
     def test_protocol_mode_requires_a_selected_server_protocol(self):
         composer = (FRONTEND / "composer.js").read_text(encoding="utf-8")

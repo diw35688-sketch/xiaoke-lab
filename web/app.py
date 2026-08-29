@@ -99,9 +99,6 @@ def home(request: Request):
     page = (BASE_DIR / "frontend" / "index.html").read_text(encoding="utf-8")
     page = page.replace('/static/inworld_tts.js', '/static/local_tts.js?v=20260826-shared-warmup')
     page = page.replace('</head>', '<link rel="stylesheet" href="/static/theme.css"></head>')
-    # 注入模型设置面板（任何人都能在网页里配置模型）
-    page = page.replace('</body>', ('<script src="/static/voice_asr.js?v=20260827-clarification-card"></script>'
-                                   '</body>'))
     scripts = (
         '<script src="/static/debug_log.js?v=20260901"></script>'
         '<script src="/static/experiment_confirmation.js"></script>'
@@ -116,8 +113,9 @@ def home(request: Request):
         '<script src="/static/turn_reply_surface.js?v=20260827-progress-cleanup"></script>'
         '<script src="/static/conversation_context_blocks.js?v=20260825"></script>'
         '<script src="/static/interaction_mode_state.js?v=20260829-storage"></script>'
+        '<script src="/static/voice_asr.js?v=20260827-clarification-card"></script>'
         '<script src="/static/turn_client.js?v=20260827-timing"></script>'
-        '<script src="/static/streaming_chat_v2.js?v=20260901-telemetry"></script>'
+        '<script src="/static/streaming_chat_v2.js?v=20260829-explicit-modes"></script>'
         '<script src="/static/template_planner.js"></script>'
         '<script src="/static/task_panel.js"></script>'
         '<script src="/static/shell.js?v=20260901-telemetry"></script>'
