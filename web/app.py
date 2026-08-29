@@ -156,8 +156,8 @@ def phone_access_page(request: Request):
     """手机访问入口页：桌面端打开本页，手机扫二维码即可访问。"""
     status = network_mode.status()
     url = status.get("public_url") or status.get("lan_url") or phone_access.phone_url(request)
-    # 二维码固定指向手机专用页，扫码直接进大按钮版本
-    url = url.rstrip("/") + "/m"
+    # 二维码指向电脑界面的手机版（聊天默认，实验开始后进入工作台卡片）
+    url = url.rstrip("/") + "/"
     svg = phone_access.qr_svg(url)
     qr_block = svg if svg else f"<pre>{url}</pre>"
     mode_label = "公网隧道" if status.get("mode") == "tunnel" else "局域网"
