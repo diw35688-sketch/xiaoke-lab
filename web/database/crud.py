@@ -144,6 +144,22 @@ def ensure_conversation(conversation_id=None):
 def list_conversations(limit=50):
     initialize_database()
     with get_connection() as connection:
+        # 空会话（没有消息）不保留，避免列表里全是“新会话”。
+        connection.execute(
+            """
+            DELETE FROM turn_requests
+            WHERE conversation_id IN (
+                SELECT c.id FROM conversations c
+                WHERE NOT EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id=c.id)
+            )
+            """
+        )
+        connection.execute(
+            """
+            DELETE FROM conversations
+            WHERE NOT EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id=conversations.id)
+            """
+        )
         rows = connection.execute(
             """SELECT c.id,c.title,c.created_at,c.updated_at,
                       COUNT(m.id) AS message_count,
