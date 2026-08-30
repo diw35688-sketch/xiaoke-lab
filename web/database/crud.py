@@ -160,6 +160,20 @@ def list_conversations(limit=50):
             WHERE NOT EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id=conversations.id)
             """
         )
+        # 给历史里的“新会话”补上自动名字（取第一条用户消息）。
+        connection.execute(
+            """
+            UPDATE conversations
+            SET title=(
+                SELECT substr(replace(m.content, char(10), ' '), 1, 32)
+                FROM messages m
+                WHERE m.conversation_id=conversations.id AND m.role='user'
+                ORDER BY m.id ASC LIMIT 1
+            )
+            WHERE title='新会话'
+              AND EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id=conversations.id)
+            """
+        )
         rows = connection.execute(
             """SELECT c.id,c.title,c.created_at,c.updated_at,
                       COUNT(m.id) AS message_count,
