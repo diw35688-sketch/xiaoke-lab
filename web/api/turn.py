@@ -11,6 +11,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from asr_application_service import AudioValidationError, get_asr_application_service
+from database.crud import latest_conversation
 from database.turn_store import TurnRequestConflictError, TurnStore
 from playback_runtime import web_playback_service
 from src.core.conversation_turn import ExperimentContext, InputSource, InteractionMode
@@ -56,7 +57,13 @@ class _ModeFields(BaseModel):
     mode_version: int = Field(ge=1)
 
     def resolved_conversation_id(self) -> str:
-        return self.conversation_id or str(uuid.uuid4())
+        if self.conversation_id:
+            return self.conversation_id
+        # 兜底：避免缺 ID 时每条消息生成一个新会话；复用最近一次会话。
+        latest = latest_conversation()
+        if latest:
+            return latest
+        return str(uuid.uuid4())
 
 
 class TurnTextRequest(_ModeFields):
