@@ -9,7 +9,10 @@ import llm_bridge
 import ocr_bridge
 import settings_store
 from database.turn_store import ExperimentStateConflictError, TurnStore
-from src.core.protocol_execution_state import ProtocolExecutionState
+from src.core.protocol_execution_state import (
+    ProtocolExecutionState,
+    ProtocolStepProgressStatus,
+)
 from src.core.protocol_navigation import decide_protocol_move
 from src.core.reply_coordinator import ReplyCoordinator
 
@@ -200,6 +203,8 @@ class CompletePayload(BaseModel):
     """完成请求：manual=True 表示用户手动确认（直接打勾，人类责任确认）。"""
 
     manual: bool = False
+    conversation_id: str | None = Field(default=None, min_length=1, max_length=128)
+    lab_session_id: str | None = Field(default=None, min_length=1, max_length=128)
 
 
 @router.post("/session/steps/{step_number}/complete")
@@ -212,7 +217,54 @@ def complete_step(step_number: int, payload: CompletePayload | None = None):
     - 本接口不推进步骤（方案 B），翻页仍靠用户明确指示。
     """
     manual = bool(payload and payload.manual)
+    conversation_id = payload.conversation_id if payload else None
+    lab_session_id = payload.lab_session_id if payload else None
     try:
+        if bool(conversation_id) != bool(lab_session_id):
+            raise ValueError("conversation_id 和 lab_session_id 必须同时提供。")
+        if conversation_id and lab_session_id:
+            if not manual:
+                raise ValueError("会话级完成接口目前只接受用户手动确认。")
+            selected = domain.session()
+            selected_view = domain.step_view(selected)
+            if selected_view.get("mode") != "protocol":
+                raise ValueError("当前没有选择实验方案。")
+            protocol = selected_view["protocol"]
+            stored = turn_store.load_experiment_state(
+                conversation_id, lab_session_id
+            )
+            execution = ProtocolExecutionState.from_snapshot(
+                stored.get("protocol_step_facts"),
+                protocol_id=str(protocol["id"]),
+                protocol_version=str(protocol["version"]),
+                default_step_number=int(selected_view["step"]["number"]),
+            )
+            if execution.current_step_number != step_number:
+                raise ValueError(
+                    f"只能完成当前步（第 {execution.current_step_number} 步）"
+                )
+            completed = execution.with_step(
+                execution.step_state(step_number),
+                status=ProtocolStepProgressStatus.COMPLETED,
+            )
+            revision = turn_store.save_protocol_navigation(
+                conversation_id=conversation_id,
+                lab_session_id=lab_session_id,
+                expected_revision=int(stored["revision"]),
+                protocol_step_facts=completed.to_snapshot(),
+            )
+            return {
+                "ok": True,
+                "step_number": step_number,
+                "status": ProtocolStepProgressStatus.COMPLETED.value,
+                "progress": {
+                    "status": ProtocolStepProgressStatus.COMPLETED.value,
+                    "recorded": [],
+                    "missing": [],
+                },
+                "manual": True,
+                "revision": revision,
+            }
         progress = domain.complete_step(step_number, manual)
     except ValueError as error:
         raise HTTPException(400, str(error))
@@ -336,6 +388,39 @@ def _session_view(
         domain.all_steps_view(scoped)
         if include_steps else domain.step_view(scoped)
     )
+    # domain.*_view 仍包含旧的进程级 StepProgress 状态；会话化接口必须以
+    # TurnStore 中的执行快照为准，否则“完成”写入成功后卡片又会显示 waiting_user。
+    def card_status(number: int, fallback: str) -> str:
+        status = execution.statuses.get(number)
+        if status == ProtocolStepProgressStatus.COMPLETED:
+            return "completed"
+        if status in {
+            ProtocolStepProgressStatus.IN_PROGRESS,
+            ProtocolStepProgressStatus.LEFT_WITH_PENDING,
+            ProtocolStepProgressStatus.NOT_STARTED,
+        }:
+            return "waiting_user"
+        return fallback
+
+    current = result.get("step")
+    if current:
+        current["status"] = card_status(
+            int(current["number"]), str(current.get("status") or "waiting_user")
+        )
+        if current["status"] == "completed":
+            current["card_type"] = "result"
+            current["missing"] = []
+    if include_steps:
+        for item in result.get("all_steps", []):
+            item["status"] = card_status(
+                int(item["number"]), str(item.get("status") or "waiting_user")
+            )
+            if item["status"] == "completed":
+                item["card_type"] = "result"
+                item["missing"] = []
+        result["all_completed"] = bool(result.get("all_steps")) and all(
+            item["status"] == "completed" for item in result["all_steps"]
+        )
     result["revision"] = int(stored["revision"])
     result["step_statuses"] = {
         str(number): status.value
