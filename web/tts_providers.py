@@ -74,7 +74,7 @@ PROVIDERS = [
         "default_base_url": "https://openspeech.bytedance.com/api/v1/tts",
         "default_model": "volcano_tts",
         "api_url": "https://console.volcengine.com/speech/app",
-        "note": "密钥填 appid:access_token（冒号分隔）。「合成模型」框填控制台 cluster（默认 volcano_tts）。音色为火山官方中文女声/童声（免费21款内为主），可自由切换试听。",
+        "note": "旧版小模型填 appid:access_token（冒号分隔），cluster 填 volcano_tts。seed-tts 大模型请填火山方舟 AK/SK + Endpoint ID，走官方 MaaS audio/speech 接口，避免 resource not granted。",
         "voices": [
             {"id": "BV001_streaming", "label": "通用女声（亲切，12种情感）"},
             {"id": "BV001_V2_streaming", "label": "通用女声 2.0"},
@@ -319,6 +319,53 @@ def _volcano(text: str, settings) -> bytes:
     return base64.b64decode(audio_b64)
 
 
+def _volcano_maas(text: str, settings) -> bytes:
+    """火山方舟 MaaS 大模型语音合成（seed-tts）。
+
+    文档接口：POST /api/v2/endpoint/{endpoint_id}/audio/speech
+    使用 AK/SK 签名，请求体为 input / voice / response_format / speed。
+    这是 seed-tts 等大模型音色的正确入口；旧 /api/v1/tts 会报
+    `resource_id=tts.sync.level1 requested resource not granted`。
+    """
+    from volcengine.maas import MaasException
+    from volcengine.maas.v2 import MaasService
+
+    if not settings.tts_model:
+        raise RuntimeError("火山方舟 MaaS 语音合成需要填写 Endpoint ID（当前“合成模型”为空）")
+    if not settings.tts_access_key or not settings.tts_secret_key:
+        raise RuntimeError(
+            "火山方舟 MaaS 语音合成需要填写 Access Key 和 Secret Key，"
+            "在火山引擎「访问控制」或控制台 API 密钥页获取"
+        )
+
+    host = (settings.tts_base_url or "maas-api.ml-platform-cn-beijing.volces.com").strip()
+    if host.startswith("https://"):
+        host = host[len("https://"):]
+    if host.endswith("/"):
+        host = host.rstrip("/")
+    region = "cn-beijing"
+
+    maas = MaasService(host, region)
+    maas.set_ak(settings.tts_access_key.strip())
+    maas.set_sk(settings.tts_secret_key.strip())
+
+    payload = {
+        "input": text,
+        "voice": (settings.tts_voice or "BV001_streaming").strip(),
+        "response_format": "mp3",
+        "speed": float(settings.tts_speed or 1.0),
+    }
+    try:
+        response = maas.audio.speech.create(settings.tts_model.strip(), payload)
+        return b"".join(response.iter_bytes())
+    except MaasException as error:
+        raise RuntimeError(
+            f"火山方舟语音合成失败：{getattr(error, 'message', str(error))}"
+        ) from error
+    except Exception as error:
+        raise RuntimeError(f"火山方舟语音合成失败：{type(error).__name__}: {error}") from error
+
+
 def synthesize(text: str, settings) -> tuple[bytes, str]:
     """按当前配置合成语音，返回 (音频字节, MIME)。"""
     provider = settings.tts_provider or "browser"
@@ -333,5 +380,7 @@ def synthesize(text: str, settings) -> tuple[bytes, str]:
     if provider == "local_qwen":
         return _local_qwen(text, settings), "audio/wav"
     if provider == "volcano":
+        if settings.tts_access_key and settings.tts_secret_key:
+            return _volcano_maas(text, settings), "audio/mpeg"
         return _volcano(text, settings), "audio/mpeg"
     raise RuntimeError("未知的语音合成供应商：" + str(provider))
