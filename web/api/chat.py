@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 import settings_store
 from agent.core import ModelServiceError, refine_chat_answer
 from database.crud import (
+    conversation_exists,
     create_conversation,
     delete_conversation,
     get_messages,
@@ -132,6 +133,9 @@ def chat_history(conversation_id: str | None = None):
     - 不传：读取最近一次会话；没有任何会话时返回空列表。
     """
     target = conversation_id or latest_conversation()
+    if target is not None and not conversation_exists(target):
+        # 本地还存着已删除的会话 ID 时，自动回到最近的有效会话。
+        target = latest_conversation()
     if target is None:
         return {"conversation_id": None, "messages": []}
     return {"conversation_id": target, "messages": get_messages(target, limit=100)}
