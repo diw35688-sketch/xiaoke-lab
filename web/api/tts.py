@@ -49,6 +49,8 @@ def providers():
             "speak_record_ack": current.speak_record_ack,
             "model": current.tts_model,
             "api_key_set": bool(current.tts_api_key),
+            "access_key_set": bool(current.tts_access_key),
+            "secret_key_set": bool(current.tts_secret_key),
         },
     }
 
