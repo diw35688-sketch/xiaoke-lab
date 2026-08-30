@@ -72,72 +72,86 @@ def _format_experiment_state(
             lines.append("【本实验会话最近记录】")
             lines.extend(f"- {item}" for item in prompt_context[-6:])
 
-        # 2. 方案执行状态
-        selected_domain_state = domain.session()
-        selected_view = domain.step_view(selected_domain_state)
-        if (
-            isinstance(selected_view, Mapping)
-            and selected_view.get("mode") == "protocol"
-        ):
-            protocol_info = selected_view["protocol"]
-            protocol_execution = ProtocolExecutionState.from_snapshot(
-                stored.get("protocol_step_facts"),
-                protocol_id=str(protocol_info["id"]),
-                protocol_version=str(protocol_info["version"]),
-                default_step_number=int(selected_view["step"]["number"]),
-            )
-            protocol_domain_state = selected_domain_state.jump_to(
-                protocol_execution.current_step_number
-            )
-            step_view = domain.step_view(protocol_domain_state)
-            step = step_view["step"]
-            lines.append("【当前实验方案状态】")
-            lines.append(f"方案：{protocol_info['title']}")
-            lines.append(
-                f"当前第 {step['number']} 步：{step.get('title', '')}"
-            )
-            if step.get("instruction"):
-                lines.append(f"步骤说明：{str(step['instruction'])[:200]}")
-            if step.get("protocol_values"):
-                values = "、".join(
-                    f"{key}={value}"
-                    for key, value in step["protocol_values"].items()
+        # 2. 方案执行状态：优先使用本实验会话的快照，而不是全局 domain 状态。
+        facts = dict(stored.get("protocol_step_facts") or {})
+        protocol_id = facts.get("protocol_id")
+        protocol_version = facts.get("protocol_version")
+        if protocol_id and protocol_version:
+            protocol = domain.protocols().get_by_id(str(protocol_id))
+            if protocol is not None:
+                protocol_execution = ProtocolExecutionState.from_snapshot(
+                    facts,
+                    protocol_id=str(protocol_id),
+                    protocol_version=str(protocol_version),
+                    default_step_number=1,
                 )
-                lines.append(f"方案已定：{values}")
-            if step.get("must_record"):
-                lines.append("现场必测：" + "、".join(step["must_record"]))
-
-            current_state = protocol_execution.step_state(
-                protocol_execution.current_step_number
-            )
-            recorded = current_state.values
-            if recorded:
-                lines.append(
-                    "当前步已记录："
-                    + "、".join(
-                        f"{name}={value.value}" for name, value in recorded.items()
+                current_step_number = protocol_execution.current_step_number
+                current_step = next(
+                    (
+                        step for step in protocol.steps
+                        if step.step_number == current_step_number
+                    ),
+                    None,
+                )
+                if current_step is not None:
+                    lines.append("【当前实验方案状态】")
+                    lines.append(f"方案：{protocol.title}")
+                    lines.append(
+                        f"当前第 {current_step.step_number} 步：{current_step.title}"
                     )
-                )
+                    if getattr(current_step, "instruction", None):
+                        lines.append(
+                            f"步骤说明：{str(current_step.instruction)[:200]}"
+                        )
+                    if getattr(current_step, "protocol_values", None):
+                        values = "、".join(
+                            f"{key}={value}"
+                            for key, value in current_step.protocol_values.items()
+                        )
+                        lines.append(f"方案已定：{values}")
+                    if getattr(current_step, "must_record", None):
+                        lines.append(
+                            "现场必测：" + "、".join(current_step.must_record)
+                        )
+
+                    current_state = protocol_execution.step_state(
+                        current_step_number
+                    )
+                    recorded = current_state.values
+                    if recorded:
+                        lines.append(
+                            "当前步已记录："
+                            + "、".join(
+                                f"{name}={value.value}"
+                                for name, value in recorded.items()
+                            )
+                        )
+                    else:
+                        lines.append("当前步尚未记录实测值。")
+
+                    statuses = protocol_execution.statuses
+                    if statuses:
+                        status_text = "、".join(
+                            f"第{step_number}步:{status.value}"
+                            for step_number, status in sorted(statuses.items())
+                        )
+                        lines.append(f"步骤完成状态：{status_text}")
+
+                    # 所有步骤中已记录的字段，方便跨步引用
+                    all_recorded: list[str] = []
+                    for step_number, fact_state in protocol_execution.steps.items():
+                        for field_name, observed in fact_state.values.items():
+                            all_recorded.append(
+                                f"第{step_number}步 {field_name}={observed.value}"
+                            )
+                    if all_recorded:
+                        lines.append(
+                            "本实验已记录数据：" + "；".join(all_recorded[:10])
+                        )
+                else:
+                    lines.append("当前实验方案状态读取失败：找不到当前步骤。")
             else:
-                lines.append("当前步尚未记录实测值。")
-
-            statuses = protocol_execution.statuses
-            if statuses:
-                status_text = "、".join(
-                    f"第{step_number}步:{status.value}"
-                    for step_number, status in sorted(statuses.items())
-                )
-                lines.append(f"步骤完成状态：{status_text}")
-
-            # 所有步骤中已记录的字段，方便跨步引用
-            all_recorded: list[str] = []
-            for step_number, fact_state in protocol_execution.steps.items():
-                for field_name, observed in fact_state.values.items():
-                    all_recorded.append(
-                        f"第{step_number}步 {field_name}={observed.value}"
-                    )
-            if all_recorded:
-                lines.append("本实验已记录数据：" + "；".join(all_recorded[:10]))
+                lines.append("当前实验方案状态读取失败：方案库中找不到该方案。")
         else:
             lines.append("当前实验会话：自由记录模式（未绑定方案）。")
             if prompt_context:

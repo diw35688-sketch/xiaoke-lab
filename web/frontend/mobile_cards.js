@@ -679,10 +679,15 @@
           }).join('');
     }).catch(function () {});
     sel.onchange = function () {
+      var ids = window.protocolSessionIdentity ? window.protocolSessionIdentity() : {};
       fetch('/protocols/session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ protocol_id: sel.value || null }),
+        body: JSON.stringify({
+          protocol_id: sel.value || null,
+          conversation_id: ids.conversation_id || null,
+          lab_session_id: ids.lab_session_id || null,
+        }),
       }).then(function () {
         setVoiceSoon('idle', sel.value ? '方案已选择' : '已切到自由记录模式', 1500);
         loadReal();
