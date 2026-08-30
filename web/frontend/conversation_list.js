@@ -111,6 +111,7 @@
     });
   }
 
+  window.conversationListReload = load;
   document.addEventListener('shell-ready', function () {
     var button = document.getElementById('sh-new-session');
     if (button) button.onclick = createConversation;
