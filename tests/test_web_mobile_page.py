@@ -66,6 +66,39 @@ class WebMobilePageTests(unittest.TestCase):
         for desktop_script in ("shell.js", "composer.js", "vad_mode.js", "voice_asr.js"):
             self.assertNotIn(desktop_script, html)
 
+    def test_mobile_experiment_view_keeps_flex_layout(self):
+        source = (FRONTEND_DIR / "mobile_cards.js").read_text(encoding="utf-8")
+        self.assertIn("card.style.display = 'flex'", source)
+        self.assertIn("chat.style.display = 'flex'", source)
+        self.assertNotIn("card.style.display = 'block'", source)
+
+    def test_mobile_formal_entry_hides_dev_controls_and_does_not_fallback_to_mock(self):
+        html = (FRONTEND_DIR / "mobile.html").read_text(encoding="utf-8")
+        source = (FRONTEND_DIR / "mobile_cards.js").read_text(encoding="utf-8")
+        self.assertIn('<details class="m-dev" hidden>', html)
+        self.assertIn('class="m-mock-badge" hidden', html)
+        self.assertIn("new URLSearchParams(window.location.search).get('dev') === '1'", source)
+        self.assertNotIn("连不上后端，已切换演示数据", source)
+        self.assertIn("backendErrorCard", source)
+
+    def test_mobile_navigation_uses_the_current_experiment_session(self):
+        source = (FRONTEND_DIR / "mobile_cards.js").read_text(encoding="utf-8")
+        self.assertIn("function experimentSessionIds()", source)
+        self.assertIn("'/record/history'", source)
+        self.assertIn("items[0].conversation_id || items[0].id", source)
+        self.assertIn("title: '手机实验会话'", source)
+        self.assertIn("conversation_id: ids.conversation_id", source)
+        self.assertIn("lab_session_id: ids.lab_session_id", source)
+        self.assertIn("'/protocols/session/steps' + query", source)
+        self.assertIn("'/complete'", source)
+        self.assertIn("var scopedStatuses = view.step_statuses || {}", source)
+        self.assertIn("applyScopedStatus(view.step)", source)
+        self.assertIn("mobileExperimentConversationId", source)
+        self.assertIn("localStorage.setItem(MOBILE_CONVERSATION_KEY, id)", source)
+        self.assertIn("mobileCompletedSteps:", source)
+        self.assertIn("rememberCompletedStep(Number(realCard.step))", source)
+        self.assertIn("applyRememberedCompletion(view.step)", source)
+
 
 if __name__ == "__main__":
     unittest.main()

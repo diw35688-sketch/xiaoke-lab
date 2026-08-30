@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f4f6fb">
   <title>实验助手 · 移动端</title>
-  <link rel="stylesheet" href="/static/mobile.css?v=20260902-chat-default">
+  <link rel="stylesheet" href="/static/mobile.css?v=20260830-mobile-layout-fix">
 </head>
 <body>
   <div class="m-shell">
@@ -42,7 +42,7 @@
         <div class="m-brand">⚗ 实验助手</div>
         <button id="m-back-chat" class="m-btn small" type="button">← 返回聊天</button>
         <button class="m-gear" id="gear-btn" hidden aria-label="退出演示模式">⚙</button>
-        <div class="m-mock-badge" title="本轮为界面原型：卡片数据与步骤推进均为本地 MOCK，未接后端">DEV · MOCK 数据</div>
+        <div class="m-mock-badge" hidden title="本轮为界面原型：卡片数据与步骤推进均为本地 MOCK，未接后端">DEV · MOCK 数据</div>
       </header>
 
       <!-- AI 形象"小科" + 语音状态（复用 PC 端立绘与状态体系，由 setVoice 驱动） -->
@@ -95,7 +95,7 @@
       </div>
 
       <!-- DEV / MOCK 调试面板：只服务于开发验收，不是正式产品逻辑 -->
-      <details class="m-dev">
+      <details class="m-dev" hidden>
         <summary>DEV / MOCK 调试面板（正式版将移除）</summary>
         <p class="m-dev-note">
           正式链路（默认"真实接口"数据源）：语音 → /chat → 大模型工具调用
@@ -138,7 +138,7 @@
 
     </div>
   </div>
-  <script src="/static/mobile_cards.js?v=20260902-chat-default"></script>
+  <script src="/static/mobile_cards.js?v=20260830-completed-visual-persistence"></script>
   <script src="/static/mobile_voice.js?v=20260902-chat-default"></script>
 </body>
 </html>

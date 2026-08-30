@@ -456,6 +456,10 @@ class TurnStore:
                     raise ExperimentStateConflictError(
                         "实验会话状态并发变化，切步未保存。"
                     )
+            connection.execute(
+                "UPDATE conversations SET updated_at=? WHERE id=?",
+                (now, conversation_id),
+            )
         return next_revision
 
     def referenced_audio_paths(self) -> tuple[str, ...]:

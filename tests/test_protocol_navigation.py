@@ -1,7 +1,10 @@
 import unittest
 
 from src.core.pending_clarification import ClarificationStatus, PendingClarification
-from src.core.protocol_execution_state import ProtocolExecutionState
+from src.core.protocol_execution_state import (
+    ProtocolExecutionState,
+    ProtocolStepProgressStatus,
+)
 from src.core.protocol_navigation import decide_protocol_move
 
 
@@ -84,6 +87,25 @@ class ProtocolNavigationTests(unittest.TestCase):
         )
         self.assertTrue(decision.allowed)
         self.assertEqual(decision.state.statuses[1].value, "completed")
+
+    def test_manual_completion_stays_completed_when_moving_with_missing_fields(self):
+        completed = self.state.with_step(
+            self.state.step_state(1),
+            status=ProtocolStepProgressStatus.COMPLETED,
+        )
+
+        decision = decide_protocol_move(
+            state=completed,
+            action="next",
+            total_steps=3,
+            evaluation={"missing_fields": ["condition"]},
+            unresolved=(),
+        )
+
+        self.assertTrue(decision.allowed)
+        self.assertEqual(decision.state.current_step_number, 2)
+        self.assertEqual(decision.state.statuses[1].value, "completed")
+        self.assertEqual(decision.missing_fields, ())
 
     def test_backward_jump_is_allowed_but_forward_skip_is_rejected(self):
         on_two = self.state.move_to(
