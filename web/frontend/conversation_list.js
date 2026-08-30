@@ -116,7 +116,24 @@
     var button = document.getElementById('sh-new-session');
     if (button) button.onclick = createConversation;
     var search = document.getElementById('sh-conversation-search');
-    if (search) search.addEventListener('input', load);
+    if (search) {
+      // 防止浏览器自动填充邮箱/历史搜索词，导致会话列表被过滤成空。
+      search.value = '';
+      search.addEventListener('input', load);
+      setTimeout(function () {
+        if (search && search.value) {
+          search.value = '';
+          load();
+        }
+      }, 250);
+      search.addEventListener('focus', function () {
+        // 浏览器自动填充的邮箱/历史搜索词在聚焦时清掉，避免过滤成空列表。
+        if (/\S+@\S+/.test(search.value || '')) {
+          search.value = '';
+          load();
+        }
+      });
+    }
     load();
   });
   document.addEventListener('conversation-changed', load);
