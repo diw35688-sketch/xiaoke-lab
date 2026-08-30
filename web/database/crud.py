@@ -144,22 +144,6 @@ def ensure_conversation(conversation_id=None):
 def list_conversations(limit=50):
     initialize_database()
     with get_connection() as connection:
-        # 空会话（没有消息）不保留，避免列表里全是“新会话”。
-        connection.execute(
-            """
-            DELETE FROM turn_requests
-            WHERE conversation_id IN (
-                SELECT c.id FROM conversations c
-                WHERE NOT EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id=c.id)
-            )
-            """
-        )
-        connection.execute(
-            """
-            DELETE FROM conversations
-            WHERE NOT EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id=conversations.id)
-            """
-        )
         # 给历史里的“新会话”补上自动名字（取第一条用户消息）。
         connection.execute(
             """
@@ -174,6 +158,7 @@ def list_conversations(limit=50):
               AND EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id=conversations.id)
             """
         )
+        # 只展示有效会话（有消息的）；新建的空会话保留在数据库，避免“新会话”被立即删掉。
         rows = connection.execute(
             """SELECT c.id,c.title,c.created_at,c.updated_at,
                       COUNT(m.id) AS message_count,
@@ -183,6 +168,7 @@ def list_conversations(limit=50):
                FROM conversations c
                LEFT JOIN messages m ON m.conversation_id=c.id
                GROUP BY c.id
+               HAVING COUNT(m.id) > 0
                ORDER BY c.updated_at DESC
                LIMIT ?""",
             (limit,),
