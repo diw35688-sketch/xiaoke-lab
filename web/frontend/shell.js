@@ -154,7 +154,7 @@
     '<div id="sh-chat">',
     '  <div id="sh-conversation-panel">',
     '    <div class="sh-panel-title"><span>会话管理</span><button id="sh-close-conversation" type="button" title="关闭会话列表">✕</button></div>',
-    '    <input id="sh-conversation-search" type="search" placeholder="搜索会话…" autocomplete="off">',
+    '    <input id="sh-conversation-search" type="text" name="conversation-search-noname" placeholder="搜索会话…" autocomplete="off" spellcheck="false">',
     '    <button class="sh-btn" id="sh-new-session" type="button">＋ 新会话</button>',
     '    <div id="sh-conversation-list"></div>',
     '  </div>',
