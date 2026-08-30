@@ -22,6 +22,8 @@ turn_store = TurnStore()
 
 class SelectPayload(BaseModel):
     protocol_id: str | None = None
+    conversation_id: str | None = Field(default=None, max_length=128)
+    lab_session_id: str | None = Field(default=None, max_length=128)
 
 
 class MovePayload(BaseModel):
@@ -279,12 +281,34 @@ def complete_step(step_number: int, payload: CompletePayload | None = None):
 
 @router.post("/session")
 def start(payload: SelectPayload):
-    """选择方案开始会话；protocol_id 为空表示自由记录模式。"""
+    """选择方案开始会话；protocol_id 为空表示自由记录模式。
+
+    如果同时传了 conversation_id + lab_session_id，会把这个方案选择
+    写入该实验会话的 TurnStore 快照，Harness 才能真正按会话感知。
+    """
     try:
         state = domain.start_session(payload.protocol_id or None)
+        selected_view = domain.step_view(state)
+        if payload.conversation_id and payload.lab_session_id and selected_view.get("mode") == "protocol":
+            protocol = selected_view["protocol"]
+            execution = ProtocolExecutionState.start(
+                protocol_id=str(protocol["id"]),
+                protocol_version=str(protocol["version"]),
+                step_number=1,
+            )
+            stored = turn_store.load_experiment_state(
+                payload.conversation_id, payload.lab_session_id
+            )
+            turn_store.save_protocol_navigation(
+                conversation_id=payload.conversation_id,
+                lab_session_id=payload.lab_session_id,
+                expected_revision=int(stored["revision"]),
+                protocol_step_facts=execution.to_snapshot(),
+            )
+            selected_view["revision"] = int(stored["revision"]) + 1
+        return selected_view
     except Exception as error:
         raise HTTPException(status_code=400, detail=str(error))
-    return domain.step_view(state)
 
 
 @router.post("/session/move")

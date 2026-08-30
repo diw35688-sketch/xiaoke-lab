@@ -160,7 +160,12 @@
     }).catch(function () {});
 
     el('lab-select').onchange = function (e) {
-      api('/protocols/session', 'POST', { protocol_id: e.target.value || null })
+      var ids = window.protocolSessionIdentity ? window.protocolSessionIdentity() : {};
+      api('/protocols/session', 'POST', {
+        protocol_id: e.target.value || null,
+        conversation_id: ids.conversation_id || null,
+        lab_session_id: ids.lab_session_id || null,
+      })
         .then(function (d) { state = d; el('lab-result').innerHTML = ''; paint(); });
     };
     el('lab-prev').onclick = function () {

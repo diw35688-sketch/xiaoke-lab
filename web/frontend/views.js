@@ -236,7 +236,12 @@
         return safe.replace(new RegExp('(' + escaped + ')', 'gi'), '<mark>$1</mark>');
       }
       function startProtocol(id, title) {
-        api('/protocols/session', 'POST', { protocol_id: id || null }).then(function () {
+        var ids = window.protocolSessionIdentity ? window.protocolSessionIdentity() : {};
+        api('/protocols/session', 'POST', {
+          protocol_id: id || null,
+          conversation_id: ids.conversation_id || null,
+          lab_session_id: ids.lab_session_id || null,
+        }).then(function () {
           window.interactionModeState.select(id ? 'protocol' : 'free', id || null);
           refreshStatus();
           window.shellShow('chat');
@@ -484,7 +489,12 @@
           });
           host.querySelector('#protocol-back').onclick = function () { window.shellShow('protocols'); };
           host.querySelector('#protocol-select-detail').onclick = function () {
-            api('/protocols/session', 'POST', { protocol_id: protocolId }).then(function () {
+            var ids = window.protocolSessionIdentity ? window.protocolSessionIdentity() : {};
+            api('/protocols/session', 'POST', {
+              protocol_id: protocolId,
+              conversation_id: ids.conversation_id || null,
+              lab_session_id: ids.lab_session_id || null,
+            }).then(function () {
               refreshStatus();
               window.shellShow('run');
               if (window.runReload) window.runReload();

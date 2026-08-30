@@ -146,6 +146,18 @@ def _wants_protocol_list(text: str) -> bool:
     ))
 
 
+def _looks_like_start_experiment(text: str) -> bool:
+    """实验模式下“开始执行方案/准备开始”应直接进入当前步骤，而不是当作记录/Review。"""
+    lowered = (text or "").strip()
+    if not lowered:
+        return False
+    if lowered in {"开始", "继续", "开始吧", "开始当前实验", "准备开始"}:
+        return True
+    return any(keyword in lowered for keyword in (
+        "开始执行方案", "我现在开始", "开始做", "开始这个实验", "开始当前方案",
+    ))
+
+
 def _wants_reagent_list(text: str) -> bool:
     lowered = (text or "").strip()
     if not lowered:
@@ -587,20 +599,48 @@ class ExperimentProcessor:
                 business={"kind": "experiment_clarification"},
                 voice_items=(),
             )
-        if raw in ("开始当前实验", "开始实验", "进入实验", "继续实验"):
-            if turn.experiment_context == ExperimentContext.PROTOCOL:
-                selected_view = domain.step_view(domain.session())
-                if isinstance(selected_view, Mapping) and selected_view.get("mode") == "protocol":
-                    step = selected_view.get("step") or {}
-                    protocol = selected_view.get("protocol") or {}
-                    lines = [
-                        f"方案：{protocol.get('title', '当前实验')}",
-                        f"当前第 {step.get('number', '—')} 步：{step.get('title', '—')}",
-                    ]
-                    return _quick_experiment_navigation_turn(
-                        turn, "run", lines,
-                        f"已进入「{protocol.get('title', '当前实验')}」，继续实验。",
+        if raw in ("开始当前实验", "开始实验", "进入实验", "继续实验") or _looks_like_start_experiment(raw):
+            if turn.experiment_context == ExperimentContext.PROTOCOL and turn.lab_session_id:
+                try:
+                    stored = self._store.load_experiment_state(
+                        turn.conversation_id, turn.lab_session_id
                     )
+                    facts = dict(stored.get("protocol_step_facts") or {})
+                    protocol_id = facts.get("protocol_id")
+                    protocol_version = facts.get("protocol_version")
+                    protocol = (
+                        domain.protocols().get_by_id(str(protocol_id))
+                        if protocol_id and protocol_version else None
+                    )
+                    if protocol is not None:
+                        execution = ProtocolExecutionState.from_snapshot(
+                            facts,
+                            protocol_id=str(protocol_id),
+                            protocol_version=str(protocol_version),
+                            default_step_number=1,
+                        )
+                        current_step = next(
+                            (
+                                step for step in protocol.steps
+                                if step.step_number == execution.current_step_number
+                            ),
+                            None,
+                        )
+                        if current_step is not None:
+                            lines = [
+                                f"方案：{protocol.title}",
+                                f"当前第 {current_step.step_number} 步：{current_step.title}",
+                            ]
+                            instruction = str(current_step.instruction or "")[:160]
+                            if instruction:
+                                lines.append(f"步骤说明：{instruction}")
+                            return _quick_experiment_navigation_turn(
+                                turn, "run", lines,
+                                f"已进入「{protocol.title}」，当前是第 "
+                                f"{current_step.step_number} 步：{current_step.title}。",
+                            )
+                except Exception:
+                    pass  # 快速路径失败时回退到方案库选择。
             return _quick_experiment_navigation_turn(
                 turn, "protocols",
                 ["当前没有正在运行的实验方案，请选择实验。"],
