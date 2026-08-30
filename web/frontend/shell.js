@@ -6,11 +6,22 @@
 (function () {
   var AUTO_COLLAPSE = 1240;
 
+  // 「纸上实验台」皮肤：默认 paper，经典外观完整保留、随时切回。
+  // 皮肤只在 body 上挂一个类，全部差异都在 theme.css 的 body.skin-paper 块里。
+  var SKIN_KEY = 'lab-skin';
+  var skin = 'paper';
+  try { skin = localStorage.getItem(SKIN_KEY) || 'paper'; } catch (_) {}
+  if (skin === 'paper') document.body.classList.add('skin-paper');
+
   var CSS = [
     'body.shell{margin:0;overflow:hidden}',
-    '#shell{position:fixed;inset:0;display:flex;background:var(--n-60);font-family:var(--font-ui);font-size:var(--fs-md);color:var(--n-900)}',
+    // 老页面（index.html 内联应用）整体埋掉：外壳接管后它只在底层耗资源，
+    // 任何样式失效都不允许它"透出来"（2026-08-30 截图事故：主题变量失联时深色老侧栏穿透）。
+    'body.shell .app>.sidebar{display:none!important}',
+    // 关键背景一律带字面量兜底：theme.css 加载失败/缓存旧版时外壳也不得透明。
+    '#shell{position:fixed;inset:0;display:flex;background:var(--n-60,#f5f6f7);font-family:var(--font-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif);font-size:var(--fs-md,14px);color:var(--n-900,#1b1b1c)}',
     // 左侧栏：浅色，不再是深蓝黑
-    '#sh-side{flex:0 0 220px;background:var(--n-50);border-right:1px solid var(--bd-2);display:flex;flex-direction:column;transition:flex-basis .18s}',
+    '#sh-side{flex:0 0 220px;background:var(--n-50,#f9fafb);border-right:1px solid var(--bd-2,rgba(0,0,0,.1));display:flex;flex-direction:column;transition:flex-basis .18s}',
     '#shell.side-collapsed #sh-side{flex-basis:54px}',
     '#sh-brand{padding:16px 14px 12px;font-size:var(--fs-md);font-weight:600;color:var(--n-900);display:flex;align-items:center;gap:10px;white-space:nowrap;overflow:hidden}',
     '#sh-brand .mark{display:grid;place-items:center;width:28px;height:28px;border-radius:9px;background:var(--brand);color:#fff;flex:0 0 28px;box-shadow:var(--sh-1)}',
@@ -26,8 +37,8 @@
     '#shell.side-collapsed .sh-label,#shell.side-collapsed .sh-sec,#shell.side-collapsed #sh-brand b{display:none}',
     '#sh-foot{padding:8px;border-top:1px solid var(--bd-1)}',
     // 管理画布与聊天互斥显示，不再左右并排。
-    '#sh-center{flex:1;min-width:320px;display:flex;flex-direction:column;background:var(--n-60)}',
-    '#sh-top{height:44px;flex:0 0 44px;background:var(--n-00);border-bottom:1px solid var(--bd-2);display:flex;align-items:center;padding:0 14px;gap:10px}',
+    '#sh-center{flex:1;min-width:320px;display:flex;flex-direction:column;background:var(--n-60,#f5f6f7)}',
+    '#sh-top{height:44px;flex:0 0 44px;background:var(--n-00,#fff);border-bottom:1px solid var(--bd-2,rgba(0,0,0,.1));display:flex;align-items:center;padding:0 14px;gap:10px}',
     '#sh-title{font-size:var(--fs-md);font-weight:600;color:var(--n-900)}',
     '#sh-status{font-size:var(--fs-sm);color:var(--n-600);margin-left:auto;display:flex;align-items:center;gap:6px}',
     '#sh-notify{position:relative;margin-left:auto;padding:5px 9px;display:inline-flex;align-items:center;color:var(--n-600)}',
@@ -39,10 +50,16 @@
     '.sh-pill.ok{background:var(--green-100);color:var(--green-900)}',
     '#sh-canvas{flex:1;overflow:auto;padding:16px 20px}',
     '#sh-canvas.empty{display:flex;align-items:center;justify-content:center;color:var(--n-500);font-size:var(--fs-md);text-align:center;line-height:1.9}',
+    // 空状态：纸面里就是「一张还没写字的纸」
+    '.sh-blank{max-width:560px;margin:8vh auto 0;text-align:center;color:var(--n-600,#81858c)}',
+    '.sh-blank-title{font-size:19px;font-weight:600;color:var(--n-800,#353638);margin-bottom:10px}',
+    '.sh-blank-text{font-size:var(--fs-md,14px);line-height:2;margin:0 0 20px}',
+    '.sh-blank-acts{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}',
+    'body.skin-paper .sh-blank-title{font-family:var(--f-kai,"KaiTi",serif);font-size:22px;letter-spacing:.06em}',
     // 右侧对话
     '#sh-chat-resizer{flex:0 0 9px;cursor:col-resize;background:rgba(148,163,184,.12);position:relative;z-index:5;border-left:1px solid var(--bd-2);border-right:1px solid var(--bd-2);transition:background .15s}',
     '#sh-chat-resizer:hover,#sh-chat-resizer.dragging{background:rgba(59,103,232,.25)}',
-    '#sh-chat{flex:0 0 640px;background:var(--n-00);border-left:1px solid var(--bd-1);display:flex;flex-direction:row;transition:flex-basis .18s;min-width:0;position:relative}',
+    '#sh-chat{flex:0 0 640px;background:var(--n-00,#fff);border-left:1px solid var(--bd-1,rgba(0,0,0,.04));display:flex;flex-direction:row;transition:flex-basis .18s;min-width:0;position:relative}',
     '#shell.chat-closed #sh-chat{flex-basis:0;overflow:hidden;border-left:0}',
     '#sh-toggle-conversation.active{background:var(--brand-50);color:var(--brand-strong)}',
     '#shell.conversation-hidden #sh-conversation-panel{display:none!important;border-right:0}',
@@ -123,7 +140,8 @@
     '    <div class="sh-sec">配置</div>',
     '    <div class="sh-item" data-view="settings"><span class="sh-ico">' + I.gear + '</span><span class="sh-label">设置</span></div>',
     '  </div>',
-    '  <div id="sh-foot"><button class="sh-btn" id="sh-collapse" style="width:100%">收起侧栏</button></div>',
+    '  <div id="sh-foot"><button class="sh-btn" id="sh-collapse" style="width:100%">收起侧栏</button>',
+    '  <button class="sh-btn" id="sh-skin" style="width:100%;margin-top:6px" title="纸面外观与经典外观随时互切，数据与功能完全一致"></button></div>',
     '</div>',
     '<div id="sh-center">',
     '  <div id="sh-top"><span id="sh-title">实验进行中</span>',
@@ -171,7 +189,7 @@
     Array.prototype.forEach.call(document.querySelectorAll('.sh-item'), function (n) {
       n.classList.toggle('active', n.dataset.view === view);
     });
-    var titles = { run: '实验进行中', calculator: '分子量计算', protocols: '实验方案', reagent_prep: '试剂配置库', reagents: '试剂安全库',
+    var titles = { chat: '智能对话', run: '实验进行中', calculator: '分子量计算', protocols: '实验方案', reagent_prep: '试剂配置库', reagents: '试剂安全库',
                    records: '本次记录', settings: '设置', storage: '储存库', community: '社区' };
     el('sh-title').textContent = titles[view] || view;
     var canvas = el('sh-canvas');
@@ -181,6 +199,25 @@
     if (avatar) avatar.classList.toggle('avatar-hidden', view !== 'run');
     if (view === 'run') {
       if (window.runCanvasRender) window.runCanvasRender(canvas);
+      return;
+    }
+    // 聊天视图：中间是「今天这一页」。没有进行中的实验时给出人话空状态与下一步，
+    // 不再显示开发者黑话「此页尚未接入」（chat 本就不是画布视图，之前落到了兜底分支）。
+    if (view === 'chat') {
+      canvas.innerHTML = [
+        '<div class="sh-blank">',
+        '  <div class="sh-blank-title">今天这一页还空着</div>',
+        '  <p class="sh-blank-text">开口说话或在右边打字，记录会自动写到这一页上。<br>',
+        '     想照方案做，就先翻开一个实验方案。</p>',
+        '  <div class="sh-blank-acts">',
+        '    <button class="sh-btn primary" data-go="protocols">翻开实验方案</button>',
+        '    <button class="sh-btn" data-go="run">看实验进行中</button>',
+        '  </div>',
+        '</div>'
+      ].join('');
+      Array.prototype.forEach.call(canvas.querySelectorAll('[data-go]'), function (b) {
+        b.onclick = function () { show(b.dataset.go); };
+      });
       return;
     }
     canvas.innerHTML = '<div style="color:#94a3b8;font-size:13px">加载中…</div>';
@@ -229,6 +266,23 @@
     document.body.appendChild(shell);
     document.body.classList.add('shell');
 
+    // 纸面皮肤：铺一层纸纹颗粒；外观切换按钮（经典外观完整保留）
+    if (document.body.classList.contains('skin-paper') && !document.getElementById('paper-grain')) {
+      var grain = document.createElement('div');
+      grain.id = 'paper-grain';
+      grain.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(grain);
+    }
+    var skinBtn = el('sh-skin');
+    if (skinBtn) {
+      var onPaper = document.body.classList.contains('skin-paper');
+      skinBtn.textContent = onPaper ? '换回经典外观' : '换上纸面外观';
+      skinBtn.onclick = function () {
+        try { localStorage.setItem(SKIN_KEY, onPaper ? 'classic' : 'paper'); } catch (_) {}
+        location.reload();
+      };
+    }
+
     // 接管队友已有的聊天卡片整块，不重写其聊天逻辑
     if (chatCard) {
       chatCard.style.border = '0';
@@ -270,6 +324,9 @@
     }
     var convoBtn = el('sh-toggle-conversation');
     if (convoBtn) {
+      // 默认展开：会话列表是查历史会话的唯一入口，默认藏起来等于功能消失。
+      // 2026-08-30 教训：曾因"它挡住聊天正文"改为默认收起，结果用户找不到历史会话；
+      // 正解是让它不再压住正文（见 theme.css 给 #sh-chat-main 让位），而不是把它藏起来。
       var convoHidden = localStorage.getItem('lab-conversation-hidden') === '1';
       shell.classList.toggle('conversation-hidden', convoHidden);
       convoBtn.classList.toggle('active', !convoHidden);
@@ -277,6 +334,7 @@
         shell.classList.toggle('conversation-hidden', hidden);
         localStorage.setItem('lab-conversation-hidden', hidden ? '1' : '0');
         convoBtn.classList.toggle('active', !hidden);
+        if (!hidden && window.conversationListReload) window.conversationListReload();
       }
       convoBtn.onclick = function () { setConvoHidden(!shell.classList.contains('conversation-hidden')); };
       var closeConvo = el('sh-close-conversation');

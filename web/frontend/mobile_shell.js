@@ -56,6 +56,12 @@
   function init() {
     addTopButtons();
     syncMode();
+    // 手机端默认收起会话管理，点“会话”按钮后由 shell 的
+    // conversation-hidden 类切换滑出/收起。
+    var shell = document.getElementById('shell');
+    if (shell && window.innerWidth <= 900) {
+      shell.classList.add('conversation-hidden');
+    }
     window.addEventListener('resize', syncMode);
   }
 
