@@ -516,6 +516,34 @@ class _RuleAnswerExtractor:
         }
 
 
+def _quick_experiment_navigation_turn(turn: TurnInput, view: str, lines: list[str], answer: str) -> PreparedTurn:
+    """实验模式下用户发“开始实验/下一步”等导航意图时，直接给卡片动作，不再进入理解模型。"""
+    user = _text_block(turn, "user", turn.raw_text, assistant=False)
+    card = ConversationBlock(
+        block_id=f"{turn.turn_id}:nav",
+        type=BlockType.TOOL_CARD,
+        payload={
+            "card": "generic",
+            "kind": "execute",
+            "title": f"打开页面 {view}",
+            "status": "done",
+            "lines": lines,
+            "ui_action": {"type": "navigate", "view": view},
+        },
+    )
+    assistant = _text_block(turn, "spoken", answer, assistant=True)
+    conversation_turn = ConversationTurn(
+        turn.conversation_id, turn.request_id, turn.turn_id,
+        turn.interaction_mode, turn.experiment_context, turn.mode_version,
+        turn.input_source, (user, card, assistant),
+    )
+    return PreparedTurn(
+        turn=conversation_turn,
+        business={"kind": "experiment_navigation"},
+        voice_items=(),
+    )
+
+
 class ExperimentProcessor:
     """Plan experiment/control/uncertain output from a SQLite-restored state copy."""
 
@@ -540,6 +568,43 @@ class ExperimentProcessor:
     def prepare(self, turn: TurnInput, timing: TurnTimingRecorder) -> PreparedTurn:
         if turn.lab_session_id is None:
             raise ValueError("实验 Turn 缺少 lab_session_id。")
+        raw = (turn.raw_text or "").strip()
+        if raw in ("？", "?", "什么意思", "啥意思", "没懂"):
+            user = _text_block(turn, "user", turn.raw_text, assistant=False)
+            assistant = _text_block(
+                turn, "spoken",
+                "抱歉，我没有理解这条。你可以直接说：开始实验、下一步、完成配置，或告诉我你要做什么。",
+                assistant=True,
+            )
+            conversation_turn = ConversationTurn(
+                turn.conversation_id, turn.request_id, turn.turn_id,
+                turn.interaction_mode, turn.experiment_context, turn.mode_version,
+                turn.input_source, (user, assistant),
+            )
+            return PreparedTurn(
+                turn=conversation_turn,
+                business={"kind": "experiment_clarification"},
+                voice_items=(),
+            )
+        if raw in ("开始当前实验", "开始实验", "进入实验", "继续实验"):
+            if turn.experiment_context == ExperimentContext.PROTOCOL:
+                selected_view = domain.step_view(domain.session())
+                if isinstance(selected_view, Mapping) and selected_view.get("mode") == "protocol":
+                    step = selected_view.get("step") or {}
+                    protocol = selected_view.get("protocol") or {}
+                    lines = [
+                        f"方案：{protocol.get('title', '当前实验')}",
+                        f"当前第 {step.get('number', '—')} 步：{step.get('title', '—')}",
+                    ]
+                    return _quick_experiment_navigation_turn(
+                        turn, "run", lines,
+                        f"已进入「{protocol.get('title', '当前实验')}」，继续实验。",
+                    )
+            return _quick_experiment_navigation_turn(
+                turn, "protocols",
+                ["当前没有正在运行的实验方案，请选择实验。"],
+                "当前没有正在运行的实验方案，已打开实验方案库，请选择。",
+            )
         tool_command = ExperimentToolCommandParser.parse(turn.raw_text)
         if tool_command.matched:
             return self._prepare_tool_turn(turn, timing, tool_command.command_text or "")
