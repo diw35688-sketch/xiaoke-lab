@@ -47,6 +47,7 @@ from src.core.presentation_intent import MessageKind, MessagePriority
 from src.core.reply_coordinator import FIELD_LABELS, ReplyCoordinator
 from src.core.rule_entity_extraction import extract_entities
 from src.core.session_context import SessionContext
+from src.core.task_context import TaskContext
 from src.core.turn_input import TurnInput
 from src.core.turn_timing import TurnTimingRecorder
 from src.core.spoken_output import build_spoken_block_plan, select_spoken_output_policy
@@ -250,7 +251,7 @@ class ChatProcessor:
         # 使用流式 agent 生成：保留工具卡片与 ui_action，不再只返回一段纯文本。
         text_parts: list[str] = []
         cards: dict[str, dict] = {}
-        for chunk in self._generate(history, turn.conversation_id, turn.interaction_mode):
+        for chunk in self._generate(history, turn.conversation_id, turn.interaction_mode, turn.lab_session_id):
             if isinstance(chunk, str) and chunk.startswith("[[LABTHINK]]"):
                 continue
             if isinstance(chunk, str) and chunk.startswith("[[LABCARD]]"):
@@ -662,6 +663,9 @@ class ExperimentProcessor:
             raw_text=turn.raw_text,
             reply_coordinator=coordinator,
             recent_context=context.as_prompt_context(),
+            # 任务层接线点：step 已由上面的 domain.step_view() 算好，
+            # 此前只喂给前端画卡片，从未进提示词——模型因此不知道用户在做第几步。
+            task_context=TaskContext.from_step_view(step),
         )
         timing.mark("llm_completed")
         timing.mark("understanding_completed")
