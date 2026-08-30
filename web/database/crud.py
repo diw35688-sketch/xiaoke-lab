@@ -208,6 +208,11 @@ def delete_conversation(conversation_id):
     with get_connection() as connection:
         connection.execute("DELETE FROM agent_tasks WHERE conversation_id=?", (conversation_id,))
         connection.execute("DELETE FROM messages WHERE conversation_id=?", (conversation_id,))
+        connection.execute("DELETE FROM lab_records WHERE conversation_id=?", (conversation_id,))
+        connection.execute("DELETE FROM experiment_session_state WHERE conversation_id=?", (conversation_id,))
+        connection.execute("DELETE FROM reagent_prep_flows WHERE conversation_id=?", (conversation_id,))
+        # turn_requests 删除会级联删除 asr_evidence / experiment_events。
+        connection.execute("DELETE FROM turn_requests WHERE conversation_id=?", (conversation_id,))
         cursor = connection.execute("DELETE FROM conversations WHERE id=?", (conversation_id,))
     return bool(cursor.rowcount)
 
