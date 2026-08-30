@@ -111,8 +111,11 @@
     });
   }
 
-  window.conversationListReload = load;
-  document.addEventListener('shell-ready', function () {
+  var conversationListInit = false;
+
+  function initConversationList() {
+    if (conversationListInit) return;
+    conversationListInit = true;
     var button = document.getElementById('sh-new-session');
     if (button) button.onclick = createConversation;
     var search = document.getElementById('sh-conversation-search');
@@ -133,8 +136,23 @@
           load();
         }
       });
+      window.addEventListener('load', function () {
+        setTimeout(function () {
+          if (search && /\S+@\S+/.test(search.value || '')) {
+            search.value = '';
+            load();
+          }
+        }, 400);
+      });
     }
     load();
-  });
+  }
+
+  window.conversationListReload = load;
+  if (document.getElementById('shell')) {
+    // shell.js 可能在 conversation_list.js 之前就初始化并派发过 shell-ready。
+    initConversationList();
+  }
+  document.addEventListener('shell-ready', initConversationList);
   document.addEventListener('conversation-changed', load);
 })();
