@@ -432,11 +432,12 @@ def run_storage_agent(history, conversation_id):
     return _run_skill_agent(STORAGE_SKILL, history, conversation_id)
 
 
-def stream_agent(history, conversation_id, interaction_mode=None):
+def stream_agent(history, conversation_id, interaction_mode=None, lab_session_id=None):
     """逐段产出模型文字；遇到工具调用时先执行工具，再继续流式回答。"""
     client = _client()
     harness_context = build_harness_context(
         conversation_id=conversation_id,
+        lab_session_id=lab_session_id,
         interaction_mode=interaction_mode,
     )
     messages = _messages(history, interaction_mode, harness_context)
