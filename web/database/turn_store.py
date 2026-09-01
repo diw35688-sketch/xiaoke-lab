@@ -242,6 +242,20 @@ class TurnStore:
                     ),
                 )
 
+            # 新会话自动命名：以第一条用户消息作为标题。
+            for message in messages:
+                if message.get("role") == "user":
+                    title_row = connection.execute(
+                        "SELECT title FROM conversations WHERE id=?", (turn.conversation_id,)
+                    ).fetchone()
+                    if title_row is not None and title_row["title"] in ("新会话", ""):
+                        title = str(message.get("content") or "").strip().replace("\n", " ")[:32] or "新会话"
+                        connection.execute(
+                            "UPDATE conversations SET title=? WHERE id=?",
+                            (title, turn.conversation_id),
+                        )
+                    break
+
             if lab_record is not None:
                 connection.execute(
                     """INSERT INTO lab_records
