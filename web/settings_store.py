@@ -88,6 +88,9 @@ class ModelSettings:
     tts_model: str = ""
     tts_voice: str = ""
     tts_speed: float = 1.0
+    # 火山方舟 MaaS 大模型语音合成（seed-tts）使用 AK/SK + endpoint_id。
+    tts_access_key: str = ""
+    tts_secret_key: str = ""
     voice_short_reply: bool = True
     voice_disable_thinking: bool = True
     api_keys: dict = field(default_factory=dict)
@@ -121,6 +124,10 @@ class ModelSettings:
                 tts_key[:4] + "*" * 8 + tts_key[-4:] if len(tts_key) > 8 else "*" * len(tts_key)
             )
             data["tts_api_key_set"] = True
+        data["tts_access_key_set"] = bool(self.tts_access_key)
+        data["tts_access_key"] = _mask_key(self.tts_access_key) if self.tts_access_key else ""
+        data["tts_secret_key_set"] = bool(self.tts_secret_key)
+        data["tts_secret_key"] = _mask_key(self.tts_secret_key) if self.tts_secret_key else ""
         key = self.api_key
         if not key:
             data["api_key"] = ""
@@ -210,6 +217,8 @@ def current() -> ModelSettings:
                     tts_model=raw.get("tts_model", ""),
                     tts_voice=raw.get("tts_voice", ""),
                     tts_speed=float(raw.get("tts_speed", 1.0) or 1.0),
+                    tts_access_key=raw.get("tts_access_key", ""),
+                    tts_secret_key=raw.get("tts_secret_key", ""),
                     voice_short_reply=bool(raw.get("voice_short_reply", True)),
                     voice_disable_thinking=bool(raw.get("voice_disable_thinking", True)),
                     api_keys=raw.get("api_keys", {}) or {},
@@ -270,6 +279,12 @@ def update(**changes) -> ModelSettings:
         new_tts_key = changes.get("tts_api_key")
         if new_tts_key:
             settings.tts_api_key = str(new_tts_key).strip()
+        new_tts_ak = changes.get("tts_access_key")
+        if new_tts_ak:
+            settings.tts_access_key = str(new_tts_ak).strip()
+        new_tts_sk = changes.get("tts_secret_key")
+        if new_tts_sk:
+            settings.tts_secret_key = str(new_tts_sk).strip()
         new_mineru_key = changes.get("mineru_api_key")
         if new_mineru_key:
             settings.mineru_api_key = str(new_mineru_key).strip()
