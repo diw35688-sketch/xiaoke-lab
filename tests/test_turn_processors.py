@@ -641,8 +641,9 @@ class TurnProcessorTests(unittest.TestCase):
 
     def test_chat_prepares_both_messages_without_writing(self):
         seen = {}
-        def generate(history, conversation_id, interaction_mode):
+        def generate(history, conversation_id, interaction_mode, lab_session_id):
             seen["history"] = history
+            seen["lab_session_id"] = lab_session_id
             return "回答"
         processor = ChatProcessor(generate=generate, history=lambda cid: [])
         result = processor.prepare(
@@ -650,6 +651,7 @@ class TurnProcessorTests(unittest.TestCase):
             TurnTimingRecorder(),
         )
         self.assertEqual(seen["history"][-1], {"role": "user", "content": "问题"})
+        self.assertIsNone(seen["lab_session_id"])
         self.assertEqual([m["role"] for m in result.messages], ["user", "assistant"])
         self.assertEqual(result.turn.blocks[1].payload["text"], "回答")
 
