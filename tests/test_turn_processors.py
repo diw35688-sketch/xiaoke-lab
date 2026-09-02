@@ -340,6 +340,40 @@ class TurnProcessorTests(unittest.TestCase):
         self.assertEqual(card.payload["question"], "还需要补充：时间。")
         self.assertEqual(card.payload["original_question"], "请补充温度和时间。")
 
+    def test_free_uncertain_chinese_temperature_answers_unique_current_question(self):
+        snapshot = {
+            "clarifications": [{
+                "clarification_id": "q1", "display_number": 1,
+                "source_segment_id": 1, "source_raw_text": "加热溶液十分钟",
+                "question": "加热溶液的温度是多少？",
+                "missing_fields": ["temperature"],
+                "status": "active", "revision": 1, "reply_pending": False,
+                "requires_confirmation": False,
+                "last_updated_segment_id": None,
+            }],
+            "next_display_number": 2,
+            "current_clarification_id": "q1",
+        }
+        processor = ExperimentProcessor(
+            _StateStore(reply_coordinator=snapshot, step_count=1),
+            observer_factory=lambda: UnifiedObserver(UnifiedAcceptanceBypass(
+                UnifiedUnderstandingRouter(_FixedLLM(uncertain=True))
+            )),
+        )
+        result = processor.prepare(
+            TurnInput(
+                "c1", "r-free-natural-answer", "t-free-natural-answer", "lab1",
+                InteractionMode.EXPERIMENT, ExperimentContext.FREE, 1,
+                InputSource.TEXT, "六十摄氏度",
+            ),
+            TurnTimingRecorder(),
+        )
+
+        self.assertEqual(result.business["clarification_action"], "answer")
+        self.assertIn("已补充完整", result.turn.blocks[-2].payload["text"])
+        clarification = result.session_state["reply_coordinator"]["clarifications"][0]
+        self.assertEqual(clarification["status"], "resolved")
+
     def test_protocol_natural_turns_accumulate_and_resolve_one_question(self):
         step_view = {
             "mode": "protocol",
@@ -422,6 +456,80 @@ class TurnProcessorTests(unittest.TestCase):
         active = second.session_state["reply_coordinator"]["clarifications"]
         self.assertEqual(active[0]["status"], "resolved")
         self.assertEqual(active[0]["protocol_step_number"], 1)
+
+    def test_protocol_uncertain_natural_short_answer_resolves_unique_question(self):
+        step_view = {
+            "mode": "protocol",
+            "protocol": {
+                "id": "p1", "title": "显色反应", "source": "test",
+                "version": "1.0", "total_steps": 1,
+            },
+            "step": {
+                "number": 1, "title": "观察终点",
+                "instruction": "记录终点颜色", "protocol_values": {},
+                "must_record": ["observation"], "hazard_note": None,
+                "terms": [], "substeps": [],
+            },
+            "safety": [], "safety_note": "",
+        }
+        question = {
+            "clarification_id": "q1", "display_number": 1,
+            "source_segment_id": 1, "source_raw_text": "反应到达终点",
+            "question": "终点时溶液颜色是什么？",
+            "missing_fields": ["observation"], "status": "active",
+            "revision": 1, "reply_pending": False,
+            "requires_confirmation": False, "last_updated_segment_id": None,
+            "protocol_id": "p1", "protocol_version": "1.0",
+            "protocol_step_number": 1,
+        }
+        store = _StateStore(
+            reply_coordinator={
+                "clarifications": [question], "next_display_number": 2,
+                "current_clarification_id": "q1",
+            },
+            step_count=1,
+            protocol_step_facts={
+                "protocol_id": "p1", "protocol_version": "1.0",
+                "current_step_number": 1,
+                "steps": {"1": {
+                    "protocol_id": "p1", "protocol_version": "1.0",
+                    "step_number": 1, "values": {}, "clarification_id": "q1",
+                }},
+                "statuses": {"1": "in_progress"},
+            },
+        )
+        processor = ExperimentProcessor(
+            store,
+            observer_factory=lambda: UnifiedObserver(UnifiedAcceptanceBypass(
+                UnifiedUnderstandingRouter(_FixedLLM(uncertain=True))
+            )),
+        )
+        with mock.patch("turn_processors.domain.session", return_value=None), \
+             mock.patch("turn_processors.domain.step_view", return_value=step_view), \
+             mock.patch(
+                 "turn_processors.domain.evaluate_for_state",
+                 side_effect=lambda _state, values: {
+                     "missing_fields": ([] if values.get("observation") else ["observation"]),
+                     "follow_up_required": not bool(values.get("observation")),
+                     "follow_up_question": None,
+                     "deviations": [],
+                 },
+             ):
+            result = processor.prepare(
+                TurnInput(
+                    "c1", "r-short-answer", "t-short-answer", "lab1",
+                    InteractionMode.EXPERIMENT, ExperimentContext.PROTOCOL, 1,
+                    InputSource.TEXT, "粉红色",
+                ),
+                TurnTimingRecorder(),
+            )
+
+        self.assertEqual(result.business["clarification_action"], "answer")
+        self.assertIn("已补充完整", result.turn.blocks[-2].payload["text"])
+        step = result.session_state["protocol_step_facts"]["steps"]["1"]
+        self.assertEqual(step["values"]["observation"]["value"], "粉红色")
+        clarification = result.session_state["reply_coordinator"]["clarifications"][0]
+        self.assertEqual(clarification["status"], "resolved")
 
     def test_protocol_answer_from_step_two_updates_debt_on_step_one(self):
         protocol = domain.protocols().list_all()[0]

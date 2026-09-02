@@ -30,7 +30,12 @@ from src.core.conversation_turn import (
     ConversationTurn,
     ExperimentContext,
 )
-from src.core.clarification_acceptance import ClarificationActionType
+from src.core.answer_fallback import decide_natural_short_answer
+from src.core.clarification_acceptance import (
+    ClarificationAction,
+    ClarificationActionType,
+    ClarificationMutationPermission,
+)
 from src.core.experiment_acceptance import ExperimentAcceptanceKind
 from src.core.experiment_tool_command import ExperimentToolCommandParser
 from src.core.protocol_completion_policy import (
@@ -605,6 +610,61 @@ class ExperimentProcessor:
                 )
                 final_action = protocol_completion.action
                 protocol_execution = protocol_execution.with_step(protocol_state)
+
+        if (
+            analysis is None
+            and final_action is not None
+            and final_action.action_type == ClarificationActionType.NO_ACTION
+            and not observation.end_confirmation_requested
+            and observation.protocol_navigation_action is None
+        ):
+            all_active = tuple(coordinator.active_clarifications())
+            current = coordinator.current_clarification()
+            uniquely_current = tuple(
+                item for item in all_active
+                if len(all_active) == 1
+                and current is not None
+                and item.clarification_id == current.clarification_id
+            )
+            if turn.experiment_context == ExperimentContext.PROTOCOL:
+                active = tuple(
+                    item for item in uniquely_current
+                    if protocol_execution is not None
+                    and item.protocol_id == protocol_execution.protocol_id
+                    and item.protocol_version == protocol_execution.protocol_version
+                    and item.protocol_step_number is not None
+                )
+            else:
+                active = tuple(
+                    item for item in uniquely_current
+                    if item.protocol_id is None
+                    and item.protocol_version is None
+                    and item.protocol_step_number is None
+                )
+            fallback = decide_natural_short_answer(
+                pending_questions=active,
+                text=turn.raw_text,
+                current_segment_id=segment_id,
+            )
+            if fallback.is_answer and len(active) == 1:
+                target = active[0]
+                final_action = ClarificationAction(
+                    request_id=turn.request_id,
+                    session_id=turn.lab_session_id,
+                    segment_id=segment_id,
+                    asr_transcript=turn.raw_text,
+                    action_type=ClarificationActionType.ANSWER,
+                    mutation_permission=(
+                        ClarificationMutationPermission.PREPARE_UPDATE
+                    ),
+                    reason="Web 当前问题自然短回答兜底",
+                    requires_evidence_persistence=True,
+                    target_clarification_id=target.clarification_id,
+                    target_display_number=target.display_number,
+                    expected_revision=target.revision,
+                    answer_text=turn.raw_text,
+                    supplied_entity_fields=fallback.fields,
+                )
 
         answer_target = None
         if (
