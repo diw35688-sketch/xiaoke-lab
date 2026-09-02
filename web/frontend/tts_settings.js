@@ -21,6 +21,15 @@
     '    <input id="tts-appid" type="text" placeholder="AppID" style="flex:1;min-width:140px" />',
     '    <input id="tts-access-token" type="password" placeholder="Access Token" style="flex:2;min-width:220px" autocomplete="off" />',
     '  </div>',
+    '  <em style="display:block;font-style:normal;font-size:12px;color:#64748b;margin-top:5px">旧版小模型填这个；若你是 seed-tts 大模型，请改用下方 AK/SK。</em>',
+    '</div>',
+    '<div id="tts-maas-row" class="settings-field" style="display:none">',
+    '  <span style="display:block;font-size:13px;color:#334155;margin-bottom:6px;font-weight:600">火山方舟 AK/SK（seed-tts 大模型语音合成）</span>',
+    '  <div style="display:flex;gap:8px;flex-wrap:wrap">',
+    '    <input id="tts-access-key" type="password" placeholder="Access Key ID" style="flex:1;min-width:140px" autocomplete="off" />',
+    '    <input id="tts-secret-key" type="password" placeholder="Secret Access Key" style="flex:2;min-width:220px" autocomplete="off" />',
+    '  </div>',
+    '  <em style="display:block;font-style:normal;font-size:12px;color:#64748b;margin-top:5px">「合成模型」填你在火山方舟创建的语音 Endpoint ID，例如 seed-tts-2.0 对应的 endpoint。</em>',
     '</div>',
     '<div id="tts-model-row" class="settings-field" style="display:none">',
     '  <span style="display:block;font-size:13px;color:#334155;margin-bottom:6px;font-weight:600">合成模型</span>',
@@ -57,6 +66,7 @@
     var isVolcano = id === 'volcano';
     el('tts-key-row').style.display = (meta.needs_key && !isVolcano) ? 'block' : 'none';
     el('tts-volcano-row').style.display = isVolcano ? 'block' : 'none';
+    el('tts-maas-row').style.display = isVolcano ? 'block' : 'none';
     el('tts-model-row').style.display = meta.default_model ? 'block' : 'none';
     var voices = meta.voices || [];
     el('tts-voice-row').style.display = voices.length ? 'block' : 'none';
@@ -80,6 +90,8 @@
       el('tts-enabled').checked = !!cur.enabled;
       el('speak-record-ack').checked = !!cur.speak_record_ack;
       el('tts-key').placeholder = cur.api_key_set ? '已保存，留空表示不修改' : '留空表示不修改';
+      el('tts-access-key').placeholder = cur.access_key_set ? '已保存，留空表示不修改' : 'Access Key ID';
+      el('tts-secret-key').placeholder = cur.secret_key_set ? '已保存，留空表示不修改' : 'Secret Access Key';
       applyProvider(el('tts-provider').value);
       if (cur.voice) el('tts-voice').value = cur.voice;
     });
@@ -98,6 +110,10 @@
       var appid = el('tts-appid').value.trim();
       var accessToken = el('tts-access-token').value.trim();
       if (appid && accessToken) data.tts_api_key = appid + ':' + accessToken;
+      var ak = el('tts-access-key').value.trim();
+      var sk = el('tts-secret-key').value.trim();
+      if (ak) data.tts_access_key = ak;
+      if (sk) data.tts_secret_key = sk;
     } else {
       var key = el('tts-key').value.trim();
       if (key) data.tts_api_key = key;

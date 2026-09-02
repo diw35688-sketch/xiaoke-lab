@@ -45,6 +45,27 @@ CLOUDFLARED_URL = (
     "cloudflared-windows-amd64.exe"
 )
 
+LIGHT_BLUE = "\033[96m"
+ORANGE = "\033[38;5;208m"
+RESET_COLOR = "\033[0m"
+
+STARTUP_BANNER = r"""
+               ██                    ██████    █    ██                  ██                       ██████    █    ██      
+               ██               ███████         █   ██                  ██                  ███████         █   ██  
+               ██                    ██      █      ██                  ██                       ██      █      ██
+               ██                    ██       █     ██                  ██                       ██       █     ██
+        ██     ██     ██      ████████████          ██           ██     ██     ██         ████████████          ██
+       ██      ██      ██            ██      ██████████████     ██      ██      ██               ██      ██████████████
+      ██       ██       ██       ██  ██ ██          ██         ██       ██       ██          ██  ██ ██          ██
+     ██        ██        ██     ██   ██  ██         ██        ██        ██        ██        ██   ██  ██         ██
+               ██         ██   ██    ██   ██        ██                  ██         ██      ██    ██   ██        ██
+               ██                    ██             ██                  ██                       ██             ██
+         ██    ██                    ██             ██            ██    ██                       ██             ██
+           ███                                                       ███
+
+                                    小 科 小 科          ── 智 能 实 验 助 手 ──                
+""".strip("\n")
+
 # The Web app imports both top-level modules from ``web`` (for example
 # ``phone_access``) and shared application/domain modules from ``src``.
 # Running this file as ``python scripts/start_best.py`` only puts ``scripts``
@@ -108,6 +129,7 @@ def run_tunnel_mode(cloudflared: str) -> None:
             match = pattern.search(line)
             if match:
                 public_url = match.group(0)
+                print_startup_banner()
                 print("=" * 58)
                 print("实验助手已通过公网隧道启动（手机无需同一 WiFi）")
                 print(f"  电脑访问: http://127.0.0.1:8000")
@@ -141,6 +163,7 @@ def run_lan_mode() -> None:
         ssl_kwargs = {"ssl_keyfile": cert_pair[1], "ssl_certfile": cert_pair[0]}
 
     url = f"{scheme}://{ip}:8000"
+    print_startup_banner()
     print("=" * 58)
     print("实验助手已启动（局域网模式）")
     print(f"  电脑访问: {scheme}://127.0.0.1:8000")
@@ -228,6 +251,27 @@ def print_ascii_qr(url: str) -> None:
         qr.print_ascii(invert=False)
     except Exception:
         pass
+
+
+def print_startup_banner() -> None:
+    """打印欢迎画面，仅将方块组成的“小科小科”大字设为浅蓝色。"""
+    logo, separator, caption = STARTUP_BANNER.partition("\n\n")
+    use_color = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
+    print()
+    if use_color:
+        # 空调用会让旧版 Windows 控制台启用 ANSI/VT 处理；失败时不影响启动。
+        if os.name == "nt":
+            os.system("")
+        print(f"{LIGHT_BLUE}{logo}{RESET_COLOR}")
+    else:
+        print(logo)
+    if separator:
+        print()
+        if use_color:
+            print(f"{ORANGE}{caption}{RESET_COLOR}")
+        else:
+            print(caption)
+    print()
 
 
 def main() -> None:

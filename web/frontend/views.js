@@ -235,13 +235,26 @@
         var escaped = String(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         return safe.replace(new RegExp('(' + escaped + ')', 'gi'), '<mark>$1</mark>');
       }
-      function startProtocol(id) {
-        api('/protocols/session', 'POST', { protocol_id: id || null }).then(function () {
+      function startProtocol(id, title) {
+        var ids = window.protocolSessionIdentity ? window.protocolSessionIdentity() : {};
+        api('/protocols/session', 'POST', {
+          protocol_id: id || null,
+          conversation_id: ids.conversation_id || null,
+          lab_session_id: ids.lab_session_id || null,
+        }).then(function () {
           window.interactionModeState.select(id ? 'protocol' : 'free', id || null);
           refreshStatus();
           window.shellShow('chat');
           if (window.composerRefresh) window.composerRefresh();
           if (window.labStepsReload) window.labStepsReload();
+          // 把开始实验的上下文自动发给会话，Agent 能直接接手当前方案。
+          if (window.composerSend) {
+            if (id && title) {
+              window.composerSend('我现在开始执行方案「' + title + '」，请简要说明第一步怎么做、需要哪些试剂和仪器。');
+            } else {
+              window.composerSend('已进入自由记录模式，开始记录实验操作。');
+            }
+          }
         });
       }
       host.innerHTML = '<div class="card-toolbar">'
@@ -262,7 +275,7 @@
         var visible = items.slice(0, protocolPageSize);
         var cards = visible.map(function (p) {
           var on = session && session.mode === 'protocol' && session.protocol.id === p.id;
-          return '<div class="p-card' + (on ? ' active' : '') + '" data-id="' + p.id + '">'
+          return '<div class="p-card' + (on ? ' active' : '') + '" data-id="' + p.id + '" data-title="' + esc(p.title) + '">'
             + '<div style="font-weight:600;color:#0f172a;margin-bottom:5px">' + protocolMark(p.title, q)
             + (on ? '<span style="color:#2563eb;font-size:12px;margin-left:8px">进行中</span>' : '') + '</div>'
             + '<div style="color:#64748b;font-size:12px;line-height:1.6">共 ' + p.total_steps + ' 步 · ' + protocolMark(p.source, q) + '</div>'
@@ -270,7 +283,7 @@
         }).join('');
         var freeActive = session && session.mode === 'free';
         var grid = host.querySelector('#protocol-grid');
-        grid.innerHTML = '<div class="p-card' + (freeActive ? ' active' : '') + '" data-id="">'
+        grid.innerHTML = '<div class="p-card' + (freeActive ? ' active' : '') + '" data-id="" data-title="自由记录模式">'
           + '<div style="font-weight:600;color:#0f172a">自由记录模式</div>'
           + '<div style="color:#64748b;font-size:12px;margin-top:4px">不按方案，只做记录，不产生方案性追问</div>'
           + '<div style="margin-top:8px"><button class="sh-btn" type="button" data-view-detail="" style="padding:3px 9px;font-size:12px">进入</button></div></div>'
@@ -278,7 +291,7 @@
         Array.prototype.forEach.call(grid.querySelectorAll('.p-card'), function (card) {
           card.onclick = function (e) {
             if (e.target.closest('[data-view-detail]')) return;
-            startProtocol(card.dataset.id);
+            startProtocol(card.dataset.id, card.dataset.title);
           };
         });
         Array.prototype.forEach.call(grid.querySelectorAll('[data-view-detail]'), function (btn) {
@@ -286,7 +299,7 @@
             e.stopPropagation();
             var id = btn.getAttribute('data-view-detail');
             if (!id) {
-              startProtocol('');
+              startProtocol('', '自由记录模式');
               return;
             }
             showProtocolDetail(host, id);
@@ -386,13 +399,7 @@
 
       Array.prototype.forEach.call(host.querySelectorAll('.p-card'), function (card) {
         card.onclick = function () {
-          api('/protocols/session', 'POST', { protocol_id: card.dataset.id || null }).then(function () {
-            window.interactionModeState.select(card.dataset.id ? 'protocol' : 'free', card.dataset.id || null);
-            refreshStatus();
-            window.shellShow('chat');
-            if (window.composerRefresh) window.composerRefresh();
-            if (window.labStepsReload) window.labStepsReload();
-          });
+          startProtocol(card.dataset.id, card.dataset.title);
         };
       });
 
@@ -482,7 +489,12 @@
           });
           host.querySelector('#protocol-back').onclick = function () { window.shellShow('protocols'); };
           host.querySelector('#protocol-select-detail').onclick = function () {
-            api('/protocols/session', 'POST', { protocol_id: protocolId }).then(function () {
+            var ids = window.protocolSessionIdentity ? window.protocolSessionIdentity() : {};
+            api('/protocols/session', 'POST', {
+              protocol_id: protocolId,
+              conversation_id: ids.conversation_id || null,
+              lab_session_id: ids.lab_session_id || null,
+            }).then(function () {
               refreshStatus();
               window.shellShow('run');
               if (window.runReload) window.runReload();

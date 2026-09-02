@@ -9,7 +9,10 @@ if str(WEB) not in sys.path:
 import domain  # noqa: E402
 from api import protocols as protocol_api  # noqa: E402
 from fastapi import HTTPException  # noqa: E402
-from src.core.protocol_execution_state import ProtocolExecutionState  # noqa: E402
+from src.core.protocol_execution_state import (  # noqa: E402
+    ProtocolExecutionState,
+    ProtocolStepProgressStatus,
+)
 from src.core.reply_coordinator import ReplyCoordinator  # noqa: E402
 
 
@@ -35,6 +38,7 @@ class _StateStore:
 
     def save_protocol_navigation(self, **values):
         self.saved = values
+        self.snapshot = values["protocol_step_facts"]
         return 5
 
 
@@ -90,6 +94,29 @@ class ProtocolNavigationApiTests(unittest.TestCase):
         saved = store.saved["protocol_step_facts"]
         self.assertEqual(saved["statuses"]["1"], "left_with_pending")
         self.assertEqual(saved["current_step_number"], 2)
+
+    def test_manual_completion_updates_the_scoped_current_step(self):
+        store = _StateStore(ReplyCoordinator())
+        protocol = domain.protocols().list_all()[0]
+        store.snapshot = ProtocolExecutionState.start(
+            protocol_id=protocol.protocol_id,
+            protocol_version=protocol.version,
+        ).move_to(
+            2, leaving_status=ProtocolStepProgressStatus.COMPLETED
+        ).to_snapshot()
+        protocol_api.turn_store = store
+
+        result = protocol_api.complete_step(2, protocol_api.CompletePayload(
+            manual=True, conversation_id="c1", lab_session_id="lab1"
+        ))
+
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(store.saved["protocol_step_facts"]["current_step_number"], 2)
+        self.assertEqual(store.saved["protocol_step_facts"]["statuses"]["2"], "completed")
+        view = protocol_api._session_view("c1", "lab1", include_steps=True)
+        self.assertEqual(view["step"]["number"], 2)
+        self.assertEqual(view["step"]["status"], "completed")
+        self.assertEqual(view["all_steps"][1]["status"], "completed")
 
 
 if __name__ == "__main__":

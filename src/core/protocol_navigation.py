@@ -119,12 +119,22 @@ def decide_protocol_move(
             deferred,
         )
 
+    existing_status = state.statuses.get(
+        current, ProtocolStepProgressStatus.IN_PROGRESS
+    )
+    manually_completed = existing_status == ProtocolStepProgressStatus.COMPLETED
     leaving_status = (
-        ProtocolStepProgressStatus.LEFT_WITH_PENDING
+        ProtocolStepProgressStatus.COMPLETED
+        if manually_completed
+        else ProtocolStepProgressStatus.LEFT_WITH_PENDING
         if missing
         else ProtocolStepProgressStatus.COMPLETED
     )
-    if missing and deferred:
+    if manually_completed:
+        reason = "当前步骤已确认完成，已进入下一步。"
+        missing = ()
+        deferred = ()
+    elif missing and deferred:
         reason = "已带着暂缓问题进入下一步。"
     elif missing:
         reason = "当前步骤仍有未记录字段，已进入下一步。"

@@ -5,6 +5,7 @@ import threading
 from openai import APIConnectionError, APIStatusError, APITimeoutError, OpenAI
 import settings_store
 from database.crud import list_memories
+from harness_context import build_harness_context
 from tools.calculator import calculate
 from tools.experiment_tools import check_experiment_conflicts, confirm_pending_experiment, list_current_experiments, propose_experiment
 from tools.memory_tools import confirm_pending_memory, propose_memory
@@ -160,12 +161,15 @@ def refine_chat_answer(answer: str, max_chars: int = 50) -> str:
     )
 
 
-def _messages(history, interaction_mode=None):
+def _messages(history, interaction_mode=None, harness_context=None):
     if interaction_mode == InteractionMode.CHAT:
         policy = CHAT_POLICY if settings_store.current().voice_short_reply else CHAT_POLICY_FULL
     else:
         policy = EXPERIMENT_RECORD_POLICY
-    return [{"role":"system","content":INSTRUCTIONS + "\n\n" + policy + "\n\n" + _memory_context()}, *history]
+    system = INSTRUCTIONS + "\n\n" + policy + "\n\n" + _memory_context()
+    if harness_context:
+        system += "\n\n" + harness_context
+    return [{"role": "system", "content": system}, *history]
 
 
 def _tools_for_mode(interaction_mode=None):
@@ -377,9 +381,14 @@ STORAGE_SKILL = """你是「储存库制作助手」。用户要制作储存库�
 """
 
 
-def _run_skill_agent(skill: str, history, conversation_id):
+def _run_skill_agent(skill: str, history, conversation_id, harness_context=None):
     client = _client()
-    messages = [{"role": "system", "content": skill + "\n\n" + _memory_context()}] + list(history)
+    if harness_context is None:
+        harness_context = build_harness_context(
+            conversation_id=conversation_id,
+            interaction_mode=None,
+        )
+    messages = [{"role": "system", "content": skill + "\n\n" + _memory_context() + "\n\n" + harness_context}] + list(history)
     try:
         for _ in range(20):
             response = client.chat.completions.create(
@@ -423,10 +432,15 @@ def run_storage_agent(history, conversation_id):
     return _run_skill_agent(STORAGE_SKILL, history, conversation_id)
 
 
-def stream_agent(history, conversation_id, interaction_mode=None):
+def stream_agent(history, conversation_id, interaction_mode=None, lab_session_id=None):
     """逐段产出模型文字；遇到工具调用时先执行工具，再继续流式回答。"""
     client = _client()
-    messages = _messages(history, interaction_mode)
+    harness_context = build_harness_context(
+        conversation_id=conversation_id,
+        lab_session_id=lab_session_id,
+        interaction_mode=interaction_mode,
+    )
+    messages = _messages(history, interaction_mode, harness_context)
     try:
         for _ in range(20):
             text_parts = []
