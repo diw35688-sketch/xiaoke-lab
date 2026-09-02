@@ -94,7 +94,10 @@ class ExplicitModeSwitchTests(unittest.TestCase):
             composer.index("interactionModeState.select('protocol', session.protocol.id)"),
         )
         self.assertIn("window.shellShow('protocols')", composer)
-        self.assertIn("interactionModeState.select(card.dataset.id ? 'protocol' : 'free', card.dataset.id || null)", views)
+        self.assertIn(
+            "interactionModeState.select(id ? 'protocol' : 'free', id || null)",
+            views,
+        )
         self.assertIn("window.shellShow('chat')", views)
 
     def test_free_mode_clears_server_protocol_before_switching_frontend(self):

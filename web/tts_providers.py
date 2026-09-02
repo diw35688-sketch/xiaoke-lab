@@ -380,7 +380,10 @@ def synthesize(text: str, settings) -> tuple[bytes, str]:
     if provider == "local_qwen":
         return _local_qwen(text, settings), "audio/wav"
     if provider == "volcano":
-        if settings.tts_access_key and settings.tts_secret_key:
+        if (
+            getattr(settings, "tts_access_key", "")
+            and getattr(settings, "tts_secret_key", "")
+        ):
             return _volcano_maas(text, settings), "audio/mpeg"
         return _volcano(text, settings), "audio/mpeg"
     raise RuntimeError("未知的语音合成供应商：" + str(provider))
