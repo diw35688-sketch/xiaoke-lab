@@ -16,6 +16,7 @@ from __future__ import annotations
 import subprocess
 import sys
 import urllib.request
+import shutil
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -25,6 +26,33 @@ CLOUDFLARED_URL = (
     "https://github.com/cloudflare/cloudflared/releases/latest/download/"
     "cloudflared-windows-amd64.exe"
 )
+STAGING_DIR = ROOT / "build" / "runtime_payload"
+
+
+def prepare_runtime_payload() -> Path:
+    """Create a release-safe Web payload without local secrets or runtime data."""
+    if STAGING_DIR.exists():
+        shutil.rmtree(STAGING_DIR)
+    staged_web = STAGING_DIR / "web"
+    excluded_dirs = {
+        "__pycache__", "certs", "uploads", "audio", "logs", "results",
+    }
+    excluded_names = {
+        ".env", "settings.json", "lab_assistant.db", "lab_assistant.sqlite",
+    }
+
+    def ignore(directory: str, names: list[str]) -> set[str]:
+        ignored = set()
+        for name in names:
+            if name in excluded_dirs or name in excluded_names:
+                ignored.add(name)
+            elif name.endswith((".db", ".sqlite", ".sqlite3", ".log")):
+                ignored.add(name)
+        return ignored
+
+    shutil.copytree(ROOT / "web", staged_web, ignore=ignore)
+    print(f"[OK] 已生成无密钥运行资源：{staged_web}")
+    return staged_web
 
 
 def ensure_cloudflared() -> None:
@@ -41,6 +69,7 @@ def ensure_cloudflared() -> None:
 
 def main() -> None:
     ensure_cloudflared()
+    staged_web = prepare_runtime_payload()
 
     print("[*] 检查/安装 PyInstaller ...")
     subprocess.check_call([sys.executable, "-m", "pip", "install", "pyinstaller"])
@@ -57,7 +86,7 @@ def main() -> None:
         "--collect-all", "funasr",
         "--collect-all", "modelscope",
         "--collect-all", "sherpa_onnx",
-        "--add-data", f"{ROOT / 'web'};web",
+        "--add-data", f"{staged_web};web",
         "--add-data", f"{ROOT / 'src'};src",
         "--add-data", f"{ROOT / 'scripts'};scripts",
         "--add-data", f"{ROOT / 'models'};models",

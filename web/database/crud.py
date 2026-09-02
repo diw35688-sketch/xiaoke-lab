@@ -144,6 +144,21 @@ def ensure_conversation(conversation_id=None):
 def list_conversations(limit=50):
     initialize_database()
     with get_connection() as connection:
+        # 给历史里的“新会话”补上自动名字（取第一条用户消息）。
+        connection.execute(
+            """
+            UPDATE conversations
+            SET title=(
+                SELECT substr(replace(m.content, char(10), ' '), 1, 32)
+                FROM messages m
+                WHERE m.conversation_id=conversations.id AND m.role='user'
+                ORDER BY m.id ASC LIMIT 1
+            )
+            WHERE title='新会话'
+              AND EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id=conversations.id)
+            """
+        )
+        # 只展示有效会话（有消息的）；新建的空会话保留在数据库，避免“新会话”被立即删掉。
         rows = connection.execute(
             """SELECT c.id,c.title,c.created_at,c.updated_at,
                       COUNT(m.id) AS message_count,
@@ -153,6 +168,7 @@ def list_conversations(limit=50):
                FROM conversations c
                LEFT JOIN messages m ON m.conversation_id=c.id
                GROUP BY c.id
+               HAVING COUNT(m.id) > 0
                ORDER BY c.updated_at DESC
                LIMIT ?""",
             (limit,),
@@ -178,6 +194,11 @@ def delete_conversation(conversation_id):
     with get_connection() as connection:
         connection.execute("DELETE FROM agent_tasks WHERE conversation_id=?", (conversation_id,))
         connection.execute("DELETE FROM messages WHERE conversation_id=?", (conversation_id,))
+        connection.execute("DELETE FROM lab_records WHERE conversation_id=?", (conversation_id,))
+        connection.execute("DELETE FROM experiment_session_state WHERE conversation_id=?", (conversation_id,))
+        connection.execute("DELETE FROM reagent_prep_flows WHERE conversation_id=?", (conversation_id,))
+        # turn_requests 删除会级联删除 asr_evidence / experiment_events。
+        connection.execute("DELETE FROM turn_requests WHERE conversation_id=?", (conversation_id,))
         cursor = connection.execute("DELETE FROM conversations WHERE id=?", (conversation_id,))
     return bool(cursor.rowcount)
 

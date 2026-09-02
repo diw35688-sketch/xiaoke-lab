@@ -93,7 +93,14 @@
     if (!row) {
       row = document.createElement('div');
       row.className = 'message tool';
-      row.innerHTML = '<div class="chat-tool"><div class="chat-tool-head"><span class="ic">⚙</span><span class="tt"></span><span class="st">进行中</span></div><div class="chat-tool-body"></div></div>';
+      // 工具调用 = 仪器小票：默认折成一行「票根」，点票头展开全票。
+      // 此前默认全展开，多次调用会把聊天流刷满（2026-08-30 纸面落地）。
+      row.innerHTML = '<div class="chat-tool"><button type="button" class="chat-tool-head" aria-expanded="false"><span class="ic">⚙</span><span class="tt"></span><span class="st">进行中</span></button><div class="chat-tool-body"></div></div>';
+      const toolCard = row.querySelector('.chat-tool');
+      row.querySelector('.chat-tool-head').addEventListener('click', function () {
+        const open = toolCard.classList.toggle('open');
+        this.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
       var toolAnchor = messageRow(reply);
       chat.insertBefore(row, (toolAnchor && toolAnchor.parentNode === chat) ? toolAnchor : null);
       blockRows[block.block_id] = row;
@@ -105,6 +112,11 @@
     st.textContent = state; st.className = 'st ' + (view.status || 'done');
     row.querySelector('.chat-tool-body').textContent = lines.join('\n');
     row.classList.toggle('tool-error', view.status === 'error');
+    // 失败不允许被折叠藏住：出错时自动展开，用户必须看见原因。
+    if (view.status === 'error') {
+      row.querySelector('.chat-tool').classList.add('open');
+      row.querySelector('.chat-tool-head').setAttribute('aria-expanded', 'true');
+    }
     chat.scrollTop = chat.scrollHeight;
   }
 
@@ -362,6 +374,18 @@
         chat.textContent = '';
         add(WELCOME_TEXT, 'assistant');
         showNewChatOptions();
+        // 首次加载/清除本地会话后，先固定一个后端会话 ID，
+        // 避免第一条消息让每个 Turn 都生成新 UUID（一句话一个会话）。
+        if (!localStorage.getItem(conversationKey)) {
+          fetch('/chat/conversations', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
+          }).then(r => r.json()).then(d => {
+            if (d && d.conversation_id) {
+              localStorage.setItem(conversationKey, d.conversation_id);
+              document.dispatchEvent(new CustomEvent('conversation-changed'));
+            }
+          }).catch(() => {});
+        }
         return;
       }
       chat.textContent = '';

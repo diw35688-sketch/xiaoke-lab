@@ -72,6 +72,8 @@
   var pollTimer = null;
   var renderStatuses = [];         // 分段状态（按步骤号 1..N 索引减 1）
   var renderCurIndex = 0;          // 当前步号（高亮分段用）
+  var activeExperimentIds = null;  // 当前对话/实验会话，供完成状态本机备份使用
+  var activeProtocolId = null;
 
   function el(id) { return document.getElementById(id); }
   function esc(s) {
@@ -249,13 +251,28 @@
       step: 0, total_steps: 0,
       title: '自由记录模式',
       instruction: '尚未选择实验方案',
-      description: '在下方 DEV 面板「实验方案」里选一份，即可开始卡片式流程。',
+      description: '请在上方“实验”下拉框里选择一份方案，即可开始卡片式流程。',
       warning: '',
       status: 'waiting_user',
       type: 'info',
       must_record: [],
       recorded: [],
       missing: [],
+      image: null,
+      params: [],
+    };
+  }
+
+  function backendErrorCard(message) {
+    return {
+      step: 0, total_steps: 0,
+      title: '暂时无法载入实验',
+      instruction: '手机端没有取得实验数据',
+      description: message || '请确认电脑端服务仍在运行，然后刷新页面重试。',
+      warning: '当前没有使用演示数据，页面不会显示虚假的实验进度。',
+      status: 'error',
+      type: 'error',
+      must_record: [], recorded: [], missing: [],
       image: null,
       params: [],
     };
@@ -410,10 +427,81 @@
   }
 
   // ---------- 7. 真实接口 ----------
+  function experimentSessionIds() {
+    return Promise.all([
+      resolveConvId(),
+      fetch('/record/history').then(function (r) {
+        if (!r.ok) throw new Error('读取实验会话失败');
+        return r.json();
+      }).then(function (data) { return data && data.session_id; }),
+    ]).then(function (ids) {
+      if (!ids[0] || !ids[1]) throw new Error('当前实验会话尚未建立');
+      activeExperimentIds = {
+        conversation_id: ids[0], lab_session_id: ids[1]
+      };
+      return activeExperimentIds;
+    });
+  }
+
+  function completedStepsKey() {
+    if (!activeExperimentIds || !activeProtocolId) return null;
+    return 'mobileCompletedSteps:' + activeExperimentIds.conversation_id
+      + ':' + activeExperimentIds.lab_session_id + ':' + activeProtocolId;
+  }
+
+  function rememberedCompletedSteps() {
+    var key = completedStepsKey();
+    if (!key) return [];
+    try { return JSON.parse(localStorage.getItem(key) || '[]'); }
+    catch (e) { return []; }
+  }
+
+  function rememberCompletedStep(stepNumber) {
+    var key = completedStepsKey();
+    if (!key) return;
+    var completed = rememberedCompletedSteps();
+    if (completed.indexOf(stepNumber) < 0) completed.push(stepNumber);
+    try { localStorage.setItem(key, JSON.stringify(completed)); } catch (e) {}
+  }
+
   function loadReal(direction) {
-    return fetch('/protocols/session/steps')
+    return experimentSessionIds().then(function (ids) {
+      var query = '?conversation_id=' + encodeURIComponent(ids.conversation_id)
+        + '&lab_session_id=' + encodeURIComponent(ids.lab_session_id);
+      return fetch('/protocols/session/steps' + query);
+    })
       .then(function (r) { return r.json(); })
       .then(function (view) {
+        activeProtocolId = view.protocol && view.protocol.id;
+        // 会话状态由 TurnStore 返回在 step_statuses；覆盖旧的进程级卡片状态，
+        // 避免完成写入成功后又被 step.status=waiting_user 覆盖。
+        var scopedStatuses = view.step_statuses || {};
+        function applyScopedStatus(item) {
+          if (!item) return;
+          var scoped = scopedStatuses[String(item.number)];
+          if (!scoped) return;
+          item.status = scoped === 'completed' ? 'completed' : 'waiting_user';
+          if (item.status === 'completed') {
+            item.card_type = 'result';
+            item.missing = [];
+          }
+        }
+        applyScopedStatus(view.step);
+        (view.all_steps || []).forEach(applyScopedStatus);
+        var locallyCompleted = rememberedCompletedSteps();
+        function applyRememberedCompletion(item) {
+          if (!item || locallyCompleted.indexOf(Number(item.number)) < 0) return;
+          item.status = 'completed';
+          item.card_type = 'result';
+          item.missing = [];
+        }
+        applyRememberedCompletion(view.step);
+        (view.all_steps || []).forEach(applyRememberedCompletion);
+        if (view.all_steps && view.all_steps.length) {
+          view.all_completed = view.all_steps.every(function (item) {
+            return item.status === 'completed';
+          });
+        }
         var sel = el('protocol-select');
         if (view.mode !== 'protocol' || !view.step) {
           renderStatuses = [];
@@ -453,18 +541,29 @@
         applyState(card, dir);
         return view;
       })
-      .catch(function () {
-        setVoiceSoon('idle', '连不上后端，已切换演示数据', 2000);
-        setDataSource('mock');
+      .catch(function (error) {
+        dataSource = 'real';
+        realCard = null;
+        renderStatuses = [];
+        renderCurIndex = 0;
+        renderProgressPanel(null);
+        applyState(backendErrorCard(error && error.message), null);
+        setVoiceSoon('idle', '实验数据载入失败，请刷新后重试', 2200);
       });
   }
 
   function moveReal(action) {
     if (transitioning) return;
-    fetch('/protocols/session/move', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: action }),
+    experimentSessionIds().then(function (ids) {
+      return fetch('/protocols/session/move', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: action,
+          conversation_id: ids.conversation_id,
+          lab_session_id: ids.lab_session_id,
+        }),
+      });
     }).then(function (r) {
       return r.json().then(function (d) { return { ok: r.ok, d: d }; });
     }).then(function (res) {
@@ -478,22 +577,45 @@
     });
   }
 
-  // 对话记忆：手机端不保存自己的会话，统一使用电脑端/服务端的最新会话。
+  // 对话记忆：手机端固定使用同一个对话编号，刷新后仍回到同一实验状态。
+  var MOBILE_CONVERSATION_KEY = 'mobileExperimentConversationId';
   function convId() {
-    return null;
+    try { return localStorage.getItem(MOBILE_CONVERSATION_KEY) || null; }
+    catch (e) { return null; }
   }
-  function saveConvId(_id) {
-    // 手机端不写本地会话，始终跟随电脑端最新会话。
+  function saveConvId(id) {
+    if (!id) return;
+    try { localStorage.setItem(MOBILE_CONVERSATION_KEY, id); } catch (e) {}
   }
-  // 与电脑端共用对话：每次直接从服务端取最新会话。
+  // 首次使用服务端最近会话；一旦选定就固定，避免刷新时因排序变化换会话。
   function resolveConvId() {
+    var remembered = convId();
+    if (remembered) return Promise.resolve(remembered);
     return fetch('/chat/conversations').then(function (r) { return r.json(); }).then(function (d) {
       var items = (d && d.items) || [];
-      return (items[0] && items[0].conversation_id) || null;
+      var existing = items[0]
+        ? (items[0].conversation_id || items[0].id || null)
+        : null;
+      if (existing) {
+        saveConvId(existing);
+        return existing;
+      }
+      return fetch('/chat/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: '手机实验会话' }),
+      }).then(function (r) {
+        if (!r.ok) throw new Error('创建手机会话失败');
+        return r.json();
+      }).then(function (created) {
+        saveConvId(created.conversation_id);
+        return created.conversation_id;
+      });
     }).catch(function () { return null; });
   }
   function resetConversation() {
-    setVoiceSoon('idle', '手机端不保存独立会话，重置无效；请到电脑端新建/切换会话', 1800);
+    try { localStorage.removeItem(MOBILE_CONVERSATION_KEY); } catch (e) {}
+    setVoiceSoon('idle', '手机端会话绑定已重置，下次将跟随最近会话', 1800);
   }
 
   // 语音文本 → /chat → 大模型工具调用（record_observation / move_step）→ 状态机判定
@@ -557,10 +679,15 @@
           }).join('');
     }).catch(function () {});
     sel.onchange = function () {
+      var ids = window.protocolSessionIdentity ? window.protocolSessionIdentity() : {};
       fetch('/protocols/session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ protocol_id: sel.value || null }),
+        body: JSON.stringify({
+          protocol_id: sel.value || null,
+          conversation_id: ids.conversation_id || null,
+          lab_session_id: ids.lab_session_id || null,
+        }),
       }).then(function () {
         setVoiceSoon('idle', sel.value ? '方案已选择' : '已切到自由记录模式', 1500);
         loadReal();
@@ -729,15 +856,22 @@
       return;
     }
     // 用户手动确认完成：直接打勾（后端状态机接受并落盘），不再要求口述数据
-    fetch('/protocols/session/steps/' + realCard.step + '/complete', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ manual: true }),
+    experimentSessionIds().then(function (ids) {
+      return fetch('/protocols/session/steps/' + realCard.step + '/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          manual: true,
+          conversation_id: ids.conversation_id,
+          lab_session_id: ids.lab_session_id,
+        }),
+      });
     })
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
       .then(function (res) {
         var msg;
         if (res.ok) {
+          rememberCompletedStep(Number(realCard.step));
           msg = '✓ 本步已完成（手动确认）。说"下一步"或点按钮翻页。';
           setVoiceSoon('happy', msg, 2600);
         } else {
@@ -785,17 +919,28 @@
   // ---------- 12. 绑定 ----------
   function showChatView() {
     var chat = el('chat-view'), card = el('card-view');
-    if (chat) chat.style.display = 'block';
+    if (chat) chat.style.display = 'flex';
     if (card) card.style.display = 'none';
   }
   function showCardView() {
     var chat = el('chat-view'), card = el('card-view');
     if (chat) chat.style.display = 'none';
-    if (card) card.style.display = 'block';
+    if (card) card.style.display = 'flex';
     loadReal();
   }
 
+  function configureDevUi() {
+    var enabled = false;
+    try { enabled = new URLSearchParams(window.location.search).get('dev') === '1'; } catch (e) {}
+    var panel = document.querySelector('.m-dev');
+    var badge = document.querySelector('.m-mock-badge');
+    if (panel) panel.hidden = !enabled;
+    if (badge) badge.hidden = !enabled;
+    return enabled;
+  }
+
   function bind() {
+    var devEnabled = configureDevUi();
     var prev = el('btn-prev'), next = el('btn-next');
     if (prev) prev.onclick = gesturePrev;
     if (next) next.onclick = gestureNext;
@@ -826,8 +971,10 @@
     var demoBtn = el('dev-demo');
     if (demoBtn) demoBtn.onclick = function () { setDemoMode(true); };
     var savedDemo = '0';
-    try { savedDemo = localStorage.getItem('mobileDemoMode') || '0'; } catch (e) {}
-    setDemoMode(savedDemo === '1');
+    if (devEnabled) {
+      try { savedDemo = localStorage.getItem('mobileDemoMode') || '0'; } catch (e) {}
+    }
+    setDemoMode(devEnabled && savedDemo === '1');
 
     var savedTheme = 'mist';
     try { savedTheme = localStorage.getItem('mobileCardTheme') || 'mist'; } catch (e) {}

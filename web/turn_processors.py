@@ -150,6 +150,18 @@ def _wants_protocol_list(text: str) -> bool:
     ))
 
 
+def _looks_like_start_experiment(text: str) -> bool:
+    """实验模式下“开始执行方案/准备开始”应直接进入当前步骤，而不是当作记录/Review。"""
+    lowered = (text or "").strip()
+    if not lowered:
+        return False
+    if lowered in {"开始", "继续", "开始吧", "开始当前实验", "准备开始"}:
+        return True
+    return any(keyword in lowered for keyword in (
+        "开始执行方案", "我现在开始", "开始做", "开始这个实验", "开始当前方案",
+    ))
+
+
 def _wants_reagent_list(text: str) -> bool:
     lowered = (text or "").strip()
     if not lowered:
@@ -217,7 +229,7 @@ def _best_reagent_match(text: str) -> dict | None:
 def _looks_like_direct_protocol(text: str) -> bool:
     lowered = (text or "").strip()
     return bool(lowered) and any(keyword in lowered for keyword in (
-        "做", "开始", "选择", "进入", "打开", "用",
+        "做", "开始", "选择", "进入", "用",
     ))
 
 
@@ -226,6 +238,18 @@ def _looks_like_direct_reagent(text: str) -> bool:
     return bool(lowered) and any(keyword in lowered for keyword in (
         "配", "配置", "做", "打开", "查看", "用",
     ))
+
+
+def _is_confident_direct_match(text: str, title: str) -> bool:
+    raw = _normalize_match_text(text)
+    normalized_title = (title or "").lower()
+    if not raw or not normalized_title:
+        return False
+    return (
+        raw in normalized_title
+        or normalized_title in raw
+        or difflib.SequenceMatcher(None, raw, normalized_title).ratio() >= 0.8
+    )
 
 
 class ChatProcessor:
@@ -243,7 +267,7 @@ class ChatProcessor:
         # 使用流式 agent 生成：保留工具卡片与 ui_action，不再只返回一段纯文本。
         text_parts: list[str] = []
         cards: dict[str, dict] = {}
-        for chunk in self._generate(history, turn.conversation_id, turn.interaction_mode):
+        for chunk in self._generate(history, turn.conversation_id, turn.interaction_mode, turn.lab_session_id):
             if isinstance(chunk, str) and chunk.startswith("[[LABTHINK]]"):
                 continue
             if isinstance(chunk, str) and chunk.startswith("[[LABCARD]]"):
@@ -259,10 +283,38 @@ class ChatProcessor:
         direct_protocol = None
         direct_reagent = None
         # 1) 用户说了具体方案名/试剂名时，直接选择或打开对应卡片页。
-        if not any(card.get("title") == "选择实验方案" or card.get("kind") == "execute"
-                   for card in cards_list) and _looks_like_direct_protocol(turn.raw_text):
+        #    只要名称高度匹配就命中，不一定非要带“配/做/打开”等动词。
+        #    试剂类优先：缓冲液/溶液/直接发名称通常是想打开配方。
+        if not any(card.get("title") == "查看试剂配方" for card in cards_list):
+            reagent_match = _best_reagent_match(turn.raw_text)
+            if reagent_match is not None and (
+                _looks_like_direct_reagent(turn.raw_text)
+                or _is_confident_direct_match(turn.raw_text, reagent_match.get("name_zh") or "")
+            ):
+                outcome = lab_tools.call(
+                    "get_reagent_prep", {"reagent_prep_id": reagent_match["reagent_prep_id"]}
+                )
+                if outcome.get("ok"):
+                    direct_card = lab_tools.present_result(
+                        "get_reagent_prep",
+                        {"reagent_prep_id": reagent_match["reagent_prep_id"]},
+                        outcome,
+                    )
+                    if "开始" in turn.raw_text or "配" in turn.raw_text:
+                        direct_card["ui_action"] = {
+                            "type": "start_reagent_prep_flow",
+                            "id": reagent_match["reagent_prep_id"],
+                        }
+                    cards["__direct_reagent"] = direct_card
+                    cards_list = list(cards.values())
+                    direct_reagent = reagent_match
+        if not direct_reagent and not any(card.get("title") == "选择实验方案" or card.get("kind") == "execute"
+                                          for card in cards_list):
             match = _best_protocol_match(turn.raw_text)
-            if match is not None:
+            if match is not None and (
+                _looks_like_direct_protocol(turn.raw_text)
+                or _is_confident_direct_match(turn.raw_text, match.get("title") or "")
+            ):
                 outcome = lab_tools.call(
                     "select_protocol", {"protocol_id": match["protocol_id"]}
                 )
@@ -274,22 +326,37 @@ class ChatProcessor:
                     )
                     cards_list = list(cards.values())
                     direct_protocol = match
-        if not direct_protocol and not any(card.get("title") == "查看试剂配方"
-                                           for card in cards_list) \
-                and _looks_like_direct_reagent(turn.raw_text):
-            match = _best_reagent_match(turn.raw_text)
-            if match is not None:
-                outcome = lab_tools.call(
-                    "get_reagent_prep", {"reagent_prep_id": match["reagent_prep_id"]}
-                )
-                if outcome.get("ok"):
-                    cards["__direct_reagent"] = lab_tools.present_result(
-                        "get_reagent_prep",
-                        {"reagent_prep_id": match["reagent_prep_id"]},
-                        outcome,
-                    )
-                    cards_list = list(cards.values())
-                    direct_reagent = match
+        # 1.5) 模型自己已经调了“打开配方/选择实验”，同样把正文改成确认语，
+        #      避免它一边打开页面一边还在聊天里追问体积/pH。
+        if not direct_reagent:
+            reagent_card = next((
+                card for card in cards_list
+                if card.get("status") == "done"
+                and str(card.get("title") or "").startswith("查看试剂配方")
+            ), None)
+            if reagent_card is not None:
+                first_line = (reagent_card.get("lines") or [""])[0]
+                name_zh = first_line.split("：", 1)[1].strip() if "：" in first_line else first_line.strip()
+                direct_reagent = {"name_zh": name_zh or "该试剂"}
+                if ("开始" in turn.raw_text or "配" in turn.raw_text) \
+                        and (reagent_card.get("ui_action") or {}).get("type") == "open_reagent_prep":
+                    reagent_card["ui_action"] = {
+                        "type": "start_reagent_prep_flow",
+                        "id": (reagent_card.get("ui_action") or {}).get("id"),
+                    }
+        if not direct_protocol:
+            protocol_card = next((
+                card for card in cards_list
+                if card.get("status") == "done"
+                and (str(card.get("title") or "").startswith("选择实验方案")
+                     or card.get("kind") == "execute")
+            ), None)
+            if protocol_card is not None:
+                first_line = (protocol_card.get("lines") or [""])[0]
+                protocol_title = first_line
+                if first_line.startswith("方案："):
+                    protocol_title = first_line.split("：", 1)[1].strip()
+                direct_protocol = {"title": protocol_title or "所选实验"}
         # 2) 没直接命中时，用户明确要“列方案/选实验/看试剂库”则强制列出概览。
         if not direct_protocol and not direct_reagent:
             if not any(card.get("title") == "查看可选实验方案" for card in cards_list) \
@@ -312,7 +379,14 @@ class ChatProcessor:
         if direct_protocol:
             answer = f"已进入「{direct_protocol['title']}」，开始实验。"
         elif direct_reagent:
-            answer = f"已找到「{direct_reagent['name_zh']}」并打开试剂配置库。"
+            flow_action = any(
+                (card.get("ui_action") or {}).get("type") == "start_reagent_prep_flow"
+                for card in cards_list
+            )
+            if flow_action:
+                answer = f"已开始配置「{direct_reagent['name_zh']}」，正在进入配置流程。"
+            else:
+                answer = f"已找到「{direct_reagent['name_zh']}」并打开试剂配置库。"
         # 方案/试剂很多时，聊天只给简短概览，真正的选择交给方案库/配置库页面。
         list_card = next((
             card for card in cards_list
@@ -459,6 +533,34 @@ class _RuleAnswerExtractor:
         }
 
 
+def _quick_experiment_navigation_turn(turn: TurnInput, view: str, lines: list[str], answer: str) -> PreparedTurn:
+    """实验模式下用户发“开始实验/下一步”等导航意图时，直接给卡片动作，不再进入理解模型。"""
+    user = _text_block(turn, "user", turn.raw_text, assistant=False)
+    card = ConversationBlock(
+        block_id=f"{turn.turn_id}:nav",
+        type=BlockType.TOOL_CARD,
+        payload={
+            "card": "generic",
+            "kind": "execute",
+            "title": f"打开页面 {view}",
+            "status": "done",
+            "lines": lines,
+            "ui_action": {"type": "navigate", "view": view},
+        },
+    )
+    assistant = _text_block(turn, "spoken", answer, assistant=True)
+    conversation_turn = ConversationTurn(
+        turn.conversation_id, turn.request_id, turn.turn_id,
+        turn.interaction_mode, turn.experiment_context, turn.mode_version,
+        turn.input_source, (user, card, assistant),
+    )
+    return PreparedTurn(
+        turn=conversation_turn,
+        business={"kind": "experiment_navigation"},
+        voice_items=(),
+    )
+
+
 class ExperimentProcessor:
     """Plan experiment/control/uncertain output from a SQLite-restored state copy."""
 
@@ -483,6 +585,71 @@ class ExperimentProcessor:
     def prepare(self, turn: TurnInput, timing: TurnTimingRecorder) -> PreparedTurn:
         if turn.lab_session_id is None:
             raise ValueError("实验 Turn 缺少 lab_session_id。")
+        raw = (turn.raw_text or "").strip()
+        if raw in ("？", "?", "什么意思", "啥意思", "没懂"):
+            user = _text_block(turn, "user", turn.raw_text, assistant=False)
+            assistant = _text_block(
+                turn, "spoken",
+                "抱歉，我没有理解这条。你可以直接说：开始实验、下一步、完成配置，或告诉我你要做什么。",
+                assistant=True,
+            )
+            conversation_turn = ConversationTurn(
+                turn.conversation_id, turn.request_id, turn.turn_id,
+                turn.interaction_mode, turn.experiment_context, turn.mode_version,
+                turn.input_source, (user, assistant),
+            )
+            return PreparedTurn(
+                turn=conversation_turn,
+                business={"kind": "experiment_clarification"},
+                voice_items=(),
+            )
+        if raw in ("开始当前实验", "开始实验", "进入实验", "继续实验") or _looks_like_start_experiment(raw):
+            if turn.experiment_context == ExperimentContext.PROTOCOL and turn.lab_session_id:
+                try:
+                    stored = self._store.load_experiment_state(
+                        turn.conversation_id, turn.lab_session_id
+                    )
+                    facts = dict(stored.get("protocol_step_facts") or {})
+                    protocol_id = facts.get("protocol_id")
+                    protocol_version = facts.get("protocol_version")
+                    protocol = (
+                        domain.protocols().get_by_id(str(protocol_id))
+                        if protocol_id and protocol_version else None
+                    )
+                    if protocol is not None:
+                        execution = ProtocolExecutionState.from_snapshot(
+                            facts,
+                            protocol_id=str(protocol_id),
+                            protocol_version=str(protocol_version),
+                            default_step_number=1,
+                        )
+                        current_step = next(
+                            (
+                                step for step in protocol.steps
+                                if step.step_number == execution.current_step_number
+                            ),
+                            None,
+                        )
+                        if current_step is not None:
+                            lines = [
+                                f"方案：{protocol.title}",
+                                f"当前第 {current_step.step_number} 步：{current_step.title}",
+                            ]
+                            instruction = str(current_step.instruction or "")[:160]
+                            if instruction:
+                                lines.append(f"步骤说明：{instruction}")
+                            return _quick_experiment_navigation_turn(
+                                turn, "run", lines,
+                                f"已进入「{protocol.title}」，当前是第 "
+                                f"{current_step.step_number} 步：{current_step.title}。",
+                            )
+                except Exception:
+                    pass  # 快速路径失败时回退到方案库选择。
+            return _quick_experiment_navigation_turn(
+                turn, "protocols",
+                ["当前没有正在运行的实验方案，请选择实验。"],
+                "当前没有正在运行的实验方案，已打开实验方案库，请选择。",
+            )
         tool_command = ExperimentToolCommandParser.parse(turn.raw_text)
         if tool_command.matched:
             return self._prepare_tool_turn(turn, timing, tool_command.command_text or "")
