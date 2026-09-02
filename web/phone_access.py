@@ -8,6 +8,51 @@ qrcode 是可选依赖：装了会返回二维码 SVG；没装则返回 None，�
 from __future__ import annotations
 
 import socket
+import ipaddress
+import re
+import subprocess
+
+
+def _usable_lan_ip(value: str) -> bool:
+    """Return whether *value* can reasonably be reached by another LAN device."""
+    try:
+        address = ipaddress.ip_address(value)
+    except ValueError:
+        return False
+    # 198.18.0.0/15 is reserved for benchmarking and is commonly used by
+    # proxy/TUN adapters (for example Mihomo).  It must never win over Wi-Fi.
+    benchmark = ipaddress.ip_network("198.18.0.0/15")
+    return (
+        address.version == 4
+        and address.is_private
+        and not address.is_loopback
+        and not address.is_link_local
+        and address not in benchmark
+    )
+
+
+def _windows_default_route_ips() -> list[tuple[int, str]]:
+    """Read interface IPs on IPv4 default routes, best metric first."""
+    try:
+        output = subprocess.check_output(
+            ["route", "print", "-4"],
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=2,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return []
+
+    routes: list[tuple[int, str]] = []
+    pattern = re.compile(
+        r"^\s*0\.0\.0\.0\s+0\.0\.0\.0\s+\S+\s+(\d+\.\d+\.\d+\.\d+)\s+(\d+)\s*$"
+    )
+    for line in output.splitlines():
+        match = pattern.match(line)
+        if match and _usable_lan_ip(match.group(1)):
+            routes.append((int(match.group(2)), match.group(1)))
+    return sorted(routes)
 
 
 def lan_ip() -> str:
@@ -15,15 +60,29 @@ def lan_ip() -> str:
 
     用 UDP connect 到公网地址不会真正发包，系统只是据此选一个出口网卡。
     """
+    # On Windows a proxy/TUN may install a metric-0 default route.  Consult all
+    # default routes and discard non-LAN ranges before using the socket trick.
+    route_ips = _windows_default_route_ips()
+    if route_ips:
+        return route_ips[0][1]
+
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         s.settimeout(0.5)
         s.connect(("223.5.5.5", 80))
-        return s.getsockname()[0]
+        candidate = s.getsockname()[0]
+        if _usable_lan_ip(candidate):
+            return candidate
     except Exception:
-        return "127.0.0.1"
+        pass
     finally:
         s.close()
+
+    try:
+        candidates = socket.gethostbyname_ex(socket.gethostname())[2]
+        return next(ip for ip in candidates if _usable_lan_ip(ip))
+    except (OSError, StopIteration):
+        return "127.0.0.1"
 
 
 def phone_url(request, path: str = "/") -> str:

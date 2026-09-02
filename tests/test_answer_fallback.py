@@ -1,6 +1,7 @@
 import unittest
 
 from src.core.answer_fallback import (
+    decide_natural_short_answer,
     decide_unnumbered_answer,
     extract_entity_fields,
 )
@@ -138,6 +139,61 @@ class DecideUnnumberedAnswerTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "非回答"):
             UnnumberedAnswerDecision(is_answer=False, fields=("duration",))
+
+
+class DecideNaturalShortAnswerTests(unittest.TestCase):
+    def test_observation_value_answers_unique_adjacent_question(self):
+        decision = decide_natural_short_answer(
+            pending_questions=[pending_question(missing_fields=("observation",))],
+            text="粉红色",
+            current_segment_id=2,
+        )
+        self.assertEqual(decision.fields, ("observation",))
+
+    def test_chinese_number_temperature_answers_unique_question(self):
+        decision = decide_natural_short_answer(
+            pending_questions=[pending_question(missing_fields=("temperature",))],
+            text="六十摄氏度",
+            current_segment_id=2,
+        )
+        self.assertEqual(decision.fields, ("temperature",))
+
+    def test_ambiguous_room_temperature_does_not_guess(self):
+        decision = decide_natural_short_answer(
+            pending_questions=[pending_question(
+                missing_fields=("temperature", "condition"),
+            )],
+            text="室温",
+            current_segment_id=2,
+        )
+        self.assertFalse(decision.is_answer)
+
+    def test_operation_sentence_does_not_answer(self):
+        decision = decide_natural_short_answer(
+            pending_questions=[pending_question(missing_fields=("observation",))],
+            text="加入粉红色溶液",
+            current_segment_id=2,
+        )
+        self.assertFalse(decision.is_answer)
+
+    def test_non_adjacent_value_does_not_answer(self):
+        decision = decide_natural_short_answer(
+            pending_questions=[pending_question(missing_fields=("duration",))],
+            text="过夜",
+            current_segment_id=3,
+        )
+        self.assertFalse(decision.is_answer)
+
+    def test_multiple_active_questions_do_not_guess(self):
+        decision = decide_natural_short_answer(
+            pending_questions=[
+                pending_question(missing_fields=("observation",)),
+                pending_question(display_number=2, missing_fields=("duration",)),
+            ],
+            text="粉红色",
+            current_segment_id=2,
+        )
+        self.assertFalse(decision.is_answer)
 
 
 if __name__ == "__main__":

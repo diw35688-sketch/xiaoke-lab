@@ -170,9 +170,6 @@ def ensure_ready() -> None:
 
 
 def ensure_self_signed_cert(ip: str) -> tuple[str, str] | None:
-    if CERT_FILE.exists() and KEY_FILE.exists():
-        return str(CERT_FILE), str(KEY_FILE)
-
     try:
         from cryptography import x509
         from cryptography.hazmat.primitives import hashes, serialization
@@ -180,6 +177,19 @@ def ensure_self_signed_cert(ip: str) -> tuple[str, str] | None:
         from cryptography.x509.oid import NameOID
     except ImportError:
         return None
+
+    if CERT_FILE.exists() and KEY_FILE.exists():
+        try:
+            current = x509.load_pem_x509_certificate(CERT_FILE.read_bytes())
+            san = current.extensions.get_extension_for_class(
+                x509.SubjectAlternativeName
+            ).value
+            if ipaddress.ip_address(ip) in san.get_values_for_type(x509.IPAddress):
+                return str(CERT_FILE), str(KEY_FILE)
+        except (ValueError, x509.ExtensionNotFound):
+            pass
+        # The active Wi-Fi address changed, or the old certificate was made for
+        # a proxy/TUN adapter.  Replace it so the QR URL and certificate agree.
 
     CERTS_DIR.mkdir(exist_ok=True)
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
