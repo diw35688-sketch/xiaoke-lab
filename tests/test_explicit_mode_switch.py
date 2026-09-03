@@ -114,11 +114,73 @@ class ExplicitModeSwitchTests(unittest.TestCase):
             free_branch.index("interactionModeState.select('free')"),
         )
 
+    def test_agent_protocol_tool_switches_mode_before_navigating(self):
+        tools = (WEB / "lab_tools.py").read_text(encoding="utf-8")
+        shell = (FRONTEND / "shell.js").read_text(encoding="utf-8")
+        state = (FRONTEND / "interaction_mode_state.js").read_text(
+            encoding="utf-8"
+        )
+        stream = (FRONTEND / "streaming_chat_v2.js").read_text(
+            encoding="utf-8"
+        )
+        select_tool = tools[
+            tools.index("def _select_protocol"):
+            tools.index("def _create_reagent_prep", tools.index("def _select_protocol"))
+        ]
+        self.assertIn('"type": "switch_interaction_mode"', select_tool)
+        self.assertIn('"mode": "free"', select_tool)
+        self.assertIn('"mode": "protocol"', select_tool)
+        self.assertIn('"protocol_id": result["protocol"]["id"]', select_tool)
+        self.assertIn("window.applyInteractionModeUiAction(action)", shell)
+        switch_branch = shell[
+            shell.index("if (action.type === 'switch_interaction_mode')"):
+            shell.index("if (action.type === 'navigate'")
+        ]
+        self.assertLess(
+            switch_branch.index("applyInteractionModeUiAction"),
+            switch_branch.index("show(action.view || 'run')"),
+        )
+        self.assertIn("window.interactionModeState.select(", state)
+        tool_branch_start = stream.index(
+            "} else if (block.type === 'tool_card') {"
+        )
+        tool_branch = stream[
+            tool_branch_start:
+            stream.index(
+                "} else if (block.type === 'assistant_text'", tool_branch_start
+            )
+        ]
+        self.assertNotIn("&& activeReply", tool_branch)
+        self.assertIn("window.appApplyUiAction(action)", tool_branch)
+
     def test_chat_store_and_request_share_one_frozen_snapshot(self):
         source = (FRONTEND / "streaming_chat_v2.js").read_text(encoding="utf-8")
         self.assertIn("consumeComposerModeSnapshot(form, 'text')", source)
         self.assertGreaterEqual(source.count("...modeSnapshot"), 2)
         self.assertNotIn("interaction_mode: 'chat'", source)
+
+    def test_composer_labels_chat_and_free_experiment_separately(self):
+        source = (FRONTEND / "composer.js").read_text(encoding="utf-8")
+
+        self.assertIn("snapshot.interaction_mode === 'chat'", source)
+        self.assertIn("return '自由聊天'", source)
+        self.assertIn("snapshot.experiment_context === 'free'", source)
+        self.assertIn("return '自由实验记录'", source)
+        self.assertNotIn(": '自由记录') + '<span", source)
+
+    def test_header_status_labels_chat_and_free_experiment_separately(self):
+        views = (FRONTEND / "views.js").read_text(encoding="utf-8")
+        shell = (FRONTEND / "shell.js").read_text(encoding="utf-8")
+
+        status_start = views.index("function interactionStatusLabel")
+        status_end = views.index("window.interactionStatusLabel", status_start)
+        status = views[status_start:status_end]
+        self.assertIn("snapshot.interaction_mode === 'chat'", status)
+        self.assertIn("return '自由聊天'", status)
+        self.assertIn("snapshot.experiment_context === 'free'", status)
+        self.assertIn("return '自由实验记录'", status)
+        self.assertNotIn("自由记录模式", status)
+        self.assertIn("window.shellRefreshStatus()", shell)
 
     def test_recording_and_call_are_only_input_sources(self):
         recorder = (FRONTEND / "voice_asr.js").read_text(encoding="utf-8")

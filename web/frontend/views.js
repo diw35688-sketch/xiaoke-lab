@@ -42,6 +42,22 @@
 
   var session = null;
 
+  function interactionStatusLabel(protocolSession) {
+    var snapshot = window.interactionModeState?.capture('text');
+    if (!snapshot || snapshot.interaction_mode === 'chat') return '自由聊天';
+    if (snapshot.experiment_context === 'free') return '自由实验记录';
+    if (snapshot.experiment_context === 'protocol') {
+      return protocolSession && protocolSession.mode === 'protocol' && protocolSession.protocol
+        ? esc(protocolSession.protocol.title) + ' · 第 ' + protocolSession.step.number
+          + '/' + protocolSession.protocol.total_steps + ' 步'
+        : '方案实验';
+    }
+    if (snapshot.experiment_context === 'template') return '模板实验';
+    if (snapshot.experiment_context === 'storage') return '实验存储';
+    return '实验模式';
+  }
+  window.interactionStatusLabel = interactionStatusLabel;
+
   // ---------- 顶栏状态 ----------
   function refreshStatus() {
     var protocolPath = window.protocolSessionUrl
@@ -54,9 +70,7 @@
       bits.push(s.ready
         ? '<span class="sh-pill ok">模型已配置</span>'
         : '<span class="sh-pill warn">未配置模型</span>');
-      bits.push(p.mode === 'protocol'
-        ? '<span class="sh-pill">' + esc(p.protocol.title) + ' · 第 ' + p.step.number + '/' + p.protocol.total_steps + ' 步</span>'
-        : '<span class="sh-pill">自由记录模式</span>');
+      bits.push('<span class="sh-pill">' + interactionStatusLabel(p) + '</span>');
       window.shellStatus(bits.join(''));
       if (window.runReload) window.runReload();
     }).catch(function () {});

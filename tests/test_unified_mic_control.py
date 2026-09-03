@@ -12,7 +12,9 @@ class UnifiedMicControlTests(unittest.TestCase):
 
         self.assertEqual(source.count('id="cp-mic"'), 1)
         self.assertIn('id="cp-phone-call"', source)
+        self.assertIn('id="cp-wake-word"', source)
         self.assertIn("window.phoneCallToggle?.();", source)
+        self.assertIn("window.wakeWordToggle?.();", source)
         self.assertIn("real.click();", source)
 
     def test_continuous_call_reports_real_active_state_to_composer(self):
@@ -21,6 +23,13 @@ class UnifiedMicControlTests(unittest.TestCase):
         self.assertIn("'lab:continuous-call-state'", source)
         self.assertIn("detail: { active: on }", source)
         self.assertIn("window.phoneCallIsActive = () => active", source)
+
+    def test_wake_word_waiting_is_separate_from_active_call(self):
+        source = (FRONTEND / "phone_call.js").read_text(encoding="utf-8")
+
+        self.assertIn("voiceMode = 'wake'", source)
+        self.assertIn("window.XiaokeWakeWord?.detectWakeWord(transcript)", source)
+        self.assertIn("'lab:wake-word-state'", source)
 
 
 if __name__ == "__main__":

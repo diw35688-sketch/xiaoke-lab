@@ -55,6 +55,19 @@
 
   window.createInteractionModeState = createInteractionModeState;
   window.interactionModeState = window.interactionModeState || createInteractionModeState();
+  window.applyInteractionModeUiAction = function (action) {
+    if (!action || action.type !== 'switch_interaction_mode') return null;
+    if (action.mode !== 'free' && action.mode !== 'protocol') {
+      throw new Error('不支持的服务端模式动作：' + action.mode);
+    }
+    if (action.mode === 'protocol' && !action.protocol_id) {
+      throw new Error('方案实验模式动作缺少 protocol_id');
+    }
+    return window.interactionModeState.select(
+      action.mode,
+      action.mode === 'protocol' ? action.protocol_id : null
+    );
+  };
   window.captureComposerModeSnapshot = function (form, inputSource, frozenSnapshot) {
     var snapshot = frozenSnapshot || window.interactionModeState.capture(inputSource);
     if (form) form.__interactionModeSnapshot = snapshot;

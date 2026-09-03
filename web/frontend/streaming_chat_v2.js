@@ -162,8 +162,9 @@
     turn.blocks.forEach(block => {
       if (block.type === 'system_status' && block.payload.kind === 'think' && activeReply) {
         updateThink(activeReply, block.payload.text, block.payload.running);
-      } else if (block.type === 'tool_card' && activeReply) {
-        ensureToolRow(block, activeReply);
+      } else if (block.type === 'tool_card') {
+        if (activeReply) ensureToolRow(block, activeReply);
+        else ensureCardRow(block, null);
         const action = block.payload?.ui_action;
         if (action && !appliedToolUi[block.block_id]) {
           appliedToolUi[block.block_id] = true;

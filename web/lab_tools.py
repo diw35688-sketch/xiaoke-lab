@@ -525,7 +525,19 @@ def _list_protocols():
 )
 def _select_protocol(protocol_id=None):
     result = domain.step_view(domain.start_session(protocol_id or None))
-    result["ui_action"] = {"type": "navigate", "view": "run"}
+    if result.get("mode") == "free":
+        result["ui_action"] = {
+            "type": "switch_interaction_mode",
+            "mode": "free",
+            "view": "run",
+        }
+    else:
+        result["ui_action"] = {
+            "type": "switch_interaction_mode",
+            "mode": "protocol",
+            "protocol_id": result["protocol"]["id"],
+            "view": "run",
+        }
     return result
 
 
