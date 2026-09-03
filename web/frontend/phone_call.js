@@ -13,6 +13,7 @@
   const CONVERSATION_KEY = 'lab-agent-conversation-id';
 
   let active = false;
+  let voiceMode = 'idle'; // idle | wake | call
   let audioCtx = null;
   let stream = null;
   let source = null;
@@ -71,7 +72,18 @@
     if (active) stopCall();
     else startCall();
   };
-  window.phoneCallIsActive = () => active;
+  window.phoneCallIsActive = () => active && voiceMode === 'call';
+  window.wakeWordToggle = () => {
+    if (active) stopCall();
+    else startWakeWord();
+  };
+  window.wakeWordIsWaiting = () => active && voiceMode === 'wake';
+
+  function publishWakeWordState(waiting) {
+    document.dispatchEvent(new CustomEvent('lab:wake-word-state', {
+      detail: {waiting}
+    }));
+  }
 
   function setAvatar(state) {
     window.dispatchAvatarState?.(state);
@@ -371,6 +383,32 @@
     while (active && segmentQueue.length) {
       const blob = segmentQueue.shift();
       try {
+        if (voiceMode === 'wake') {
+          hint('正在判断唤醒词…');
+          const form = new FormData();
+          form.append('audio', blob, 'wake_word.wav');
+          const response = await fetch('/asr/transcribe', {method: 'POST', body: form});
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.detail || '唤醒词识别失败');
+          const transcript = String(data.transcript || '').trim();
+          const keyword = window.XiaokeWakeWord?.detectWakeWord(transcript);
+          if (!keyword) {
+            hint(transcript
+              ? '识别为“' + transcript.slice(0, 24) + '”，未命中；继续等待“小科小科”'
+              : '没有识别出文字，继续等待“小科小科”…');
+            setAvatar('idle');
+            continue;
+          }
+          voiceMode = 'call';
+          publishWakeWordState(false);
+          setCallButton(true);
+          setAvatar('listening');
+          hint('唤醒成功：' + keyword + '。请直接说话');
+          window.dispatchEvent(new CustomEvent('lab:wake-word-detected', {
+            detail: {keyword, transcript}
+          }));
+          continue;
+        }
         await queueVoiceRuntimeEvent('asr_processing_started');
         hint('正在识别语音…');
         if (window.turnClient) {
@@ -470,6 +508,7 @@
       }
 
       active = true;
+      voiceMode = 'call';
       segmentQueue = [];
       sessionEndPending = false;
       runtimeEventChain = Promise.resolve();
@@ -479,11 +518,13 @@
         (window.performance?.now?.() ?? Date.now()) - callStartedAt
       );
       setCallButton(true);
+      publishWakeWordState(false);
       setAvatar('listening');
       if (captureMode === 'silero') hint('通话已开始，Silero 正在听你说话');
       console.info('[voice-ready]', window.__voiceStartupTimings);
     } catch (error) {
       active = false;
+      voiceMode = 'idle';
       setCallButton(false);
       hint('无法开始通话：' + error.message);
       setAvatar('idle');
@@ -492,8 +533,41 @@
     }
   }
 
+  async function startWakeWord() {
+    if (active) return;
+    const button = $('#cp-wake-word');
+    if (button) button.disabled = true;
+    try {
+      const statusRes = await fetch('/asr/status');
+      const asrStatus = await statusRes.json();
+      if (asrStatus && !asrStatus.loaded) {
+        hint('首次使用正在加载语音模型，约需 1 分钟…');
+        const warm = await fetch('/asr/warmup', {method: 'POST'});
+        if (!warm.ok) throw new Error('ASR 模型加载失败');
+      }
+      active = true;
+      voiceMode = 'wake';
+      segmentQueue = [];
+      sessionEndPending = false;
+      await startPreferredCapture();
+      setCallButton(false);
+      publishWakeWordState(true);
+      setAvatar('idle');
+      hint('待机唤醒中，请说“小科小科”');
+    } catch (error) {
+      active = false;
+      voiceMode = 'idle';
+      publishWakeWordState(false);
+      hint('无法开始唤醒检测：' + error.message);
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
   function stopCall(options = {}) {
     active = false;
+    const stoppedMode = voiceMode;
+    voiceMode = 'idle';
     captureMode = 'idle';
     segmentQueue = [];
     const autoSpeak = $('#auto-speak');
@@ -515,8 +589,9 @@
     sessionEndPending = false;
     if (!options.preservePlayback) window.stopSpeech?.();
     setCallButton(false);
+    publishWakeWordState(false);
     setAvatar('idle');
-    hint('通话已结束');
+    hint(stoppedMode === 'wake' ? '待机唤醒已关闭' : '通话已结束');
   }
 
   function prepareOnPageLoad() {

@@ -21,6 +21,7 @@
     '  color:var(--n-600);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:15px;flex:0 0 auto;font-family:inherit}',
     '.cp-icon:hover{background:var(--n-60)}',
     '.cp-icon.rec{background:var(--red-500);border-color:var(--red-500);color:#fff}',
+    '.cp-icon.wake{background:var(--brand-50);border-color:var(--brand);color:var(--brand)}',
     '.cp-chip{display:inline-flex;align-items:center;gap:5px;height:30px;padding:0 10px;border-radius:15px;',
     '  border:1px solid rgba(0,0,0,.10);background:var(--n-00);color:var(--n-700);font-size:var(--fs-sm);',
     '  cursor:pointer;white-space:nowrap;font-family:inherit;max-width:190px;overflow:hidden;text-overflow:ellipsis}',
@@ -53,6 +54,7 @@
     plus: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>',
     mic: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><path d="M12 18v4"/></svg>',
     phoneCall: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.09 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>',
+    wake: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0-6 6v3l-2 3h16l-2-3V9a6 6 0 0 0-6-6z"/><path d="M10 19h4"/></svg>',
     phone: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M12 18h.01"/></svg>'
   };
 
@@ -63,6 +65,7 @@
     '    <input type="file" id="cp-file-input" style="display:none" />',
     '    <button class="cp-icon" id="cp-mic" title="单次录音：是否保存由当前模式决定">' + ICONS.mic + '</button>',
     '    <button class="cp-icon" id="cp-phone-call" title="通话/连续通话">' + ICONS.phoneCall + '</button>',
+    '    <button class="cp-icon" id="cp-wake-word" title="待机唤醒：说“小科小科”开始连续通话">' + ICONS.wake + '</button>',
     '    <button class="cp-icon" id="cp-phone" title="手机端">' + ICONS.phone + '</button>',
     '    <span class="cp-chip plain" id="cp-hint">单次录音</span>',
     '  </div>',
@@ -83,6 +86,21 @@
   ].join('');
 
   function el(id) { return document.getElementById(id); }
+
+  function currentModeLabel(protocolSession) {
+    var snapshot = window.interactionModeState?.capture('text');
+    if (!snapshot || snapshot.interaction_mode === 'chat') return '自由聊天';
+    if (snapshot.experiment_context === 'free') return '自由实验记录';
+    if (snapshot.experiment_context === 'protocol') {
+      return protocolSession && protocolSession.mode === 'protocol' && protocolSession.protocol
+        ? protocolSession.protocol.title + ' 第' + protocolSession.step.number + '步'
+        : '方案实验';
+    }
+    if (snapshot.experiment_context === 'template') return '模板实验';
+    if (snapshot.experiment_context === 'storage') return '实验存储';
+    return '实验模式';
+  }
+  window.composerCurrentModeLabel = currentModeLabel;
 
   var stats = { turns: 0, tools: 0, seconds: 0, chars: 0 };
 
@@ -144,8 +162,7 @@
       ? window.protocolSessionUrl('/protocols/session')
       : '/protocols/session';
     fetch(protocolPath).then(function (r) { return r.json(); }).then(function (d) {
-      el('cp-pop-proto').innerHTML = (d.mode === 'protocol'
-        ? d.protocol.title + ' 第' + d.step.number + '步' : '自由记录') + '<span class="chev">›</span>';
+      el('cp-pop-proto').innerHTML = currentModeLabel(d) + '<span class="chev">›</span>';
     }).catch(function () {});
   }
   window.composerRefresh = refresh;
@@ -269,6 +286,13 @@
     };
     var phoneCallBtn = el('cp-phone-call');
     if (phoneCallBtn) phoneCallBtn.onclick = function () { if (window.logAction) window.logAction('phone_call_toggle'); window.phoneCallToggle?.(); };
+    var wakeWordBtn = el('cp-wake-word');
+    if (wakeWordBtn) wakeWordBtn.onclick = function () { if (window.logAction) window.logAction('wake_word_toggle'); window.wakeWordToggle?.(); };
+    document.addEventListener('lab:wake-word-state', function (event) {
+      var waiting = Boolean(event.detail && event.detail.waiting);
+      wakeWordBtn?.classList.toggle('wake', waiting);
+      wakeWordBtn?.setAttribute('aria-pressed', waiting ? 'true' : 'false');
+    });
     var phoneBtn = el('cp-phone');
     if (phoneBtn) phoneBtn.onclick = function () { if (window.logAction) window.logAction('open_phone_page'); window.open('/phone', '_blank'); };
 

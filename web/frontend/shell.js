@@ -229,6 +229,27 @@
   window.shellStatus = function (html) { el('sh-status').innerHTML = html; };
   window.appApplyUiAction = function (action) {
     if (!action || typeof action !== 'object') return;
+    if (action.type === 'switch_interaction_mode') {
+      try {
+        if (!window.applyInteractionModeUiAction) {
+          throw new Error('模式状态模块尚未加载');
+        }
+        window.applyInteractionModeUiAction(action);
+        if (window.composerRefresh) window.composerRefresh();
+        if (window.shellRefreshStatus) window.shellRefreshStatus();
+        show(action.view || 'run');
+      } catch (error) {
+        if (window.logAction) {
+          window.logAction('mode_switch_failed', {
+            mode: action.mode || null,
+            message: error.message || String(error)
+          });
+        }
+        var hint = document.getElementById('cp-hint');
+        if (hint) hint.textContent = error.message || String(error);
+      }
+      return;
+    }
     if (action.type === 'navigate' && action.view) {
       show(action.view);
       return;
