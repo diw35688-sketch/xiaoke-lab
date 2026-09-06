@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """唯一启动器：自动检查安装状态 → 启动 HTTPS 局域网服务 → 打印手机二维码。
 
 用户只需要双击仓库根目录的 start.bat，其他都不需要管。
@@ -12,10 +12,13 @@ import ipaddress
 import os
 import re
 import shutil
+import socket
 import subprocess
 import sys
 import threading
+import time
 import urllib.request
+import webbrowser
 from pathlib import Path
 
 if getattr(sys, "frozen", False):
@@ -99,7 +102,30 @@ def download_cloudflared() -> str:
     return str(CLOUDFLARED_EXE)
 
 
-def run_tunnel_mode(cloudflared: str) -> None:
+def open_browser_when_ready(
+    url: str,
+    host: str = "127.0.0.1",
+    port: int = 8000,
+    timeout: float = 30.0,
+) -> None:
+    """等 Web 端口真正开始监听后，用系统默认浏览器打开页面。"""
+    def _wait_and_open() -> None:
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            try:
+                with socket.create_connection((host, port), timeout=0.5):
+                    break
+            except OSError:
+                time.sleep(0.4)
+        try:
+            webbrowser.open(url)
+        except Exception:
+            pass
+
+    threading.Thread(target=_wait_and_open, daemon=True).start()
+
+
+def run_tunnel_mode(cloudflared: str, open_browser: bool = True) -> None:
     """公网模式：手机在任何网络都能访问，不需要局域网。"""
     import uvicorn
 
@@ -137,6 +163,9 @@ def run_tunnel_mode(cloudflared: str) -> None:
                 print(f"  二维码页: {public_url}/phone")
                 print("=" * 58)
                 print_ascii_qr(public_url)
+                if open_browser:
+                    print("[*] 正在自动打开浏览器...")
+                    open_browser_when_ready("http://127.0.0.1:8000")
 
         if public_url is None:
             print("[!] 隧道启动失败：没有读取到公网地址。")
@@ -152,7 +181,7 @@ def run_tunnel_mode(cloudflared: str) -> None:
         server.should_exit = True
 
 
-def run_lan_mode() -> None:
+def run_lan_mode(open_browser: bool = True) -> None:
     """局域网模式：同 WiFi 下延迟最低。"""
     ip = phone_access.lan_ip()
     scheme = "http"
@@ -175,6 +204,10 @@ def run_lan_mode() -> None:
         print("  未启用 HTTPS；手机麦克风可能被浏览器禁用")
     print("=" * 58)
     print_ascii_qr(url)
+    if open_browser:
+        print("[*] 正在自动打开浏览器...")
+        # 打开电脑本机地址（比 https://局域网IP 更不容易触发证书告警）
+        open_browser_when_ready(f"{scheme}://127.0.0.1:8000")
 
     import uvicorn
 
@@ -287,7 +320,13 @@ def main() -> None:
         action="store_true",
         help="只检查路径与启动条件，不下载模型、不启动服务",
     )
+    parser.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="启动后不自动打开浏览器（适合无人值守/自动测试）",
+    )
     args = parser.parse_args()
+    auto_browser = not args.no_browser
 
     if args.doctor:
         checks = {
@@ -308,7 +347,7 @@ def main() -> None:
     ensure_ready()
 
     if args.mode == "lan":
-        run_lan_mode()
+        run_lan_mode(open_browser=auto_browser)
         return
 
     if args.mode == "tunnel":
@@ -316,7 +355,7 @@ def main() -> None:
         if cloudflared is None:
             print("[*] 未检测到 cloudflared，尝试自动下载到项目 bin 目录...")
             cloudflared = download_cloudflared()
-        run_tunnel_mode(cloudflared)
+        run_tunnel_mode(cloudflared, open_browser=auto_browser)
         return
 
     # auto：优先公网隧道，下载失败再回退局域网
@@ -329,10 +368,10 @@ def main() -> None:
             print(f"[!] cloudflared 自动下载失败（{error}），本次先回退到局域网模式。")
 
     if cloudflared is not None:
-        run_tunnel_mode(cloudflared)
+        run_tunnel_mode(cloudflared, open_browser=auto_browser)
         return
 
-    run_lan_mode()
+    run_lan_mode(open_browser=auto_browser)
 
 
 if __name__ == "__main__":

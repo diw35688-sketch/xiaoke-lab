@@ -38637,12 +38637,10 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
   // integration/qwen_realtime_widget.jsx
   var import_jsx_runtime = __toESM(require_jsx_runtime(), 1);
   function qwenOrigin() {
-    const host = window.location.hostname || "127.0.0.1";
-    const lower = host.toLowerCase();
-    const loopback = lower === "localhost" || lower === "127.0.0.1" || lower === "[::1]" || lower === "::1";
-    if (!loopback) return "";
-    const proto = window.location.protocol === "https:" ? "https:" : "http:";
-    return `${proto}//${host}:3101`;
+    // 统一走同源 /api/realtime 反向代理（桌面 HTTPS/HTTP、手机隧道都能连）。
+    // 不能直接连 127.0.0.1:3101：HTTPS 页面会拼成 wss://3101，
+    // 但网关是纯 ws，导致 connectionState=unavailable、实时语音连不上。
+    return "";
   }
   function newSessionId() {
     return "lab-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);

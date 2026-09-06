@@ -1,13 +1,17 @@
 # -*- coding: utf-8 -*-
 """文件上传与读取接口：给对话里的 Agent 提供上传文件访问能力。"""
 import os
+import sys
 import time
 import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+if getattr(sys, "frozen", False):
+    BASE_DIR = Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent)) / "web"
+else:
+    BASE_DIR = Path(__file__).resolve().parent.parent
 UPLOAD_DIR = BASE_DIR.parent / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 

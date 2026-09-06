@@ -12,11 +12,17 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import threading
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent
+if getattr(sys, "frozen", False):
+    # PyInstaller 冻结运行时：模块的 __file__ 是虚拟路径，必须用 _MEIPASS
+    # 定位真正可写的资源目录（onedir 下通常是 .../_internal/web）。
+    BASE_DIR = Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent)) / "web"
+else:
+    BASE_DIR = Path(__file__).resolve().parent
 SETTINGS_FILE = BASE_DIR / "settings.json"
 
 # 常见服务商预设，方便用户一键填好地址和模型名
@@ -170,6 +176,10 @@ class ModelSettings:
     def key_for(self, provider_id: str | None) -> str:
         """按供应商取密钥；未单独保存时回退到当前主密钥。"""
 
+        # DashScope 实时语音/模型有独立字段 dashscope_api_key，优先用它；
+        # 否则用户在主模型里填了 DashScope Key 也能通过 api_keys 生效。
+        if provider_id == "dashscope" and self.dashscope_api_key:
+            return self.dashscope_api_key
         if provider_id and self.api_keys.get(provider_id):
             return self.api_keys[provider_id]
         return self.api_key

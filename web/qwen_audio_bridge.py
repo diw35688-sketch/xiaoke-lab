@@ -19,6 +19,14 @@ QWEN_AUDIO_ROOT = Path(__file__).resolve().parent.parent / "_qwen-audio-agent"
 SERVER_ENTRY = QWEN_AUDIO_ROOT / "lab" / "start-lab-gateway.mjs"
 DEFAULT_PORT = 3101
 DEFAULT_MODEL = "qwen-audio-3.0-realtime-plus"
+BUNDLED_NODE = QWEN_AUDIO_ROOT / "node" / "node.exe"
+
+
+def node_command() -> str:
+    """优先使用随包分发的 Node，找不到再回退到系统 PATH 里的 node。"""
+    if BUNDLED_NODE.is_file():
+        return str(BUNDLED_NODE)
+    return "node"
 
 
 def qwen_env() -> dict:
@@ -29,12 +37,19 @@ def qwen_env() -> dict:
     env["QWEN_AUDIO_REALTIME_PROVIDER"] = "dashscope"
     env["QWEN_AUDIO_REALTIME_MODEL"] = settings.dashscope_realtime_model or DEFAULT_MODEL
     env["AGENT_PROTOCOL"] = "none"
-    env["LAB_ASSISTANT_BASE_URL"] = os.getenv("LAB_ASSISTANT_BASE_URL", "http://127.0.0.1:8000")
+    # PyInstaller 冻结版本地后端是 HTTPS 自签名，Node 必须用 https 回调并
+    # 关闭证书校验，否则工具定义拉取/任务提交全部 fetch failed。
+    if getattr(sys, "frozen", False):
+        default_lab_base = "https://127.0.0.1:8000"
+        env.setdefault("NODE_TLS_REJECT_UNAUTHORIZED", "0")
+    else:
+        default_lab_base = "http://127.0.0.1:8000"
+    env["LAB_ASSISTANT_BASE_URL"] = os.getenv("LAB_ASSISTANT_BASE_URL", default_lab_base)
     env.setdefault(
         "QWEN_AUDIO_AGENT_ALLOWED_ORIGINS",
         os.getenv(
             "QWEN_AUDIO_AGENT_ALLOWED_ORIGINS",
-            "http://127.0.0.1:8000,http://localhost:8000",
+            "https://127.0.0.1:8000,http://127.0.0.1:8000,http://localhost:8000",
         ),
     )
     env["QWEN_AUDIO_AGENT_ASSISTANT_PROFILE_PATH"] = str(
@@ -82,7 +97,7 @@ def start(port: int = DEFAULT_PORT, wait: bool = True) -> dict:
 
     with log_path.open("a", encoding="utf-8") as log_file:
         process = subprocess.Popen(
-            ["node", str(SERVER_ENTRY)],
+            [node_command(), str(SERVER_ENTRY)],
             cwd=str(QWEN_AUDIO_ROOT),
             env=env,
             stdout=log_file,
