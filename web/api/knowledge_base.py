@@ -10,6 +10,7 @@
   - kb_rows_fts：FTS5 全文索引（跨所有列做关键词搜索）
 """
 import json
+import sys
 import time
 import uuid
 from pathlib import Path
@@ -21,7 +22,10 @@ from database.db import get_connection
 
 router = APIRouter(prefix="/kb", tags=["知识库"])
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+if getattr(sys, "frozen", False):
+    BASE_DIR = Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent)) / "web"
+else:
+    BASE_DIR = Path(__file__).resolve().parent.parent
 KB_UPLOAD_DIR = BASE_DIR.parent / "uploads" / "kb"
 KB_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 

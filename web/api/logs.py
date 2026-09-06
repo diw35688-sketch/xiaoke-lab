@@ -1,12 +1,16 @@
 # -*- coding: utf-8 -*-
 """调试日志接口：查看 uvicorn 输出/错误日志尾部，便于排查线上问题。"""
+import sys
 from pathlib import Path
 
 from fastapi import APIRouter, Query
 
 from fastapi.responses import PlainTextResponse
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+if getattr(sys, "frozen", False):
+    REPO_ROOT = Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent))
+else:
+    REPO_ROOT = Path(__file__).resolve().parents[2]
 OUT_LOG = REPO_ROOT / "uvicorn_out.log"
 ERR_LOG = REPO_ROOT / "uvicorn_err.log"
 EVENT_LOG = REPO_ROOT / "debug_events.log"

@@ -12,7 +12,11 @@ import sys
 import threading
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+if getattr(sys, "frozen", False):
+    # PyInstaller 冻结运行时：__file__ 是虚拟路径，用 _MEIPASS 定位真实资源根。
+    REPO_ROOT = Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent))
+else:
+    REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 

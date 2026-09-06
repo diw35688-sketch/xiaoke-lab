@@ -15,10 +15,14 @@
 from __future__ import annotations
 
 import sqlite3
+import sys
 from pathlib import Path
 
 # 与 config.DATABASE_PATH 指向同一文件；测试可整体替换该路径。
-DB_PATH = Path(__file__).resolve().parent.parent / "lab_agent.db"
+if getattr(sys, "frozen", False):
+    DB_PATH = Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent)) / "web" / "lab_agent.db"
+else:
+    DB_PATH = Path(__file__).resolve().parent.parent / "lab_agent.db"
 
 _DDL = [
     """CREATE TABLE IF NOT EXISTS session_snapshot (

@@ -10,13 +10,18 @@ import json
 import re
 import shutil
 import subprocess
+import sys
 import threading
 import time
 from pathlib import Path
 
 import phone_access
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+if getattr(sys, "frozen", False):
+    # PyInstaller 冻结运行时：__file__ 是虚拟路径，必须用 _MEIPASS 定位真实资源。
+    REPO_ROOT = Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent))
+else:
+    REPO_ROOT = Path(__file__).resolve().parent.parent
 BIN_DIR = REPO_ROOT / "bin"
 CLOUDFLARED_EXE = BIN_DIR / "cloudflared.exe"
 STATE_FILE = REPO_ROOT / "data" / "network_mode.json"
@@ -68,6 +73,18 @@ def _cloudflared_path() -> str | None:
     return found
 
 
+def _tunnel_origin() -> tuple[str, list[str]]:
+    """返回 cloudflared 转发到本机的地址与附加参数。
+
+    PyInstaller 冻结版用 start_best 启动，本地服务是 HTTPS 自签名；
+    cloudflared 必须用 https:// 转发并跳过证书校验，否则公网访问 502。
+    源码开发环境（restart_server.ps1）是 HTTP，保持原样。
+    """
+    if getattr(sys, "frozen", False):
+        return "https://127.0.0.1:8000", ["--no-tls-verify"]
+    return "http://127.0.0.1:8000", []
+
+
 def _read_tunnel_output(process: subprocess.Popen) -> None:
     global _public_url, _tunnel_log, _tunnel_error
     pattern = re.compile(r"https://[a-z0-9-]+\.trycloudflare\.com")
@@ -117,7 +134,8 @@ def _kill_matching_cloudflared() -> None:
             script = (
                 "Get-CimInstance Win32_Process | "
                 "Where-Object { $_.Name -eq 'cloudflared.exe' -and "
-                "$_.CommandLine -like '*--url http://127.0.0.1:8000*' } | "
+                "($_.CommandLine -like '*--url http://127.0.0.1:8000*' -or "
+                "$_.CommandLine -like '*--url https://127.0.0.1:8000*') } | "
                 "ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
             )
             subprocess.run(
@@ -129,7 +147,7 @@ def _kill_matching_cloudflared() -> None:
             )
         else:
             subprocess.run(
-                ["pkill", "-f", r"cloudflared.*--url http://127\.0\.0\.1:8000"],
+                ["pkill", "-f", r"cloudflared.*--url (http|https)://127\.0\.0\.1:8000"],
                 timeout=5,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
@@ -191,8 +209,9 @@ def start_tunnel() -> dict:
         _stop_event = threading.Event()
         _public_url = None
         _tunnel_error = None
+        origin, extra_args = _tunnel_origin()
         _tunnel_process = subprocess.Popen(
-            [binary, "tunnel", "--no-autoupdate", "--url", "http://127.0.0.1:8000"],
+            [binary, "tunnel", "--no-autoupdate", *extra_args, "--url", origin],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,

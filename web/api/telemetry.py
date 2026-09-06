@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """前端行为遥测接口：把用户使用的关键功能上报到调试日志。"""
 import json
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -8,7 +9,10 @@ from typing import Any
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+if getattr(sys, "frozen", False):
+    REPO_ROOT = Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent))
+else:
+    REPO_ROOT = Path(__file__).resolve().parents[2]
 EVENT_LOG = REPO_ROOT / "debug_events.log"
 
 router = APIRouter(prefix="/api", tags=["调试遥测"])

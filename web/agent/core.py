@@ -2,15 +2,20 @@ import json
 import logging
 import os
 from pathlib import Path
+
 _logger = logging.getLogger("agent_core")
 if not _logger.handlers:
-    # Use a writable per-user location; never rely on the developer's machine path.
-    _log_dir = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "AI107LabAssistant" / "logs"
-    _log_dir.mkdir(parents=True, exist_ok=True)
-    _h = logging.FileHandler(_log_dir / "agent_tool.log", encoding="utf-8")
-    _h.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
-    _logger.addHandler(_h)
-    _logger.setLevel(logging.INFO)
+    # EXE 打包后不依赖开发者机器路径：优先写 per-user 目录；写不了就静默降级。
+    try:
+        _log_dir = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "AI107LabAssistant" / "logs"
+        _log_dir.mkdir(parents=True, exist_ok=True)
+        _h = logging.FileHandler(_log_dir / "agent_tool.log", encoding="utf-8")
+        _h.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
+        _logger.addHandler(_h)
+        _logger.setLevel(logging.INFO)
+    except OSError:
+        # 只读目录/打包环境写不了日志时静默降级，不影响主流程。
+        _logger.addHandler(logging.NullHandler())
 import httpx
 import threading
 from openai import APIConnectionError, APIStatusError, APITimeoutError, OpenAI

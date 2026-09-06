@@ -1595,13 +1595,13 @@
             msg.textContent = '正在拉取模型…';
             modelSelect.style.display = 'none';
             var providerId = provider ? provider.id : (select ? select.value : '');
-            var useStoredKey = Boolean(provider) || (providerId && providerId !== '__custom__');
+            // 用户刚在输入框里填了 Key 就优先用它拉取，不需要先保存；
+            // 没填时才回退到后端已保存的 Key。
             var fetchPayload = {
               base_url: baseInput.value.trim(),
               provider_id: providerId,
-              api_key: ''
+              api_key: keyInput.value.trim()
             };
-            if (!useStoredKey && keyInput.value.trim()) fetchPayload.api_key = keyInput.value.trim();
             fetch('/settings/models', {
               method: 'POST', headers: {'Content-Type': 'application/json'},
               body: JSON.stringify(fetchPayload)

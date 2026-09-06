@@ -56,6 +56,7 @@
     '      <em>点“拉取模型”会用上面这个 DashScope Key 拉取可用模型，选择后保存。</em></label>',
     '    <div class="settings-qwen-row">',
     '      <button id="settings-qwen-start" class="ghost" type="button">启动 QwenAudio 实时语音</button>',
+    '      <button id="settings-dashscope-test" class="ghost" type="button" style="white-space:nowrap">测试语音 Key</button>',
     '      <span id="settings-qwen-status" class="settings-qwen-status"></span></div>',
     '    </div>',
     '    <div class="settings-section" data-section="misc">',
@@ -73,7 +74,7 @@
     '      <textarea id="settings-profile-notes" rows="2" placeholder="例如：习惯晚上做实验、记录要详细、自动播报"></textarea></label>',
     '    </div>',
     '    <div class="settings-actions">',
-    '      <button id="settings-test" class="ghost">测试连接</button>',
+    '      <button id="settings-test" class="ghost">测试文字模型</button>',
     '      <button id="settings-save" class="primary">保存并生效</button></div>',
     '    <p id="settings-result" class="settings-result"></p>',
     '  </div></div>'
@@ -123,13 +124,20 @@
   var providerProfiles = {};
   function el(id) { return document.getElementById(id); }
 
-  function setStatus(ready, missing) {
+  function setStatus(ready, missing, voiceReady) {
     var box = el('settings-status'), button = el('settings-open');
     if (ready) {
       box.className = 'settings-status ok';
       box.textContent = '模型已配置，可以正常对话。';
       button.classList.remove('needs-setup');
       button.textContent = '设置';
+    } else if (voiceReady) {
+      // 语音已配好、仅文字模型未配齐时，不要把文字模型的缺失
+      // 渲染成语音配置失败。
+      box.className = 'settings-status warn';
+      box.textContent = '语音模型已配置；文字模型还需：' + ((missing || []).join('；') || '完善配置') + '。';
+      button.classList.add('needs-setup');
+      button.textContent = '需要配置文字模型';
     } else {
       box.className = 'settings-status warn';
       box.textContent = ((missing || []).join('；') || '尚未完成配置') + '。填写后即可使用。';
@@ -194,7 +202,7 @@
           ? ('已保存 ' + providerKeys[selected.id] + '，留空表示不修改')
           : '请填写 API 密钥';
       }
-      setStatus(data.ready, data.missing);
+      setStatus(data.ready, data.missing, data.settings.dashscope_api_key_set);
     });
   }
 
@@ -283,20 +291,82 @@
     el('settings-qwen-start').onclick = function () {
       var button = el('settings-qwen-start');
       var status = el('settings-qwen-status');
+      var dashKey = (el('settings-dashscope-key').value || '').trim();
       button.disabled = true;
-      status.textContent = '启动中…';
-      fetch('/settings/qwen-audio/start', { method: 'POST' })
-        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
-        .then(function (res) {
-          button.disabled = false;
-          status.textContent = res.d.message || (res.ok ? '已启动' : '启动失败');
-          status.style.color = res.d.ok ? '#047857' : '#dc2626';
-        })
-        .catch(function () {
-          button.disabled = false;
-          status.textContent = '启动请求失败';
-          status.style.color = '#dc2626';
+      status.textContent = dashKey ? '正在保存 Key 并启动…' : '启动中…';
+      function doStart() {
+        fetch('/settings/qwen-audio/start', { method: 'POST' })
+          .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+          .then(function (res) {
+            button.disabled = false;
+            status.textContent = res.d.message || (res.ok ? '已启动' : '启动失败');
+            status.style.color = res.d.ok ? '#047857' : '#dc2626';
+          })
+          .catch(function () {
+            button.disabled = false;
+            status.textContent = '启动请求失败';
+            status.style.color = '#dc2626';
+          });
+      }
+      var save = Promise.resolve();
+      if (dashKey) {
+        // 用户刚在输入框里填了 Key 就点“启动”：先保存，再启动，
+        // 否则启动用的是旧 Key/空 Key，必然报“密钥无效”。
+        save = fetch('/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dashscope_api_key: dashKey })
+        }).then(function (r) {
+          if (!r.ok) return r.json().then(function (d) { throw new Error(d.detail || '保存失败'); });
+          el('settings-dashscope-key').value = '';
+          return r.json();
         });
+      }
+      save.then(doStart).catch(function (e) {
+        button.disabled = false;
+        status.textContent = '保存 Key 失败：' + String(e.message || e);
+        status.style.color = '#dc2626';
+      });
+    };
+    el('settings-dashscope-test').onclick = function () {
+      var button = el('settings-dashscope-test');
+      var status = el('settings-qwen-status');
+      var dashKey = (el('settings-dashscope-key').value || '').trim();
+      button.disabled = true;
+      status.textContent = dashKey ? '正在保存 Key 并测试语音…' : '正在测试语音…';
+      status.style.color = '#64748b';
+      function doTest() {
+        // 真正测语音：启动 QwenAudio 网关；能启动/已在运行说明 Key 可用。
+        fetch('/settings/qwen-audio/start', { method: 'POST' })
+          .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+          .then(function (res) {
+            button.disabled = false;
+            status.textContent = res.d.message || (res.ok ? '✅ 语音服务正常' : '❌ 启动失败');
+            status.style.color = res.ok ? '#047857' : '#dc2626';
+          })
+          .catch(function () {
+            button.disabled = false;
+            status.textContent = '测试请求失败';
+            status.style.color = '#dc2626';
+          });
+      }
+      var save = Promise.resolve();
+      if (dashKey) {
+        save = fetch('/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dashscope_api_key: dashKey })
+        }).then(function (r) {
+          if (!r.ok) return r.json().then(function (d) { throw new Error(d.detail || '保存失败'); });
+          el('settings-dashscope-key').value = '';
+          return r.json();
+        });
+      }
+      save.then(doTest).catch(function (e) {
+        button.disabled = false;
+        status.textContent = '保存 Key 失败：' + String(e.message || e);
+        status.style.color = '#dc2626';
+      });
     };
     el('settings-dashscope-pull').onclick = function () {
       var button = el('settings-dashscope-pull');
@@ -434,8 +504,10 @@
         .then(function (r) { return r.json(); })
         .then(function (d) {
           el('settings-key').value = '';
-          setStatus(d.ready, d.missing);
-          result(d.ready, d.ready ? d.message : (d.message + '，但仍缺：' + (d.missing || []).join('；')));
+          // 保存本身已经成功，固定显示成功消息；文字模型未配齐的提示
+          // 只通过顶部状态条(setStatus)表达，避免让用户误以为保存失败。
+          setStatus(d.ready, d.missing, d.settings.dashscope_api_key_set);
+          result(true, d.message || '设置已保存');
           return load();
         })
         .catch(function (err) { result(false, String(err)); })
