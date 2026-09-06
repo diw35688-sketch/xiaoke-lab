@@ -181,7 +181,8 @@
   }
 
   function flowCid() {
-    return localStorage.getItem('lab-agent-conversation-id') || 'reagent-flow-default';
+    // 单用户助手只有一个活动会话；配制流程挂在会话上，不再随聊天会话漂移。
+    return 'lab-session';
   }
 
   function flowApi(path, method, payload) {
@@ -226,15 +227,22 @@
       }
       var step = steps[index];
       var progress = Math.round(((index + 1) / steps.length) * 100);
+      var checklist = steps.map(function (s, i) {
+        var cls = i < index ? 'done' : (i === index ? 'current' : '');
+        var mark = i < index ? '☑' : (i === index ? '▶' : '☐');
+        return '<div class="prep-flow-item ' + cls + '" style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-bottom:1px dashed #eef2f7">'
+          + '<span style="flex:0 0 20px;font-size:16px;line-height:1.5;color:' + (i < index ? '#16a34a' : (i === index ? '#2563eb' : '#94a3b8')) + '">' + mark + '</span>'
+          + '<span style="flex:1;font-size:14px;color:' + (i < index ? '#64748b' : (i === index ? '#0f172a' : '#334155')) + ';line-height:1.7;white-space:pre-wrap">' + esc(s) + '</span>'
+          + '</div>';
+      }).join('');
       host.innerHTML = '<div class="prep-detail">'
         + '<div style="display:flex;gap:8px;justify-content:space-between;align-items:center"><button class="sh-btn" id="prep-flow-back">← 退出配置</button>'
         + '<span style="font-size:12px;color:#64748b">第 ' + (index + 1) + ' / ' + steps.length + ' 步</span></div>'
         + '<div class="prep-detail-title">开始配置：' + esc(prep.name_zh) + '</div>'
         + '<div class="prep-detail-sub">' + esc(prep.purpose || '') + ' · 目标：' + esc(prep.target_concentration || '未指定') + ' · 体积：' + esc(prep.target_volume || '按需') + '</div>'
         + '<div class="rc-progress"><div class="rc-progress-bar" style="width:' + progress + '%"></div></div>'
-        + '<div class="prep-flow-step" style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px 18px;margin-bottom:12px">'
-        + '<div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:8px">第 ' + (index + 1) + ' 步</div>'
-        + '<div style="font-size:15px;color:#1f2937;line-height:1.8;white-space:pre-wrap">' + esc(step) + '</div>'
+        + '<div class="prep-flow-step" style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:6px 4px;margin-bottom:12px">'
+        + checklist
         + '</div>'
         + (prep.safety && prep.safety.length
             ? '<div class="prep-detail-box prep-safety-box"><div class="prep-section-title">本步安全提醒</div>'
@@ -244,7 +252,7 @@
         + (flowMsg ? '<div style="color:#c2410c;font-size:12px;margin-bottom:8px">' + esc(flowMsg) + '</div>' : '')
         + '<div style="display:flex;gap:8px;margin-top:4px">'
         + '<button class="sh-btn" id="prep-flow-prev"' + (index === 0 ? ' disabled' : '') + '>上一步</button>'
-        + '<button class="sh-btn primary" id="prep-flow-next"' + (index === steps.length - 1 ? ' disabled' : '') + '>下一步</button>'
+        + '<button class="sh-btn primary" id="prep-flow-next"' + (index === steps.length - 1 ? ' disabled' : '') + '>完成当前步，下一步</button>'
         + (index === steps.length - 1 ? '<button class="sh-btn" id="prep-flow-done">完成配置</button>' : '')
         + '</div></div>';
       host.querySelector('#prep-flow-back').onclick = function () { window.shellShow('reagent_prep'); };
@@ -412,7 +420,7 @@
       });
     }
 
-    var prepPageSize = 8;
+    var prepPageSize = 10000;
     function load(filterText) {
       fetch('/reagent-prep').then(function (r) { return r.json(); }).then(function (d) {
         var q = (filterText || '').trim().toLowerCase();
@@ -466,7 +474,7 @@
 
     var searchInput = host.querySelector('#prep-search');
     searchInput.addEventListener('input', function () {
-      prepPageSize = 8;
+      prepPageSize = 10000;
       load(searchInput.value.trim());
     });
     window.prepOpenDetail = function (id) {

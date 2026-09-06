@@ -11,6 +11,7 @@
 """
 from __future__ import annotations
 
+import json
 from typing import Mapping, Optional
 
 import domain
@@ -25,6 +26,17 @@ from src.core.protocol_execution_state import (
 from src.core.session_context import SessionContext
 
 _turn_store = TurnStore()
+
+
+def get_current_protocol_id() -> str | None:
+    """获取当前选中方案的 ID（全局 domain session）。"""
+    try:
+        state = domain.session()
+        if state.selection.has_protocol:
+            return state.selection.protocol.protocol_id
+    except Exception:
+        pass
+    return None
 
 
 def _format_protocol_state() -> str:
@@ -45,8 +57,7 @@ def _format_protocol_state() -> str:
                 f"{key}={value}" for key, value in step.protocol_values.items()
             )
             lines.append(f"方案已定：{values}")
-        if getattr(step, "must_record", None):
-            lines.append("现场必测：" + "、".join(step.must_record))
+        # 不输出“现场必测”，全局没有必填字段。
         return "\n".join(lines)
     except Exception:  # noqa: BLE001 - 采集上下文不应让会话失败
         return "当前方案状态读取失败（不影响继续对话）。"
@@ -74,6 +85,25 @@ def _format_experiment_state(
 
         # 2. 方案执行状态：优先使用本实验会话的快照，而不是全局 domain 状态。
         facts = dict(stored.get("protocol_step_facts") or {})
+        if not facts:
+            # 兼容旧版 lab_session 错位：如果当前 lab_session 没有方案，
+            # 找同一 conversation 下任意一份非空协议快照。
+            try:
+                with get_connection() as connection:
+                    rows = connection.execute(
+                        """SELECT protocol_step_facts_json
+                           FROM experiment_session_state
+                           WHERE conversation_id=? AND protocol_step_facts_json != '{}'
+                           ORDER BY updated_at DESC""",
+                        (conversation_id,),
+                    ).fetchall()
+                for row in rows:
+                    candidate = json.loads(row["protocol_step_facts_json"])
+                    if candidate:
+                        facts = dict(candidate)
+                        break
+            except Exception:
+                pass
         protocol_id = facts.get("protocol_id")
         protocol_version = facts.get("protocol_version")
         if protocol_id and protocol_version:
@@ -109,10 +139,7 @@ def _format_experiment_state(
                             for key, value in current_step.protocol_values.items()
                         )
                         lines.append(f"方案已定：{values}")
-                    if getattr(current_step, "must_record", None):
-                        lines.append(
-                            "现场必测：" + "、".join(current_step.must_record)
-                        )
+                    # 不输出“现场必测”，全局没有必填字段。
 
                     current_state = protocol_execution.step_state(
                         current_step_number
@@ -169,23 +196,140 @@ def _format_experiment_state(
         )
 
 
-def _format_reagent_flow(conversation_id: Optional[str]) -> str:
-    if not conversation_id:
-        return "没有进行中的试剂配置流程。"
+def _format_reagent_flow(
+    conversation_id: Optional[str] = None,
+    lab_session_id: Optional[str] = None,
+) -> str:
+    """试剂配制流程：优先按 lab_session_id 查，其次用 conversation_id。
+
+    增加陈旧检测：超过 4 小时未更新的流程视为过期，不注入上下文。
+    """
+    from datetime import datetime, timedelta
+
     try:
         with get_connection() as connection:
-            row = connection.execute(
-                "SELECT * FROM reagent_prep_flows WHERE conversation_id=?",
-                (conversation_id,),
-            ).fetchone()
+            # 优先用 lab_session_id 查，回退到旧的 "lab-session" 键
+            keys_to_try = []
+            if lab_session_id:
+                keys_to_try.append(lab_session_id)
+            if conversation_id:
+                keys_to_try.append(conversation_id)
+            keys_to_try.append("lab-session")  # 兼容旧数据
+
+            row = None
+            for key in keys_to_try:
+                row = connection.execute(
+                    "SELECT * FROM reagent_prep_flows WHERE conversation_id=?",
+                    (key,),
+                ).fetchone()
+                if row is not None:
+                    break
+
         if row is None:
             return "没有进行中的试剂配置流程。"
+
+        # 陈旧检测：updated_at 超过 4 小时的流程不注入
+        updated_raw = str(row["updated_at"] or "")
+        try:
+            # 数据库存储格式：YYYY-MM-DD HH:MM:SS 或 ISO 格式
+            updated = datetime.fromisoformat(
+                updated_raw.replace(" ", "T").replace("Z", "")
+            )
+            age = datetime.utcnow() - updated
+            if age > timedelta(hours=4):
+                # 过期流程自动标记为 stale，不再误导模型
+                with get_connection() as conn:
+                    conn.execute(
+                        "UPDATE reagent_prep_flows SET status='stale' WHERE conversation_id=?",
+                        (row["conversation_id"],),
+                    )
+                return "没有进行中的试剂配置流程。"
+        except (ValueError, TypeError):
+            pass  # 时间解析失败时不阻断，保守返回
+
+        status = row["status"]
+        if status not in ("running", "active"):
+            return "没有进行中的试剂配置流程。"
+
         return (
             f"当前试剂配置流程：reagent_prep_id={row['prep_id']}，"
-            f"第 {row['current_index'] + 1} 步，状态：{row['status']}"
+            f"第 {row['current_index'] + 1} 步，状态：{status}"
         )
     except Exception:  # noqa: BLE001
         return "当前试剂配置流程读取失败。"
+
+
+def _format_active_experiments(
+    conversation_id: Optional[str] = None,
+    current_lab_session_id: Optional[str] = None,
+) -> str:
+    """列出同一会话下的活跃实验，标出哪个是当前焦点。
+
+    从 experiment_session_state 表读出同一 conversation_id 下所有有方案的状态，
+    按最后更新时间排序。超过 24 小时未更新的标记为陈旧。
+    """
+    if not conversation_id:
+        return ""
+    from datetime import datetime, timedelta
+
+    try:
+        with get_connection() as connection:
+            rows = connection.execute(
+                """SELECT lab_session_id, protocol_step_facts_json, updated_at
+                   FROM experiment_session_state
+                   WHERE conversation_id=? AND protocol_step_facts_json != '{}'
+                   ORDER BY updated_at DESC
+                   LIMIT 5""",
+                (conversation_id,),
+            ).fetchall()
+        if not rows:
+            return ""
+
+        lines = []
+        now = datetime.utcnow()
+        active_count = 0
+        for row in rows:
+            facts = json.loads(row["protocol_step_facts_json"] or "{}")
+            protocol_id = facts.get("protocol_id")
+            step_num = facts.get("current_step_number")
+            if not protocol_id:
+                continue
+            lab_sid = row["lab_session_id"]
+            updated_raw = str(row["updated_at"] or "")
+            try:
+                updated = datetime.fromisoformat(
+                    updated_raw.replace(" ", "T").replace("Z", "")
+                )
+                age = now - updated
+            except (ValueError, TypeError):
+                age = timedelta(0)
+
+            # 超过 24 小时不显示
+            if age > timedelta(hours=24):
+                continue
+
+            # 查方案标题
+            try:
+                title = facts.get("protocol_title") or protocol_id
+            except Exception:
+                title = protocol_id
+
+            is_current = (
+                current_lab_session_id
+                and lab_sid == current_lab_session_id
+            )
+            marker = " ← 当前" if is_current else ""
+            lines.append(
+                f"  • {title}（第{step_num}步）{marker}"
+            )
+            active_count += 1
+
+        if not lines:
+            return ""
+        header = f"【活跃实验（{active_count}个）】"
+        return header + "\n" + "\n".join(lines)
+    except Exception:  # noqa: BLE001
+        return ""
 
 
 def build_harness_context(
@@ -202,9 +346,15 @@ def build_harness_context(
     if conversation_id:
         parts.append(f"会话 ID：{conversation_id}")
 
-    parts.append(_format_protocol_state())
-    parts.append(_format_experiment_state(conversation_id, lab_session_id))
-    parts.append(_format_reagent_flow(conversation_id))
+    # 有 lab_session_id 时，per-session store 是真相源；
+    # 全局 domain 可能因恢复失败而不同步，不要用它的状态误导模型。
+    if lab_session_id:
+        parts.append(_format_experiment_state(conversation_id, lab_session_id))
+    else:
+        # 没有 lab_session_id（旧客户端/聊天模式），退化为全局 domain 状态。
+        parts.append(_format_protocol_state())
+    parts.append(_format_reagent_flow(conversation_id, lab_session_id))
+    parts.append(_format_active_experiments(conversation_id, lab_session_id))
 
     if conversation_id:
         try:

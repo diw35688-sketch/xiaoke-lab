@@ -9,6 +9,9 @@
   const avatar = state => window.dispatchAvatarState?.(state);
   let activeController = null, activeReply = null, requestId = 0;
   let activeThinkRow = null, blockRows = {}, appliedToolUi = {};
+  // 跨设备同步：网页版没有推送，手机看不到电脑上刚聊的新内容。
+  // 记录已渲染的轮次数，轮询发现增加时只追加新轮次，不清屏不闪烁。
+  let syncedTurnCount = -1, liveSyncTimer = null;
   const turnStore = window.conversationTurnStore;
   const blockView = window.conversationBlockView;
   if (!turnStore) throw new Error('ConversationTurnStore 未加载');
@@ -24,9 +27,18 @@
   stopButton.title = '停止生成'; stopButton.textContent = '■'; stopButton.disabled = true;
   send.after(stopButton);
 
+  function cleanDisplayText(text) {
+    // 聊天里不显示 Markdown 裸符号：去掉 **、*、`、_ 等，只保留可读文字。
+    return String(text || '')
+      .replace(/[*_`]+/g, '')
+      .replace(/^#{1,6}\s*/gm, '')
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+      .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1');
+  }
+
   function add(text, role) {
     const row = document.createElement('div'), bubble = document.createElement('div');
-    row.className = `message ${role}`; bubble.className = 'bubble'; bubble.textContent = text;
+    row.className = `message ${role}`; bubble.className = 'bubble'; bubble.textContent = cleanDisplayText(text);
     row.appendChild(bubble); chat.appendChild(row); chat.scrollTop = chat.scrollHeight; return bubble;
   }
   window.addChatMessage = add;
@@ -89,6 +101,11 @@
 
   function ensureToolRow(block, reply) {
     const view = block.payload;
+    const artifact = view.artifact || {};
+    const toolTitle = artifact.title || view.title || '工具调用';
+    const toolLines = Array.isArray(artifact.lines) ? artifact.lines : (view.lines || []);
+    const toolAction = Array.isArray(artifact.actions) && artifact.actions[0]
+      ? artifact.actions[0] : view.ui_action;
     let row = blockRows[block.block_id];
     if (!row) {
       row = document.createElement('div');
@@ -101,16 +118,29 @@
         const open = toolCard.classList.toggle('open');
         this.setAttribute('aria-expanded', open ? 'true' : 'false');
       });
+      // 清单/准备/试剂/配方类卡片在右侧也展开显示。
+      if (/清单|准备|试剂|配方|准备台/.test(toolTitle)) {
+        toolCard.classList.add('open');
+        row.querySelector('.chat-tool-head').setAttribute('aria-expanded', 'true');
+      }
       var toolAnchor = messageRow(reply);
       chat.insertBefore(row, (toolAnchor && toolAnchor.parentNode === chat) ? toolAnchor : null);
       blockRows[block.block_id] = row;
     }
     const state = view.status === 'pending' ? '进行中' : (view.status === 'error' ? '失败' : '完成');
-    const lines = (view.lines || []).filter(Boolean).slice(0, 4);
-    row.querySelector('.chat-tool-head .tt').textContent = view.title || '工具调用';
+    const allLines = toolLines.filter(Boolean);
+    const isChecklist = artifact.type === 'checklist' || artifact.type === 'prep_bench' || /清单|准备|试剂|配方|准备台/.test(toolTitle);
+    const lines = isChecklist ? allLines : allLines.slice(0, 4);
+    row.querySelector('.chat-tool-head .tt').textContent = cleanDisplayText(toolTitle);
     const st = row.querySelector('.chat-tool-head .st');
     st.textContent = state; st.className = 'st ' + (view.status || 'done');
-    row.querySelector('.chat-tool-body').textContent = lines.join('\n');
+    // 清单类 artifact 用统一渲染器画出可勾选结构，而不是一坨纯文本。
+    const body = row.querySelector('.chat-tool-body');
+    if (isChecklist && window.renderArtifact && artifact && (artifact.type === 'checklist' || artifact.type === 'prep_bench')) {
+      body.innerHTML = window.renderArtifact(artifact);
+    } else {
+      body.textContent = cleanDisplayText(lines.join('\n'));
+    }
     row.classList.toggle('tool-error', view.status === 'error');
     // 失败不允许被折叠藏住：出错时自动展开，用户必须看见原因。
     if (view.status === 'error') {
@@ -134,11 +164,11 @@
       blockRows[block.block_id] = row;
     }
     row.className = `message block-card tone-${view.tone}`;
-    row.querySelector('.label').textContent = view.label;
-    row.querySelector('.title').textContent = view.title;
-    row.querySelector('.status').textContent = view.status;
-    row.querySelector('.chat-block-lines').textContent = view.lines.join('\n');
-    row.querySelector('.chat-block-meta').textContent = view.meta.join(' · ');
+    row.querySelector('.label').textContent = cleanDisplayText(view.label);
+    row.querySelector('.title').textContent = cleanDisplayText(view.title);
+    row.querySelector('.status').textContent = cleanDisplayText(view.status);
+    row.querySelector('.chat-block-lines').textContent = cleanDisplayText(view.lines.join('\n'));
+    row.querySelector('.chat-block-meta').textContent = cleanDisplayText(view.meta.join(' · '));
     chat.scrollTop = chat.scrollHeight;
   }
 
@@ -165,7 +195,9 @@
       } else if (block.type === 'tool_card') {
         if (activeReply) ensureToolRow(block, activeReply);
         else ensureCardRow(block, null);
-        const action = block.payload?.ui_action;
+        const artifact = block.payload?.artifact || {};
+        const action = (Array.isArray(artifact.actions) && artifact.actions[0])
+          || block.payload?.ui_action;
         if (action && !appliedToolUi[block.block_id]) {
           appliedToolUi[block.block_id] = true;
           if (window.appApplyUiAction) window.appApplyUiAction(action);
@@ -176,7 +208,7 @@
           if (row) row.hidden = true;
           return;
         }
-        activeReply.textContent = block.payload.text || '';
+        activeReply.textContent = cleanDisplayText(block.payload.text || '');
         chat.scrollTop = chat.scrollHeight;
       } else {
         ensureCardRow(block, activeReply);
@@ -225,18 +257,9 @@
       chat.scrollTop = chat.scrollHeight;
       if (input) input.focus();
     }
-    if (mode === 'chat') {
-      window.selectComposerMode('chat').then(function () {
-        showIntro('💬', '自由聊天已开启', '用于问答和讨论，不会保存为实验记录。');
-      });
-      return;
-    }
-    if (mode === 'free') {
-      window.selectComposerMode('free').then(function (selected) {
-        if (selected) {
-          showIntro('🧪', '自由实验记录已开启', '记录实际操作和测量数据，不绑定实验方案。');
-        }
-      });
+    if (mode === 'chat' || mode === 'free') {
+      // 普通文字聊天和自由实验记录已移除；残留入口统一进入方案实验。
+      if (window.shellShow) window.shellShow('protocols');
       return;
     }
     if (mode === 'protocol') {
@@ -264,8 +287,6 @@
     ensureNewChatStyles();
     if (chat.querySelector('.new-chat-options')) return;
     var MODE_ICONS = {
-      chat: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>',
-      free: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>',
       protocol: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5h6"/><path d="M9 9h6"/><path d="M9 13h4"/><rect x="5" y="2" width="14" height="20" rx="2"/></svg>',
       template: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
       storage: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>'
@@ -273,9 +294,7 @@
     var wrap = document.createElement('div');
     wrap.className = 'new-chat-options';
     wrap.innerHTML = [
-      '<div class="nco-card" data-mode="chat"><div class="nco-ic">' + MODE_ICONS.chat + '</div><div class="nco-title">自由聊天</div><div class="nco-desc">问答和讨论，不保存实验记录</div></div>',
-      '<div class="nco-card" data-mode="free"><div class="nco-ic">' + MODE_ICONS.free + '</div><div class="nco-title">自由实验记录</div><div class="nco-desc">记录操作和数据，不绑定方案</div></div>',
-      '<div class="nco-card" data-mode="protocol"><div class="nco-ic">' + MODE_ICONS.protocol + '</div><div class="nco-title">方案实验</div><div class="nco-desc">进入方案页，查看或选择方案后开始</div></div>',
+      '<div class="nco-card" data-mode="protocol"><div class="nco-ic">' + MODE_ICONS.protocol + '</div><div class="nco-title">方案实验</div><div class="nco-desc">按当前方案逐步推进并记录</div></div>',
       '<div class="nco-card" data-mode="template"><div class="nco-ic">' + MODE_ICONS.template + '</div><div class="nco-title">AI制作方案/配方</div><div class="nco-desc">对话创建或修改；PDF/图片请到方案页导入</div></div>',
       '<div class="nco-card" data-mode="storage"><div class="nco-ic">' + MODE_ICONS.storage + '</div><div class="nco-title">制作储存库</div><div class="nco-desc">登记位置/物品/库存</div></div>'
     ].join('');
@@ -306,7 +325,7 @@
       }
       if (block.type === 'assistant_text') {
         if (!reply) reply = add(payload.text || '', 'assistant');
-        else if (reply.parentElement) reply.textContent = payload.text || '';
+        else if (reply.parentElement) reply.textContent = cleanDisplayText(payload.text || '');
         return;
       }
       if (block.type === 'system_status' && payload.kind === 'think') {
@@ -337,6 +356,7 @@
       localStorage.removeItem(freshChatKey);
       return;
     }
+    document.dispatchEvent(new CustomEvent('lab:context-preparing'));
     const id = conversationId || localStorage.getItem(conversationKey);
     if (id) {
       fetch(`/turn/history?conversation_id=${encodeURIComponent(id)}`).then(response => {
@@ -350,7 +370,10 @@
         activeThinkRow = null;
         blockRows = {};
         turns.forEach((turn) => renderTurnHistory(turn.result));
+        syncedTurnCount = turns.length;
+        startLiveSync();
         chat.scrollTop = chat.scrollHeight;
+        document.dispatchEvent(new CustomEvent('lab:context-ready', { detail: { turns: turns.length } }));
       }).catch(() => loadFlatHistory(id));
     } else {
       loadFlatHistory(null);
@@ -358,6 +381,7 @@
   }
 
   function loadFlatHistory(conversationId) {
+    document.dispatchEvent(new CustomEvent('lab:context-preparing'));
     const id = conversationId || localStorage.getItem(conversationKey);
     const url = id
       ? `/chat/history?conversation_id=${encodeURIComponent(id)}`
@@ -385,7 +409,12 @@
               localStorage.setItem(conversationKey, d.conversation_id);
               document.dispatchEvent(new CustomEvent('conversation-changed'));
             }
-          }).catch(() => {});
+            document.dispatchEvent(new CustomEvent('lab:context-ready', { detail: { fresh: true } }));
+          }).catch(() => {
+            document.dispatchEvent(new CustomEvent('lab:context-ready', { detail: { fresh: true } }));
+          });
+        } else {
+          document.dispatchEvent(new CustomEvent('lab:context-ready', { detail: { fresh: true } }));
         }
         return;
       }
@@ -395,8 +424,13 @@
         const clean = String(item.content || '').replace(/\[\[LABTHINK\]\]|\[\[LABCARD\]\]/g, '');
         add(clean, item.role === 'user' ? 'user' : 'assistant');
       });
+      // flat 历史没有 turn 计数；启动同步后，下次发现 turn 历史会自动全量切换。
+      startLiveSync();
       chat.scrollTop = chat.scrollHeight;
-    }).catch(() => {});
+      document.dispatchEvent(new CustomEvent('lab:context-ready', { detail: { messages: messages.length } }));
+    }).catch(() => {
+      document.dispatchEvent(new CustomEvent('lab:context-ready', { detail: { error: true } }));
+    });
   }
 
   window.switchConversation = function (id) {
@@ -404,6 +438,7 @@
     stopCurrentResponse(false);
     localStorage.setItem(conversationKey, id);
     activeThinkRow = null; blockRows = {};
+    syncedTurnCount = -1;                                   // 换会话后重新计数
     turnStore.clear();
     window.runClearStream?.();
     clearChat();
@@ -432,6 +467,47 @@
   });
 
   loadHistory();
+
+  // ── 跨设备增量同步 ──────────────────────────────────────────────
+  // 网页版没有跨设备推送：电脑上发了新消息，手机不会自动知道；用户把手机切到
+  // 后台再切回来时，聊天还停在旧画面。这里在「标签页重新可见」和「轻量定时轮询」
+  // 时重新拉取历史，发现新轮次就增量追加。生成回复期间不刷新，避免打断正在打的字。
+  async function syncNewTurns() {
+    if (document.hidden) return;
+    // 正在本机生成回复时不刷新——会吞掉正在流式输出的气泡。
+    if (window.isAssistantBusy && window.isAssistantBusy()) return;
+    const cid = localStorage.getItem(conversationKey);
+    if (!cid) return;
+    try {
+      const res = await fetch('/turn/history?conversation_id=' + encodeURIComponent(cid));
+      if (!res.ok) return;
+      const data = await res.json();
+      const turns = data.turns || [];
+      if (turns.length <= syncedTurnCount) return;          // 没有新内容
+      activeThinkRow = null;
+      if (syncedTurnCount < 0) {
+        // 首次从 flat 历史切换到 turn 历史：全量重渲染，避免重复。
+        chat.textContent = '';
+        add(WELCOME_TEXT, 'assistant');
+        blockRows = {};
+        turns.forEach(turn => renderTurnHistory(turn.result));
+      } else {
+        // 增量追加新增轮次，已有内容不动，不闪烁。
+        const fresh = turns.slice(syncedTurnCount);
+        fresh.forEach(turn => renderTurnHistory(turn.result));
+      }
+      syncedTurnCount = turns.length;
+      chat.scrollTop = chat.scrollHeight;
+    } catch (_) { /* 同步失败静默，下次轮询重试 */ }
+  }
+
+  function startLiveSync() {
+    if (liveSyncTimer) return;
+    liveSyncTimer = setInterval(syncNewTurns, 4000);
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) syncNewTurns();                 // 手机切回前台立即同步
+    });
+  }
 
 
   function stopCurrentResponse(showNotice = true) {
@@ -463,8 +539,7 @@
     activeReply = reply;
     const localRequestId = `web-${Date.now()}-${ownId}`;
     const localTurnId = `turn-${localRequestId}`;
-    const assistantBlockId = modeSnapshot.interaction_mode === 'chat'
-      ? `${localTurnId}:spoken` : `${localTurnId}:assistant`;
+    const assistantBlockId = `${localTurnId}:assistant`;
     turnStore.beginTurn({
       conversation_id: localStorage.getItem(conversationKey) || 'pending-conversation',
       request_id: localRequestId,
@@ -476,14 +551,13 @@
         payload: { text: message },
       }],
     });
-    if (modeSnapshot.interaction_mode === 'experiment') {
+    if (modeSnapshot.experiment_context !== 'protocol') {
       window.publishProtocolContextBlocks?.(localTurnId).catch(() => {});
     }
     const publishAnswer = text => turnStore.upsertBlock({
       block_id: assistantBlockId,
       type: 'assistant_text',
-      payload: modeSnapshot.interaction_mode === 'chat'
-        ? { role: 'spoken', text } : { text },
+      payload: { text },
     });
     activeController = new AbortController();
     stopButton.disabled = false;
@@ -511,6 +585,8 @@
               settleCommittedReply(reply, assistant, publishAnswer);
               window.__voiceLastScreenAt = window.performance?.now?.() ?? Date.now();
               if (data.business?.kind === 'experiment') window.labStepsReload?.();
+              if (typeof window.runReload === 'function') window.runReload();
+              if (typeof window.chatHomeReload === 'function') window.chatHomeReload();
             } else if (data.type === 'voice_delivery') {
               window.consumeVoiceDelivery?.(data);
             } else if (data.type === 'turn_error') {
@@ -623,6 +699,7 @@
             if (data.conversation_id) localStorage.setItem(conversationKey, data.conversation_id);
             avatar('happy'); setTimeout(() => avatar('idle'), 1000);
             if (typeof loadExperiments === 'function') loadExperiments();
+            if (typeof window.chatHomeReload === 'function') window.chatHomeReload();
           } else if (data.type === 'error') {
             throw new Error(data.detail || '流式回复失败');
           }

@@ -774,3 +774,13 @@ body {
 #card-view .m-top{align-items:center;gap:8px}
 #card-view .m-brand{flex:1}
 #m-back-chat{background:#fff;border:1px solid var(--line);border-radius:9px;padding:4px 10px;font-size:13px;color:var(--muted)}
+
+/* ========== 多轨道切换条 ========== */
+.m-tracks-bar{display:flex;gap:7px;overflow-x:auto;padding:7px 12px;background:var(--card);border-bottom:1px solid var(--line);-webkit-overflow-scrolling:touch}
+.m-tracks-bar::-webkit-scrollbar{display:none}
+.m-track-chip{flex:0 0 auto;display:flex;align-items:center;gap:5px;background:var(--bg);border:1.5px solid var(--line);border-radius:20px;padding:5px 10px 5px 12px;font-size:12px;cursor:pointer;transition:border-color .2s,background .2s;white-space:nowrap}
+.m-track-chip.active{border-color:var(--brand);background:var(--brand-weak);color:var(--brand);font-weight:600}
+.m-track-chip-name{max-width:80px;overflow:hidden;text-overflow:ellipsis}
+.m-track-chip-prog{font-size:10px;opacity:.7}
+.m-track-chip-x{width:18px;height:18px;border:0;border-radius:50%;background:transparent;font-size:12px;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;flex:0 0 18px}
+.m-track-chip-x:hover{background:var(--warn-weak);color:var(--warn)}

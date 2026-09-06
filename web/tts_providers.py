@@ -74,8 +74,10 @@ PROVIDERS = [
         "default_base_url": "https://openspeech.bytedance.com/api/v1/tts",
         "default_model": "volcano_tts",
         "api_url": "https://console.volcengine.com/speech/app",
-        "note": "旧版小模型填 appid:access_token（冒号分隔），cluster 填 volcano_tts。seed-tts 大模型请填火山方舟 AK/SK + Endpoint ID，走官方 MaaS audio/speech 接口，避免 resource not granted。",
+        "note": "推荐：填豆包语音控制台的 API Key（一个 Key），走 x-api-key 即可；旧版也可填 appid:access_token。",
         "voices": [
+            {"id": "zh_female_vv_uranus_bigtts", "label": "seed-tts · 晴川（官方示例）"},
+            {"id": "zh_male_M392_conversation_wvae_bigtts", "label": "seed-tts · 深沉男声（官方示例）"},
             {"id": "BV001_streaming", "label": "通用女声（亲切，12种情感）"},
             {"id": "BV001_V2_streaming", "label": "通用女声 2.0"},
             {"id": "BV700_streaming", "label": "灿灿（22种情感）"},
@@ -269,7 +271,22 @@ def _volcano(text: str, settings) -> bytes:
     base = (settings.tts_base_url or "https://openspeech.bytedance.com/api/v1/tts").rstrip("/")
     # cluster 是控制台申请分配的（官方 FAQ Q1 可查），不是写死的；
     # 用 tts_model 字段承载（火山接口没有 model 概念），默认 volcano_tts。
-    cluster = (settings.tts_model or "volcano_tts").strip() or "volcano_tts"
+    # 只接受 volcano_ 开头的旧版 cluster；seed-tts 的 ep- 不属于旧接口 cluster。
+    raw_model = (settings.tts_model or "").strip()
+    cluster = raw_model if raw_model.startswith("volcano_") else "volcano_tts"
+    request = {
+        "reqid": uuid.uuid4().hex,
+        "text": text,
+        "text_type": "plain",
+        "operation": "query",
+        "with_frontend": 1,
+        "frontend_type": "unitTson",
+    }
+    # 官方大模型语音合成（seed-tts）在 request.model 里可选模型版本，
+    # 例如 seed-tts-1.1 / seed-tts-2.0；旧接口不需要 Endpoint ID。
+    raw_model = (settings.tts_model or "").strip()
+    if raw_model and raw_model.startswith(("seed-tts", "volcano_")):
+        request["model"] = raw_model
     payload = {
         "app": {"appid": appid, "token": token, "cluster": cluster},
         "user": {"uid": "web_lab_assistant"},
@@ -280,14 +297,7 @@ def _volcano(text: str, settings) -> bytes:
             "volume_ratio": 1.0,
             "pitch_ratio": 1.0,
         },
-        "request": {
-            "reqid": uuid.uuid4().hex,
-            "text": text,
-            "text_type": "plain",
-            "operation": "query",
-            "with_frontend": 1,
-            "frontend_type": "unitTson",
-        },
+        "request": request,
     }
     response = httpx.post(
         base,
@@ -326,8 +336,17 @@ def _volcano_maas(text: str, settings) -> bytes:
     使用 AK/SK 签名，请求体为 input / voice / response_format / speed。
     这是 seed-tts 等大模型音色的正确入口；旧 /api/v1/tts 会报
     `resource_id=tts.sync.level1 requested resource not granted`。
+
+    这里不用 MaaS SDK 的 requests 传输：当前 Python 环境 urllib3/requests
+    版本不匹配会导致所有 HTTPS 出现 SSLEOFError；改用 httpx 直连并复用
+    SDK 的 V4 签名，避免“connection pool max retries”的误报。
     """
-    from volcengine.maas import MaasException
+    import copy
+    import json
+    import uuid
+
+    import httpx
+    from volcengine.auth.SignerV4 import SignerV4
     from volcengine.maas.v2 import MaasService
 
     if not settings.tts_model:
@@ -349,21 +368,190 @@ def _volcano_maas(text: str, settings) -> bytes:
     maas.set_ak(settings.tts_access_key.strip())
     maas.set_sk(settings.tts_secret_key.strip())
 
+    api_info = copy.deepcopy(MaasService.get_api_info()["audio.speech"])
+    api_info.path = api_info.path.format(endpoint_id=settings.tts_model.strip())
+    request = maas.prepare_request(api_info, {})
+    request.headers["x-tt-logid"] = uuid.uuid4().hex
+    request.headers["Content-Type"] = "application/json"
+
     payload = {
         "input": text,
         "voice": (settings.tts_voice or "BV001_streaming").strip(),
         "response_format": "mp3",
         "speed": float(settings.tts_speed or 1.0),
     }
+    request.body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    SignerV4.sign(request, maas.service_info.credentials)
+    url = request.build()
+
     try:
-        response = maas.audio.speech.create(settings.tts_model.strip(), payload)
-        return b"".join(response.iter_bytes())
-    except MaasException as error:
-        raise RuntimeError(
-            f"火山方舟语音合成失败：{getattr(error, 'message', str(error))}"
-        ) from error
+        response = httpx.post(
+            url,
+            content=request.body,
+            headers=dict(request.headers),
+            timeout=httpx.Timeout(60, connect=10),
+            trust_env=False,
+        )
     except Exception as error:
-        raise RuntimeError(f"火山方舟语音合成失败：{type(error).__name__}: {error}") from error
+        raise RuntimeError(f"火山方舟语音合成连接失败：{type(error).__name__}: {error}") from error
+
+    if response.status_code != 200:
+        try:
+            detail = response.json()
+        except Exception:
+            detail = response.text[:200]
+        if response.status_code == 502:
+            detail = (
+                "火山网关返回 502（TLB）。请确认「合成模型」填的是火山方舟"
+                "语音 Endpoint ID（ep- 开头），不是 seed-tts 模型名；"
+                "并确认该 Endpoint 已开通音频合成能力。原始响应："
+                + str(detail)
+            )
+        raise RuntimeError(
+            f"火山方舟语音合成失败：HTTP {response.status_code}: {detail}"
+        )
+    if not response.content:
+        raise RuntimeError("火山方舟语音合成返回了空音频。")
+    return response.content
+
+
+def _volcano_ark_v3(text: str, settings) -> bytes:
+    """火山方舟 Agent Plan 语音模型（seed-tts）HTTP 接口。
+
+    官方推荐：只要「专属 API Key」一个密钥，不需要 AK/SK、不需要 Endpoint ID。
+    接口：POST https://openspeech.bytedance.com/api/v3/plan/tts/unidirectional
+    头：X-Api-Key / X-Api-Resource-Id（seed-tts-2.0）
+    返回：NDJSON，每行 JSON 的 data 字段是 base64 音频分片。
+    """
+    import base64
+    import json
+
+    api_key = (settings.tts_ark_api_key or "").strip()
+    if not api_key:
+        raise RuntimeError("火山方舟 seed-tts 需要填写「专属 API Key」")
+    resource_id = (settings.tts_model or "seed-tts-2.0").strip() or "seed-tts-2.0"
+    speaker = (settings.tts_voice or "zh_female_vv_uranus_bigtts").strip()
+
+    url = "https://openspeech.bytedance.com/api/v3/plan/tts/unidirectional"
+    headers = {
+        "X-Api-Key": api_key,
+        "X-Api-Resource-Id": resource_id,
+        "Content-Type": "application/json",
+        "Connection": "keep-alive",
+        "X-Control-Require-Usage-Tokens-Return": "*",
+    }
+    payload = {
+        "req_params": {
+            "text": text,
+            "speaker": speaker,
+            "audio_params": {"format": "mp3", "sample_rate": 24000},
+        }
+    }
+
+    try:
+        response = httpx.post(
+            url, headers=headers, json=payload,
+            timeout=httpx.Timeout(60, connect=10), trust_env=False,
+        )
+    except Exception as error:
+        raise RuntimeError(
+            f"火山方舟 seed-tts 连接失败：{type(error).__name__}: {error}"
+        ) from error
+
+    if response.status_code != 200:
+        raise RuntimeError(
+            f"火山方舟 seed-tts 失败：HTTP {response.status_code}: {response.text[:200]}"
+        )
+
+    audio = bytearray()
+    for line in response.text.splitlines():
+        if not line.strip():
+            continue
+        try:
+            data = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        code = int(data.get("code", 0) or 0)
+        if code == 20000000:
+            break
+        if code > 0:
+            raise RuntimeError(
+                f"火山方舟 seed-tts 返回错误：code={code} message={data.get('message')}"
+            )
+        chunk = data.get("data")
+        if chunk:
+            audio.extend(base64.b64decode(chunk))
+    if not audio:
+        raise RuntimeError("火山方舟 seed-tts 未返回音频数据。")
+    return bytes(audio)
+
+
+def _volcano_speech_key(text: str, settings) -> bytes:
+    """豆包语音控制台 API Key（x-api-key）直接调旧版 /api/v1/tts。
+
+    官方文档「API Key使用」说明：在任意接口 Header 填：
+        x-api-key: ${your-api-key}
+    即可，不需要填 appid。旧接口请求体仍要求 app.appid，传占位 "0"
+    即可，鉴权完全由 x-api-key 承担。
+    """
+    import base64
+    import uuid
+
+    api_key = (settings.tts_ark_api_key or "").strip()
+    if not api_key:
+        raise RuntimeError("需要填写豆包语音控制台的 API Key")
+    url = "https://openspeech.bytedance.com/api/v1/tts"
+    headers = {
+        "x-api-key": api_key,
+        "Content-Type": "application/json",
+    }
+    raw_model = (settings.tts_model or "").strip()
+    cluster = raw_model if raw_model.startswith("volcano_") else "volcano_tts"
+    request = {
+        "reqid": uuid.uuid4().hex,
+        "text": text,
+        "text_type": "plain",
+        "operation": "query",
+        "with_frontend": 1,
+        "frontend_type": "unitTson",
+    }
+    if raw_model and raw_model.startswith(("seed-tts", "volcano_")):
+        request["model"] = raw_model
+    payload = {
+        "app": {"appid": "0", "token": "0", "cluster": cluster},
+        "user": {"uid": "web_lab_assistant"},
+        "audio": {
+            "voice_type": settings.tts_voice or "BV001_streaming",
+            "encoding": "mp3",
+            "speed_ratio": float(settings.tts_speed or 1.0),
+            "volume_ratio": 1.0,
+            "pitch_ratio": 1.0,
+        },
+        "request": request,
+    }
+    try:
+        response = httpx.post(
+            url, headers=headers, json=payload,
+            timeout=httpx.Timeout(60, connect=10), trust_env=False,
+        )
+    except Exception as error:
+        raise RuntimeError(
+            f"豆包语音 API Key 连接失败：{type(error).__name__}: {error}"
+        ) from error
+    if response.status_code != 200:
+        raise RuntimeError(
+            f"豆包语音 API Key 失败：HTTP {response.status_code}: {response.text[:200]}"
+        )
+    data = response.json()
+    code = int(data.get("code", -1))
+    if code != 3000:
+        raise RuntimeError(
+            f"豆包语音 API Key 返回错误：code={code} message={data.get('message')}"
+        )
+    audio_b64 = data.get("data", "")
+    if not audio_b64:
+        raise RuntimeError("豆包语音 API Key 响应中没有音频数据。")
+    return base64.b64decode(audio_b64)
 
 
 def synthesize(text: str, settings) -> tuple[bytes, str]:
@@ -380,10 +568,22 @@ def synthesize(text: str, settings) -> tuple[bytes, str]:
     if provider == "local_qwen":
         return _local_qwen(text, settings), "audio/wav"
     if provider == "volcano":
-        if (
-            getattr(settings, "tts_access_key", "")
-            and getattr(settings, "tts_secret_key", "")
-        ):
+        model = (settings.tts_model or "").strip()
+        access_key = getattr(settings, "tts_access_key", "") or ""
+        secret_key = getattr(settings, "tts_secret_key", "") or ""
+        ark_api_key = getattr(settings, "tts_ark_api_key", "") or ""
+        # 1) 有「豆包语音 API Key」 -> 官方最简方式：一个 Key + x-api-key header。
+        if ark_api_key:
+            try:
+                return _volcano_speech_key(text, settings), "audio/mpeg"
+            except RuntimeError as error:
+                # Key 无效时退回 AppID/Access Token 旧接口，避免卡配置。
+                if ":" in (settings.tts_api_key or ""):
+                    return _volcano(text, settings), "audio/mpeg"
+                raise
+        # 2) AK/SK + ep- Endpoint ID -> 方舟 MaaS 大模型接口。
+        if access_key and secret_key and model.startswith("ep-"):
             return _volcano_maas(text, settings), "audio/mpeg"
+        # 3) 默认：AppID + Access Token 旧版接口，自动使用 cluster volcano_tts。
         return _volcano(text, settings), "audio/mpeg"
     raise RuntimeError("未知的语音合成供应商：" + str(provider))

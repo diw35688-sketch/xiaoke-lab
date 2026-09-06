@@ -51,6 +51,7 @@ def providers():
             "api_key_set": bool(current.tts_api_key),
             "access_key_set": bool(current.tts_access_key),
             "secret_key_set": bool(current.tts_secret_key),
+            "ark_api_key_set": bool(current.tts_ark_api_key),
         },
     }
 

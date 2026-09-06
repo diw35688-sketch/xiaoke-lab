@@ -224,16 +224,9 @@
           return;
         }
         say('正在连接理解服务…');
-        // 33e：录音只是 input_source。Chat 回到聊天策略；实验模式才保存原始事实。
-        var submittedModeSnapshot = recordingModeSnapshot;
+        // 统一实验模式；录音走实验记录。
+        var submittedModeSnapshot = recordingModeSnapshot || {};
         recordingModeSnapshot = null;
-        if (submittedModeSnapshot.interaction_mode === 'chat') {
-          window.composerSend?.(text, {
-            inputSource: 'single_recording', modeSnapshot: submittedModeSnapshot
-          });
-          say('已作为自由聊天发送，不会保存为实验记录');
-          return;
-        }
         Promise.resolve(window.beginRecordSurface?.(text, submittedModeSnapshot)).then(function (identity) {
           return streamRecord(text, Object.assign({}, submittedModeSnapshot, identity || {}), function (event) {
           if (event.type === 'record_status') {

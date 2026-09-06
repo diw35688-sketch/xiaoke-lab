@@ -11,11 +11,6 @@ from __future__ import annotations
 from typing import Iterable
 
 from src.core.presentation_delivery import VoiceDeliveryItem
-from src.core.presentation_intent import MessageKind
-from src.core.voice_delivery import (
-    MAX_VOICE_CHARS,
-    MAX_VOICE_ITEMS,
-)
 from tool_presentation import ToolVoiceDeliveryBatch
 
 
@@ -58,20 +53,17 @@ def voice_delivery_event(
     authorization: str = "CONTENT_ELIGIBLE",
     reason: str | None = None,
 ) -> dict:
-    """构造语音事件，并在 Web 边界再次验证预算与授权枚举。"""
+    """构造语音事件，并在 Web 边界校验授权枚举。
+
+    这里不再对文本长度做“截断/丢弃”处理：长回复应该完整说完，
+    不能因为 50 字/2 条等预算把话剪到一半。内容预算应在更早的策略层决定，
+    而不是在 Web 边界把已经生成的语音内容扔掉。
+    """
 
     batch = tuple(items)
     if not batch:
         raise ValueError("voice_delivery 至少需要一条语音。")
-    if len(batch) > MAX_VOICE_ITEMS:
-        raise ValueError(f"每轮最多交付 {MAX_VOICE_ITEMS} 条语音。")
-    if sum(len(item.voice_text) for item in batch) > MAX_VOICE_CHARS:
-        raise ValueError(f"每轮语音总计不能超过 {MAX_VOICE_CHARS} 字。")
-    question_count = sum(
-        item.kind == MessageKind.CLARIFICATION for item in batch
-    )
-    if question_count > 1:
-        raise ValueError("每轮最多交付一个问题。")
+
     allowed_authorizations = {
         "CONTENT_ELIGIBLE", "READY", "DEFERRED", "DROP", "PREEMPT"
     }

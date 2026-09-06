@@ -119,6 +119,36 @@
   window.protocolSessionUrl = protocolSessionUrl;
   window.moveProtocolStep = moveProtocolStep;
 
+  // 切换实验轨道：把指定 lab_session_id 写入 localStorage，再切换交互模式
+  async function switchTrack(protocolId, labSessionId, protocolTitle) {
+    if (!protocolId || !labSessionId) return;
+    // 写入 localStorage，让 protocolSessionIdentity() 返回正确的 lab_session_id
+    var modeKey = 'protocol:' + protocolId;
+    var sessions = readSessions();
+    sessions[modeKey] = labSessionId;
+    writeSessions(sessions);
+    // 切换交互模式
+    window.interactionModeState.select('protocol', protocolId);
+    // 通知后端切换会话
+    var ids = protocolSessionIdentity();
+    try {
+      await fetch('/protocols/session', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          protocol_id: protocolId,
+          conversation_id: ids.conversation_id,
+          lab_session_id: ids.lab_session_id,
+        }),
+      });
+    } catch (_) {}
+    // 触发画布刷新
+    window.dispatchEvent(new CustomEvent('lab:track-switched', {
+      detail: { protocol_id: protocolId, lab_session_id: labSessionId, title: protocolTitle }
+    }));
+  }
+  window.switchTrack = switchTrack;
+
   // 把服务端 TurnTimingRecorder 快照换算成关键阶段耗时（毫秒）。
   // 服务端只记每个 mark 的 elapsed_ms，差值才是"某一段花了多久"。
   function summarizeServerTiming(timing) {

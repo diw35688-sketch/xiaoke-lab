@@ -32,6 +32,9 @@
         return {label: '待确认问题', title: text(payload.title || '请确认'), tone: 'confirm',
           status: text(payload.status), lines: compact(payload.lines || [payload.question || payload.text]), meta: compact(payload.meta || [])};
       case 'system_status':
+        // 语音启动自检不刷聊天流：进度由聊天头部的小科状态条展示，
+        // 只有真的失败才落一张警示卡片（数据仍完整进 store，此处只管呈现）。
+        if (payload.kind === 'voice_startup' && !payload.error) return null;
         return {label: '状态', title: text(payload.title || '系统状态'), tone: payload.error ? 'danger' : 'status',
           status: payload.running ? '进行中' : text(payload.status),
           lines: compact([payload.text].concat(payload.lines || [])), meta: compact(payload.meta || [])};

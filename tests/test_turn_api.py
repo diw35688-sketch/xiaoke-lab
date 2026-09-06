@@ -12,12 +12,18 @@ from unittest.mock import patch
 WEB = Path(__file__).resolve().parent.parent / "web"
 if str(WEB) not in sys.path:
     sys.path.insert(0, str(WEB))
+# tests 目录也要在路径上：discover 与 -m unittest tests.x 两种跑法的导入方式不同。
+TESTS_DIR = Path(__file__).resolve().parent
+if str(TESTS_DIR) not in sys.path:
+    sys.path.insert(0, str(TESTS_DIR))
 
 from fastapi.testclient import TestClient  # noqa: E402
 from api import turn as turn_api  # noqa: E402
 from app import app  # noqa: E402
 from asr_application_service import ASRApplicationService  # noqa: E402
+import auth as auth_core  # noqa: E402
 from database import db  # noqa: E402
+import auth_helpers  # noqa: E402
 from src.asr.schemas import ASRResult  # noqa: E402
 from src.core.conversation_turn import (  # noqa: E402
     BlockType, ConversationBlock, ConversationTurn,
@@ -79,15 +85,17 @@ class TurnAPITests(unittest.TestCase):
         self.old_db = db.DATABASE_PATH
         db.DATABASE_PATH = Path(self.temp.name) / "api.db"
         db.initialize_database()
-        self.old_chat = turn_api.turn_application_service._chat_processor
         self.old_experiment = turn_api.turn_application_service._experiment_processor
         processor = _Processor()
-        turn_api.turn_application_service._chat_processor = processor
         turn_api.turn_application_service._experiment_processor = processor
         self.client = TestClient(app)
+        # 全局登录闸门：测试也要真的走一遍注册/登录，不给自己开后门。
+        self._iter_patch = patch.object(auth_core, "DEFAULT_ITERATIONS", 1000)
+        self._iter_patch.start()
+        auth_helpers.login(self.client)
 
     def tearDown(self):
-        turn_api.turn_application_service._chat_processor = self.old_chat
+        self._iter_patch.stop()
         turn_api.turn_application_service._experiment_processor = self.old_experiment
         db.DATABASE_PATH = self.old_db
         self.temp.cleanup()
@@ -150,7 +158,7 @@ class TurnAPITests(unittest.TestCase):
             "mode_version": 1,
             "text": "你好",
         }
-        original = turn_api.turn_application_service._chat_processor
+        original = turn_api.turn_application_service._experiment_processor
 
         class _VoiceProcessor(_Processor):
             def prepare(self, turn, timing):
@@ -168,7 +176,7 @@ class TurnAPITests(unittest.TestCase):
                     ),),
                 )
 
-        turn_api.turn_application_service._chat_processor = _VoiceProcessor()
+        turn_api.turn_application_service._experiment_processor = _VoiceProcessor()
         try:
             with patch.object(
                 turn_api.web_playback_service,
@@ -177,7 +185,7 @@ class TurnAPITests(unittest.TestCase):
             ):
                 events = _events(self.client.post("/turn/text", json=body))
         finally:
-            turn_api.turn_application_service._chat_processor = original
+            turn_api.turn_application_service._experiment_processor = original
 
         self.assertEqual(events[-2]["type"], "turn_result")
         self.assertEqual(events[-1]["type"], "done")

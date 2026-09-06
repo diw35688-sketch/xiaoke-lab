@@ -106,42 +106,101 @@ def save_memory(content, category="general"):
     return dict(row)
 
 
-def create_conversation(title="新会话", conversation_id=None):
+def save_protocol_preference(keyword, protocol_id):
+    """记住用户在搜索某关键词时选了哪个方案，下次同样的关键词自动选定。"""
+    initialize_database()
+    keyword = keyword.strip().lower()
+    if not keyword:
+        raise ValueError("关键词不能为空。")
+    with get_connection() as connection:
+        connection.execute(
+            "INSERT INTO protocol_preferences (keyword, protocol_id) VALUES (?,?) "
+            "ON CONFLICT(keyword) DO UPDATE SET protocol_id=excluded.protocol_id",
+            (keyword, protocol_id),
+        )
+    return {"keyword": keyword, "protocol_id": protocol_id}
+
+
+def get_protocol_preference(keyword):
+    """查询某关键词的方案偏好；没有返回 None。
+
+    先精确匹配，再做子串匹配（存储的关键词是搜索关键词的子串或反之），
+    这样"缓冲液"的偏好能匹配"缓冲液配制实验"。
+    """
+    initialize_database()
+    keyword = keyword.strip().lower()
+    if not keyword:
+        return None
+    with get_connection() as connection:
+        # 1. 精确匹配
+        row = connection.execute(
+            "SELECT protocol_id FROM protocol_preferences WHERE keyword=?",
+            (keyword,),
+        ).fetchone()
+        if row:
+            return row["protocol_id"]
+        # 2. 子串匹配
+        rows = connection.execute(
+            "SELECT keyword, protocol_id FROM protocol_preferences"
+        ).fetchall()
+    for r in rows:
+        stored = r["keyword"].lower()
+        if stored in keyword or keyword in stored:
+            return r["protocol_id"]
+    return None
+
+
+def _require_owner(user_id):
+    """归属参数必须真实存在。
+
+    这里宁可抛错也不放行：一个空的 user_id 若被当成"不过滤"，
+    就会把所有人的数据一次性泄露给调用方。
+    """
+    if not isinstance(user_id, str) or not user_id.strip():
+        raise ValueError("缺少数据归属 user_id：拒绝执行未限定归属的会话查询。")
+
+
+def create_conversation(user_id, title="新会话", conversation_id=None):
+    """建会话。user_id 是必填首参：给它默认值等于给越权留后门。"""
+    _require_owner(user_id)
     initialize_database()
     conversation_id = conversation_id or str(uuid.uuid4())
     title = str(title or "新会话").strip() or "新会话"
     with get_connection() as connection:
         connection.execute(
-            "INSERT OR IGNORE INTO conversations (id,title) VALUES (?,?)",
-            (conversation_id, title),
+            "INSERT OR IGNORE INTO conversations (id,title,user_id) VALUES (?,?,?)",
+            (conversation_id, title, user_id),
         )
     return conversation_id
 
 
-def conversation_exists(conversation_id):
-    """判断一个会话是否已存在。"""
+def conversation_exists(conversation_id, user_id):
+    """会话是否存在**且属于该用户**。别人的会话一律视为不存在。"""
+    _require_owner(user_id)
     initialize_database()
     with get_connection() as connection:
         row = connection.execute(
-            "SELECT 1 FROM conversations WHERE id=?",
-            (conversation_id,),
+            "SELECT 1 FROM conversations WHERE id=? AND user_id=?",
+            (conversation_id, user_id),
         ).fetchone()
     return bool(row)
 
 
-def ensure_conversation(conversation_id=None):
+def ensure_conversation(user_id, conversation_id=None):
+    _require_owner(user_id)
     if conversation_id is None:
-        return create_conversation()
+        return create_conversation(user_id)
     initialize_database()
     with get_connection() as connection:
         connection.execute(
-            "INSERT OR IGNORE INTO conversations (id,title) VALUES (?,?)",
-            (conversation_id, "新会话"),
+            "INSERT OR IGNORE INTO conversations (id,title,user_id) VALUES (?,?,?)",
+            (conversation_id, "新会话", user_id),
         )
     return conversation_id
 
 
-def list_conversations(limit=50):
+def list_conversations(user_id, limit=50):
+    _require_owner(user_id)
     initialize_database()
     with get_connection() as connection:
         # 给历史里的“新会话”补上自动名字（取第一条用户消息）。
@@ -155,10 +214,13 @@ def list_conversations(limit=50):
                 ORDER BY m.id ASC LIMIT 1
             )
             WHERE title='新会话'
+              AND user_id=?
               AND EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id=conversations.id)
-            """
+            """,
+            (user_id,),
         )
-        # 只展示有效会话（有消息的）；新建的空会话保留在数据库，避免“新会话”被立即删掉。
+        # 只展示有效且与实验相关的会话（有消息的）。
+        # 普通闲聊会话不再出现在左侧；历史普通会话隐藏但不删除。
         rows = connection.execute(
             """SELECT c.id,c.title,c.created_at,c.updated_at,
                       COUNT(m.id) AS message_count,
@@ -167,30 +229,48 @@ def list_conversations(limit=50):
                        ORDER BY lm.id DESC LIMIT 1) AS last_message
                FROM conversations c
                LEFT JOIN messages m ON m.conversation_id=c.id
+               WHERE c.user_id=?
+                 AND (
+                   EXISTS (
+                     SELECT 1 FROM lab_records lr
+                     WHERE lr.conversation_id=c.id
+                   )
+                   OR EXISTS (
+                     SELECT 1 FROM experiment_session_state es
+                     WHERE es.conversation_id=c.id
+                       AND es.protocol_step_facts_json != '{}'
+                   )
+                 )
                GROUP BY c.id
                HAVING COUNT(m.id) > 0
                ORDER BY c.updated_at DESC
                LIMIT ?""",
-            (limit,),
+            (user_id, limit),
         ).fetchall()
     return [dict(row) for row in rows]
 
 
-def rename_conversation(conversation_id, title):
+def rename_conversation(conversation_id, title, user_id):
+    _require_owner(user_id)
     title = str(title or "").strip()
     if not title:
         raise ValueError("会话标题不能为空。")
     initialize_database()
     with get_connection() as connection:
         cursor = connection.execute(
-            "UPDATE conversations SET title=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
-            (title, conversation_id),
+            "UPDATE conversations SET title=?,updated_at=CURRENT_TIMESTAMP"
+            " WHERE id=? AND user_id=?",
+            (title, conversation_id, user_id),
         )
     return bool(cursor.rowcount)
 
 
-def delete_conversation(conversation_id):
+def delete_conversation(conversation_id, user_id):
+    """删除自己的会话。归属不符时直接返回 False，不动任何数据。"""
+    _require_owner(user_id)
     initialize_database()
+    if not conversation_exists(conversation_id, user_id):
+        return False
     with get_connection() as connection:
         connection.execute("DELETE FROM agent_tasks WHERE conversation_id=?", (conversation_id,))
         connection.execute("DELETE FROM messages WHERE conversation_id=?", (conversation_id,))
@@ -199,7 +279,9 @@ def delete_conversation(conversation_id):
         connection.execute("DELETE FROM reagent_prep_flows WHERE conversation_id=?", (conversation_id,))
         # turn_requests 删除会级联删除 asr_evidence / experiment_events。
         connection.execute("DELETE FROM turn_requests WHERE conversation_id=?", (conversation_id,))
-        cursor = connection.execute("DELETE FROM conversations WHERE id=?", (conversation_id,))
+        cursor = connection.execute(
+            "DELETE FROM conversations WHERE id=? AND user_id=?",
+            (conversation_id, user_id))
     return bool(cursor.rowcount)
 
 
@@ -235,11 +317,14 @@ def get_messages(conversation_id, limit=100):
     return [dict(row) for row in rows]
 
 
-def latest_conversation():
-    """最近一次对话的 id；没有对话时返回 None。"""
+def latest_conversation(user_id):
+    """该用户最近一次对话的 id；没有则 None。"""
+    _require_owner(user_id)
     with get_connection() as connection:
         row = connection.execute(
-            "SELECT id FROM conversations ORDER BY updated_at DESC LIMIT 1"
+            "SELECT id FROM conversations WHERE user_id=?"
+            " ORDER BY updated_at DESC LIMIT 1",
+            (user_id,),
         ).fetchone()
     return row["id"] if row is not None else None
 
@@ -682,7 +767,10 @@ def list_community_entries(q="", kind="", limit=200):
     params.append(limit)
     with get_connection() as connection:
         rows = connection.execute(
-            f"SELECT id,kind,title,author,tags,downloads,status,created_at,updated_at,content_json FROM community_entries {where_sql} ORDER BY id DESC LIMIT ?",
+            f"""SELECT id,kind,title,author,tags,downloads,status,created_at,updated_at,content_json,
+                       (SELECT COUNT(*) FROM community_likes l WHERE l.entry_id=community_entries.id) AS likes,
+                       (SELECT COUNT(*) FROM community_comments c WHERE c.entry_id=community_entries.id) AS comment_count
+                FROM community_entries {where_sql} ORDER BY id DESC LIMIT ?""",
             params,
         ).fetchall()
     return [dict(row) for row in rows]
@@ -691,7 +779,13 @@ def list_community_entries(q="", kind="", limit=200):
 def get_community_entry(entry_id):
     initialize_database()
     with get_connection() as connection:
-        row = connection.execute("SELECT * FROM community_entries WHERE id=?", (entry_id,)).fetchone()
+        row = connection.execute(
+            """SELECT *, 
+                      (SELECT COUNT(*) FROM community_likes l WHERE l.entry_id=community_entries.id) AS likes,
+                      (SELECT COUNT(*) FROM community_comments c WHERE c.entry_id=community_entries.id) AS comment_count
+               FROM community_entries WHERE id=?""",
+            (entry_id,),
+        ).fetchone()
     return dict(row) if row else None
 
 
@@ -712,6 +806,73 @@ def increment_community_downloads(entry_id):
         connection.execute("UPDATE community_entries SET downloads=downloads+1 WHERE id=?", (entry_id,))
         row = connection.execute("SELECT * FROM community_entries WHERE id=?", (entry_id,)).fetchone()
     return dict(row) if row else None
+
+
+def toggle_community_like(entry_id, user_id):
+    initialize_database()
+    with get_connection() as connection:
+        exists = connection.execute(
+            "SELECT 1 FROM community_likes WHERE entry_id=? AND user_id=?",
+            (entry_id, user_id),
+        ).fetchone()
+        if exists:
+            connection.execute(
+                "DELETE FROM community_likes WHERE entry_id=? AND user_id=?",
+                (entry_id, user_id),
+            )
+            connection.execute("UPDATE community_entries SET likes=MAX(0,likes-1) WHERE id=?", (entry_id,))
+            liked = False
+        else:
+            connection.execute(
+                "INSERT OR IGNORE INTO community_likes(entry_id,user_id) VALUES (?,?)",
+                (entry_id, user_id),
+            )
+            connection.execute("UPDATE community_entries SET likes=likes+1 WHERE id=?", (entry_id,))
+            liked = True
+        row = connection.execute(
+            "SELECT likes FROM community_entries WHERE id=?", (entry_id,)
+        ).fetchone()
+    return {"liked": liked, "likes": int(row["likes"]) if row else 0}
+
+
+def list_community_comments(entry_id):
+    initialize_database()
+    with get_connection() as connection:
+        rows = connection.execute(
+            "SELECT * FROM community_comments WHERE entry_id=? ORDER BY id ASC",
+            (entry_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def add_community_comment(entry_id, user_id, user_name, content):
+    initialize_database()
+    content = str(content or "").strip()
+    if not content:
+        raise ValueError("评论内容不能为空")
+    with get_connection() as connection:
+        cursor = connection.execute(
+            "INSERT INTO community_comments(entry_id,user_id,user_name,content) VALUES (?,?,?,?)",
+            (entry_id, user_id, user_name or "", content),
+        )
+        row = connection.execute(
+            "SELECT * FROM community_comments WHERE id=?", (cursor.lastrowid,)
+        ).fetchone()
+    return dict(row)
+
+
+def delete_community_comment(comment_id, user_id=None, is_admin=False):
+    initialize_database()
+    with get_connection() as connection:
+        row = connection.execute(
+            "SELECT * FROM community_comments WHERE id=?", (comment_id,)
+        ).fetchone()
+        if row is None:
+            return False
+        if not is_admin and row["user_id"] != user_id:
+            return False
+        connection.execute("DELETE FROM community_comments WHERE id=?", (comment_id,))
+        return True
 
 
 def delete_community_entry(entry_id):

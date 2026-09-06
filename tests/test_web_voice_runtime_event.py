@@ -21,6 +21,14 @@ class WebVoiceRuntimeEventTests(unittest.TestCase):
         web_playback_service.clear()
         app = FastAPI()
         app.include_router(router)
+        # 这些用例测的是语音运行时路由本身，不是登录。
+        # 用依赖覆盖注入一个固定用户，既满足归属参数，又不把认证逻辑
+        # 掺进无关测试里（登录闸门另有 test_auth_api 专门把关）。
+        from api.auth import require_user
+        app.dependency_overrides[require_user] = lambda: {
+            "id": "test-user", "username": "tester", "display_name": "tester",
+            "is_admin": True, "is_active": True,
+        }
         self.client = TestClient(app)
 
     def tearDown(self):
@@ -204,7 +212,8 @@ class WebVoiceRuntimeEventTests(unittest.TestCase):
         self.assertEqual(delivery["authorization"], "READY")
         self.assertEqual(delivery["items"][0]["source_block_id"], "turn-startup:voice-startup")
         self.assertEqual(delivery["items"][0]["speech_rate"], 1.2)
-        ensure.assert_called_once_with(None)
+        # 归属参数是首参：确保建会话时带上了当前用户，而不是建成无主会话。
+        ensure.assert_called_once_with("test-user", None)
 
 
 if __name__ == "__main__":

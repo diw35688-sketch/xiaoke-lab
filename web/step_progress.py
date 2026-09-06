@@ -33,17 +33,19 @@ class StepProgress:
 
     def __init__(self) -> None:
         self._recorded: dict[int, set[str]] = {}
+        self._values: dict[int, dict[str, str]] = {}
         self._deviations: set[int] = set()
         self._confirmed: set[int] = set()
 
     def record(self, step_number: int, fields: dict | None, has_deviation: bool) -> None:
-        """登记一段口述：fields 为 {字段名: 值}，只累加非空值的字段名。"""
+        """登记一段口述：fields 为 {字段名: 值}，累加非空值的字段名和值。"""
         if step_number is None:
             return
         if fields:
             for name, value in fields.items():
                 if value:
                     self._recorded.setdefault(step_number, set()).add(name)
+                    self._values.setdefault(step_number, {})[name] = str(value)
         if has_deviation:
             self._deviations.add(step_number)
 
@@ -63,14 +65,26 @@ class StepProgress:
         if step.step_number in self._deviations:
             # 偏差优先于完成：有偏差必须先处理，不能打勾。
             return STATUS_ERROR
-        if not must.issubset(self._recorded.get(step.step_number, set())):
+        recorded = self._recorded.get(step.step_number, set())
+        if not must.issubset(recorded):
             return STATUS_WAITING
-        # must_record 为空表示本步没有现场必测项，视为天然完成。
+        # must_record 全部满足后，还需要用户有过实际交互（记录了数据或手动确认），
+        # 否则 must_record 为空的步骤一进来就被标记完成，用户体验上等于跳步。
+        if not recorded and step.step_number not in self._confirmed:
+            return STATUS_WAITING
         return STATUS_COMPLETED
 
     def recorded_fields(self, step_number: int) -> list:
         """本步已经记录到的字段名（排序后返回，便于展示与测试）。"""
         return sorted(self._recorded.get(step_number, set()))
+
+    def values_for(self, step_number: int) -> dict[str, str]:
+        """本步已记录的字段名→值映射。"""
+        return dict(self._values.get(step_number, {}))
+
+    def all_values(self) -> dict[int, dict[str, str]]:
+        """所有步骤的已记录值，用于序列化到 protocol_step_facts。"""
+        return {sn: dict(vals) for sn, vals in self._values.items()}
 
     def missing_fields(self, step) -> list:
         """本步还缺的必测字段名（排序后返回）；已手动确认的步骤视为不缺。"""
@@ -81,14 +95,17 @@ class StepProgress:
 
     def reset(self) -> None:
         self._recorded.clear()
+        self._values.clear()
         self._deviations.clear()
         self._confirmed.clear()
 
-    def restore(self, step_number: int, recorded: list | None, deviation: bool) -> None:
-        """从持久层恢复一步的进度；recorded 为字段名列表。"""
+    def restore(self, step_number: int, recorded: list | None, deviation: bool, values: dict | None = None) -> None:
+        """从持久层恢复一步的进度；recorded 为字段名列表，values 为字段名→值映射。"""
         if step_number is None:
             return
         self._recorded[step_number] = set(recorded or [])
+        if values:
+            self._values[step_number] = dict(values)
         if deviation:
             self._deviations.add(step_number)
         else:

@@ -8,28 +8,72 @@
   body { overflow: hidden; }
   #shell { min-height: 100vh; height: 100vh; align-items: stretch; }
 
-  /* 左侧导航抽屉 */
+  /* 左侧导航：保留为可滑出的功能抽屉，不再被 shell.js 的窄屏兜底规则隐藏。 */
   #sh-side {
-    position: fixed; left: 0; top: 0; bottom: 0; z-index: 100;
-    width: 218px; flex: 0 0 218px;
+    display: flex !important;
+    position: fixed; left: 0; top: 0; bottom: 0; z-index: 300;
+    width: 250px; flex: 0 0 250px;
     transform: translateX(-100%);
     transition: transform .2s;
     box-shadow: 12px 0 28px rgba(15,23,42,.18);
   }
+  #sh-side .sh-nav { padding: 6px 10px 12px; }
+  #sh-side .sh-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px; margin-bottom: 4px;
+    border-radius: 12px; font-size: 16px; font-weight: 600;
+  }
+  #sh-side .sh-item .sh-ico { width: 24px; height: 24px; flex: 0 0 auto; }
+  #sh-side .sh-item .sh-label {
+    display: flex; flex-direction: column; gap: 2px;
+    line-height: 1.2;
+  }
+  #sh-side .sh-item .sh-label::after {
+    font-size: 11px; font-weight: 400; color: var(--n-500); line-height: 1.35;
+  }
+  #sh-side .sh-item[data-view="run"] .sh-label::after { content: '当前实验步骤与记录'; }
+  #sh-side .sh-item[data-view="calculator"] .sh-label::after { content: '分子量/配液/稀释计算'; }
+  #sh-side .sh-item[data-view="protocols"] .sh-label::after { content: '可选实验方案与详情'; }
+  #sh-side .sh-item[data-view="reagent_prep"] .sh-label::after { content: '试剂缓冲液配方库'; }
+  #sh-side .sh-item[data-view="storage"] .sh-label::after { content: '种子/样品/试剂库存'; }
+  #sh-side .sh-item[data-view="community"] .sh-label::after { content: '共享模板与交流'; }
+  #sh-side .sh-item[data-view="records"] .sh-label::after { content: '实验记录与历史数据'; }
+  #sh-side .sh-item[data-view="agent"] .sh-label::after { content: '今日安排与提醒'; }
+  #sh-side .sh-item[data-view="settings"] .sh-label::after { content: '账号、模型、语音设置'; }
+  #sh-side .sh-brand { font-size: 15px; padding-left: 14px; }
   body.mobile-nav-open #sh-side { transform: translateX(0); }
   body.mobile-nav-open #sh-mobile-overlay { display: block; }
   #sh-mobile-overlay {
-    display: none; position: fixed; inset: 0; z-index: 90;
+    display: none; position: fixed; inset: 0; z-index: 200;
     background: rgba(15,23,42,.42);
   }
 
-  /* 顶部工具按钮 */
-  #sh-top { padding: 0 8px; gap: 6px; }
+  /* 移动端导航按钮：固定在视口左上角，不跟随聊天内容移动。 */
+  #sh-mobile-controls {
+    position: fixed; left: 12px; top: 10px; z-index: 240;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
   #sh-mobile-menu, #sh-mobile-view-toggle {
     border: 1px solid var(--bd-2); background: var(--n-00);
-    border-radius: var(--r-md); padding: 5px 8px; font-size: 13px;
-    color: var(--n-800); cursor: pointer; font-family: inherit;
+    border-radius: 999px; min-width: 36px; height: 34px; padding: 0 10px;
+    font-size: 16px; line-height: 1; color: var(--n-800); cursor: pointer;
+    font-family: inherit; box-shadow: 0 2px 10px rgba(15,23,42,.10);
   }
+  #sh-mobile-menu:hover, #sh-mobile-view-toggle:hover { background: var(--n-75); }
+  body.mobile-nav-open #sh-mobile-controls { opacity: 0; pointer-events: none; }
+  #sh-mobile-version { display: none !important; }
+  #sh-mobile-drawer-close {
+    display: inline-flex; align-items: center; justify-content: center;
+    margin-left: auto; width: 30px; height: 30px; border: 0;
+    background: transparent; color: var(--n-500); font-size: 24px; line-height: 1;
+    cursor: pointer; border-radius: 8px;
+  }
+  #sh-mobile-drawer-close:hover { color: var(--n-900); background: var(--n-100); }
+  /* 给左上角固定的 ☰/💬 让出位置：聊天头和工作台标题都不能被它们压住。 */
+  #sh-top { padding: 0 8px 0 100px !important; gap: 6px; }
+  #sh-chat-head { padding-left: 100px !important; }
+  #sh-side { padding-top: env(safe-area-inset-top); }
+  #sh-brand { padding-top: 14px; }
   #sh-title { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #sh-notify { margin-left: auto; }
 
@@ -44,7 +88,39 @@
     height: 100%; min-height: 0;
   }
   body.mobile-mode-work #sh-chat { display: none !important; }
-  body.mobile-mode-work #sh-center { flex: 1 1 100% !important; display: flex !important; }
+  body.mobile-mode-work #sh-center { flex: 1 1 100% !important; display: flex !important; min-height: 0 !important; }
+
+  /* 手机上实验进行中的滚动区域优化：
+     1) 隐藏会挡住画布滑动的小科立绘；
+     2) 步骤卡栏从大卡片压缩成一行横向小卡，把垂直空间让给正文滚动。 */
+  body.mobile-mode-work #assistant-avatar { display: none !important; }
+  #steps-rail { max-height: 108px; overflow: hidden; }
+  #steps-head { display: none !important; }
+  #steps-inner {
+    padding: 6px 8px 8px;
+    gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  .step-card {
+    flex: 0 0 150px;
+    min-height: 0;
+    padding: 8px 10px;
+    border-radius: 12px;
+    transform: none;
+    opacity: 1;
+  }
+  .step-card.current { transform: none; }
+  .step-card .sc-icon, .step-card .sc-badges { display: none !important; }
+  .step-card .sc-title {
+    font-size: 13px;
+    line-height: 1.35;
+    margin-bottom: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .step-card .sc-text { display: none !important; }
 
   /* 会话面板在手机上默认收起，点“会话”按钮时从左侧滑出 */
   #sh-conversation-panel {

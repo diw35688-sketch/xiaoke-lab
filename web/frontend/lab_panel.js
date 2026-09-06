@@ -160,6 +160,7 @@
     }).catch(function () {});
 
     el('lab-select').onchange = function (e) {
+      window.interactionModeState.select(e.target.value ? 'protocol' : 'free', e.target.value || null);
       var ids = window.protocolSessionIdentity ? window.protocolSessionIdentity() : {};
       api('/protocols/session', 'POST', {
         protocol_id: e.target.value || null,

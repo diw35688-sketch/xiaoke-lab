@@ -32,7 +32,13 @@
   window.appNewConversation = createConversation;
 
   function parseTime(str) {
-    var t = str ? new Date(String(str).replace(' ', 'T')) : null;
+    // SQLite CURRENT_TIMESTAMP 是 UTC；必须按 UTC 解析，否则中国时区会显示成 8 小时前。
+    var value = String(str || '').trim();
+    if (!value) return null;
+    var normalized = value.replace(' ', 'T');
+    var t = /(Z|[+-]\d{2}:\d{2})$/.test(normalized)
+      ? new Date(normalized)
+      : new Date(normalized + 'Z');
     return t && !isNaN(t.getTime()) ? t : null;
   }
 

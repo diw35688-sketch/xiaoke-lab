@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>登录 · 实验助手</title>
+<style>
+  :root{ --paper:#E4DCC9; --page:#FDFBF4; --ink:#1F2A44; --red:#C4604F;
+         --grid:rgba(59,86,134,.10); --muted:#6b7280; }
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--paper);
+       font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;color:var(--ink)}
+  .sheet{width:min(400px,calc(100vw - 32px));background:var(--page);border:1px solid rgba(31,42,68,.10);
+         border-radius:4px;padding:34px 32px 30px 44px;position:relative;
+         box-shadow:0 1px 2px rgba(31,42,68,.06),0 14px 34px rgba(31,42,68,.14);
+         background-image:linear-gradient(90deg,transparent 0 30px,var(--red) 30px 31px,transparent 31px),
+                          linear-gradient(var(--grid) 1px,transparent 1px);
+         background-size:100% 100%,100% 22px}
+  h1{font-size:19px;margin:0 0 4px;letter-spacing:.5px}
+  .sub{color:var(--muted);font-size:12.5px;margin:0 0 22px;line-height:1.7}
+  label{display:block;font-size:12px;color:var(--muted);margin:14px 0 5px}
+  input{width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:7px;
+        font-size:14px;font-family:inherit;background:#fff;color:var(--ink)}
+  input:focus{outline:2px solid rgba(59,86,134,.35);outline-offset:1px;border-color:#94a3b8}
+  button{width:100%;margin-top:22px;padding:11px;border:0;border-radius:7px;background:var(--ink);
+         color:#fff;font-size:14px;font-family:inherit;cursor:pointer;letter-spacing:1px}
+  button:hover{background:#2c3a5c}
+  button:disabled{opacity:.55;cursor:default}
+  .msg{margin-top:14px;font-size:12.5px;min-height:18px;line-height:1.6}
+  .msg.err{color:var(--red)}
+  .msg.ok{color:#2f7d5d}
+  .hint{margin-top:18px;padding-top:14px;border-top:1px dashed #cbd5e1;color:var(--muted);
+        font-size:11.5px;line-height:1.7}
+</style>
+</head>
+<body>
+<main class="sheet">
+  <h1 id="title">登录</h1>
+  <p class="sub" id="subtitle">请输入你的账号，进入你自己的实验台。</p>
+  <form id="form" autocomplete="on">
+    <label for="username">用户名</label>
+    <input id="username" name="username" autocomplete="username" autocapitalize="off"
+           spellcheck="false" required>
+    <label for="display" id="display-label" style="display:none">显示名称（可留空）</label>
+    <input id="display" name="display_name" autocomplete="nickname" style="display:none">
+    <label for="password" id="pw-label">口令</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required>
+    <button type="submit" id="submit">登录</button>
+  </form>
+  <div class="msg" id="msg" role="status" aria-live="polite"></div>
+  <div class="hint" id="hint" style="display:none">
+    这台机器还没有任何账号。你创建的第一个账号将成为管理员，之后可以为其他人开账号。
+  </div>
+</main>
+<script>
+(function () {
+  var bootstrap = false;
+  var form = document.getElementById('form');
+  var msg = document.getElementById('msg');
+  var submit = document.getElementById('submit');
+
+  function say(text, kind) { msg.textContent = text || ''; msg.className = 'msg' + (kind ? ' ' + kind : ''); }
+
+  fetch('/auth/state', { credentials: 'same-origin' })
+    .then(function (r) { return r.json(); })
+    .then(function (state) {
+      if (state.authenticated) { location.replace('/'); return; }
+      bootstrap = !!state.needs_bootstrap;
+      if (bootstrap) {
+        document.getElementById('title').textContent = '创建管理员账号';
+        document.getElementById('subtitle').textContent = '首次使用，先建一个属于你的账号。';
+        document.getElementById('pw-label').textContent = '设置口令（至少 8 位）';
+        document.getElementById('password').autocomplete = 'new-password';
+        document.getElementById('display-label').style.display = '';
+        document.getElementById('display').style.display = '';
+        document.getElementById('hint').style.display = '';
+        submit.textContent = '创建并进入';
+      }
+    })
+    .catch(function () { say('无法连接服务，请确认后端已启动。', 'err'); });
+
+  form.addEventListener('submit', function (event) {
+    event.preventDefault();
+    var body = {
+      username: document.getElementById('username').value,
+      password: document.getElementById('password').value
+    };
+    if (bootstrap) body.display_name = document.getElementById('display').value || '';
+    submit.disabled = true;
+    say(bootstrap ? '正在创建…' : '正在登录…');
+    fetch(bootstrap ? '/auth/register' : '/auth/login', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    }).then(function (response) {
+      return response.json().then(function (data) { return { ok: response.ok, data: data }; });
+    }).then(function (result) {
+      if (!result.ok) {
+        submit.disabled = false;
+        say(result.data.detail || '操作失败。', 'err');
+        return;
+      }
+      say('成功，正在进入…', 'ok');
+      location.replace('/');
+    }).catch(function (error) {
+      submit.disabled = false;
+      say('网络错误：' + error.message, 'err');
+    });
+  });
+})();
+</script>
+</body>
+</html>

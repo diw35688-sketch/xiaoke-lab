@@ -4,10 +4,11 @@ import logging
 
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 import settings_store
+from api.auth import require_user
 from database.crud import conversation_exists, ensure_conversation
 from src.core.voice_runtime_state import VoiceRuntimeEventType, VoiceRuntimeState
 from src.core.playback_reevaluation import ReevaluationTrigger
@@ -94,9 +95,9 @@ def _state_payload(state: VoiceRuntimeState) -> dict:
 
 
 @router.post("/startup")
-def create_voice_startup(request: VoiceStartupRequest):
+def create_voice_startup(request: VoiceStartupRequest, user=Depends(require_user)):
     """Create the page-start welcome through the normal playback scheduler."""
-    conversation_id = ensure_conversation(request.conversation_id)
+    conversation_id = ensure_conversation(user["id"], request.conversation_id)
     if request.local_hour < 6:
         greeting = "凌晨好"
     elif request.local_hour < 12:
@@ -131,8 +132,8 @@ def create_voice_startup(request: VoiceStartupRequest):
 
 
 @router.post("/event")
-def consume_voice_runtime_event(request: VoiceRuntimeEventRequest):
-    if not conversation_exists(request.conversation_id):
+def consume_voice_runtime_event(request: VoiceRuntimeEventRequest, user=Depends(require_user)):
+    if not conversation_exists(request.conversation_id, user["id"]):
         raise HTTPException(status_code=404, detail="当前会话不存在。")
 
     priority = None
@@ -198,9 +199,9 @@ def consume_voice_runtime_event(request: VoiceRuntimeEventRequest):
 
 
 @router.post("/client-result")
-def record_voice_delivery_client_result(request: VoiceDeliveryClientResultRequest):
+def record_voice_delivery_client_result(request: VoiceDeliveryClientResultRequest, user=Depends(require_user)):
     """Record the browser's final playback-boundary outcome without changing state."""
-    if not conversation_exists(request.conversation_id):
+    if not conversation_exists(request.conversation_id, user["id"]):
         raise HTTPException(status_code=404, detail="当前会话不存在。")
     logger.info(
         "voice_delivery_client_result conversation_id=%s code=%s authorization=%s reason=%s intent_id=%s",

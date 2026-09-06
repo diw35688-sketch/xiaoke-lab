@@ -120,7 +120,7 @@ def _record_response(
             "kind": getattr(getattr(voice_item, "kind", None), "value", "assistant_reply"),
             "priority": getattr(getattr(voice_item, "priority", None), "name", "REVIEW"),
             "screen_target": "dialogue",
-            "text": (assistant_block or {}).get("payload", {}).get("text", "处理完成。"),
+            "text": (assistant_block or {}).get("payload", {}).get("text", "未生成回复，请重试。"),
         }] if assistant_block is not None else []),
         "voice_delivery_events": [],
         "turn": wire_turn,
@@ -276,3 +276,187 @@ def reset():
     """开始新会话。"""
     session_id = start_new_session()
     return {"session_id": session_id, "message": "已开始新会话"}
+
+
+@router.get("/events")
+def record_events():
+    """SSE 端点：实验记录一写入就推给前端，不用等轮询。
+
+    前端连接后，每当 save_record 写入新记录，这里会 yield 一条
+    ``data: {"type":"record_written",...}`` 事件。前端收到后刷新实验本。
+    """
+    import time
+
+    from database.lab_record_store import (
+        subscribe_record_events,
+        unsubscribe_record_events,
+    )
+
+    q = subscribe_record_events()
+
+    def event_stream():
+        try:
+            # 先发一条 hello，让前端确认连接成功。
+            yield 'event: hello\ndata: {"type":"connected"}\n\n'
+            while True:
+                try:
+                    event = q.get(timeout=15)
+                    payload = json.dumps(event, ensure_ascii=False)
+                    yield f'data: {payload}\n\n'
+                except Exception:
+                    # 15 秒没事件也要发 keepalive，防止代理超时断开。
+                    yield ': keepalive\n\n'
+        finally:
+            unsubscribe_record_events(q)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
+
+
+@router.get("/sessions")
+def list_lab_sessions():
+    """实验本首页：列出所有有记录的实验会话，按最近活动排序。
+
+    每个会话包含：方案名、步骤进度、记录条数、首末时间、部分最新记录摘要。
+    这是「实验本」页面的数据源——不再用 /experiments（那是实验安排表）。
+    """
+    import sqlite3
+    from database.db import get_connection
+
+    with get_connection() as conn:
+        # 所有有记录的会话
+        rows = conn.execute(
+            """SELECT session_id,
+                      COUNT(*) AS record_count,
+                      MIN(at) AS first_at,
+                      MAX(at) AS last_at,
+                      GROUP_CONCAT(DISTINCT conversation_id) AS conv_ids
+               FROM lab_records
+               GROUP BY session_id
+               ORDER BY MAX(id) DESC
+               LIMIT 50"""
+        ).fetchall()
+
+        # 每个会话的方案信息
+        state_rows = conn.execute(
+            """SELECT lab_session_id,
+                      protocol_step_facts_json,
+                      revision,
+                      updated_at
+               FROM experiment_session_state"""
+        ).fetchall()
+        protocol_map: dict[str, dict] = {}
+        for sr in state_rows:
+            facts = json.loads(sr["protocol_step_facts_json"] or "{}")
+            protocol_map[sr["lab_session_id"]] = {
+                "protocol_id": facts.get("protocol_id"),
+                "protocol_version": facts.get("protocol_version"),
+                "current_step_number": facts.get("current_step_number"),
+                "total_steps": len(facts.get("steps") or {}),
+                "revision": sr["revision"],
+            }
+
+        # 协议标题
+        import domain as domain_module
+        proto_titles: dict[str, str] = {}
+        try:
+            for p in domain_module.protocols().list_all():
+                proto_titles[p.protocol_id] = p.title
+        except Exception:
+            pass
+
+    sessions = []
+    for row in rows:
+        sid = row["session_id"]
+        proto = protocol_map.get(sid, {})
+        proto_id = proto.get("protocol_id")
+        sessions.append({
+            "session_id": sid,
+            "conversation_ids": (row["conv_ids"] or "").split(",") if row["conv_ids"] else [],
+            "record_count": row["record_count"],
+            "first_at": row["first_at"],
+            "last_at": row["last_at"],
+            "protocol_id": proto_id,
+            "protocol_title": proto_titles.get(proto_id, "") if proto_id else "",
+            "current_step_number": proto.get("current_step_number"),
+            "total_steps": proto.get("total_steps"),
+        })
+    return {"sessions": sessions}
+
+
+@router.get("/sessions/{session_id}")
+def get_lab_session_detail(session_id: str, conversation_id: str | None = None):
+    """实验本详情页：一个实验会话的完整记录。
+
+    返回该会话的所有 lab_records（含 transcript/entities/evaluation/step）
+    以及方案步骤进度。
+    """
+    import sqlite3
+    from database.db import get_connection
+
+    with get_connection() as conn:
+        rows = conn.execute(
+            """SELECT * FROM lab_records
+               WHERE session_id = ?
+               ORDER BY segment_id, id""",
+            (session_id,),
+        ).fetchall()
+
+        if not rows:
+            raise HTTPException(404, "未找到该实验会话的记录。")
+
+        # 方案状态
+        state_row = None
+        if conversation_id:
+            state_row = conn.execute(
+                """SELECT protocol_step_facts_json FROM experiment_session_state
+                   WHERE lab_session_id = ? AND conversation_id = ?
+                   ORDER BY revision DESC LIMIT 1""",
+                (session_id, conversation_id),
+            ).fetchone()
+        if not state_row:
+            state_row = conn.execute(
+                """SELECT protocol_step_facts_json FROM experiment_session_state
+                   WHERE lab_session_id = ?
+                   ORDER BY revision DESC LIMIT 1""",
+                (session_id,),
+            ).fetchone()
+
+    facts = {}
+    if state_row:
+        facts = json.loads(state_row["protocol_step_facts_json"] or "{}")
+
+    records = []
+    for row in rows:
+        item = dict(row)
+        for field in ("entities", "extraction", "evaluation", "step"):
+            if item.get(field) is not None:
+                item[field] = json.loads(item[field])
+        records.append(item)
+
+    proto_id = facts.get("protocol_id")
+    proto_title = ""
+    if proto_id:
+        try:
+            import domain as domain_module
+            proto = domain_module.protocols().get(proto_id)
+            proto_title = getattr(proto, "title", "")
+        except Exception:
+            pass
+
+    return {
+        "session_id": session_id,
+        "protocol_id": proto_id,
+        "protocol_title": proto_title,
+        "current_step_number": facts.get("current_step_number"),
+        "steps": facts.get("steps") or {},
+        "record_count": len(records),
+        "records": records,
+    }

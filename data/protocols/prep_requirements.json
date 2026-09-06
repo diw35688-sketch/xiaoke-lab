@@ -21,6 +21,17 @@
     ],
     "protocolsio-0-1x-bwt-buffer": [
       "bwt-0.1x"
-    ]
+    ],
+    "western-blot": [],
+    "rna-extraction-trizol": [],
+    "plasmid-dna-miniprep-alkaline-lysis": [],
+    "recombinant-protein-expression-purification": [],
+    "pcr": [],
+    "dna-gel-extraction": [],
+    "transformation": [],
+    "competent-cell-preparation": [],
+    "colony-pcr-protocol": [],
+    "colony-pcr-40s-ribosomal": [],
+    "colony-pcr-standard": []
   }
 }

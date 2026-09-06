@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Mapping
 
+from src.core.task_context import TaskContext
 from src.core.intent_classifier import (
     IntentCandidate,
     IntentCandidateStatus,
@@ -50,6 +51,9 @@ class UnifiedUnderstandingInput:
     recent_context: tuple[str, ...] = ()
     pending_question_numbers: tuple[int, ...] = ()
     current_question_number: int | None = None
+    # 任务层：当前方案与步骤，只用于接地与消歧（详见 task_context.py）。
+    # 缺省自由记录，保证既有调用方无需改动即可继续工作。
+    task_context: TaskContext = field(default_factory=TaskContext.free)
 
     def __post_init__(self) -> None:
         if not self.raw_text.strip():
@@ -283,7 +287,7 @@ def build_degraded_understanding(
     segment_id: int,
     reason: str,
 ) -> UnifiedUnderstandingResult:
-    """网络或格式失败时仅保存未分类NOTE，不产生控制候选。"""
+    """网络或格式失败时保留原话为NOTE，不把分类任务转嫁给用户。"""
 
     if not reason.strip():
         raise ValueError("降级原因不能为空。")
@@ -292,15 +296,15 @@ def build_degraded_understanding(
         raw_text=raw_text,
         normalized_text=raw_text,
         entities=ExperimentEntities(),
-        needs_confirmation=True,
+        needs_confirmation=False,
         confirmation_reason=f"统一理解失败：{reason}",
         source_session_id=session_id,
         source_segment_id=segment_id,
     )
     analysis = LLMAnalysisResult(
         events=[event],
-        should_ask_follow_up=True,
-        follow_up_question="本段内容未能分类，请确认或稍后重试。",
+        should_ask_follow_up=False,
+        follow_up_question=None,
         assistant_reply=None,
     )
     return UnifiedUnderstandingResult(

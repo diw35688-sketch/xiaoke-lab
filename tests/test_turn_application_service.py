@@ -74,7 +74,7 @@ class TurnApplicationServiceTests(unittest.TestCase):
         gate = threading.Event()
         processor = _Processor(gate)
         self.service = TurnApplicationService(
-            store=self.store, chat_processor=processor,
+            store=self.store,
             experiment_processor=processor,
             template_processor=processor, storage_processor=processor,
         )
@@ -90,7 +90,7 @@ class TurnApplicationServiceTests(unittest.TestCase):
     def test_committed_replay_does_not_process_or_return_voice(self):
         processor = _Processor()
         self.service = TurnApplicationService(
-            store=self.store, chat_processor=processor,
+            store=self.store,
             experiment_processor=processor,
             template_processor=processor, storage_processor=processor,
         )
@@ -103,7 +103,7 @@ class TurnApplicationServiceTests(unittest.TestCase):
     def test_conflict_and_failure_are_durable_and_retryable(self):
         failing = _Processor(fail=True)
         self.service = TurnApplicationService(
-            store=self.store, chat_processor=failing,
+            store=self.store,
             experiment_processor=failing,
             template_processor=failing, storage_processor=failing,
         )
@@ -116,7 +116,7 @@ class TurnApplicationServiceTests(unittest.TestCase):
     def test_post_commit_timing_failure_does_not_reverse_business_success(self):
         processor = _Processor()
         self.service = TurnApplicationService(
-            store=self.store, chat_processor=processor,
+            store=self.store,
             experiment_processor=processor,
             template_processor=processor, storage_processor=processor,
         )

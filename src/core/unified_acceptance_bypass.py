@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from src.asr.schemas import ASRResult
 from src.core.clarification_acceptance import (
@@ -16,6 +16,7 @@ from src.core.experiment_acceptance import (
 )
 from src.core.unified_dispatch import UnifiedDispatchDestination
 from src.core.unified_dispatch_execution import DispatchExecutionRequest
+from src.core.task_context import TaskContext
 from src.core.unified_understanding import UnifiedUnderstandingInput
 
 
@@ -31,6 +32,7 @@ class UnifiedAcceptanceBypassInput:
     session_active: bool = True
     recent_context: tuple[str, ...] = ()
     raw_text: str | None = None
+    task_context: TaskContext = field(default_factory=TaskContext.free)
 
     def __post_init__(self) -> None:
         if not self.request_id.strip() or not self.session_id.strip():
@@ -61,6 +63,7 @@ class UnifiedAcceptanceBypassInput:
             session_id=self.session_id,
             segment_id=self.segment_id,
             recent_context=self.recent_context,
+            task_context=self.task_context,
             pending_question_numbers=numbers,
             current_question_number=(
                 current.display_number if current is not None else None

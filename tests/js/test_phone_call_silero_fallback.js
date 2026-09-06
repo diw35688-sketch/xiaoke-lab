@@ -10,12 +10,19 @@ let sileroCallbacks = null;
 const fetchCalls = [];
 
 const classNames = new Set();
+const callClassNames = new Set();
 const autoSpeak = {checked: false};
 const micButton = {
   disabled: false,
-  textContent: '◉',
+  textContent: '<svg mic>',
   classList: {
     toggle(name, enabled) { if (enabled) classNames.add(name); else classNames.delete(name); },
+  },
+};
+const callButton = {
+  title: '',
+  classList: {
+    toggle(name, enabled) { if (enabled) callClassNames.add(name); else callClassNames.delete(name); },
   },
 };
 const status = {textContent: ''};
@@ -26,6 +33,7 @@ global.document = {
     return {
       '#auto-speak': autoSpeak,
       '#cp-mic': micButton,
+      '#cp-phone-call': callButton,
       '#voice-status': status,
       '#cp-hint': null,
     }[selector] || null;
@@ -88,8 +96,11 @@ require('../../web/frontend/phone_call.js');
   await wait();
   assert.strictEqual(sileroStarts, 1);
   assert.strictEqual(getUserMediaCalls, 0);
-  assert.strictEqual(micButton.textContent, '■');
-  assert.ok(classNames.has('rec'));
+  // 通话状态点亮通话按钮；麦克风按钮的 SVG 图标与样式不得被通话链路改写。
+  assert.strictEqual(micButton.textContent, '<svg mic>');
+  assert.ok(!classNames.has('rec'));
+  assert.ok(callClassNames.has('rec'));
+  assert.ok(callButton.title.includes('挂断'));
   assert.ok(status.textContent.includes('Silero'));
 
   sileroCallbacks.onEvent('speech_started');
@@ -154,7 +165,8 @@ require('../../web/frontend/phone_call.js');
   window.phoneCallToggle();
   await wait();
   assert.strictEqual(getUserMediaCalls, 2);
-  assert.strictEqual(micButton.textContent, '■');
+  assert.strictEqual(micButton.textContent, '<svg mic>');
+  assert.ok(callClassNames.has('rec'));
   assert.ok(status.textContent.includes('基础降噪模式'));
 
   window.phoneCallToggle();

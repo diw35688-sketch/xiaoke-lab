@@ -36,23 +36,33 @@ class VolcanoStreamConfig:
     cluster: str
     voice: str
     speed: float
+    api_key: str = ""
 
     @classmethod
     def from_settings(cls, settings: Any) -> "VolcanoStreamConfig":
         raw_key = settings.tts_api_key or ""
-        if ":" not in raw_key:
+        if raw_key and ":" not in raw_key:
+            # 豆包语音 API Key 单独走 x-api-key，不再强制要求 appid:token。
+            appid, access_token = "0", "0"
+        elif ":" not in raw_key:
             raise VolcanoStreamingTTSError(
                 "火山引擎密钥格式应为 appid:access_token（中间用冒号）"
             )
-        appid, access_token = (part.strip() for part in raw_key.split(":", 1))
+        else:
+            appid, access_token = (part.strip() for part in raw_key.split(":", 1))
         if not appid or not access_token:
             raise VolcanoStreamingTTSError("火山引擎 appid 或 access_token 为空")
+        raw_model = (settings.tts_model or "").strip()
+        # 流式走旧版 WebSocket，cluster 必须是旧接口资源名（volcano_ 开头）。
+        # 用户填 seed-tts 的 ep- 时仍退回 volcano_tts，避免 resource not granted。
+        cluster = raw_model if raw_model.startswith("volcano_") else "volcano_tts"
         return cls(
             appid=appid,
             access_token=access_token,
-            cluster=(settings.tts_model or "volcano_tts").strip() or "volcano_tts",
+            cluster=cluster,
             voice=(settings.tts_voice or "BV001_streaming").strip(),
             speed=float(settings.tts_speed or 1.0),
+            api_key=(getattr(settings, "tts_ark_api_key", "") or "").strip(),
         )
 
 
@@ -63,10 +73,23 @@ class VolcanoFrame:
 
 
 def build_request_frame(text: str, config: VolcanoStreamConfig) -> bytes:
+    # 有 x-api-key 时，body 里的 appid/token 仅需占位，鉴权看 header。
+    appid = "0" if config.api_key else config.appid
+    token = "0" if config.api_key else config.access_token
+    request = {
+        "reqid": uuid.uuid4().hex,
+        "text": text,
+        "text_type": "plain",
+        "operation": "submit",
+        "with_frontend": 1,
+        "frontend_type": "unitTson",
+    }
+    if config.cluster.startswith(("seed-tts", "volcano_")):
+        request["model"] = config.cluster
     payload = {
         "app": {
-            "appid": config.appid,
-            "token": config.access_token,
+            "appid": appid,
+            "token": token,
             "cluster": config.cluster,
         },
         "user": {"uid": "web_lab_assistant"},
@@ -78,14 +101,7 @@ def build_request_frame(text: str, config: VolcanoStreamConfig) -> bytes:
             "volume_ratio": 1.0,
             "pitch_ratio": 1.0,
         },
-        "request": {
-            "reqid": uuid.uuid4().hex,
-            "text": text,
-            "text_type": "plain",
-            "operation": "submit",
-            "with_frontend": 1,
-            "frontend_type": "unitTson",
-        },
+        "request": request,
     }
     body = gzip.compress(json.dumps(payload, ensure_ascii=False).encode("utf-8"))
     # Protocol v1, one 4-byte header; full-client-request; JSON; gzip.
@@ -165,11 +181,14 @@ class VolcanoStreamingTTSClient:
             return self._socket
         await self._close_unlocked()
         try:
+            extra_headers = (
+                {"x-api-key": config.api_key}
+                if config.api_key
+                else {"Authorization": f"Bearer;{config.access_token}"}
+            )
             self._socket = await websockets.connect(
                 self._url,
-                additional_headers={
-                    "Authorization": f"Bearer;{config.access_token}",
-                },
+                additional_headers=extra_headers,
                 open_timeout=10,
                 close_timeout=3,
                 max_size=8 * 1024 * 1024,

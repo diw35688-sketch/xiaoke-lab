@@ -89,36 +89,8 @@ def decide_protocol_move(
     )
     deferred = tuple(item.display_number for item in deferred_items)
 
-    if active:
-        return ProtocolMoveDecision(
-            False,
-            "当前步骤仍有待回答问题；请先回答或明确暂缓。",
-            state,
-            current,
-            target,
-            missing,
-            active,
-            deferred,
-        )
-
-    deferred_fields = {
-        field
-        for item in deferred_items
-        for field in item.missing_fields
-    }
-    uncovered = tuple(field for field in missing if field not in deferred_fields)
-    if uncovered and scoped:
-        return ProtocolMoveDecision(
-            False,
-            "当前步骤仍有未被暂缓问题承接的缺失字段。",
-            state,
-            current,
-            target,
-            uncovered,
-            (),
-            deferred,
-        )
-
+    # 方案执行以自然聊天为主：未回答的现场字段不阻断继续，保留在当前步骤状态中供之后补充。
+    # active / uncovered 只作为状态信息返回，不再把“下一步”变成硬门槛。
     existing_status = state.statuses.get(
         current, ProtocolStepProgressStatus.IN_PROGRESS
     )

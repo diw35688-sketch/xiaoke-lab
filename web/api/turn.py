@@ -6,10 +6,11 @@ import json
 import logging
 import uuid
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
+from api.auth import assert_owns_conversation, require_user
 from asr_application_service import AudioValidationError, get_asr_application_service
 from database.crud import latest_conversation
 from database.turn_store import TurnRequestConflictError, TurnStore
@@ -18,7 +19,7 @@ from src.core.conversation_turn import ExperimentContext, InputSource, Interacti
 from src.core.turn_input import TurnInput
 from src.core.turn_request_envelope import TurnRequestEnvelope
 from turn_application_service import TurnApplicationService, TurnSubmission
-from turn_processors import ChatProcessor, ExperimentProcessor, StorageProcessor, TemplateProcessor
+from turn_processors import ExperimentProcessor, StorageProcessor, TemplateProcessor
 from turn_stream_contract import (
     sse_event, turn_accepted_event, turn_error_event, turn_status_event,
 )
@@ -29,7 +30,6 @@ logger = logging.getLogger(__name__)
 turn_store = TurnStore()
 turn_application_service = TurnApplicationService(
     store=turn_store,
-    chat_processor=ChatProcessor(),
     experiment_processor=ExperimentProcessor(turn_store),
     template_processor=TemplateProcessor(),
     storage_processor=StorageProcessor(),
@@ -56,11 +56,11 @@ class _ModeFields(BaseModel):
     experiment_context: ExperimentContext
     mode_version: int = Field(ge=1)
 
-    def resolved_conversation_id(self) -> str:
+    def resolved_conversation_id(self, user_id: str) -> str:
         if self.conversation_id:
             return self.conversation_id
-        # 兜底：避免缺 ID 时每条消息生成一个新会话；复用最近一次会话。
-        latest = latest_conversation()
+        # 兜底：避免缺 ID 时每条消息生成一个新会话；复用**该用户**最近一次会话。
+        latest = latest_conversation(user_id)
         if latest:
             return latest
         return str(uuid.uuid4())
@@ -132,8 +132,8 @@ def _streaming_response(submission, envelope):
 
 
 @router.post("/text")
-def turn_text(payload: TurnTextRequest):
-    conversation_id = payload.resolved_conversation_id()
+def turn_text(payload: TurnTextRequest, user=Depends(require_user)):
+    conversation_id = payload.resolved_conversation_id(user["id"])
     try:
         turn = TurnInput(
             conversation_id, payload.request_id, payload.turn_id,
@@ -157,11 +157,12 @@ def turn_text(payload: TurnTextRequest):
 @router.post("/audio")
 async def turn_audio(
     audio: UploadFile = File(...), metadata: str = Form(...),
+    user=Depends(require_user),
 ):
     try:
         parsed = TurnAudioMetadata.model_validate(json.loads(metadata))
         envelope = TurnRequestEnvelope(
-            parsed.resolved_conversation_id(), parsed.request_id, parsed.turn_id,
+            parsed.resolved_conversation_id(user["id"]), parsed.request_id, parsed.turn_id,
             parsed.lab_session_id, parsed.interaction_mode,
             parsed.experiment_context, parsed.mode_version, parsed.input_source,
         )
@@ -200,19 +201,23 @@ def _delete_audio_paths(paths):
 
 
 @router.get("/history")
-def turn_history(conversation_id: str):
+def turn_history(conversation_id: str, user=Depends(require_user)):
     """按会话读取已提交 Turn 的完整结构（含 think/tool/assistant 等块）。"""
+    assert_owns_conversation(conversation_id, user)
     return {"turns": turn_store.list_committed_turns(conversation_id)}
 
 
 @router.delete("/conversations/{conversation_id}")
-def delete_conversation_turn_data(conversation_id: str):
+def delete_conversation_turn_data(conversation_id: str, user=Depends(require_user)):
+    assert_owns_conversation(conversation_id, user)
     paths = turn_store.delete_conversation_turn_data(conversation_id)
     return {"conversation_id": conversation_id, **_delete_audio_paths(paths)}
 
 
 @router.delete("/conversations/{conversation_id}/experiment-sessions/{lab_session_id}")
-def delete_experiment_session(conversation_id: str, lab_session_id: str):
+def delete_experiment_session(conversation_id: str, lab_session_id: str,
+                              user=Depends(require_user)):
+    assert_owns_conversation(conversation_id, user)
     paths = turn_store.delete_experiment_session(conversation_id, lab_session_id)
     return {
         "conversation_id": conversation_id,

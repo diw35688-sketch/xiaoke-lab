@@ -13,12 +13,16 @@
       request_id: identity, turn_id: turnId, ...modeSnapshot,
       blocks: [{block_id: `${turnId}:user`, type: 'user_text', payload: {text: transcript}}],
     });
-    await window.publishProtocolContextBlocks?.(turnId);
+    // 方案卡片由服务端在明确进入/切换方案时返回；普通口述和聊天不再自动插入方案上下文。
     return {request_id: identity, turn_id: turnId};
   };
 
+  // 方案上下文只在用户明确进入方案/开始实验时展示一次；普通聊天不重复插入整套方案卡片。
+  let protocolContextPublished = false;
+  window.resetProtocolContextSurface = () => { protocolContextPublished = false; };
+
   window.publishProtocolContextBlocks = async turnId => {
-    if (!store || !turnId) return;
+    if (!store || !turnId || protocolContextPublished) return;
     const path = window.protocolSessionUrl
       ? window.protocolSessionUrl('/protocols/session/steps')
       : '/protocols/session/steps';
@@ -26,8 +30,9 @@
     if (!response.ok) return;
     const data = await response.json();
     if (data.mode !== 'protocol') {
+      protocolContextPublished = true;
       store.upsertBlock({block_id: `${turnId}:protocol`, type: 'protocol_card', payload: {
-        title: '自由实验记录', summary: '当前没有方案约束，仍会保留必要的语义追问。', status: 'free',
+        title: '请先选择实验方案', summary: '当前没有激活方案，请进入方案实验并选择方案。', status: 'protocol',
       }});
       return;
     }
@@ -35,11 +40,18 @@
       title: data.protocol.title, summary: `共 ${data.protocol.total_steps} 步`, status: 'protocol',
     }});
     const step = data.step;
+    if (!step) return;
+    protocolContextPublished = true;
     store.upsertBlock({block_id: `${turnId}:step:${step.number}`, type: 'step_card', payload: {
       number: step.number, title: step.title, instruction: step.instruction,
       lines: (step.substeps || []).map(item => item.text),
       meta: [`方案已知 ${Object.keys(step.protocol_values || {}).length} 项`, `现场必测 ${(step.must_record || []).length} 项`],
     }});
+    // 步骤卡片更新时，通知实验画布刷新并自动跳转到"实验进行中"视图
+    try { window.dispatchEvent(new CustomEvent('lab:experiment-changed')); } catch (_) {}
+    try {
+      if (window.shellShow) window.shellShow('run');
+    } catch (_) {}
     (data.safety || []).forEach((item, index) => store.upsertBlock({
       block_id: `${turnId}:safety:${item.cas || item.name || index}`,
       type: 'safety_alert', payload: {...item, note: data.safety_note},

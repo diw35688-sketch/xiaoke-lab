@@ -6,8 +6,8 @@ from src.core.conversation_turn import ExperimentContext, InputSource, Interacti
 
 
 class ModeSnapshotFields(BaseModel):
-    interaction_mode: InteractionMode = InteractionMode.CHAT
-    experiment_context: ExperimentContext = ExperimentContext.NONE
+    interaction_mode: InteractionMode = InteractionMode.EXPERIMENT
+    experiment_context: ExperimentContext = ExperimentContext.PROTOCOL
     mode_version: int = Field(default=1, ge=1)
     input_source: InputSource = InputSource.TEXT
     request_id: str | None = Field(default=None, min_length=1, max_length=128)

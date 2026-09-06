@@ -52,7 +52,12 @@ class UnifiedUnderstandingProcessor:
             )
         except (LLMClientError, UnifiedUnderstandingError) as error:
             # 预期内失败：外部服务不可用或模型输出违反合同。
-            # 这是设计好的降级路径，安静处理。
+            # 这是设计好的降级路径；但要留日志，方便排查“为什么又降级”。
+            logger.warning(
+                "[统一理解] 预期内失败，已降级 NOTE：%s: %s",
+                type(error).__name__,
+                error,
+            )
             return self._degrade(request, generation, error)
         except Exception as error:
             # 预期外失败：走到这里说明本模块存在缺陷，

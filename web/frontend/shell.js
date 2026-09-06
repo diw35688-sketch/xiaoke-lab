@@ -6,6 +6,11 @@
 (function () {
   var AUTO_COLLAPSE = 1240;
 
+  window.dicebearAvatarUrl = function (seed, style, size) {
+    style = style || 'avataaars';
+    return 'https://api.dicebear.com/9.x/' + encodeURIComponent(style) + '/svg?seed=' + encodeURIComponent(seed || 'user') + '&size=' + (size || 28);
+  };
+
   // 「纸上实验台」皮肤：默认 paper，经典外观完整保留、随时切回。
   // 皮肤只在 body 上挂一个类，全部差异都在 theme.css 的 body.skin-paper 块里。
   var SKIN_KEY = 'lab-skin';
@@ -26,7 +31,7 @@
     '#sh-brand{padding:16px 14px 12px;font-size:var(--fs-md);font-weight:600;color:var(--n-900);display:flex;align-items:center;gap:10px;white-space:nowrap;overflow:hidden}',
     '#sh-brand .mark{display:grid;place-items:center;width:28px;height:28px;border-radius:9px;background:var(--brand);color:#fff;flex:0 0 28px;box-shadow:var(--sh-1)}',
     '#sh-brand .mark svg{display:block}',
-    '.sh-nav{padding:4px 8px;flex:1;overflow:auto}',
+    '.sh-nav{padding:4px 8px;flex:1;overflow:auto;min-height:0}',
     '.sh-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--r-md);cursor:pointer;font-size:var(--fs-md);color:var(--n-700);white-space:nowrap;overflow:hidden;margin-bottom:1px;transition:background .12s}',
     '.sh-item:hover{background:var(--n-100)}',
     '.sh-item.active{background:var(--brand-50);color:var(--brand-strong);font-weight:500}',
@@ -37,7 +42,7 @@
     '#shell.side-collapsed .sh-label,#shell.side-collapsed .sh-sec,#shell.side-collapsed #sh-brand b{display:none}',
     '#sh-foot{padding:8px;border-top:1px solid var(--bd-1)}',
     // 管理画布与聊天互斥显示，不再左右并排。
-    '#sh-center{flex:1;min-width:320px;display:flex;flex-direction:column;background:var(--n-60,#f5f6f7)}',
+    '#sh-center{flex:1;min-width:320px;min-height:0;display:flex;flex-direction:column;background:var(--n-60,#f5f6f7)}',
     '#sh-top{height:44px;flex:0 0 44px;background:var(--n-00,#fff);border-bottom:1px solid var(--bd-2,rgba(0,0,0,.1));display:flex;align-items:center;padding:0 14px;gap:10px}',
     '#sh-title{font-size:var(--fs-md);font-weight:600;color:var(--n-900)}',
     '#sh-status{font-size:var(--fs-sm);color:var(--n-600);margin-left:auto;display:flex;align-items:center;gap:6px}',
@@ -48,7 +53,7 @@
     '.sh-pill{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:var(--r-sm);background:var(--n-75);font-size:var(--fs-xs);color:var(--n-700)}',
     '.sh-pill.warn{background:var(--red-50);color:var(--red-600)}',
     '.sh-pill.ok{background:var(--green-100);color:var(--green-900)}',
-    '#sh-canvas{flex:1;overflow:auto;padding:16px 20px}',
+    '#sh-canvas{flex:1;min-height:0;overflow:auto;padding:16px 20px}',
     '#sh-canvas.empty{display:flex;align-items:center;justify-content:center;color:var(--n-500);font-size:var(--fs-md);text-align:center;line-height:1.9}',
     // 空状态：纸面里就是「一张还没写字的纸」
     '.sh-blank{max-width:560px;margin:8vh auto 0;text-align:center;color:var(--n-600,#81858c)}',
@@ -103,7 +108,23 @@
     '.sh-conversation-rename,.sh-conversation-delete{border:0;background:transparent;color:var(--n-400);cursor:pointer;font-size:14px;line-height:1;padding:2px 4px;border-radius:4px}',
     '.sh-conversation-rename:hover{background:var(--n-100);color:var(--brand-strong)}',
     '.sh-conversation-delete:hover{background:#fef2f2;color:#b91c1c}',
-      '@media(max-width:820px){#sh-side{display:none!important}#shell{flex-direction:column!important}#sh-center{flex:0 0 42vh!important}#sh-chat{flex:1 1 58vh!important;border-left:0!important;border-top:1px solid var(--bd-1)!important}#sh-toggle-chat{display:none!important}}'
+    // 聊天视图中央：当前步骤 + 实验记录账本
+    '#chat-home{max-width:880px;margin:0 auto}',
+    '#chat-home .ch-current{background:var(--n-00);border:1px solid var(--bd-2);border-radius:var(--r-lg);padding:14px 16px;margin-bottom:14px}',
+    '#chat-home .ch-current-head{display:flex;align-items:center;gap:10px;margin-bottom:8px}',
+    '#chat-home .ch-current-num{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 6px;border-radius:var(--r-sm);background:var(--brand-50);color:var(--brand-strong);font-size:var(--fs-xs);font-weight:600}',
+    '#chat-home .ch-current-title{font-size:var(--fs-lg);font-weight:600;color:var(--n-900)}',
+    '#chat-home .ch-current-instruction{color:var(--n-600);font-size:var(--fs-md);line-height:1.7;margin-bottom:8px}',
+    '#chat-home .ch-current-kv{display:inline-block;background:var(--n-75);color:var(--n-700);border-radius:var(--r-sm);padding:2px 7px;margin:3px 5px 0 0;font-size:var(--fs-xs)}',
+    '#chat-home .ch-current-kv.rec{background:var(--amber-100);color:var(--amber-600)}',
+    '#chat-home .ch-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}',
+    '#chat-home .ch-blank{max-width:560px;margin:4vh auto 0;text-align:center;color:var(--n-600,#81858c)}',
+    '#chat-home .ch-blank-title{font-size:19px;font-weight:600;color:var(--n-800,#353638);margin-bottom:10px}',
+    '#chat-home .ch-blank-text{font-size:var(--fs-md,14px);line-height:2;margin:0 0 20px}',
+    '#chat-home .ch-blank-acts{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}',
+    '#chat-home .ch-records-title{font-size:var(--fs-xs);color:var(--n-500);margin:16px 0 8px;display:flex;align-items:center;gap:8px}',
+    '#chat-home .ch-records-title::after{content:"";flex:1;height:1px;background:var(--bd-1)}',
+    '@media(max-width:820px){#shell{flex-direction:column!important}#sh-center{flex:0 0 42vh!important}#sh-chat{flex:1 1 58vh!important;border-left:0!important;border-top:1px solid var(--bd-1)!important}#sh-toggle-chat{display:none!important}}'
 
   ].join('');
 
@@ -120,9 +141,12 @@
     tube: ico('<path d="M14.5 2v17.5a2.5 2.5 0 0 1-5 0V2"/><path d="M8.5 2h7"/><path d="M14.5 16h-5"/>'),
     box: ico('<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="M3.3 7l8.7 5 8.7-5"/><path d="M12 22V12"/>'),
     globe: ico('<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>'),
+    book: ico('<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>'),
     file: ico('<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M16 13H8M16 17H8M10 9H8"/>'),
     gear: ico('<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>'),
-    bell: ico('<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>')
+    bell: ico('<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>'),
+    user: ico('<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/>'),
+    voice: ico('<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><path d="M12 18v4"/>')
   };
 
   var HTML = [
@@ -135,12 +159,14 @@
     '    <div class="sh-item" data-view="protocols"><span class="sh-ico">' + I.clipboard + '</span><span class="sh-label">实验方案</span></div>',
     '    <div class="sh-item" data-view="reagent_prep"><span class="sh-ico">' + I.tube + '</span><span class="sh-label">试剂配置库</span></div>',
     '    <div class="sh-item" data-view="storage"><span class="sh-ico">' + I.box + '</span><span class="sh-label">储存库</span></div>',
+    '    <div class="sh-item" data-view="kb"><span class="sh-ico">' + I.book + '</span><span class="sh-label">知识库</span></div>',
     '    <div class="sh-item" data-view="community"><span class="sh-ico">' + I.globe + '</span><span class="sh-label">社区</span></div>',
-    '    <div class="sh-item" data-view="records"><span class="sh-ico">' + I.file + '</span><span class="sh-label">本次记录</span></div>',
+    '    <div class="sh-item" data-view="records"><span class="sh-ico">' + I.file + '</span><span class="sh-label">实验本</span></div>',
+    '    <div class="sh-item" data-view="agent"><span class="sh-ico">' + I.bell + '</span><span class="sh-label">今日规划</span></div>',
     '    <div class="sh-sec">配置</div>',
     '    <div class="sh-item" data-view="settings"><span class="sh-ico">' + I.gear + '</span><span class="sh-label">设置</span></div>',
     '  </div>',
-    '  <div id="sh-foot"><button class="sh-btn" id="sh-collapse" style="width:100%">收起侧栏</button>',
+    '  <div id="sh-foot"><div class="wb-console"><span class="wb-avatar" id="wb-user-avatar">小</span><div class="wb-meta"><b id="wb-user-name">未登录</b><span id="wb-user-role">控制台</span></div><button class="sh-btn wb-collapse" id="sh-collapse" type="button" title="收起侧栏">收起</button></div>',
     '  <button class="sh-btn" id="sh-skin" style="width:100%;margin-top:6px" title="纸面外观与经典外观随时互切，数据与功能完全一致"></button></div>',
     '</div>',
     '<div id="sh-center">',
@@ -159,7 +185,7 @@
     '    <div id="sh-conversation-list"></div>',
     '  </div>',
     '  <div id="sh-chat-main">',
-    '    <div id="sh-chat-head"><span>实验对话</span><span id="sh-chat-actions"><button class="sh-btn" id="sh-toggle-conversation" type="button" title="显示/隐藏会话列表">会话</button><button class="sh-btn" id="sh-new-chat" type="button">新对话</button><div id="sh-more-wrap"><button class="sh-btn" id="sh-more" type="button" title="更多">⋯</button><div id="sh-more-menu" style="display:none"><button class="sh-btn" id="sh-phone" type="button">手机</button><button class="sh-btn" id="sh-call" type="button">通话</button></div></div></span></div>',
+    '    <div id="sh-chat-head"><span>实验对话</span><span id="sh-chat-actions"><button class="sh-btn" id="sh-toggle-conversation" type="button" title="显示/隐藏会话列表">会话</button><button class="sh-btn" id="sh-new-chat" type="button">新对话</button></span></div>',
     '    <div id="sh-chat-host"></div>',
     '  </div>',
     '</div>'
@@ -189,8 +215,8 @@
     Array.prototype.forEach.call(document.querySelectorAll('.sh-item'), function (n) {
       n.classList.toggle('active', n.dataset.view === view);
     });
-    var titles = { chat: '智能对话', run: '实验进行中', calculator: '分子量计算', protocols: '实验方案', reagent_prep: '试剂配置库', reagents: '试剂安全库',
-                   records: '本次记录', settings: '设置', storage: '储存库', community: '社区' };
+    var titles = { chat: '智能对话', run: '实验进行中', qwen_audio: '实时语音', calculator: '分子量计算', protocols: '实验方案', reagent_prep: '试剂配置库', reagents: '试剂安全库',
+                   records: '实验本', agent: '今日规划', settings: '设置', storage: '储存库', community: '社区', personal: '个人中心', kb: '知识库' };
     el('sh-title').textContent = titles[view] || view;
     var canvas = el('sh-canvas');
     if (previous === 'settings' && window.__settingsCleanup) window.__settingsCleanup();
@@ -201,23 +227,9 @@
       if (window.runCanvasRender) window.runCanvasRender(canvas);
       return;
     }
-    // 聊天视图：中间是「今天这一页」。没有进行中的实验时给出人话空状态与下一步，
-    // 不再显示开发者黑话「此页尚未接入」（chat 本就不是画布视图，之前落到了兜底分支）。
+    // 聊天视图：中间不再是静态空白页，而是「当前步骤 + 本次实验记录」。
     if (view === 'chat') {
-      canvas.innerHTML = [
-        '<div class="sh-blank">',
-        '  <div class="sh-blank-title">今天这一页还空着</div>',
-        '  <p class="sh-blank-text">开口说话或在右边打字，记录会自动写到这一页上。<br>',
-        '     想照方案做，就先翻开一个实验方案。</p>',
-        '  <div class="sh-blank-acts">',
-        '    <button class="sh-btn primary" data-go="protocols">翻开实验方案</button>',
-        '    <button class="sh-btn" data-go="run">看实验进行中</button>',
-        '  </div>',
-        '</div>'
-      ].join('');
-      Array.prototype.forEach.call(canvas.querySelectorAll('[data-go]'), function (b) {
-        b.onclick = function () { show(b.dataset.go); };
-      });
+      renderChatHome(canvas);
       return;
     }
     canvas.innerHTML = '<div style="color:#94a3b8;font-size:13px">加载中…</div>';
@@ -252,10 +264,13 @@
     }
     if (action.type === 'navigate' && action.view) {
       show(action.view);
+      // 切换到实验进行中时，立即刷新步骤卡，避免等 4 秒轮询
+      if (action.view === 'run' && window.labStepsReload) window.labStepsReload();
       return;
     }
     if (action.type === 'refresh') {
       show(current);
+      if (window.labStepsReload) window.labStepsReload();
       return;
     }
     if (action.type === 'open_reagent_prep' && action.id) {
@@ -272,6 +287,101 @@
       var input = document.getElementById('message');
       if (input) input.focus();
     }
+  };
+
+  function escHtml(raw) {
+    return String(raw == null ? '' : raw).replace(/[&<>]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c];
+    });
+  }
+
+  function currentStepHomeHtml(view) {
+    if (!view || view.mode !== 'protocol' || !view.step || !view.protocol) return '';
+    var s = view.step, p = view.protocol;
+    var planned = Object.keys(s.protocol_values || {}).map(function (k) {
+      return '<span class="ch-current-kv">' + escHtml(k) + '=' + escHtml(s.protocol_values[k]) + '</span>';
+    }).join('');
+    var must = (s.must_record || []).map(function (k) {
+      return '<span class="ch-current-kv rec">' + escHtml(k) + '</span>';
+    }).join('');
+    var pct = Math.round((s.number / p.total_steps) * 100);
+    return '<section class="ch-current">'
+      + '<div class="ch-current-head">'
+      + '<span class="ch-current-num">第 ' + s.number + ' / ' + p.total_steps + ' 步</span>'
+      + '<span class="ch-current-title">' + escHtml(s.title) + '</span>'
+      + '</div>'
+      + (s.instruction ? '<div class="ch-current-instruction">' + escHtml(s.instruction) + '</div>' : '')
+      + (planned ? '<div style="margin-top:6px">方案已定：' + planned + '</div>' : '')
+      + (must ? '<div style="margin-top:6px">现场必测：' + must + '</div>' : '')
+      + '<div class="ch-actions">'
+      + '<button class="sh-btn" data-home-go="run">看实验进行中</button>'
+      + '<button class="sh-btn primary" data-home-go="protocols">打开方案页</button>'
+      + '</div>'
+      + '<div class="rc-progress" style="margin-top:12px"><div class="rc-progress-bar" style="width:' + pct + '%"></div></div>'
+      + '</section>';
+  }
+
+  function blankChatHomeHtml(view) {
+    var hasProtocol = view && view.mode === 'protocol' && view.step;
+    var actions = hasProtocol ? '' : ''
+      + '<button class="sh-btn primary" data-home-go="protocols">翻开实验方案</button>'
+      + '<button class="sh-btn" data-home-go="run">看实验进行中</button>';
+    return '<div class="ch-blank">'
+      + '<div class="ch-blank-title">' + (hasProtocol ? '这一页还在等你写下第一条记录' : '今天这一页还空着') + '</div>'
+      + '<p class="ch-blank-text">' + (hasProtocol
+        ? '直接告诉我你刚做了什么，记录会自动落到下面。'
+        : '开口说话或在右边打字，记录会自动写到这一页上。<br>想照方案做，就先翻开一个实验方案。') + '</p>'
+      + '<div class="ch-blank-acts">' + actions + '</div>'
+      + '</div>';
+  }
+
+  function renderChatHome(canvas) {
+    if (!canvas) return;
+    canvas.classList.remove('empty');
+    canvas.innerHTML = '<div id="chat-home" style="color:#94a3b8;text-align:center;padding:40px 0">正在整理今日实验…</div>';
+    var ids = window.protocolSessionIdentity ? window.protocolSessionIdentity() : {};
+    var query = ids.conversation_id && ids.lab_session_id
+      ? '?conversation_id=' + encodeURIComponent(ids.conversation_id)
+        + '&lab_session_id=' + encodeURIComponent(ids.lab_session_id)
+      : '';
+    Promise.all([
+      fetch('/protocols/session/steps' + query).then(function (r) { return r.json(); }).catch(function () { return null; }),
+      fetch('/record/history' + query).then(function (r) { return r.json(); }).catch(function () { return null; })
+    ]).then(function (results) {
+      var view = results[0], ledger = results[1];
+      var html = '<div id="chat-home">';
+      if (view && view.mode === 'protocol' && view.step) {
+        // 顶部步骤卡已经完整展示当前步骤，这里只留一条轻量导航，不重复大卡。
+        html += '<div class="ch-current-compact" style="display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #eef2f7;border-radius:14px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:#475569">'
+          + '<span style="color:#2563eb;font-weight:600">当前第 ' + view.step.number + ' / ' + view.protocol.total_steps + ' 步</span>'
+          + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(view.step.title) + '</span>'
+          + '<button class="sh-btn" data-home-go="run">看实验进行中</button>'
+          + '<button class="sh-btn primary" data-home-go="protocols">打开方案页</button>'
+          + '</div>';
+      }
+      var hasRecords = ledger && ledger.items && ledger.items.length;
+      if (hasRecords) {
+        html += '<div class="ch-records-title">实验记录</div>';
+        if (window.renderLedgerRecords) html += window.renderLedgerRecords(ledger.items);
+        if (window.renderLedgerClarifications && ledger.clarifications && ledger.clarifications.length) {
+          html += window.renderLedgerClarifications(ledger.clarifications);
+        }
+      } else {
+        html += blankChatHomeHtml(view);
+      }
+      html += '</div>';
+      canvas.innerHTML = html;
+      Array.prototype.forEach.call(canvas.querySelectorAll('[data-home-go]'), function (b) {
+        b.onclick = function () { show(b.getAttribute('data-home-go')); };
+      });
+      window.chatHomeCanvas = canvas;
+    }).catch(function () {
+      canvas.innerHTML = blankChatHomeHtml(null);
+    });
+  }
+  window.chatHomeReload = function () {
+    var canvas = window.chatHomeCanvas || document.getElementById('sh-canvas');
+    if (canvas && window.shellCurrentView() === 'chat') renderChatHome(canvas);
   };
 
   function init() {
@@ -319,6 +429,27 @@
     }
     if (main) main.style.display = 'none';
 
+    function loadUserConsole() {
+      fetch('/auth/state').then(function (r) { return r.json(); }).then(function (s) {
+        var nameEl = el('wb-user-name');
+        var roleEl = el('wb-user-role');
+        var avatarEl = el('wb-user-avatar');
+        if (nameEl) nameEl.textContent = s.authenticated ? (s.user.display_name || s.user.username || '用户') : '未登录';
+        if (roleEl) roleEl.textContent = s.authenticated ? (s.user.is_admin ? '管理员' : '控制台') : '控制台';
+        if (avatarEl) {
+          if (s.authenticated && window.dicebearAvatarUrl) {
+            window.__userSeed = s.user.username || 'user';
+            var style = 'avataaars';
+            try { style = localStorage.getItem('lab-user-avatar-style') || 'avataaars'; } catch (_) {}
+            avatarEl.innerHTML = '<img src="' + window.dicebearAvatarUrl(window.__userSeed, style, 28) + '" alt="" style="width:28px;height:28px;border-radius:50%;display:block;object-fit:cover">';
+          } else {
+            avatarEl.textContent = '小';
+          }
+        }
+      }).catch(function () {});
+    }
+    loadUserConsole();
+
     Array.prototype.forEach.call(document.querySelectorAll('.sh-item'), function (n) {
       n.onclick = function () { show(n.dataset.view); };
     });
@@ -326,6 +457,21 @@
       var on = shell.classList.toggle('side-collapsed');
       el('sh-collapse').textContent = on ? '展开' : '收起侧栏';
     };
+    var consoleBox = document.querySelector('.wb-console');
+    if (consoleBox) {
+      consoleBox.style.cursor = 'pointer';
+      consoleBox.title = '展开侧栏 / 打开今日规划';
+      consoleBox.onclick = function (e) {
+        if (e.target.closest('#sh-collapse')) return;
+        if (shell.classList.contains('side-collapsed')) {
+          shell.classList.remove('side-collapsed');
+          el('sh-collapse').textContent = '收起侧栏';
+          return;
+        }
+        show('personal');
+      };
+    }
+
     var ttsButton = el('sh-tts');
     function syncTtsButton(detail) {
       if (!ttsButton) return;
@@ -426,7 +572,8 @@
       });
     }
     function responsive() {
-      if (window.innerWidth < AUTO_COLLAPSE) shell.classList.add('side-collapsed');
+      // 手机端（≤900px）侧栏是抽屉，永远不需要收起——收起会把汉字标签隐藏。
+      if (window.innerWidth < AUTO_COLLAPSE && window.innerWidth > 900) shell.classList.add('side-collapsed');
     }
     initChatResizer();
     responsive();

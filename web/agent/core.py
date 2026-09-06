@@ -1,8 +1,15 @@
 import json
+import logging
+_logger = logging.getLogger("agent_core")
+if not _logger.handlers:
+    _h = logging.FileHandler(r"D:\me\ai107\agent_tool.log", encoding="utf-8")
+    _h.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
+    _logger.addHandler(_h)
+    _logger.setLevel(logging.INFO)
 import httpx
-from dataclasses import dataclass
 import threading
 from openai import APIConnectionError, APIStatusError, APITimeoutError, OpenAI
+import compaction
 import settings_store
 from database.crud import list_memories
 from harness_context import build_harness_context
@@ -10,48 +17,88 @@ from tools.calculator import calculate
 from tools.experiment_tools import check_experiment_conflicts, confirm_pending_experiment, list_current_experiments, propose_experiment
 from tools.memory_tools import confirm_pending_memory, propose_memory
 import lab_tools
-from src.core.conversation_turn import InteractionMode
+import tool_router
 from tool_presentation import (
     ToolVoiceDeliveryBatch,
     merge_tool_plans,
     tool_reply_text,
 )
 
-INSTRUCTIONS = """你是实验室实验规划辅助助手。结合近期对话理解“它”“改到周五”等指代。准确计算必须调用 calculate，查询已有实验时调用 list_experiments。用户问时间/日期时调用 get_current_time，需要计时/定时时调用 start_timer，之后查询剩余时间用 check_timer。
+INSTRUCTIONS = """你是「小科」，实验室科研助手。陪伴研究人员完成实验全流程：查方案、配试剂、做实验、记数据、管库存。
 
-创建实验必须两步确认：用户要求创建时，先调用 check_conflicts，再调用 propose_experiment，绝对不要直接创建；提案成功后列出信息并请用户回复“确认创建”或“取消”。只有用户在最近一条消息明确确认创建时才调用 confirm_create_experiment。
+你是搭档，不是客服——说话像同事：惜字如金，只说有用的。
 
-长期记忆规则：当用户说出明显长期稳定且对未来有帮助的信息（例如实验室设备数量、预约规则、用户偏好、固定流程）时，调用 propose_memory 暂存这条信息，然后明确询问“是否保存为长期记忆？请回复确认或取消”。不要把临时安排、一次性实验结果、敏感个人信息、未确认的推测自动提议为记忆。只有当用户最近一条消息明确确认保存长期记忆时，调用 confirm_save_memory。若实验创建和记忆确认同时可能发生，先请用户说明要确认哪一项，绝不擅自同时确认。
+输出纪律（最重要）：
+- 回答尽量一两句话说完，最多不超过三句。不展开、不罗列、不复述工具返回的内容。
+- 工具卡片已经展示的数据不要在正文重复；正文只说结论或关键提醒。
+- 不用 Markdown、不加粗、不列表、不编号。不暴露内部字段名。用自然口语说出来，不要写成清单。
+- 始终用中文回答，不夹杂英文句子。
+- 用户问"怎么做"时只说当前这一步的关键操作，不要预告后面所有步骤。
+- 用户问配方/库存/方案时，工具返回什么就简洁说什么。不要追问"你是要A还是B？"——直接给最可能的答案，用户不满意会自己说。
 
-当前没有 SOP 知识库，不要假装查询过 PDF、论文或实验记录。危险操作与关键参数只能作辅助建议，并提醒用户按本实验室 SOP 和负责人要求确认。
+核心原则：
+- 涉及具体数值、配方、步骤时先调工具再回答，不凭记忆给数字。
+- 能从工具查到的信息直接查，不让用户复述。
+- 确实缺关键参数时一次只问一项，不把对话变填表。
 
-开发/调研任务：当用户要求“适配环境”“接入某功能”“查一下项目里怎么实现”“修改代码前先研究”时，先用 list_project_files / read_project_file / search_project_text / list_project_docs / check_project_environment 做只读调查，再分步规划并执行。可以连续调用多个工具形成链式流程，每一步都先看结果再继续。
+实验准备流程（用户选择实验后走这个流程）：
+1. 选方案：用户说"我要做XXX"/"做个XXX"时，调 search_protocols(keyword="XXX") 搜索。根据返回结果处理：
+   - auto_select=true：只有一个匹配或偏好命中，立即调 select_protocol(protocol_id=..., search_keyword="XXX") 选定，不用问用户。
+   - need_choice=true：有多个匹配，把候选展示给用户选——一句话列出每个方案的标题和步数，说"你要哪个？说A或B"。用户选完立即调 select_protocol(protocol_id=..., search_keyword="XXX") 选定。选定后系统会记住偏好，下次同样的关键词自动选定。
+   - 没有匹配：说"没找到匹配方案"，问用户要不要自由记录。
+   选完后调 get_protocol_prep_requirements 出准备清单。不要用 list_protocols 翻全部方案。
+2. 盘点：用户说"我有什么"时调 list_storage_items。用户口头说"我有NaOH、Tris"时，立即逐个调 add_storage_item 入库（名称用用户说的名字，数量等留空），不要问"要不要记"。入库后才算标记完成。
+3. 缺项处理：清单里标"可配"的缺项，说明配方库里有现成配方，问用户"帮你配？"，同意后调 start_reagent_prep_flow。标"缺"但没有配方的，调 search_community 搜社区，搜到问"帮你导入？"。
+4. 开始：用户说"准备好了/开始吧"时，确认清单无遗漏，然后开始第一步。
 
-储存库规则：用户说“储存一个种子/样品/试剂/溶液”“放到储存库”“入库”“存到冰箱/冰柜”时，调用 list_storage_items / add_storage_item / add_storage_location / update_storage_item / delete_storage_item / storage_stats 进行查询和登记。这是储存库操作，不是长期记忆；不要把库存/样品信息误当成 propose_memory，除非用户明确说“长期记住”或“以后都要用”。
+注意：Harness 里显示的试剂配置流程是背景信息。除非用户主动问配制进度，否则以当前实验方案的准备清单为主线推进。
 
-软件控制规则：右侧是唯一 AI 对话入口。用户要求打开页面时调用 navigate_view；查看方案时调用 get_protocol_detail；创建方案或试剂配置时调用 create_protocol_from_text / create_reagent_prep_from_text；修改、添加、删除方案步骤时调用对应 protocol 工具。不要让用户再去寻找第二个 AI 输入框，也不要只口头说“已修改”而不调用工具。
+计算规则：分子量、浓度、稀释、称量等问题必须先调计算工具，禁止凭记忆估算，只引用工具返回的数值。
 
-配液前确认规则：用户要配溶液时，先确认：试剂是固体还是液体、液体密度、纯度、目标pH；若试剂是酸性物质（如丙酮酸、乙酸、盐酸），必须主动提醒“配完后要调pH”，并询问目标pH；若用户要求先调母液/溶剂pH再稀释，就按“母液调pH + 溶剂调pH + 梯度稀释后微调”的方案给。
+体积换算规则（重要）：方案步骤中出现"等体积""70%""两倍体积""一半体积"等相对量时，必须查 Harness 上下文中本实验已记录的数据（如上清液体积、样品体积），算出具体数值后告诉用户。例如上一步记录了上清液 500µl，本步说"加等体积异丙醇"，你要说"加 500µl 异丙醇"而不是重复"加等体积"。同理"70%"要算出 350µl 说出来。只有无法从已有数据推算时才说相对量并告知用户需要知道当前体积。
 
-计算规则：用户问分子量、摩尔质量、配溶液称多少克、稀释取多少母液时，第一步就必须调用 calculate_molecular_weight / calculate_solution_prep / calculate_dilution，禁止在调用前凭记忆给出任何数值，禁止在结果之外再混入自己的估算值；最终只引用工具返回的数字。
+配液与配方规则：先查本地配方库（get_reagent_prep / list_reagent_preps）。本地没有时，调 search_community 搜社区模板库——配方和方案的权威来源是社区，不要凭记忆编配方。搜到后问一句"帮你导入？"，用户同意再调 import_community_entry。高风险试剂给一句安全提醒。
 
-语音/通话场景输出要求：回答必须简短、直接、口语化，优先用一两句话说完；不要输出大段文字、列表、Markdown 符号或重复解释。需要记录/追问时，直接给出关键字段和一句话追问。"""
+时间规划：用户问"要多久""帮我安排"时调 generate_schedule。用户问"几点能做完""午饭前来得及吗""我9点开始"时调 plan_clock_schedule（传入开始时间等参数）。用户做到一半问"还有多久"时调 get_remaining_schedule。用户说"今天要做A和B"时调 plan_multi_protocols。接到结果后只说关键结论和卡点（跨午饭、下班、过夜），不要逐条复述。器材情况不确定（离心机几个、温度多少），不要给确定性的器材建议，让用户自己判断。
+用户到达被动等待步骤（离心、孵育、电泳、煮沸等）时，主动调 start_step_timer 启动计时器，并提一句等待期间可以做什么。
 
-CHAT_POLICY = """当前请求是自由聊天。请直接给出自然、完整且可以独立理解的简短回答，正文最多50个中文字符（含标点），不要使用Markdown、标题、列表、链接、表情或“小科：”等称呼前缀。不要先写长回答再附摘要。即使用户提到刚做的实验、温度、剂量或现象，也只能自然讨论，不能调用 record_observation，不能声称已经保存。若用户确实想记录，请提醒其切换到自由实验记录或方案实验记录模式。"""
+创建/修改方案规则（重要）：
+- 用户说"新建方案"/"做个XXX方案"/"帮我做一个XXX实验"时，立即调 create_protocol_from_text(description=...)。description 写清实验名称、目的、关键参数（体系体积、温度、循环数等）即可，不需要用户提供逐步文字——AI 会自动补齐标准步骤。一轮调完，不要先问用户"你要哪几步"。
+- 用户说"和现有方案一样，只是XXX不同"时：先 search_protocols 或 list_protocols 找到原方案 protocol_id，再 get_protocol_detail(protocol_id=...) 读出完整步骤，然后把"原方案步骤+用户要改的部分"拼成一段 description，直接调 create_protocol_from_text。不要把步骤拆开来逐条问用户，不要要求用户复述步骤。
+- 创建方案和配方不需要两步确认。用户说"确定"/"新建"/"做"/"是的"就是执行指令，立即调工具，不要再问"要不要现在创建"。
 
-CHAT_POLICY_FULL = """当前请求是自由聊天。请给出自然、完整且可以独立理解的回答，允许使用必要列表或分句，但不要刻意用Markdown大段排版。即使用户提到刚做的实验、温度、剂量或现象，也只能自然讨论，不能调用 record_observation，不能声称已经保存。若用户确实想记录，请提醒其切换到自由实验记录或方案实验记录模式。"""
+创建实验：必须两步确认——先 check_conflicts 再 propose_experiment，用户明确确认后才 confirm_create_experiment。
+
+长期记忆：用户说出稳定有用信息时先 propose_memory 暂存，询问确认后再 confirm_save_memory。临时数据不是记忆，储存库操作用 storage 工具。
+
+扩展工具：你看到的工具列表是按需加载的。如果用户要做储存库操作、方案编辑、配方编辑、时间规划或实验安排但你没看到对应工具，调 activate_skill(skill名称) 解锁那组工具，然后在下一轮就能用了。
+
+软件控制：用户要打开页面时调 navigate_view，查方案调 get_protocol_detail，创建/修改方案和配方调对应工具。不要只口头说"已修改"而不调工具。
+
+知识库检索（优先级最高）：
+- 用户说"知识库""引物表""查一下引物""我们的引物""ABC的引物""查一下记录"时，立即调 search_knowledge_base(query=关键词)。禁止用 web_search 联网搜索引物——实验室自己上传的引物表才是权威来源。
+- 不要用 list_experiment_memory 查引物——记忆和知识库是两个不同的东西。
+- 查到了直接告诉用户结果（引物名称、序列、靶基因等），查不到再说"知识库里没有匹配记录"。
+
+禁止重复追问（最重要）：
+- 用户在同一话题上已经回答过的问题，后续轮次绝对不要再问。如果连续两轮你都在追问而没有调用任何工具，立即停止追问——要么用已有信息直接调工具执行，要么坦白说"我现在没法自动完成这个，帮你手动记一下"。
+- 用户说"确定"/"是的"/"都一样"/"你自己查"都是明确的执行指令，不是在跟你讨论。收到后立即行动。
+- 能用工具查到的信息（方案步骤、protocol_id、配方详情）一律自己查，禁止要求用户复述。
+
+安全边界：危险试剂和关键操作只给建议，提醒按实验室 SOP 确认。不要假装查过论文、PDF 或实验记录。"""
 
 CHAT_REFINEMENT_POLICY = """把下面的助手回答重新生成成一句自然、完整、可独立理解的中文短回复。最多{max_chars}个字符（标点也计数），不得使用Markdown、标题、列表、链接、表情或称呼前缀；保留原意和关键结论，不得只截取前半句，不得解释你的改写过程。只输出改写后的正文：\n\n{answer}"""
 
-EXPERIMENT_RECORD_POLICY = """当前请求属于实验记录。用户描述刚完成的操作或实测事实时，必须调用 record_observation 并传递原始 transcript；只有工具返回成功后才能声称已记录，失败必须如实说明未保存。"""
+EXPERIMENT_RECORD_POLICY = """当前请求属于实验记录。以自然对话回应为主：不要要求用户使用内部字段名或固定口令。用户描述刚完成的操作或实测事实时，立即调用 record_observation 并传递原始 transcript；只有工具返回成功后才能声称已记录。全局没有必填字段：用户说了什么就记什么，没说的字段一律留空，不要追问缺失信息，不要问"要不要记/要不要保存"——直接记。用户只是提问、闲聊、询问你是谁时，直接正常回答，不要强行要求记录。
 
-EXPERIMENT_TOOL_POLICY = """当前处于实验记录过程中，用户已用“小科”明确发出工具指令。只能从提供的工具中选择；不得保存本句话为实验记录，不得结束实验、修改方案或删除数据。需要工具时必须调用工具，只有工具返回成功后才能声称已经执行。用户询问“你能做什么”“有哪些工具”“支持什么功能”时，必须调用 list_experiment_commands，不得凭记忆手写清单。若没有合适工具，简短说明本次实验模式暂不支持。回答简短、直接、口语化。"""
+步骤推进与回退规则（重要）：
+- 用户说"做完了"、"完成了"、"下一步"、"继续"、"好了"等表示要推进时，调用 move_step(action="next") 推进步骤。如果本轮用户还说了新数据（数值、观察结果），先调 record_observation 记录，再调 move_step 推进。如果没有新数据，直接调 move_step。
+- 用户说"回到上一步"、"搞错了"、"退回去"、"撤回"等表示要回退时，调用 move_step(action="prev") 回退。回退后告诉用户当前是哪一步，等用户重新操作或修改记录。
+- 推进后要基于方案步骤说明（instruction）告诉用户下一步怎么做：方案写了加多少就告诉用户加多少，方案写了什么条件就告诉用户什么条件。用户是来跟着方案做实验的，不是来被追问的。例如步骤说明里有"加入 200µl 溶液 I"，你就要说"根据方案，需要加入 200µl 溶液 I"，而不是问"你加了多少？"。方案里没有指定的数值，才问用户。末尾加一句"需要改的话说'回到上一步'"。
+- 不要追问"要不要继续/下一步继续吗"。用户说"做完了"就是明确的推进信号。
+- 推进是乐观操作：宁可推快了让用户回退，也不要反复确认拖慢节奏。"""
 
-@dataclass(frozen=True)
-class ExperimentToolAgentResult:
-    answer: str
-    tool_views: tuple[dict, ...]
-    called_tools: tuple[str, ...]
+EXPERIMENT_CONVERSATION_POLICY = """当前是在进行中的实验里对话。结合 Harness 注入的方案和步骤上下文回答，像一个了解当前进展的搭档。正文最多两三句，不展开列举。卡片已展示的数据不在正文重复；用户问"怎么做"时只说当前一步的关键操作，不要预告后续所有步骤。不要要求内部字段名或固定口令。用户只是问候、提问或说"然后呢/怎么做"时正常回答，不要误当成实验记录。用户没明确说"下一步/继续"时不要问"要进入下一步吗"，也不要擅自推进。"""
 
 
 _latest_experiment_timer: dict[tuple[str, str], str] = {}
@@ -68,6 +115,11 @@ TOOLS = [
 ] + lab_tools.openai_tools()
 
 
+DEFAULT_MAX_TOOL_TURNS = 12
+MAX_MEMORY_CONTEXT_ITEMS = 20
+MAX_MEMORY_CONTEXT_CHARS = 3000
+
+
 class ModelServiceError(Exception):
     def __init__(self, detail, status_code):
         self.detail, self.status_code = detail, status_code
@@ -82,8 +134,9 @@ def run_tool(name, args, conversation_id):
 def _run_tool_with_presentation(name, args, conversation_id, interaction_mode=None):
     """Execute a tool and retain any backend-owned presentation plan."""
 
-    if interaction_mode == InteractionMode.CHAT and name == "record_observation":
-        raise PermissionError("自由聊天模式禁止写入实验记录，请切换到实验记录模式。")
+    if tool_router.is_activate_skill_call(name):
+        return tool_router.handle_activate_skill(args, conversation_id), None
+
     handlers = {
         "calculate": lambda: calculate(args["expression"]),
         "list_experiments": list_current_experiments,
@@ -107,21 +160,36 @@ def _memory_context():
     memories = list_memories()
     if not memories:
         return "当前没有已确认的长期记忆。"
-    return "已确认的长期记忆：\n" + "\n".join(f"- [{item['category']}] {item['content']}" for item in memories)
+    # 只取最近且数量受限的条目，避免长期记忆把上下文塞爆。
+    selected = memories[-MAX_MEMORY_CONTEXT_ITEMS:]
+    lines = [f"已确认的长期记忆（最近{len(selected)}条，完整内容见记忆库）："]
+    current_length = 0
+    for item in selected:
+        line = f"- [{item['category']}] {item['content']}"
+        current_length += len(line)
+        if current_length > MAX_MEMORY_CONTEXT_CHARS:
+            lines.append("- …（更多长期记忆已省略）")
+            break
+        lines.append(line)
+    return "\n".join(lines)
 
 
 def _client():
     s = settings_store.current()
     if not s.api_key:
         raise ValueError("尚未配置模型密钥。请点击界面右上角「设置」填写。")
-    return OpenAI(api_key=s.api_key, base_url=s.base_url, timeout=httpx.Timeout(60, connect=10), max_retries=1)
+    return OpenAI(
+        api_key=s.api_key,
+        base_url=s.base_url,
+        timeout=httpx.Timeout(60, connect=10),
+        max_retries=3,
+        http_client=httpx.Client(trust_env=False),
+    )
 
 
 def _extra_body():
-    """语音场景禁用思考时，显式关闭 DeepSeek thinking；否则不强制。"""
-    if settings_store.current().voice_disable_thinking:
-        return {"thinking": {"type": "disabled"}}
-    return {}
+    """全局关闭 DeepSeek thinking 以保证响应速度。"""
+    return {"thinking": {"type": "disabled"}}
 
 
 def refine_chat_answer(answer: str, max_chars: int = 50) -> str:
@@ -161,9 +229,9 @@ def refine_chat_answer(answer: str, max_chars: int = 50) -> str:
     )
 
 
-def _messages(history, interaction_mode=None, harness_context=None):
-    if interaction_mode == InteractionMode.CHAT:
-        policy = CHAT_POLICY if settings_store.current().voice_short_reply else CHAT_POLICY_FULL
+def _messages(history, interaction_mode=None, harness_context=None, policy_override=None):
+    if policy_override is not None:
+        policy = policy_override
     else:
         policy = EXPERIMENT_RECORD_POLICY
     system = INSTRUCTIONS + "\n\n" + policy + "\n\n" + _memory_context()
@@ -172,28 +240,88 @@ def _messages(history, interaction_mode=None, harness_context=None):
     return [{"role": "system", "content": system}, *history]
 
 
-def _tools_for_mode(interaction_mode=None):
-    if interaction_mode != InteractionMode.CHAT:
-        return TOOLS
-    return [tool for tool in TOOLS if tool["function"]["name"] != "record_observation"]
+def _tools_for_mode(interaction_mode=None, conversation_id=None, user_message=""):
+    """统一工具加载：核心常驻工具 + 关键词检测的 skill 组。
 
-
-def _experiment_tools():
-    tools = []
-    for tool in lab_tools.openai_tools(experiment_commands_only=True):
-        copied = json.loads(json.dumps(tool, ensure_ascii=False))
-        if copied["function"]["name"] == "check_timer":
-            copied["function"]["parameters"]["properties"] = {}
-            copied["function"]["parameters"]["required"] = []
-            copied["function"]["description"] += (
-                " 查询当前实验会话最近启动的计时器。"
-            )
-        if copied["function"]["name"] == "get_protocol_detail":
-            copied["function"]["parameters"]["properties"] = {}
-            copied["function"]["parameters"]["required"] = []
-            copied["function"]["description"] = "查看当前实验已选择方案的完整详情。"
-        tools.append(copied)
+    不再区分实验/聊天模式——前端早已统一只发 experiment 模式，
+    所有请求走同一套 skill 加载逻辑（核心工具 + 按需 skill 注入）。
+    interaction_mode 参数保留以兼容调用方签名，但不再影响工具选择。
+    """
+    core_only = [
+        t for t in TOOLS
+        if t["function"]["name"] not in lab_tools.names()
+    ]
+    tools = tool_router.build_tools(conversation_id, user_message, extra_tools=core_only)
+    _apply_session_defaults(tools)
     return tools
+
+
+def _apply_session_defaults(tools):
+    """对依赖实验会话上下文的工具调整参数（自动推断，无需用户传参）。
+
+    check_timer       → 查询当前实验会话最近启动的计时器（清空参数）
+    get_protocol_detail → protocol_id 改为可选：传了查任意方案，不传查当前会话的方案
+    深拷贝避免污染 lab_tools 原始定义。
+    """
+    for i, tool in enumerate(tools):
+        name = tool.get("function", {}).get("name")
+        if name == "check_timer":
+            copied = json.loads(json.dumps(tool, ensure_ascii=False))
+            fn = copied["function"]
+            fn["parameters"]["properties"] = {}
+            fn["parameters"]["required"] = []
+            desc = (fn.get("description") or "").strip()
+            if "查询当前实验会话" not in desc:
+                desc += " 查询当前实验会话最近启动的计时器。"
+            fn["description"] = desc
+            tools[i] = copied
+        elif name == "get_protocol_detail":
+            # 不清空参数——protocol_id 改为可选，让模型能查任意方案（用于复制/参考）。
+            # 工具描述已在 lab_tools 里说明：不传则查当前会话的方案。
+            pass
+
+
+def _select_protocol_for_session(
+    conversation_id: str | None,
+    lab_session_id: str | None,
+    protocol_id: object | None,
+):
+    """切换实验方案时，除了改全局 domain 状态，也写当前 lab_session 快照。
+
+    没有 conversation_id/lab_session_id 时退化为旧行为（只改全局）。
+    有会话身份时，确保 Harness/右侧 UI 看到的是“这个实验自己的方案”。
+    """
+    state = lab_tools.domain.start_session(protocol_id or None)
+    selected_view = lab_tools.domain.step_view(state)
+    if not conversation_id or not lab_session_id:
+        return selected_view
+    if selected_view.get("mode") != "protocol":
+        return selected_view
+    try:
+        from src.core.protocol_execution_state import ProtocolExecutionState
+        from database.turn_store import TurnStore
+
+        protocol = selected_view["protocol"]
+        execution = ProtocolExecutionState.start(
+            protocol_id=str(protocol["id"]),
+            protocol_version=str(protocol["version"]),
+            step_number=1,
+        )
+        turn_store = TurnStore()
+        stored = turn_store.load_experiment_state(
+            conversation_id, lab_session_id
+        )
+        turn_store.save_protocol_navigation(
+            conversation_id=conversation_id,
+            lab_session_id=lab_session_id,
+            expected_revision=int(stored["revision"]),
+            protocol_step_facts=execution.to_snapshot(),
+        )
+        selected_view["revision"] = int(stored["revision"]) + 1
+    except Exception:
+        # 快照写入失败时仍保留全局切换结果，不让工具调用直接失败。
+        pass
+    return selected_view
 
 
 def _execute_experiment_tool(name, args, conversation_id, lab_session_id):
@@ -214,6 +342,10 @@ def _execute_experiment_tool(name, args, conversation_id, lab_session_id):
         if protocol is None:
             return {"found": False, "message": "当前没有选择实验方案。"}
         safe_args = {"protocol_id": protocol.protocol_id}
+    if name == "select_protocol":
+        return _select_protocol_for_session(
+            conversation_id, lab_session_id, safe_args.get("protocol_id")
+        )
     outcome = lab_tools.call(name, safe_args)
     if not outcome["ok"]:
         raise RuntimeError(outcome["error"])
@@ -223,97 +355,21 @@ def _execute_experiment_tool(name, args, conversation_id, lab_session_id):
             _latest_experiment_timer[(conversation_id, lab_session_id)] = str(
                 result["timer_id"]
             )
-    return result
-
-
-def _is_experiment_capability_query(command_text):
-    normalized = "".join(
-        char for char in str(command_text or "").strip()
-        if char not in " \t\r\n，,。.!！?？:：、"
-    )
-    return normalized in {
-        "你能做什么",
-        "你现在能做什么",
-        "有哪些工具",
-        "现在有哪些工具",
-        "支持什么功能",
-        "现在支持什么功能",
-    }
-
-
-def run_experiment_tool_agent(command_text, conversation_id, lab_session_id):
-    """Run a bounded standard function-calling loop for an addressed command."""
-
-    if _is_experiment_capability_query(command_text):
-        name = "list_experiment_commands"
-        result = _execute_experiment_tool(
-            name, {}, conversation_id, lab_session_id
-        )
-        outcome = {"ok": True, "result": result}
-        view = dict(lab_tools.present_result(name, {}, outcome))
-        view["tool_call_id"] = "local:experiment-command-catalog"
-        titles = [item["title"] for item in result["tools"]]
-        answer = (
-            "当前可以" + "、".join(titles) + "。"
-            if titles else "当前没有开放的实验工具。"
-        )
-        return ExperimentToolAgentResult(answer, (view,), (name,))
-
-    client = _client()
-    messages = [
-        {"role": "system", "content": EXPERIMENT_TOOL_POLICY},
-        {"role": "user", "content": command_text},
-    ]
-    tool_views = []
-    called_tools = []
-    try:
-        for _ in range(4):
-            response = client.chat.completions.create(
-                model=settings_store.current().model_name,
-                messages=messages,
-                tools=_experiment_tools(),
-                extra_body=_extra_body(),
-            )
-            assistant = response.choices[0].message
-            calls = assistant.tool_calls or []
-            if not calls:
-                answer = (assistant.content or "本次实验模式暂不支持这个工具指令。").strip()
-                return ExperimentToolAgentResult(
-                    answer, tuple(tool_views), tuple(called_tools)
-                )
-            messages.append(assistant)
-            for call in calls:
-                name = call.function.name
-                args = {}
-                try:
-                    args = json.loads(call.function.arguments or "{}")
-                    result = _execute_experiment_tool(
-                        name, args, conversation_id, lab_session_id
+    # record_observation 提取了实体但需要同步到 domain 步骤进度追踪器，
+    # 否则下一轮上下文看不到已记录的实测值，模型会反复追问。
+    if name == "record_observation" and isinstance(result, dict):
+        entities = result.get("entities") or {}
+        deviations = result.get("deviations") or []
+        if entities:
+            try:
+                step = lab_tools.domain.session().current_step()
+                if step is not None:
+                    lab_tools.domain.record_step_fields(
+                        step.step_number, dict(entities), bool(deviations)
                     )
-                    outcome = {"ok": True, "result": result}
-                except Exception as error:
-                    result = {"error": str(error)}
-                    outcome = {"ok": False, "error": str(error)}
-                view = dict(lab_tools.present_result(name, args, outcome))
-                view["tool_call_id"] = call.id
-                tool_views.append(view)
-                called_tools.append(name)
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": call.id,
-                    "content": json.dumps(result, ensure_ascii=False),
-                })
-    except APITimeoutError as error:
-        raise ModelServiceError("实验工具判断超时，请重试。", 504) from error
-    except APIConnectionError as error:
-        raise ModelServiceError("无法连接实验工具模型，请检查网络后重试。", 502) from error
-    except APIStatusError as error:
-        raise ModelServiceError(
-            f"实验工具模型返回异常（状态码 {error.status_code}）。", 502
-        ) from error
-    return ExperimentToolAgentResult(
-        "工具调用次数过多，已停止本次请求。", tuple(tool_views), tuple(called_tools)
-    )
+            except Exception:  # noqa: BLE001
+                pass
+    return result
 
 
 def _execute_tool(name, args, conversation_id, interaction_mode=None):
@@ -328,10 +384,17 @@ def _execute_tool(name, args, conversation_id, interaction_mode=None):
 
 def run_agent(history, conversation_id, interaction_mode=None):
     client = _client()
+    history = compaction.compact_history(history, conversation_id)
+    user_message = ""
+    for msg in reversed(history):
+        if msg.get("role") == "user":
+            user_message = msg.get("content", "") if isinstance(msg.get("content"), str) else ""
+            break
     messages = _messages(history, interaction_mode)
+    last_plan = None
     try:
-        for _ in range(20):
-            response = client.chat.completions.create(model=settings_store.current().model_name, messages=messages, tools=_tools_for_mode(interaction_mode), extra_body=_extra_body())
+        for _ in range(DEFAULT_MAX_TOOL_TURNS):
+            response = client.chat.completions.create(model=settings_store.current().model_name, messages=messages, tools=_tools_for_mode(interaction_mode, conversation_id, user_message), extra_body=_extra_body())
             assistant = response.choices[0].message
             calls = assistant.tool_calls or []
             if not calls:
@@ -352,14 +415,18 @@ def run_agent(history, conversation_id, interaction_mode=None):
                 if presentation_plan is not None:
                     presentation_plans.append(presentation_plan)
             if presentation_plans:
-                return tool_reply_text(merge_tool_plans(presentation_plans))
+                last_plan = merge_tool_plans(presentation_plans)
+                # 不 return——让模型看到工具结果后继续推理下一轮
     except APITimeoutError as error:
         raise ModelServiceError("大模型连接超时，请检查网络后重试。", 504) from error
     except APIConnectionError as error:
         raise ModelServiceError("无法连接大模型服务，请检查网络后重试。", 502) from error
     except APIStatusError as error:
         raise ModelServiceError(f"大模型服务返回异常（状态码 {error.status_code}）。", 502) from error
-    return "工具调用次数过多，已停止本次请求。"
+    # 循环耗尽——用最后的工具计划兜底回复
+    if last_plan is not None:
+        return tool_reply_text(last_plan)
+    return "本次处理步骤过多已停止，请拆成小步骤再说一次。"
 
 
 TEMPLATE_SKILL = """你是「模板制作助手」。用户要制作实验模板（试剂配方或实验方案）时，按照以下规范工作：
@@ -381,19 +448,27 @@ STORAGE_SKILL = """你是「储存库制作助手」。用户要制作储存库�
 """
 
 
-def _run_skill_agent(skill: str, history, conversation_id, harness_context=None):
+def _run_skill_agent(skill: str, history, conversation_id, harness_context=None, skill_tools=None):
     client = _client()
+    history = compaction.compact_history(history, conversation_id)
     if harness_context is None:
         harness_context = build_harness_context(
             conversation_id=conversation_id,
             interaction_mode=None,
         )
     messages = [{"role": "system", "content": skill + "\n\n" + _memory_context() + "\n\n" + harness_context}] + list(history)
+    # skill_tools 指定这组 skill 可用的工具名；None 时退化为全量
+    if skill_tools is not None:
+        tool_map = {t["function"]["name"]: t for t in TOOLS}
+        active = [tool_map[n] for n in skill_tools if n in tool_map]
+    else:
+        active = TOOLS
+    last_plan = None
     try:
-        for _ in range(20):
+        for _ in range(DEFAULT_MAX_TOOL_TURNS):
             response = client.chat.completions.create(
                 model=settings_store.current().model_name, messages=messages,
-                tools=TOOLS, extra_body=_extra_body(),
+                tools=active, extra_body=_extra_body(),
             )
             assistant = response.choices[0].message
             calls = assistant.tool_calls or []
@@ -414,38 +489,71 @@ def _run_skill_agent(skill: str, history, conversation_id, harness_context=None)
                 if presentation_plan is not None:
                     presentation_plans.append(presentation_plan)
             if presentation_plans:
-                return tool_reply_text(merge_tool_plans(presentation_plans))
+                last_plan = merge_tool_plans(presentation_plans)
+                # 不 return——让模型看到工具结果后继续推理下一轮
     except APITimeoutError as error:
         raise ModelServiceError("大模型连接超时，请检查网络后重试。", 504) from error
     except APIConnectionError as error:
         raise ModelServiceError("无法连接大模型服务，请检查网络后重试。", 502) from error
     except APIStatusError as error:
         raise ModelServiceError(f"大模型服务返回异常（状态码 {error.status_code}）。", 502) from error
-    return "工具调用次数过多，已停止本次请求。"
+    if last_plan is not None:
+        return tool_reply_text(last_plan)
+    return "本次处理步骤过多已停止，请拆成小步骤再说一次。"
 
 
 def run_template_agent(history, conversation_id):
-    return _run_skill_agent(TEMPLATE_SKILL, history, conversation_id)
+    skill_tools = tool_router.SKILL_GROUPS["reagent_edit"]["tools"] | tool_router.SKILL_GROUPS["protocol_edit"]["tools"]
+    return _run_skill_agent(TEMPLATE_SKILL, history, conversation_id, skill_tools=skill_tools)
 
 
 def run_storage_agent(history, conversation_id):
-    return _run_skill_agent(STORAGE_SKILL, history, conversation_id)
+    skill_tools = tool_router.SKILL_GROUPS["storage"]["tools"] | {"calculate"}
+    return _run_skill_agent(STORAGE_SKILL, history, conversation_id, skill_tools=skill_tools)
 
 
-def stream_agent(history, conversation_id, interaction_mode=None, lab_session_id=None):
+def stream_agent(history, conversation_id, interaction_mode=None, lab_session_id=None, policy_override=None, allow_tools=True):
     """逐段产出模型文字；遇到工具调用时先执行工具，再继续流式回答。"""
     client = _client()
+    history = compaction.compact_history(history, conversation_id)
+    # 从历史最后一条用户消息提取文本，用于关键词检测
+    user_message = ""
+    for msg in reversed(history):
+        if msg.get("role") == "user":
+            content = msg.get("content", "")
+            if isinstance(content, str):
+                user_message = content
+            elif isinstance(content, list):
+                user_message = " ".join(
+                    block.get("text", "") for block in content
+                    if isinstance(block, dict) and block.get("type") == "text"
+                )
+            break
     harness_context = build_harness_context(
         conversation_id=conversation_id,
         lab_session_id=lab_session_id,
         interaction_mode=interaction_mode,
     )
-    messages = _messages(history, interaction_mode, harness_context)
+    messages = _messages(history, interaction_mode, harness_context, policy_override)
+    last_plan = None
     try:
-        for _ in range(20):
+        for _ in range(DEFAULT_MAX_TOOL_TURNS):
             text_parts = []
             calls_by_index = {}
-            stream = client.chat.completions.create(model=settings_store.current().model_name, messages=messages, tools=_tools_for_mode(interaction_mode), stream=True, extra_body=_extra_body())
+            request_args = {
+                "model": settings_store.current().model_name,
+                "messages": messages,
+                "stream": True,
+                "extra_body": _extra_body(),
+            }
+            if allow_tools:
+                request_args["tools"] = _tools_for_mode(
+                    interaction_mode, conversation_id, user_message
+                )
+                _logger.info("ROUND tools=[%s] user_msg=%r",
+                             ",".join(t["function"]["name"] for t in request_args["tools"]),
+                             user_message[:80])
+            stream = client.chat.completions.create(**request_args)
             for chunk in stream:
                 if not chunk.choices:
                     continue
@@ -458,7 +566,8 @@ def stream_agent(history, conversation_id, interaction_mode=None, lab_session_id
                     yield "[[LABTHINK]]" + reasoning
                 if delta.content:
                     text_parts.append(delta.content)
-                    yield delta.content
+                    # 不立即 yield：工具调用前的文字是模型的内部推理，
+                    # 只有本轮没有工具调用时才是最终回复。
                 for partial in delta.tool_calls or []:
                     call = calls_by_index.setdefault(partial.index, {"id":"", "type":"function", "function":{"name":"", "arguments":""}})
                     if partial.id:
@@ -471,7 +580,16 @@ def stream_agent(history, conversation_id, interaction_mode=None, lab_session_id
 
             calls = [calls_by_index[index] for index in sorted(calls_by_index)]
             if not calls:
+                # 本轮没有工具调用 → 积累的文本就是最终回复
+                final_text = "".join(text_parts)
+                if final_text.strip():
+                    yield final_text
+                _logger.info("NO TOOL CALL → final reply (%d chars)", len(final_text))
                 return
+            # 记录模型选择的工具
+            _logger.info("TOOL CALLS: %s",
+                         ", ".join(c["function"]["name"] + "(" + (c["function"]["arguments"] or "")[:100] + ")"
+                                   for c in calls))
             messages.append({"role":"assistant", "content":"".join(text_parts) or None, "tool_calls":calls})
             presentation_plans = []
             for call in calls:
@@ -480,6 +598,11 @@ def stream_agent(history, conversation_id, interaction_mode=None, lab_session_id
                     args = json.loads(call["function"]["arguments"] or "{}")
                 except json.JSONDecodeError:
                     args = {}
+                # activate_skill：激活扩展工具组，下一轮注入
+                if tool_router.is_activate_skill_call(name):
+                    result = tool_router.handle_activate_skill(args, conversation_id)
+                    messages.append({"role":"tool", "tool_call_id":call["id"], "content":json.dumps(result, ensure_ascii=False)})
+                    continue
                 # 参考 deepseek-harness：执行前先推「待执行卡片」，
                 # 让用户看见系统正在做什么，而不是干等一段空白。
                 if name in lab_tools.names():
@@ -506,14 +629,19 @@ def stream_agent(history, conversation_id, interaction_mode=None, lab_session_id
                     presentation_plans.append(presentation_plan)
             if presentation_plans:
                 plan = merge_tool_plans(presentation_plans)
-                yield tool_reply_text(plan)
+                last_plan = plan
+                # 中间轮次：只推送语音进度反馈，不推送确定性文本、不终止循环
+                # 让模型看到工具结果后继续推理，直到模型不再调用工具为止
                 if plan.voice_items:
                     yield ToolVoiceDeliveryBatch(plan.voice_items)
-                return
+        # 循环耗尽——用最后的工具计划兜底回复
+        if last_plan is not None:
+            yield tool_reply_text(last_plan)
+            return
     except APITimeoutError as error:
         raise ModelServiceError("大模型连接超时，请检查网络后重试。", 504) from error
     except APIConnectionError as error:
         raise ModelServiceError("无法连接大模型服务，请检查网络后重试。", 502) from error
     except APIStatusError as error:
         raise ModelServiceError(f"大模型服务返回异常（状态码 {error.status_code}）。", 502) from error
-    raise ModelServiceError("工具调用次数过多，已停止本次请求。", 500)
+    raise ModelServiceError("本次处理步骤过多已停止，请拆成小步骤再说一次。", 500)

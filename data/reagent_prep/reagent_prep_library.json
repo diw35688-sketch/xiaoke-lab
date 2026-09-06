@@ -683,6 +683,98 @@
       "source": "AI生成草稿",
       "source_url": null,
       "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "pbs-buffer",
+      "name_zh": "PBS 缓冲液",
+      "purpose": "分子生物学实验室高频使用的储备液，用于核酸提取、电泳、缓冲体系配制等常规操作",
+      "target_concentration": "137 mM NaCl，2.7mM KCl，10 mM Na2HPO4，2 mM KH2PO4",
+      "target_volume": "1L",
+      "solvent": "去离子水",
+      "steps": [
+        "称量下列试剂，置于1L 烧杯中；NaCl 8 g；KCl 0.2g；Na2HPO4 1.42 g；KH2PO4 0.27g",
+        "向烧杯中加入约800 mL 的去离子水，充分搅拌溶解。",
+        "滴加HCl 将pH 值调节至7.4，然后加入去离子水将溶液定容至1L。",
+        "高温高压灭菌后，室温保存。",
+        "注意：上述PBS Buffer 中无二价阳离子，如需要，可在配方中补充1mM CaCl2 和0.5 mMMgCl2。"
+      ],
+      "storage_condition": "室温保存",
+      "expiry": null,
+      "hazard_reagents": [
+        "氯化钠",
+        "氯化钾",
+        "盐酸"
+      ],
+      "source": "130 种实验室常用试剂配制方法",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "deae-cellulose",
+      "name_zh": "DEAE 阴离子交换纤维素",
+      "purpose": "层析分离介质，用于离子交换或凝胶过滤纯化生物大分子",
+      "target_concentration": null,
+      "target_volume": null,
+      "solvent": "蒸馏水",
+      "steps": [
+        "纤维素的处理取纤维素干品用蒸馏水浸泡，充分溶涨并搅拌均匀，过夜。次日再搅匀，静止30min 留下沉集部分（重复3 次），用真空泵抽干。然后用适量的0.5mol/L 的氢氧化钠溶液浸泡30min，抽干，蒸馏水洗至中性；再用适量的0.5mol/L 的盐酸溶液浸泡30min，抽干，蒸馏水洗至中性；重复用0.5mol/L 的氢氧化钠溶液浸泡30min，抽干，蒸馏水洗至中性。最后用0.005mol/L pH6.0 的磷酸缓冲液浸泡待用。",
+        "纤维素的重生回收的纤维素先用0.5mol/L 氯化钠-0.5mol/L 氢氧化钠溶液浸泡，再按上述（1）操作处理，即可再次投入使用。",
+        "纤维素的保存回收后，用0.5mol/L 氢氧化钠溶液浸泡30min 后，蒸馏水洗至中性，抽干，于鼓风干燥箱中60℃烘干后，保存。"
+      ],
+      "storage_condition": "干燥/60℃保存",
+      "expiry": null,
+      "hazard_reagents": [
+        "氢氧化钠",
+        "氯化钠",
+        "盐酸",
+        "磷酸"
+      ],
+      "source": "130 种实验室常用试剂配制方法",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "sob-medium-100ml",
+      "name_zh": "SOB培养液",
+      "purpose": "用于大肠杆菌等细菌的培养",
+      "target_concentration": null,
+      "target_volume": "100 mL",
+      "solvent": "去离子水",
+      "steps": [
+        "在95 mL去离子水中加入胰化蛋白胨2 g、酵母提取物0.5 g、NaCl 0.05 g，摇动容器使成分完全溶解。",
+        "如需添加镁离子，可加入10 mM MgCl₂或MgSO₄（例如加入1 mL 1 M MgCl₂溶液），然后补加去离子水至总体积100 mL。"
+      ],
+      "storage_condition": "室温保存或4℃保存",
+      "expiry": "建议现配现用，或4℃保存不超过1周",
+      "hazard_reagents": [
+        "氯化钠"
+      ],
+      "source": "AI生成草稿",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
+    },
+    {
+      "reagent_prep_id": "sob-medium",
+      "name_zh": "SOB培养液",
+      "purpose": "用于大肠杆菌等细菌的培养，尤其适用于转化后的复苏培养",
+      "target_concentration": null,
+      "target_volume": "100 mL",
+      "solvent": "去离子水",
+      "steps": [
+        "称取胰化蛋白胨 2 g、酵母提取物 0.5 g、NaCl 0.05 g，置于烧杯中。",
+        "加入约 80 mL 去离子水，搅拌溶解。",
+        "用去离子水定容至 100 mL。",
+        "如需添加镁离子，可加入 1 mL 1 M MgCl₂ 或 MgSO₄ 溶液（终浓度 10 mM），混匀。",
+        "分装后高压灭菌（121°C，15 min）。"
+      ],
+      "storage_condition": "室温或4°C保存",
+      "expiry": "灭菌后室温可保存数周",
+      "hazard_reagents": [
+        "氯化钠"
+      ],
+      "source": "AI生成草稿",
+      "source_url": null,
+      "review_status": "UNREVIEWED"
     }
   ]
 }

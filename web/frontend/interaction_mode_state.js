@@ -1,8 +1,8 @@
 // 唯一交互模式状态源。模式决定业务语义；input_source 只在提交时加入快照。
 (function () {
   var MODES = {
-    chat: {interaction_mode: 'chat', experiment_context: 'none'},
-    free: {interaction_mode: 'experiment', experiment_context: 'free'},
+    chat: {interaction_mode: 'experiment', experiment_context: 'protocol'},
+    free: {interaction_mode: 'experiment', experiment_context: 'protocol'},
     protocol: {interaction_mode: 'experiment', experiment_context: 'protocol'},
     template: {interaction_mode: 'experiment', experiment_context: 'template'},
     storage: {interaction_mode: 'experiment', experiment_context: 'storage'}
@@ -10,7 +10,7 @@
   var SOURCES = ['text', 'single_recording', 'continuous_call'];
 
   function createInteractionModeState() {
-    var selected = 'chat';
+    var selected = 'protocol';
     var protocolId = null;
     var version = 1;
     var listeners = [];

@@ -34,9 +34,9 @@ Write-Host "==> 等待健康检查"
 for ($i = 0; $i -lt 15; $i++) {
     Start-Sleep -Seconds 1
     try {
-        $r = Invoke-WebRequest -Uri "http://127.0.0.1:$Port/" -UseBasicParsing -TimeoutSec 2
+        $r = Invoke-WebRequest -Uri "http://127.0.0.1:$Port/health" -UseBasicParsing -TimeoutSec 2
         if ($r.StatusCode -eq 200) {
-            Write-Host "  OK: http://127.0.0.1:$Port/"
+            Write-Host "  OK: http://127.0.0.1:$Port/health"
             exit 0
         }
     } catch {}

@@ -79,6 +79,9 @@ class ModelSettings:
     api_key: str = ""
     base_url: str = "https://api.llm.ustc.edu.cn/v1"
     model_name: str = "deepseek-v4-pro"
+    thinking_level: str = "auto"
+    dashscope_api_key: str = ""
+    dashscope_realtime_model: str = "qwen-audio-3.0-realtime-plus"
     tts_enabled: bool = False
     speak_record_ack: bool = True
     tts_url: str = "http://127.0.0.1:8001/tts"
@@ -91,6 +94,9 @@ class ModelSettings:
     # 火山方舟 MaaS 大模型语音合成（seed-tts）使用 AK/SK + endpoint_id。
     tts_access_key: str = ""
     tts_secret_key: str = ""
+    # 火山方舟 Agent Plan 语音模型（seed-tts）推荐直接用「专属 API Key」，
+    # 只需一个 Key + X-Api-Resource-Id，不需要 AK/SK 或 Endpoint。
+    tts_ark_api_key: str = ""
     voice_short_reply: bool = True
     voice_disable_thinking: bool = True
     api_keys: dict = field(default_factory=dict)
@@ -101,6 +107,14 @@ class ModelSettings:
     ocr_api_key: str = ""
     ocr_model: str = "unlimited-ocr"
     community_base_url: str = "http://124.221.234.222:3000/api"
+    # 主动智能体：每日心跳时间可配置；主人画像由用户在设置中心补充。
+    heartbeat_enabled: bool = True
+    heartbeat_time: str = "08:00"
+    owner_profile: dict = field(default_factory=dict)
+
+    def realtime_dashscope_key(self) -> str:
+        """Qwen Audio 实时语音与阿里百炼文本模型共用同一 DashScope Key。"""
+        return self.dashscope_api_key or self.api_keys.get("dashscope", "")
 
     def masked(self) -> dict:
         """给前端看的版本：密钥掩码，永不回传明文。"""
@@ -128,6 +142,8 @@ class ModelSettings:
         data["tts_access_key"] = _mask_key(self.tts_access_key) if self.tts_access_key else ""
         data["tts_secret_key_set"] = bool(self.tts_secret_key)
         data["tts_secret_key"] = _mask_key(self.tts_secret_key) if self.tts_secret_key else ""
+        data["tts_ark_api_key_set"] = bool(self.tts_ark_api_key)
+        data["tts_ark_api_key"] = _mask_key(self.tts_ark_api_key) if self.tts_ark_api_key else ""
         key = self.api_key
         if not key:
             data["api_key"] = ""
@@ -135,6 +151,11 @@ class ModelSettings:
         else:
             data["api_key"] = _mask_key(key)
             data["api_key_set"] = True
+        realtime_dashscope_key = self.realtime_dashscope_key()
+        data["dashscope_api_key_set"] = bool(realtime_dashscope_key)
+        data["dashscope_api_key"] = (
+            _mask_key(realtime_dashscope_key) if realtime_dashscope_key else ""
+        )
         # 服务器/远程地址仅由后端代理使用，不暴露给浏览器，防止被攻击。
         for name in (
             "community_base_url",
@@ -187,6 +208,10 @@ def _from_env() -> ModelSettings:
         model_name=os.getenv("MODEL_NAME", "")
         or os.getenv("LLM_MODEL", "")
         or "deepseek-v4-pro",
+        dashscope_api_key=os.getenv("DASHSCOPE_API_KEY", ""),
+        dashscope_realtime_model=os.getenv(
+            "QWEN_AUDIO_REALTIME_MODEL", "qwen-audio-3.0-realtime-plus"
+        ),
         tts_enabled=os.getenv("TTS_ENABLED", "false").strip().lower()
         in {"1", "true", "yes", "on"},
         speak_record_ack=os.getenv("SPEAK_RECORD_ACK", "true").strip().lower()
@@ -208,6 +233,11 @@ def current() -> ModelSettings:
                     api_key=raw.get("api_key", ""),
                     base_url=raw.get("base_url", ""),
                     model_name=raw.get("model_name", ""),
+                    thinking_level=raw.get("thinking_level", "auto"),
+                    dashscope_api_key=raw.get("dashscope_api_key", ""),
+                    dashscope_realtime_model=raw.get(
+                        "dashscope_realtime_model", "qwen-audio-3.0-realtime-plus"
+                    ),
                     tts_enabled=bool(raw.get("tts_enabled", False)),
                     speak_record_ack=bool(raw.get("speak_record_ack", True)),
                     tts_url=raw.get("tts_url", "http://127.0.0.1:8001/tts"),
@@ -219,6 +249,7 @@ def current() -> ModelSettings:
                     tts_speed=float(raw.get("tts_speed", 1.0) or 1.0),
                     tts_access_key=raw.get("tts_access_key", ""),
                     tts_secret_key=raw.get("tts_secret_key", ""),
+                    tts_ark_api_key=raw.get("tts_ark_api_key", ""),
                     voice_short_reply=bool(raw.get("voice_short_reply", True)),
                     voice_disable_thinking=bool(raw.get("voice_disable_thinking", True)),
                     api_keys=raw.get("api_keys", {}) or {},
@@ -229,6 +260,9 @@ def current() -> ModelSettings:
                     ocr_api_key=raw.get("ocr_api_key", ""),
                     ocr_model=raw.get("ocr_model", "unlimited-ocr"),
                     community_base_url=raw.get("community_base_url", "http://124.221.234.222:3000/api"),
+                    heartbeat_enabled=bool(raw.get("heartbeat_enabled", True)),
+                    heartbeat_time=str(raw.get("heartbeat_time", "08:00") or "08:00"),
+                    owner_profile=raw.get("owner_profile", {}) or {},
                 )
             except (json.JSONDecodeError, OSError):
                 _cache = _from_env()
@@ -242,10 +276,10 @@ def update(**changes) -> ModelSettings:
     global _cache
     with _lock:
         settings = current()
-        for name in ("base_url", "model_name", "tts_url",
+        for name in ("base_url", "model_name", "thinking_level", "tts_url",
                      "tts_provider", "tts_base_url", "tts_model", "tts_voice",
                      "mineru_file_parse_url", "ocr_base_url", "ocr_model",
-                     "community_base_url"):
+                     "community_base_url", "dashscope_realtime_model"):
             if name in changes and changes[name] is not None:
                 setattr(settings, name, str(changes[name]).strip())
         if "tts_enabled" in changes and changes["tts_enabled"] is not None:
@@ -285,12 +319,33 @@ def update(**changes) -> ModelSettings:
         new_tts_sk = changes.get("tts_secret_key")
         if new_tts_sk:
             settings.tts_secret_key = str(new_tts_sk).strip()
+        new_tts_ark_key = changes.get("tts_ark_api_key")
+        if new_tts_ark_key:
+            settings.tts_ark_api_key = str(new_tts_ark_key).strip()
+        new_dashscope_key = changes.get("dashscope_api_key")
+        if new_dashscope_key:
+            settings.dashscope_api_key = str(new_dashscope_key).strip()
         new_mineru_key = changes.get("mineru_api_key")
         if new_mineru_key:
             settings.mineru_api_key = str(new_mineru_key).strip()
         new_ocr_key = changes.get("ocr_api_key")
         if new_ocr_key:
             settings.ocr_api_key = str(new_ocr_key).strip()
+        if "heartbeat_enabled" in changes and changes["heartbeat_enabled"] is not None:
+            settings.heartbeat_enabled = bool(changes["heartbeat_enabled"])
+        if changes.get("heartbeat_time") is not None:
+            raw_time = str(changes["heartbeat_time"]).strip()
+            if ":" in raw_time:
+                hour_str, minute_str = raw_time.split(":", 1)
+                try:
+                    hour = int(hour_str)
+                    minute = int(minute_str.split(".")[0].split("+")[0].strip())
+                    if 0 <= hour <= 23 and 0 <= minute <= 59:
+                        settings.heartbeat_time = f"{hour:02d}:{minute:02d}"
+                except (TypeError, ValueError):
+                    pass
+        if "owner_profile" in changes and isinstance(changes["owner_profile"], dict):
+            settings.owner_profile = dict(changes["owner_profile"])
         SETTINGS_FILE.write_text(
             json.dumps(asdict(settings), ensure_ascii=False, indent=2),
             encoding="utf-8",
@@ -311,6 +366,109 @@ def clear_api_key() -> ModelSettings:
         )
         _cache = settings
         return settings
+
+
+def list_providers() -> list[dict]:
+    """返回全部供应商（内置预设 + 自定义），适合做模型管理列表。
+
+    同一 id 同时存在于内置预设和 provider_profiles 时按同一个提供方合并，
+    不再把 DeepSeek 官方显示成两行或降级成“自定义”。
+    """
+    settings = current()
+    preset_by_id = {preset["id"]: preset for preset in PRESETS}
+    items: dict[str, dict] = {}
+    for preset in PRESETS:
+        items[preset["id"]] = {
+            "id": preset["id"],
+            "label": preset["label"],
+            "base_url": preset["base_url"],
+            "model": preset["model"],
+            "kind": "preset",
+            "key_set": bool(settings.api_keys.get(preset["id"])) or (
+                preset["id"] == "custom" and bool(settings.api_key)
+            ),
+            "active": False,
+            "api_url": preset.get("api_url", ""),
+        }
+    for provider_id, profile in settings.provider_profiles.items():
+        preset = preset_by_id.get(provider_id)
+        if preset is not None:
+            # 内置提供方：保留官方名称/类型，只覆盖用户保存过的地址和模型。
+            item = items[provider_id]
+            item["base_url"] = profile.get("base_url") or item["base_url"]
+            item["model"] = profile.get("model") or item["model"]
+            item["key_set"] = bool(settings.api_keys.get(provider_id)) or (
+                provider_id == "custom" and bool(settings.api_key)
+            )
+            continue
+        items[provider_id] = {
+            "id": provider_id,
+            "label": profile.get("label") or provider_id,
+            "base_url": profile.get("base_url", ""),
+            "model": profile.get("model", ""),
+            "kind": "custom",
+            "key_set": bool(settings.api_keys.get(provider_id)),
+            "active": False,
+            "api_url": "",
+        }
+    # 当前激活的供应商：按 base_url + model_name 匹配
+    for item in items.values():
+        model = item.get("model", "").lower()
+        item["supports_thinking"] = any(token in model for token in (
+            "reason", "reasoning", "think", "r1", "o1", "o3", "glm", "max"
+        ))
+        if item["base_url"] == settings.base_url and item["model"] == settings.model_name:
+            item["active"] = True
+    return [item for item in items.values()]
+
+
+def add_provider(
+    provider_id: str,
+    label: str,
+    base_url: str,
+    model: str,
+    api_key: str = "",
+) -> ModelSettings:
+    """新增/更新一个自定义供应商（同时可保存该供应商的 API 密钥）。"""
+    provider_id = provider_id.strip()
+    label = label.strip() or provider_id
+    base_url = base_url.strip()
+    model = model.strip()
+    if not provider_id or not base_url or not model:
+        raise ValueError("provider_id、接口地址和模型名都不能为空。")
+    settings = current()
+    settings.provider_profiles = dict(settings.provider_profiles)
+    settings.provider_profiles[provider_id] = {
+        "label": label,
+        "base_url": base_url,
+        "model": model,
+    }
+    if api_key.strip():
+        settings.api_keys = dict(settings.api_keys)
+        settings.api_keys[provider_id] = api_key.strip()
+    SETTINGS_FILE.write_text(
+        json.dumps(asdict(settings), ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    _cache = settings
+    return settings
+
+
+def delete_provider(provider_id: str) -> ModelSettings:
+    """删除自定义供应商；内置预设不会被删掉。"""
+    settings = current()
+    settings.provider_profiles = dict(settings.provider_profiles)
+    settings.api_keys = dict(settings.api_keys)
+    settings.provider_profiles.pop(provider_id, None)
+    settings.api_keys.pop(provider_id, None)
+    if settings.base_url == (settings.provider_profiles.get(provider_id, {}) or {}).get("base_url"):
+        pass  # 不自动切走当前配置，由前端在删除后主动保存新的当前供应商
+    SETTINGS_FILE.write_text(
+        json.dumps(asdict(settings), ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    _cache = settings
+    return settings
 
 
 def fetch_models(
