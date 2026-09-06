@@ -583,6 +583,7 @@
               const assistant = committed.blocks.find(block => block.type === 'assistant_text');
               answer = assistant?.payload?.text || '';
               settleCommittedReply(reply, assistant, publishAnswer);
+              syncedTurnCount += 1;  // 标记本机刚完成的轮次，避免 syncNewTurns 重复渲染
               window.__voiceLastScreenAt = window.performance?.now?.() ?? Date.now();
               if (data.business?.kind === 'experiment') window.labStepsReload?.();
               if (typeof window.runReload === 'function') window.runReload();
@@ -623,6 +624,7 @@
             window.publishRecordSurface?.(result);
             answer = (result.messages || []).map(item => item.text).filter(Boolean).join('\n');
             publishAnswer(answer || '原始事实已保存。');
+            syncedTurnCount += 1;  // 标记本机刚完成的轮次，避免重复渲染
             window.__voiceLastScreenAt = window.performance?.now?.() ?? Date.now();
             (result.voice_delivery_events || []).forEach(delivery => {
               window.consumeVoiceDelivery?.(delivery);
@@ -697,6 +699,7 @@
               avatarThought('···');
             }
             if (data.conversation_id) localStorage.setItem(conversationKey, data.conversation_id);
+            syncedTurnCount += 1;  // 标记本机刚完成的轮次，避免 syncNewTurns 重复渲染
             avatar('happy'); setTimeout(() => avatar('idle'), 1000);
             if (typeof loadExperiments === 'function') loadExperiments();
             if (typeof window.chatHomeReload === 'function') window.chatHomeReload();

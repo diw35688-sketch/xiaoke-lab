@@ -293,7 +293,8 @@
       ? window.protocolSessionUrl('/protocols/session')
       : '/protocols/session';
     fetch(protocolPath).then(function (r) { return r.json(); }).then(function (d) {
-      el('cp-pop-proto').innerHTML = currentModeLabel(d) + '<span class="chev">›</span>';
+      var protoEl = el('cp-pop-proto');
+      if (protoEl) protoEl.innerHTML = currentModeLabel(d) + '<span class="chev">›</span>';
     }).catch(function () {});
   }
   window.composerRefresh = refresh;
@@ -437,14 +438,17 @@
       if (window.logAction) window.logAction('open_settings');
       if (window.shellShow) window.shellShow('settings');
     };
-    document.addEventListener('click', function () { el('cp-pop').classList.remove('on'); });
-    el('cp-pop').onclick = function (e) { e.stopPropagation(); };
-    Array.prototype.forEach.call(el('cp-pop').querySelectorAll('.cp-pop-row'), function (row) {
-      row.onclick = function () {
-        el('cp-pop').classList.remove('on');
-        if (window.shellShow) window.shellShow(row.dataset.go);
-      };
-    });
+    var popMenu = el('cp-pop');  // cp-pop 已被 cp-mode-pop 取代，可能不存在
+    if (popMenu) {
+      document.addEventListener('click', function () { popMenu.classList.remove('on'); });
+      popMenu.onclick = function (e) { e.stopPropagation(); };
+      Array.prototype.forEach.call(popMenu.querySelectorAll('.cp-pop-row'), function (row) {
+        row.onclick = function () {
+          popMenu.classList.remove('on');
+          if (window.shellShow) window.shellShow(row.dataset.go);
+        };
+      });
+    }
     var realtimeBtn = el('cp-realtime-voice');
     if (realtimeBtn) {
       realtimeBtn.onclick = function () {
@@ -469,6 +473,7 @@
     }
     var phonePop = document.getElementById('cp-phone-pop');
     var phonePopBody = document.getElementById('cp-phone-pop-body');
+    var phoneQrBtn = el('cp-phone-qr');
     var phonePollTimer = null;
     var phoneTunnelActive = false;
 
