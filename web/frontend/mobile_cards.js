@@ -1018,6 +1018,7 @@
       preload.src = AVATAR[k].img;
     });
     setDataSource('real');   // 默认走真实接口
+    startTimerPolling();     // 启动计时器轮询
   }
 
   if (document.readyState === 'loading') {
@@ -1122,7 +1123,194 @@
     });
   }
 
-  // ---------- 14. 对外接口 ----------
+  // ---------- 14. 计时器 ----------
+  var timerPollHandle = null;
+  var timerNotified = {};
+  var timerAutoNotified = {};
+  var timerLastItems = [];
+
+  function fmtTimerDuration(sec) {
+    sec = Math.max(0, Math.floor(sec));
+    var h = Math.floor(sec / 3600);
+    var m = Math.floor((sec % 3600) / 60);
+    var s = sec % 60;
+    if (h > 0) return h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  }
+
+  function playTimerSound() {
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      var ctx = new AC();
+      [880, 1108, 1318].forEach(function (freq, i) {
+        var osc = ctx.createOscillator();
+        var gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        var t = ctx.currentTime + i * 0.22;
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.3, t + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.22);
+      });
+      setTimeout(function () { try { ctx.close(); } catch (_) {} }, 4000);
+    } catch (_) {}
+  }
+
+  function renderTimerBar(items) {
+    var bar = el('m-timer-bar');
+    if (!bar) return;
+
+    // 找最重要的计时器：完成的 > 运行中的 > 待确认的
+    var active = items.filter(function (t) { return !t.finished && !t.pending; });
+    var finished = items.filter(function (t) { return t.finished; });
+    var pending = items.filter(function (t) { return t.pending; });
+
+    if (finished.length > 0) {
+      renderSingleTimer(bar, finished[0]);
+    } else if (active.length > 0) {
+      // 多个运行中的，显示第一个，角标显示总数
+      renderSingleTimer(bar, active[0], active.length > 1 ? active.length : 0);
+    } else if (pending.length > 0) {
+      renderPendingTimer(bar, pending[0]);
+    } else {
+      bar.classList.remove('show');
+      bar.innerHTML = '';
+      return;
+    }
+    bar.classList.add('show');
+  }
+
+  function renderSingleTimer(bar, timer, extraCount) {
+    var remaining = timer.remaining_seconds || 0;
+    var pct = timer.duration_seconds > 0 ? ((timer.duration_seconds - remaining) / timer.duration_seconds * 100) : 0;
+    if (timer.finished) pct = 100;
+
+    bar.className = timer.finished ? 'finished' : '';
+    bar.classList.add('show');
+
+    var icon = timer.finished ? '🔔' : '⏱';
+    var statusText = timer.finished ? '计时结束' : '计时中';
+
+    var actions = '';
+    if (timer.finished) {
+      actions = '<div class="m-timer-actions">'
+        + '<button class="m-timer-btn notify" data-tid="' + esc(timer.timer_id) + '" data-act="notify">通知小科</button>'
+        + '<button class="m-timer-btn dismiss" data-tid="' + esc(timer.timer_id) + '" data-act="dismiss">知道了</button>'
+        + '</div>';
+    } else {
+      actions = '<div class="m-timer-actions">'
+        + '<button class="m-timer-btn cancel" data-tid="' + esc(timer.timer_id) + '" data-act="cancel">取消</button>'
+        + '</div>';
+    }
+
+    var extra = extraCount > 1 ? ' (+' + (extraCount - 1) + ')' : '';
+
+    bar.innerHTML = '<div class="m-timer-icon' + (timer.finished ? ' shake' : '') + '">' + icon + '</div>'
+      + '<div class="m-timer-info">'
+      + '<div class="m-timer-label">' + esc(timer.label || '计时器') + extra + '</div>'
+      + '<div class="m-timer-meta">' + statusText + ' · 设定 ' + fmtTimerDuration(timer.duration_seconds) + '</div>'
+      + '<div class="m-timer-progress"><div class="m-timer-progress-bar" style="width:' + pct + '%"></div></div>'
+      + actions
+      + '</div>'
+      + '<div class="m-timer-display">' + fmtTimerDuration(remaining) + '</div>';
+
+    // 绑定按钮
+    Array.prototype.forEach.call(bar.querySelectorAll('[data-act]'), function (btn) {
+      btn.onclick = function () {
+        var tid = this.getAttribute('data-tid');
+        var act = this.getAttribute('data-act');
+        if (act === 'dismiss' || act === 'cancel') {
+          delete timerNotified[tid];
+          fetch('/timers/' + encodeURIComponent(tid), { method: 'DELETE' }).catch(function () {});
+          if (act === 'cancel') delete timerAutoNotified[tid];
+        } else if (act === 'notify') {
+          notifyAITimerFinished(tid);
+        }
+      };
+    });
+  }
+
+  function renderPendingTimer(bar, timer) {
+    bar.className = '';
+    bar.classList.add('show');
+    bar.innerHTML = '<div class="m-timer-icon">⏸</div>'
+      + '<div class="m-timer-info">'
+      + '<div class="m-timer-label">' + esc(timer.label || '待确认计时器') + '</div>'
+      + '<div class="m-timer-meta">等待确认 · ' + fmtTimerDuration(timer.duration_seconds) + '</div>'
+      + '<div class="m-timer-actions">'
+      + '<button class="m-timer-btn notify" data-tid="' + esc(timer.timer_id) + '" data-act="accept">开始计时</button>'
+      + '<button class="m-timer-btn cancel" data-tid="' + esc(timer.timer_id) + '" data-act="reject">不要了</button>'
+      + '</div>'
+      + '</div>'
+      + '<div class="m-timer-display">' + fmtTimerDuration(timer.duration_seconds) + '</div>';
+
+    Array.prototype.forEach.call(bar.querySelectorAll('[data-act]'), function (btn) {
+      btn.onclick = function () {
+        var tid = this.getAttribute('data-tid');
+        var act = this.getAttribute('data-act');
+        if (act === 'accept') {
+          fetch('/timers/' + encodeURIComponent(tid) + '/accept', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+          }).then(function () { pollTimers(); }).catch(function () {});
+        } else if (act === 'reject') {
+          delete timerNotified[tid];
+          fetch('/timers/' + encodeURIComponent(tid), { method: 'DELETE' }).catch(function () {});
+        }
+      };
+    });
+  }
+
+  function notifyAITimerFinished(timerId) {
+    var timer = timerLastItems.find(function (t) { return t.timer_id === timerId; });
+    if (!timer) return;
+    playTimerSound();
+    fetch('/timers/' + encodeURIComponent(timerId) + '/notify-ai', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: timer.label || '计时器', duration_seconds: timer.duration_seconds }),
+    }).catch(function () {});
+    setVoiceSoon('happy', '已通知小科，时间到了', 2000);
+  }
+
+  function autoNotifyTimer(timer) {
+    if (timerAutoNotified[timer.timer_id]) return;
+    timerAutoNotified[timer.timer_id] = true;
+    playTimerSound();
+    var label = timer.label || '计时器';
+    fetch('/timers/' + encodeURIComponent(timer.timer_id) + '/notify-ai', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: label, duration_seconds: timer.duration_seconds }),
+    }).catch(function () {});
+  }
+
+  function pollTimers() {
+    fetch('/timers/active', { cache: 'no-store' })
+      .then(function (r) { if (!r.ok) return null; return r.json(); })
+      .then(function (d) {
+        var items = (d && d.items) || [];
+        timerLastItems = items;
+        items.forEach(function (timer) {
+          if (timer.finished && !timerNotified[timer.timer_id]) {
+            timerNotified[timer.timer_id] = true;
+            autoNotifyTimer(timer);
+          }
+        });
+        renderTimerBar(items);
+      }).catch(function () {});
+  }
+
+  function startTimerPolling() {
+    if (timerPollHandle) return;
+    pollTimers();
+    timerPollHandle = setInterval(pollTimers, 2000);
+  }
+
+  // ---------- 15. 对外接口 ----------
   window.MobileCards = {
     applyState: applyState,
     currentCard: currentCard,
