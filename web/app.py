@@ -222,7 +222,7 @@ def startup():
 # 历史教训（2026-08-30）：theme.css 加了整块皮肤样式却漏改手写的 ?v=，
 # 浏览器按戳吃缓存 → 发的是旧样式表 → 新皮肤整轮"没生效"，且现象极具误导性
 # （脚本是新的、样式是旧的）。故不再逐个手敲，改为渲染时统一打戳。
-BUILD_VERSION = "20260906-live-sync"
+BUILD_VERSION = "20260906-fix-composer"
 
 _STATIC_ASSET_RE = re.compile(r'(/static/[A-Za-z0-9_\-./]+\.(?:js|css))(\?v=[^"\']*)?')
 

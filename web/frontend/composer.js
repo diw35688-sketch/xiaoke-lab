@@ -119,15 +119,6 @@
 
   var HTML = [
     '<div id="cp-card">',
-    '  <div id="cp-icons">',
-    '    <button class="cp-icon" id="cp-file" title="上传任意文件（+）">' + ICONS.plus + '</button>',
-    '    <input type="file" id="cp-file-input" style="display:none" />',
-    '    <button class="cp-icon" id="cp-mic" title="单次录音：是否保存由当前模式决定">' + ICONS.mic + '</button>',
-    '    <button class="cp-icon" id="cp-phone-call" title="通话/连续通话">' + ICONS.phoneCall + '</button>',
-    '    <button class="cp-icon" id="cp-wake-word" title="待机唤醒：说“小科小科”开始连续通话">' + ICONS.wake + '</button>',
-    '    <button class="cp-icon" id="cp-phone" title="手机端">' + ICONS.phone + '</button>',
-    '    <span class="cp-chip plain" id="cp-hint">单次录音</span>',
-    '  </div>',
     '  <textarea id="cp-text" rows="1" placeholder="给实验助手发消息，或按住麦克风口述"></textarea>',
     '  <div id="cp-row">',
     '    <div class="cp-left">',
