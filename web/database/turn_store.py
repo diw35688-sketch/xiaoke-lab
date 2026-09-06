@@ -666,7 +666,7 @@ class TurnStore:
         seen = set()
         with closing(self._connection_factory()) as connection:
             rows = connection.execute(
-                "SELECT request_id, turn_id, status, result_json, timing_json, created_at "
+                "SELECT request_id, turn_id, status, result_json, timing_json, created_at, lab_session_id, interaction_mode "
                 "FROM turn_requests WHERE conversation_id=? AND status='committed' "
                 "ORDER BY created_at ASC",
                 (conversation_id,),
@@ -700,6 +700,8 @@ class TurnStore:
                     "turn_id": row["turn_id"],
                     "status": row["status"],
                     "result": result,
+                    "lab_session_id": row["lab_session_id"] or None,
+                    "interaction_mode": row["interaction_mode"] or None,
                     "timings": json.loads(row["timing_json"] or "{}"),
                     "created_at": row["created_at"],
                 },

@@ -351,6 +351,37 @@
     }
   }
 
+  // ── 跨设备状态恢复 ─────────────────────────────────────────────
+  // 手机 localStorage 和电脑独立；加载历史轮次后，把 lab_session_id 写回
+  // localStorage，让手机继承电脑端的实验进度（"菌落PCR第1步、20管模板"等）。
+  function restoreLabSessionsFromTurns(turns) {
+    try {
+      const SESSIONS_KEY = 'lab-agent-lab-sessions';
+      let map = {};
+      try { map = JSON.parse(localStorage.getItem(SESSIONS_KEY) || '{}'); } catch (_) {}
+      turns.forEach(turn => {
+        const item = turn.item || turn;
+        const lsid = item.lab_session_id;
+        if (!lsid) return;
+        const ctx = item.interaction_mode || '';
+        // 实验模式下的 lab_session 都按 protocol:<id> 或 free/template/storage 归类
+        // 后端记录的 interaction_mode 只有 experiment/chat；实验上下文靠 blocks 推断
+        // 但 lab_session_id 本身已经唯一标识一条实验轨道，直接写入即可。
+        if (ctx === 'experiment') {
+          // 尝试从 turn result 的 blocks 中提取 protocol_id
+          let protocolId = '';
+          const blocks = (item.result?.turn?.blocks || item.result?.blocks || []);
+          for (const b of blocks) {
+            if (b.type === 'system_status' && b.payload?.protocol_id) { protocolId = b.payload.protocol_id; break; }
+          }
+          const modeKey = protocolId ? ('protocol:' + protocolId) : 'protocol:';
+          map[modeKey] = lsid;
+        }
+      });
+      localStorage.setItem(SESSIONS_KEY, JSON.stringify(map));
+    } catch (_) { /* 静默失败，不影响历史渲染 */ }
+  }
+
   function loadHistory(conversationId) {
     if (localStorage.getItem(freshChatKey)) {
       localStorage.removeItem(freshChatKey);
@@ -371,12 +402,23 @@
         blockRows = {};
         turns.forEach((turn) => renderTurnHistory(turn.result));
         syncedTurnCount = turns.length;
+        // 从历史轮次恢复 lab_session_id 到 localStorage，让手机端继承电脑端的实验状态
+        restoreLabSessionsFromTurns(turns);
         startLiveSync();
         chat.scrollTop = chat.scrollHeight;
         document.dispatchEvent(new CustomEvent('lab:context-ready', { detail: { turns: turns.length } }));
       }).catch(() => loadFlatHistory(id));
     } else {
-      loadFlatHistory(null);
+      // 本机没有 conversation_id（手机首次打开）：先从服务端拿最新会话 ID，
+      // 再用 turn/history 加载结构化轮次（含 lab_session_id 等实验状态）。
+      fetch('/chat/history').then(r => r.json()).then(d => {
+        if (d.conversation_id) {
+          localStorage.setItem(conversationKey, d.conversation_id);
+          loadHistory(d.conversation_id);  // 递归走 turn/history 路径
+        } else {
+          loadFlatHistory(null);
+        }
+      }).catch(() => loadFlatHistory(null));
     }
   }
 
