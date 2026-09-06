@@ -12,11 +12,47 @@ from pathlib import Path
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 if str(WEB_DIR) not in sys.path:
     sys.path.insert(0, str(WEB_DIR))
+TESTS_DIR = Path(__file__).resolve().parent
+if str(TESTS_DIR) not in sys.path:
+    sys.path.insert(0, str(TESTS_DIR))
 
 FRONTEND_DIR = WEB_DIR / "frontend"
 
 
 class WebMobilePageTests(unittest.TestCase):
+    """首页现在需要登录；顺带把库指向临时文件——测试不该读写生产库。"""
+
+    def setUp(self):
+        import tempfile
+        from unittest.mock import patch
+
+        import auth as auth_core
+        from database import db
+
+        self.tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        self.patches = [
+            patch.object(db, "DATABASE_PATH", Path(self.tmp.name) / "page.db"),
+            patch.object(auth_core, "DEFAULT_ITERATIONS", 1000),
+        ]
+        for item in self.patches:
+            item.start()
+        db.initialize_database()
+
+    def tearDown(self):
+        for item in reversed(self.patches):
+            item.stop()
+        self.tmp.cleanup()
+
+    def _logged_in_client(self):
+        import auth_helpers
+        from fastapi.testclient import TestClient
+
+        from app import app
+
+        client = TestClient(app)
+        auth_helpers.login(client)
+        return client
+
     def test_m_route_is_registered(self):
         from app import app
 
@@ -28,7 +64,7 @@ class WebMobilePageTests(unittest.TestCase):
 
         from app import app
 
-        with TestClient(app) as client:
+        with self._logged_in_client() as client:
             response = client.get("/", headers={"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1"})
         self.assertEqual(response.status_code, 200)
         self.assertIn("mobile-shell.css", response.text)
@@ -39,7 +75,7 @@ class WebMobilePageTests(unittest.TestCase):
 
         from app import app
 
-        with TestClient(app) as client:
+        with self._logged_in_client() as client:
             response = client.get("/", headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"})
         self.assertEqual(response.status_code, 200)
         self.assertNotIn('id="m-record-btn"', response.text)

@@ -115,11 +115,11 @@ class InteractionCommandParser:
         "重复待确认问题",
     }
 
-    NEXT_PROTOCOL_STEP_COMMANDS = {
-        "下一步",
-        "进入下一步",
-        "继续下一步",
-    }
+    NEXT_PROTOCOL_STEP_PATTERNS = (
+        re.compile(r"^(?:已经|已)?(?:做完|完成|称量好了?|称量|称好了?)?(?:了)?(?:请)?(?:进入|到)?(?:第)?(?:二|2)步$"),
+        re.compile(r"^(?:已经|已)?(?:做完|完成|称量好了?|称量|称好了?)?(?:了)?(?:请)?(?:进入|到)?下一步$"),
+        re.compile(r"^(?:然后|接着|那就)?(?:进入|到)?(?:第)?(?:二|2)步$"),
+    )
 
     AFFIRM_EXACT = {
         "是",
@@ -225,7 +225,10 @@ class InteractionCommandParser:
                 normalized,
             )
 
-        if normalized in cls.NEXT_PROTOCOL_STEP_COMMANDS:
+        if (
+            normalized in {"下一步", "进入下一步", "继续下一步"}
+            or any(pattern.fullmatch(normalized) for pattern in cls.NEXT_PROTOCOL_STEP_PATTERNS)
+        ):
             return cls._simple_command(
                 InteractionCommandType.NEXT_PROTOCOL_STEP,
                 raw_text,

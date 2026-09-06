@@ -157,7 +157,9 @@ def resolve_protocol_completion(
     """Turn one cumulative evaluation into the single final clarification action."""
 
     missing = tuple(str(item) for item in evaluation.get("missing_fields") or ())
-    required = bool(evaluation.get("follow_up_required"))
+    # 产品要求（2026-09-03）：全局没有“必填字段”，不再因为 missing_fields
+    # 创建追问/待确认卡片。用户说多少就记多少，未提到的一律留空。
+    required = False
     question_value = evaluation.get("follow_up_question")
     question = str(question_value) if question_value else None
     deviations = tuple(

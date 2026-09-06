@@ -1,6 +1,6 @@
 # asr_demo 当前工作区交接说明
 
-最后整理：2026-08-25
+最后整理：2026-08-29
 
 > 本文件是下一会话的短入口，不保存完整历史。任务状态以
 > `PROJECT_TASK_CHECKLIST.md` 为准，架构原因见 `PROJECT_ARCHITECTURE.md`，
@@ -8,7 +8,8 @@
 
 ## 0. 工作区与启动路径
 
-- **正式工作区 = `C:\Users\dahli\Documents\107`**（本会话沙箱；最新代码 + .git + 未提交改动都在这里）。
+- **2026-08-29 更新：当前工作区 = `D:\me\ai107`**（含 .git、可用 `.venv`、当日提交与未提交改动；全量 1353 项测试可在此跑通）。下两行的 C 盘描述是历史记录，已不再成立，保留仅作迁移过程追溯。
+- ~~正式工作区 = `C:\Users\dahli\Documents\107`~~（历史：2026-08-25 前的会话沙箱）。
 - 曾计划迁移到 `D:\me\ai107`（4 个 .bat 写死该路径），但 D 盘根目录 ACL 为"仅管理员可写"（`Everyone:(RX)`），
   普通账户无法写；授权 dahli 后本会话受限 token 仍拒写，最终用户决定**放弃迁移、留在 C 盘**。
 - `D:\me\ai107` 已有一份 robocopy 副本（无 .venv，61MB，ACL 已授权 dahli 完全控制），**保留不动**；
@@ -18,6 +19,31 @@
 
 ## 1. 当前结论
 
+- **`WEB-UI-TOKEN-01` 第一步（整页美化：视觉底子 + 侧栏翻新）= AUTO_OK / UX_PENDING（2026-08-29 晚）**：
+  theme.css 新增字体栈/三档阴影/大圆角 token、正文 13→14px、全页细滚动条；shell.js 侧栏 8 个
+  字符/emoji 图标全部换细线 SVG、品牌统一"小科 · 实验助手"（含标签页标题）。新增
+  `tests/test_shell_visual_contract.py` 6 项。基线：**全量 1360 = 1358 通过 + 2 既有红**。
+  **注意当前工作区状态**：`web/app.py` 为原始状态（GZip/defer 与 agent_presence 注入不在生产链），
+  相关合同测试已同步收缩；前端源文件内的图标修复/呈现层过滤/agent_presence 模块保留，接回注入即可生效。
+  观感走查在用户。下一步：内页逐页归 token（适合下沉 Codex）。
+- **`WEB-UI-PRESENCE-01`（智能体存在感第二刀）= AUTO_OK / UX_PENDING（2026-08-29 晚）**：
+  聊天头部新增小科常驻状态条（`agent_presence.js`，词表与立绘一致，只订阅既有三事件，零硬编码色）；
+  修复三处 `■/◉` 字符顶掉 SVG 图标（composer×2/phone_call×1，通话状态改点亮通话按钮）；
+  语音启动自检卡片改"失败才现身"（store 照存，`conversation_block_view` 呈现层过滤）；
+  `cp-meta` 开发指标默认隐藏（localStorage `lab-dev-metrics=1` 恢复）；按钮提示语人话化。
+  基线：**全量 1362 = 1360 通过 + 2 既有红**；Node 11/12（1 既有红 = 8-27 已记录的
+  interaction_mode_state 签名漂移）。**真实验收待用户**：刷新页面看聊天头部状态条随
+  聆听/思考/回答变化、通话按钮变红、启动不再刷自检卡片。前端体检遗留：
+  `WEB-UI-TOKEN-01`（视觉收口）/`WEB-UI-IA-01`（对话优先信息架构）已登记。
+- **`WEB-PERF-P0-01`（前端传输层止血：GZip + defer）= AUTO_OK（2026-08-29）**：前端体检量化出
+  首页 38 个同步脚本 ~403KB 裸传 + 6 个轮询无休眠 + 4 个死文件等问题（完整清单见任务清单
+  2026-08-29 维护日志）。本轮止血两刀：`web/app.py` 挂 GZipMiddleware（排除 SSE/audio/octet-stream，
+  保护 `/tts/stream` 与 `/turn` 实时链路）+ 38 脚本全部 defer（保声明顺序）。实测首屏 39 请求传输
+  431,978 → 130,148 字节（30%）。新增 `tests/test_web_transfer_optimization.py` 7 项合同测试。
+  基线：**全量 1353 项 = 1351 通过 + 2 既有红项**（stash 回退复跑证明与本轮无关：杂散
+  `restart_web.bat` 触发启动器白名单断言、`test_conversations` Windows 句柄未释放）。
+  **真实验收待用户**：重启服务，桌面 + 手机各开一次，确认功能无退化 + Network 见
+  `content-encoding: gzip`。后续 P0/P1 已登记 `WEB-PERF-P0-02/03`、`WEB-PERF-P1-01/02/03`。
 - **`VOICE-WEB-MIGRATION-01`（语音接入 Web 迁移）= REAL_OK，Phase B（B1-B4）完成并真实验收通过（2026-08-18/19）**：
   用户指定按 `docs/VOICE_WEB_MIGRATION_PLAN.md` 推进（该文件是唯一简明落点）。
   **产品形态（用户 2026-08-18 定）：最终产品 = web（桌面）+ 手机（/m），以 web 优先**——

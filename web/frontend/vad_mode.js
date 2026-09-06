@@ -83,6 +83,7 @@
 
   function onSpeechEnd(audio) {
     if (busy) return; // 上一句还在识别时，忽略新结尾
+    if (window.__ttsSpeaking) return; // TTS 播放中，丢弃回声
     busy = true;
     say("识别中…");
     upload(audio)
@@ -156,6 +157,22 @@
     say("语音对话已关闭");
   }
 
+  // ── TTS 回声保护 ──
+  // 助手说话时暂停 VAD，避免麦克风捕获自己的 TTS 输出后当作用户输入。
+  // __ttsSpeaking 标志由 voice_delivery_client.js 管理，这里只管 VAD 暂停/恢复。
+  var resumeTimer = null;
+  window.__vadMuteForTTS = function () {
+    if (resumeTimer) { clearTimeout(resumeTimer); resumeTimer = null; }
+    if (myVad && active) { try { myVad.pause(); } catch (e) {} }
+  };
+  window.__vadUnmuteAfterTTS = function () {
+    if (resumeTimer) clearTimeout(resumeTimer);
+    resumeTimer = setTimeout(function () {
+      resumeTimer = null;
+      if (active && myVad) { try { myVad.start(); } catch (e) {} }
+    }, 100);
+  };
+
   function enable() {
     if (isManualRecording()) {
       say("请先结束手动录音，再开启自动模式");
@@ -167,6 +184,7 @@
         return window.vad.MicVAD.new({
           model: "v5",
           onnxWASMBasePath: ONNX_BASE,
+          additionalAudioConstraints: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
           onSpeechStart: function () { say("正在听…"); },
           onSpeechEnd: onSpeechEnd,
           onVADMisfire: function () { say("疑似语音太短，已忽略"); },

@@ -23,16 +23,21 @@
     '  </div>',
     '  <em style="display:block;font-style:normal;font-size:12px;color:#64748b;margin-top:5px">旧版小模型填这个；若你是 seed-tts 大模型，请改用下方 AK/SK。</em>',
     '</div>',
+    '<div id="tts-ark-row" class="settings-field" style="display:none">',
+    '  <span style="display:block;font-size:13px;color:#334155;margin-bottom:6px;font-weight:600">豆包语音 API Key（一个 Key 直接填）</span>',
+    '  <input id="tts-ark-key" type="password" placeholder="粘贴豆包语音控制台的 API Key" autocomplete="off" />',
+    '  <em style="display:block;font-style:normal;font-size:12px;color:#64748b;margin-top:5px">官方最简方式：接口里填 x-api-key 即可，不需要 AppID/AK/SK/Endpoint。</em>',
+    '</div>',
     '<div id="tts-maas-row" class="settings-field" style="display:none">',
     '  <span style="display:block;font-size:13px;color:#334155;margin-bottom:6px;font-weight:600">火山方舟 AK/SK（seed-tts 大模型语音合成）</span>',
     '  <div style="display:flex;gap:8px;flex-wrap:wrap">',
     '    <input id="tts-access-key" type="password" placeholder="Access Key ID" style="flex:1;min-width:140px" autocomplete="off" />',
     '    <input id="tts-secret-key" type="password" placeholder="Secret Access Key" style="flex:2;min-width:220px" autocomplete="off" />',
     '  </div>',
-    '  <em style="display:block;font-style:normal;font-size:12px;color:#64748b;margin-top:5px">「合成模型」填你在火山方舟创建的语音 Endpoint ID，例如 seed-tts-2.0 对应的 endpoint。</em>',
+    '  <em style="display:block;font-style:normal;font-size:12px;color:#64748b;margin-top:5px">「合成模型」填火山方舟创建的语音 Endpoint ID（ep- 开头），不是 seed-tts 模型名，例如 ep-20240612-xxxxx。</em>',
     '</div>',
     '<div id="tts-model-row" class="settings-field" style="display:none">',
-    '  <span style="display:block;font-size:13px;color:#334155;margin-bottom:6px;font-weight:600">合成模型</span>',
+    '  <span style="display:block;font-size:13px;color:#334155;margin-bottom:6px;font-weight:600">Endpoint ID / 合成模型</span>',
     '  <div class="model-row"><input id="tts-model" type="text" list="tts-model-list" />',
     '    <button id="tts-fetch-models" class="ghost" type="button">拉取模型</button></div>',
     '  <datalist id="tts-model-list"></datalist>',
@@ -66,6 +71,7 @@
     var isVolcano = id === 'volcano';
     el('tts-key-row').style.display = (meta.needs_key && !isVolcano) ? 'block' : 'none';
     el('tts-volcano-row').style.display = isVolcano ? 'block' : 'none';
+    el('tts-ark-row').style.display = isVolcano ? 'block' : 'none';
     el('tts-maas-row').style.display = isVolcano ? 'block' : 'none';
     el('tts-model-row').style.display = meta.default_model ? 'block' : 'none';
     var voices = meta.voices || [];
@@ -74,6 +80,22 @@
       return '<option value="' + v.id + '">' + v.label + '</option>';
     }).join('');
     if (meta.default_model && !el('tts-model').value) el('tts-model').value = meta.default_model;
+    var fetchBtn = el('tts-fetch-models');
+    if (fetchBtn) {
+      if (isVolcano) {
+        fetchBtn.textContent = '手动填写 Endpoint ID';
+        fetchBtn.disabled = true;
+        el('tts-model').placeholder = 'ep-xxxxxxxxxxxxxxxx';
+        el('tts-models-msg').textContent = '火山方舟不提供公开模型列表；请在控制台复制语音 Endpoint ID（ep- 开头）填到这里。';
+        el('tts-model-list').innerHTML = '';
+        el('tts-model-select').style.display = 'none';
+      } else {
+        fetchBtn.textContent = '拉取模型';
+        fetchBtn.disabled = false;
+        el('tts-model').placeholder = '';
+        el('tts-models-msg').textContent = '';
+      }
+    }
   }
 
   function load() {
@@ -92,6 +114,7 @@
       el('tts-key').placeholder = cur.api_key_set ? '已保存，留空表示不修改' : '留空表示不修改';
       el('tts-access-key').placeholder = cur.access_key_set ? '已保存，留空表示不修改' : 'Access Key ID';
       el('tts-secret-key').placeholder = cur.secret_key_set ? '已保存，留空表示不修改' : 'Secret Access Key';
+      el('tts-ark-key').placeholder = cur.ark_api_key_set ? '已保存，留空表示不修改' : '粘贴你的专属 API Key';
       applyProvider(el('tts-provider').value);
       if (cur.voice) el('tts-voice').value = cur.voice;
     });
@@ -114,6 +137,8 @@
       var sk = el('tts-secret-key').value.trim();
       if (ak) data.tts_access_key = ak;
       if (sk) data.tts_secret_key = sk;
+      var arkKey = el('tts-ark-key').value.trim();
+      if (arkKey) data.tts_ark_api_key = arkKey;
     } else {
       var key = el('tts-key').value.trim();
       if (key) data.tts_api_key = key;

@@ -261,8 +261,9 @@ class TurnStore:
                     """INSERT INTO lab_records
                        (session_id, segment_id, transcript, entities, extraction,
                         extraction_source, evaluation, step, at,
-                        request_id, conversation_id, turn_id)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        request_id, conversation_id, turn_id,
+                        recorded_by_id, recorded_by_name)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
                         str(lab_record["session_id"]),
                         int(lab_record["segment_id"]),
@@ -276,8 +277,21 @@ class TurnStore:
                         if lab_record.get("step") is not None else None,
                         str(lab_record["at"]), turn.request_id,
                         turn.conversation_id, turn.turn_id,
+                        *_signature(turn.conversation_id),
                     ),
                 )
+                # 通知 SSE 订阅者：实验本有新记录了。
+                try:
+                    from database.lab_record_store import _notify_record_written
+                    _notify_record_written({
+                        "conversation_id": turn.conversation_id,
+                        "session_id": str(lab_record["session_id"]),
+                        "segment_id": int(lab_record["segment_id"]),
+                        "transcript": str(lab_record["transcript"]),
+                        "at": str(lab_record["at"]),
+                    })
+                except Exception:
+                    pass
 
             if session_state is not None:
                 expected_revision = int(session_state["revision"]) - 1
@@ -406,6 +420,28 @@ class TurnStore:
             "next_segment_id": int(segment_row[0]) + 1,
             "experiment_step_count": int(segment_row[1]),
         }
+
+    def load_latest_experiment_state_for_lab(
+        self, lab_session_id: str
+    ) -> dict[str, object] | None:
+        """Find the most recently updated experiment state for a lab session.
+
+        This lets a newly-created chat conversation inherit the same experiment's
+        state (same lab_session_id) instead of seeing an empty FREE context.
+        """
+        with closing(self._connection_factory()) as connection:
+            row = connection.execute(
+                """SELECT conversation_id
+                   FROM experiment_session_state
+                   WHERE lab_session_id=?
+                     AND protocol_step_facts_json != '{}'
+                   ORDER BY updated_at DESC, revision DESC
+                   LIMIT 1""",
+                (lab_session_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return self.load_experiment_state(str(row["conversation_id"]), lab_session_id)
 
     def save_protocol_navigation(
         self,
@@ -620,8 +656,14 @@ class TurnStore:
         return tuple(str(row[0]) for row in rows)
 
     def list_committed_turns(self, conversation_id: str) -> list[dict]:
-        """按时间顺序列出某个会话已提交的完整 Turn（含 result blocks）。"""
+        """按时间顺序列出某个会话已提交的完整 Turn（含 result blocks）。
+
+        对早期只写进 messages 表、没有独立 Turn 的语音消息，会补成轻量
+        assistant_text/user_text Turn，避免右侧聊天漏掉小科的回复。
+        """
         initialize_database()
+        entries = []
+        seen = set()
         with closing(self._connection_factory()) as connection:
             rows = connection.execute(
                 "SELECT request_id, turn_id, status, result_json, timing_json, created_at "
@@ -629,7 +671,13 @@ class TurnStore:
                 "ORDER BY created_at ASC",
                 (conversation_id,),
             ).fetchall()
-        turns = []
+            message_rows = connection.execute(
+                "SELECT id, role, content, created_at "
+                "FROM messages WHERE conversation_id=? "
+                "AND (request_id IS NULL OR request_id='') "
+                "ORDER BY id ASC",
+                (conversation_id,),
+            ).fetchall()
         for row in rows:
             result = None
             if row["result_json"]:
@@ -637,15 +685,291 @@ class TurnStore:
                     result = json.loads(row["result_json"])
                 except Exception:
                     result = None
-            turns.append({
-                "request_id": row["request_id"],
-                "turn_id": row["turn_id"],
-                "status": row["status"],
-                "result": result,
-                "timings": json.loads(row["timing_json"] or "{}"),
+            if result:
+                blocks = (result.get("turn") or {}).get("blocks") or result.get("blocks") or []
+                for block in blocks:
+                    payload = block.get("payload") or {}
+                    btype = block.get("type") or ""
+                    if btype in ("user_text", "assistant_text") and payload.get("text"):
+                        seen.add((btype, str(payload["text"]).strip()))
+            entries.append({
                 "created_at": row["created_at"],
+                "order": 0,
+                "item": {
+                    "request_id": row["request_id"],
+                    "turn_id": row["turn_id"],
+                    "status": row["status"],
+                    "result": result,
+                    "timings": json.loads(row["timing_json"] or "{}"),
+                    "created_at": row["created_at"],
+                },
             })
-        return turns
+        for row in message_rows:
+            role = str(row["role"])
+            content = str(row["content"]).strip()
+            block_type = "assistant_text" if role == "assistant" else "user_text"
+            if (block_type, content) in seen:
+                continue
+            seen.add((block_type, content))
+            pseudo = {
+                "type": block_type,
+                "payload": {"text": content},
+            }
+            entries.append({
+                "created_at": row["created_at"],
+                "order": row["id"],
+                "item": {
+                    "request_id": f"voice-msg-{row['id']}",
+                    "turn_id": f"voice-msg-{row['id']}",
+                    "status": "committed",
+                    "result": {"blocks": [pseudo]},
+                    "timings": {},
+                    "created_at": row["created_at"],
+                },
+            })
+        # messages 表用 'YYYY-MM-DD HH:MM:SS'（空格），turn_requests 用 ISO
+        # 'YYYY-MM-DDTHH:MM:SS.fff+00:00'（T）。直接字符串排序时空格(0x20) < T(0x54)，
+        # 导致所有 messages 条目排在所有 turn_requests 前面——助手回复全跑顶部。
+        # 归一化成统一的 ISO 格式再排序。
+        def _sort_key(entry):
+            ts = str(entry["created_at"] or "")
+            if len(ts) >= 10 and ts[10] == " ":
+                ts = ts[:10] + "T" + ts[11:]
+            return (ts, entry["order"])
+        entries.sort(key=_sort_key)
+
+        # ------------------------------------------------------------------
+        # 实时语音会产生三种并行 turn：
+        #   voice-{hash}      → 用户原话（ASR 转写，只有 user_text）
+        #   voice-tool-{hash} → Qwen Audio 的 MCP 工具调用（只有 tool_card）
+        #   voice-exp-{hash}  → 真正的实验处理结果（含重写的 user_text + 回复）
+        #
+        # 不合并的话，用户看到自己的原话没有回复，回复却挂在后面一条重写过的
+        # 消息下面。这里把 voice-exp 的回复块（去掉重复的 user_text）合并回
+        # 最近的 voice turn。
+        #
+        # voice-tool 的处理分两种情况：
+        #   • 有 voice-exp → tool 结果会在 voice-exp 重复出现，跳过避免重复。
+        #   • 无 voice-exp → tool_card 是唯一的工具记录，合并回用户 turn 保留。
+        # ------------------------------------------------------------------
+        has_voice_exp = any(
+            e["item"]["request_id"].startswith("voice-exp-") for e in entries
+        )
+
+        def _merge_blocks_into_last_voice(blocks_to_merge):
+            """把 blocks 追加到最近的 voice 用户 turn。"""
+            if last_voice_idx is None:
+                return False
+            target_result = merged[last_voice_idx]["item"].get("result") or {}
+            if target_result.get("turn"):
+                target_blocks = target_result["turn"].setdefault("blocks", [])
+            else:
+                target_blocks = target_result.setdefault("blocks", [])
+            target_blocks.extend(blocks_to_merge)
+            return True
+
+        def _is_voice_user_turn(req_id):
+            """voice-{hash} 用户原话 turn（排除 voice-tool-/voice-exp-/voice-msg-）。"""
+            return (
+                req_id.startswith("voice-")
+                and not req_id.startswith("voice-tool-")
+                and not req_id.startswith("voice-exp-")
+                and not req_id.startswith("voice-msg-")
+            )
+
+        merged: list[dict] = []
+        last_voice_idx: int | None = None
+        # voice-tool 的时间戳可能比触发它的用户原话早几毫秒（异步落库），
+        # 先缓存，等对应的用户 turn 出现后再合并进去。
+        pending_tool_blocks: list = []
+
+        for entry in entries:
+            req_id = entry["item"]["request_id"]
+
+            # voice-tool：有 voice-exp 时跳过（重复），否则缓存等用户 turn。
+            if req_id.startswith("voice-tool-"):
+                if has_voice_exp:
+                    continue
+                tool_result = entry["item"].get("result") or {}
+                tool_blocks = (
+                    (tool_result.get("turn") or {}).get("blocks")
+                    or tool_result.get("blocks") or []
+                )
+                pending_tool_blocks.extend(tool_blocks)
+                continue
+
+            # 新的 voice 用户 turn：先把缓存的 tool_card 合并进来。
+            if _is_voice_user_turn(req_id):
+                merged.append(entry)
+                last_voice_idx = len(merged) - 1
+                if pending_tool_blocks:
+                    _merge_blocks_into_last_voice(pending_tool_blocks)
+                    pending_tool_blocks = []
+                continue
+
+            # 其他类型：先刷新缓存的 tool_card 到最近的 voice turn。
+            if pending_tool_blocks and last_voice_idx is not None:
+                _merge_blocks_into_last_voice(pending_tool_blocks)
+            pending_tool_blocks = []
+
+            if req_id.startswith("voice-exp-"):
+                result = entry["item"].get("result") or {}
+                exp_blocks = (
+                    (result.get("turn") or {}).get("blocks")
+                    or result.get("blocks") or []
+                )
+                # 去掉重写的 user_text，只保留回复、工具卡片、方案/步骤卡片。
+                reply_blocks = [
+                    b for b in exp_blocks if b.get("type") != "user_text"
+                ]
+                if not reply_blocks:
+                    continue
+                if _merge_blocks_into_last_voice(reply_blocks):
+                    continue
+                # 没有前置 voice turn，保留回复但不显示重写的 user_text。
+                entry["item"]["result"] = {"blocks": reply_blocks}
+                merged.append(entry)
+                continue
+
+            # Qwen Audio 的直接语音回复（不经后端）由前端 reportVoiceTranscript
+            # 落成单独的 voice turn，只有 assistant_text。合并回前面的用户 turn。
+            result = entry["item"].get("result") or {}
+            v_blocks = (
+                (result.get("turn") or {}).get("blocks")
+                or result.get("blocks") or []
+            )
+            v_types = {b.get("type") for b in v_blocks}
+            if v_types == {"assistant_text"} and _merge_blocks_into_last_voice(v_blocks):
+                continue
+
+            merged.append(entry)
+            if req_id.startswith("voice-"):
+                last_voice_idx = len(merged) - 1
+            else:
+                last_voice_idx = None
+
+        # 尾部残留的 tool_card 合并到最后一个 voice turn。
+        if pending_tool_blocks and last_voice_idx is not None:
+            _merge_blocks_into_last_voice(pending_tool_blocks)
+
+        return [entry["item"] for entry in merged]
+
+    def append_voice_transcript(
+        self,
+        *,
+        conversation_id: str,
+        role: str,
+        content: str,
+        lab_session_id: str | None = None,
+        turn_id: str | None = None,
+    ) -> dict:
+        """把实时语音的一条消息落成一条已提交的轻量 Turn，供统一 Turn 历史展示。
+
+        voice-transcript 只写 messages 表时，/turn/history 会漏掉这些消息。
+        这里补一个轻量 result block，让右侧聊天刷新时能看到实时语音内容。
+        """
+        import uuid
+
+        if not conversation_id or not content:
+            return {"ok": False, "reason": "缺少 conversation_id 或 content"}
+        initialize_database()
+        now = self._clock()
+        request_id = f"voice-{uuid.uuid4().hex[:12]}"
+        turn_id = turn_id or f"voice-{uuid.uuid4().hex[:12]}"
+        result = {
+            "blocks": [
+                {
+                    "type": "user_text" if role == "user" else "assistant_text",
+                    "payload": {"text": content},
+                }
+            ]
+        }
+        with closing(self._connection_factory()) as connection, connection:
+            connection.execute(
+                "INSERT OR IGNORE INTO conversations(id) VALUES (?)",
+                (conversation_id,),
+            )
+            connection.execute(
+                """INSERT INTO turn_requests
+                   (request_id, turn_id, conversation_id, lab_session_id,
+                    interaction_mode, experiment_context, mode_version,
+                    input_source, raw_text, request_hash, status, attempt,
+                    created_at, updated_at, committed_at)
+                   VALUES (?, ?, ?, ?, 'experiment', 'protocol', 1,
+                           'voice', ?, '', 'committed', 1, ?, ?, ?)""",
+                (
+                    request_id, turn_id, conversation_id, lab_session_id or "",
+                    content, now, now, now,
+                ),
+            )
+            connection.execute(
+                """UPDATE turn_requests SET result_json=? WHERE request_id=?""",
+                (_json(result), request_id),
+            )
+        return {"ok": True, "request_id": request_id, "turn_id": turn_id}
+
+    def append_voice_tool_call(
+        self,
+        *,
+        conversation_id: str,
+        tool_name: str,
+        arguments: object | None = None,
+        status: str = 'pending',
+        result_text: str = '',
+    ) -> dict:
+        """把实时语音的工具调用落成 tool_card Turn，供右侧聊天 UI 展示。"""
+        import uuid
+
+        if not conversation_id or not tool_name:
+            return {"ok": False, "reason": "缺少 conversation_id 或 tool_name"}
+        initialize_database()
+        now = self._clock()
+        request_id = f"voice-tool-{uuid.uuid4().hex[:12]}"
+        turn_id = f"voice-tool-{uuid.uuid4().hex[:12]}"
+        state = 'pending' if status == 'pending' else ('error' if status == 'error' else 'done')
+        lines = []
+        if result_text:
+            lines = [str(result_text)[:500]]
+        elif arguments:
+            lines = [str(arguments)[:300]]
+        payload = {
+            "card": "generic",
+            "kind": "execute",
+            "title": tool_name,
+            "raw_input": arguments or {},
+            "status": state,
+            "lines": lines,
+        }
+        result = {
+            "blocks": [{
+                "type": "tool_card",
+                "block_id": request_id,
+                "payload": payload,
+            }]
+        }
+        with closing(self._connection_factory()) as connection, connection:
+            connection.execute(
+                "INSERT OR IGNORE INTO conversations(id) VALUES (?)",
+                (conversation_id,),
+            )
+            connection.execute(
+                """INSERT INTO turn_requests
+                   (request_id, turn_id, conversation_id, lab_session_id,
+                    interaction_mode, experiment_context, mode_version,
+                    input_source, raw_text, request_hash, status, attempt,
+                    created_at, updated_at, committed_at)
+                   VALUES (?, ?, ?, '', 'experiment', 'protocol', 1,
+                           'voice', ?, '', 'committed', 1, ?, ?, ?)""",
+                (
+                    request_id, turn_id, conversation_id,
+                    tool_name, now, now, now,
+                ),
+            )
+            connection.execute(
+                """UPDATE turn_requests SET result_json=? WHERE request_id=?""",
+                (_json(result), request_id),
+            )
+        return {"ok": True, "request_id": request_id, "turn_id": turn_id}
 
     def delete_conversation_turn_data(self, conversation_id: str) -> tuple[str, ...]:
         """Delete unified Turn-owned rows for a conversation, leaving unrelated tasks."""
@@ -683,3 +1007,10 @@ class TurnStore:
                 (now,),
             )
             return int(cursor.rowcount)
+
+
+def _signature(conversation_id):
+    """记录落库时补上署名；查不到就留空，绝不编造。"""
+    from attribution import signature_for_conversation
+
+    return signature_for_conversation(conversation_id)

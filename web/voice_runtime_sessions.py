@@ -84,6 +84,16 @@ class VoiceRuntimeSessionRegistry:
                 and not current.segment_capturing
             ):
                 return current, False
+            # 浏览器/手机 VAD 有时漏发 SEGMENT_FINALIZED，ASR 就开始了。
+            # 这里把已经停下来的采集片段自动视为“已固化”，避免状态机拒绝。
+            if (
+                event_type is VoiceRuntimeEventType.ASR_PROCESSING_STARTED
+                and current.segment_capturing
+                and not current.user_speaking
+            ):
+                current = coordinator.consume(
+                    VoiceRuntimeEvent(VoiceRuntimeEventType.SEGMENT_FINALIZED)
+                )
             if (
                 event_type is VoiceRuntimeEventType.ASR_PROCESSING_STARTED
                 and current.asr_processing

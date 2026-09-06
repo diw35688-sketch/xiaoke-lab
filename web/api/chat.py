@@ -1,11 +1,13 @@
 import json
 import uuid
-from fastapi import APIRouter, HTTPException
+from pathlib import Path
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 import settings_store
 from agent.core import ModelServiceError, refine_chat_answer
+from api.auth import require_user
 from database.crud import (
     conversation_exists,
     create_conversation,
@@ -25,7 +27,6 @@ from src.core.spoken_output import build_spoken_block_plan, select_spoken_output
 from database.turn_store import TurnRequestConflictError
 from playback_runtime import web_playback_service
 from mode_snapshot import ModeSnapshotFields
-from output_policy import OutputStrategy, select_output_policy
 
 router = APIRouter(prefix="/chat", tags=["聊天"])
 
@@ -43,29 +44,21 @@ class ConversationRenamePayload(BaseModel):
     title: str = Field(min_length=1, max_length=80)
 
 
-def _require_chat_policy(request: ChatRequest):
-    policy = select_output_policy(
-        request.interaction_mode, request.experiment_context
-    )
-    if policy.strategy != OutputStrategy.CHAT:
-        raise HTTPException(
-            status_code=409,
-            detail="实验记录模式必须进入记录策略，不能交给自由聊天处理。",
-        )
-    return policy
+
 
 
 @router.get("/conversations")
-def conversations():
-    """会话列表：标题、更新时间、消息数和最后一条消息。"""
-    return {"items": list_conversations(limit=100)}
+def conversations(user=Depends(require_user)):
+    """会话列表：只返回当前登录用户自己的会话。"""
+    return {"items": list_conversations(user["id"], limit=100)}
 
 
 @router.post("/conversations")
-def new_conversation(payload: ConversationCreatePayload | None = None):
+def new_conversation(payload: ConversationCreatePayload | None = None,
+                     user=Depends(require_user)):
     """创建空会话；第一条用户消息会自动生成标题。"""
     conversation_id = create_conversation(
-        title=(payload.title if payload else None) or "新会话"
+        user["id"], title=(payload.title if payload else None) or "新会话"
     )
     return {"conversation_id": conversation_id}
 
@@ -74,15 +67,17 @@ def new_conversation(payload: ConversationCreatePayload | None = None):
 def rename_conversation_api(
     conversation_id: str,
     payload: ConversationRenamePayload,
+    user=Depends(require_user),
 ):
-    if not rename_conversation(conversation_id, payload.title):
+    # 不是自己的会话一律按「不存在」处理，不泄露它是否真的存在。
+    if not rename_conversation(conversation_id, payload.title, user["id"]):
         raise HTTPException(status_code=404, detail="会话不存在。")
     return {"ok": True, "conversation_id": conversation_id, "title": payload.title}
 
 
 @router.delete("/conversations/{conversation_id}")
-def delete_conversation_api(conversation_id: str):
-    if not delete_conversation(conversation_id):
+def delete_conversation_api(conversation_id: str, user=Depends(require_user)):
+    if not delete_conversation(conversation_id, user["id"]):
         raise HTTPException(status_code=404, detail="会话不存在。")
     return {"ok": True, "conversation_id": conversation_id}
 
@@ -114,7 +109,7 @@ def _build_chat_spoken_delivery(answer: str, turn_id: str) -> VoiceDeliveryItem:
 def _prepare_chat_spoken_delivery(
     answer: str, turn_id: str
 ) -> tuple[str, VoiceDeliveryItem]:
-    """Compatibility export; production now applies the same rule in ChatProcessor."""
+    """Legacy voice delivery builder for the /chat compatibility adapter."""
 
     try:
         return answer, _build_chat_spoken_delivery(answer, turn_id)
@@ -126,16 +121,17 @@ def _prepare_chat_spoken_delivery(
 
 
 @router.get("/history")
-def chat_history(conversation_id: str | None = None):
+def chat_history(conversation_id: str | None = None,
+                 user=Depends(require_user)):
     """页面刷新后恢复当前对话的显示历史。
 
     - 传 conversation_id：读取该会话的最近 100 条消息。
     - 不传：读取最近一次会话；没有任何会话时返回空列表。
     """
-    target = conversation_id or latest_conversation()
-    if target is not None and not conversation_exists(target):
-        # 本地还存着已删除的会话 ID 时，自动回到最近的有效会话。
-        target = latest_conversation()
+    target = conversation_id or latest_conversation(user["id"])
+    if target is not None and not conversation_exists(target, user["id"]):
+        # 本地存着已删除、或属于别人的会话 ID 时，回到自己最近的有效会话。
+        target = latest_conversation(user["id"])
     if target is None:
         return {"conversation_id": None, "messages": []}
     return {"conversation_id": target, "messages": get_messages(target, limit=100)}
@@ -143,7 +139,6 @@ def chat_history(conversation_id: str | None = None):
 
 @router.post("")
 def chat(request: ChatRequest):
-    _require_chat_policy(request)
     try:
         completed, conversation_id = _submit_legacy_chat(request)
         answer = _assistant_text(completed.result)
@@ -158,7 +153,6 @@ def chat(request: ChatRequest):
 
 @router.post("/stream")
 def chat_stream(request: ChatRequest):
-    _require_chat_policy(request)
 
     def events():
         try:
@@ -183,8 +177,32 @@ def chat_stream(request: ChatRequest):
     return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
+def _resolve_legacy_lab_session_id() -> str:
+    """Legacy /chat 没有 lab_session_id：优先读音频 agent 的当前会话，否则生成一个。"""
+    try:
+        root = Path(__file__).resolve().parent.parent / "_qwen-audio-agent"
+        value = (root / "current-lab-session-id.txt").read_text(encoding="utf-8").strip()
+        if value:
+            return value
+    except Exception:
+        pass
+    return f"lab-{uuid.uuid4().hex}"
+
+
+def _resolve_legacy_experiment_context() -> ExperimentContext:
+    """Legacy /chat 没有上下文：有激活方案就用方案实验，否则自由记录。"""
+    try:
+        import domain
+        state = domain.session()
+        if state is not None and state.selection.has_protocol:
+            return ExperimentContext.PROTOCOL
+    except Exception:
+        pass
+    return ExperimentContext.FREE
+
+
 def _submit_legacy_chat(request: ChatRequest):
-    """Compatibility adapter: old HTTP shape, unified production service."""
+    """Compatibility adapter: old /chat HTTP shape → unified experiment Turn."""
 
     from api.turn import turn_application_service
 
@@ -192,8 +210,8 @@ def _submit_legacy_chat(request: ChatRequest):
     request_id = request.request_id or f"legacy-chat-{uuid.uuid4().hex}"
     turn_id = request.turn_id or f"turn-{request_id}"
     turn = TurnInput(
-        conversation_id, request_id, turn_id, None,
-        InteractionMode.CHAT, ExperimentContext.NONE,
+        conversation_id, request_id, turn_id, _resolve_legacy_lab_session_id(),
+        InteractionMode.EXPERIMENT, _resolve_legacy_experiment_context(),
         request.mode_version, InputSource.TEXT, request.message.strip(), None,
     )
     return turn_application_service.submit(turn).future.result(), conversation_id

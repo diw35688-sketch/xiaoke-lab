@@ -153,6 +153,12 @@ def _step_recorded_missing(step):
         )
 
 
+def recorded_step_values() -> dict[int, dict[str, str]]:
+    """所有步骤的已记录值（{step_number: {field_name: value}}），用于序列化到 store。"""
+    with _lock:
+        return _progress.all_values()
+
+
 def step_progress_view(state) -> dict:
     """当前步骤的进度事实：状态 + 已记录字段 + 还缺的必测字段。
 
@@ -242,7 +248,9 @@ def step_view(state: ProtocolSessionState) -> dict:
             "safety": [],
             "safety_note": hazmat().authority_note,
         }
-    recorded, missing = _step_recorded_missing(step)
+    recorded, _missing = _step_recorded_missing(step)
+    # 产品要求：全局没有任何“必测字段”。界面只展示用户已说的内容，
+    # 不再显示“还缺什么/现场必测什么”，也不要因为缺字段把步骤卡标成等待。
     return {
         "mode": "protocol",
         "protocol": {
@@ -260,13 +268,13 @@ def step_view(state: ProtocolSessionState) -> dict:
             "value_aliases": {
                 name: list(values) for name, values in step.value_aliases.items()
             },
-            "must_record": list(step.must_record),
+            "must_record": [],
             "hazard_note": step.hazard_note,
             "terms": list(step.terms),
             "status": step_status(step),
-            "card_type": card_type_for(step_status(step), step.must_record),
+            "card_type": "confirm",
             "recorded": recorded,
-            "missing": missing,
+            "missing": [],
             "substeps": [
                 {"order": x.order, "text": x.text, "note": x.note}
                 for x in step.substeps
@@ -358,13 +366,13 @@ def all_steps_view(state) -> dict:
             "title": s.title,
             "instruction": s.instruction,
             "protocol_values": dict(s.protocol_values),
-            "must_record": list(s.must_record),
+            "must_record": [],
             "has_hazard": bool(s.hazard_note) or bool(safety_for(s)),
             "substep_count": len(s.substeps),
             "status": step_status(s),
-            "card_type": card_type_for(step_status(s), s.must_record),
+            "card_type": "confirm",
             "recorded": _step_recorded_missing(s)[0],
-            "missing": _step_recorded_missing(s)[1],
+            "missing": [],
         }
         for s in protocol.steps
     ]
@@ -388,6 +396,40 @@ def _bump_version(version: str) -> str:
         return str(version) + ".1"
 
 
+_USER_PROTOCOL_SOURCE_MARKERS = (
+    "AI生成草稿",
+    "AI生成",
+    "OCR识别草稿",
+    "论文上传",
+    "用户上传",
+    "用户创建",
+    "用户自制",
+    "本地创建",
+    "自定义",
+)
+
+
+def is_deletable_protocol_source(source: str | None) -> bool:
+    """是否属于用户自己创建/上传、可以整份删除的方案。"""
+    if not source:
+        return False
+    return any(marker in str(source) for marker in _USER_PROTOCOL_SOURCE_MARKERS)
+
+
+def _unique_protocol_title(title: str, raw_library: dict) -> str:
+    """同名方案自动加（1）/（2）…，避免多份同名方案在列表里无法区分。"""
+    titles = {
+        item.get("title", "")
+        for item in raw_library.get("protocols", [])
+    }
+    if title not in titles:
+        return title
+    index = 1
+    while f"{title}（{index}）" in titles:
+        index += 1
+    return f"{title}（{index}）"
+
+
 def protocol_detail(protocol_id: str) -> dict:
     """一份方案的完整详情：步骤、准备材料、危险提示。"""
 
@@ -401,6 +443,7 @@ def protocol_detail(protocol_id: str) -> dict:
             "source": protocol.source,
             "version": protocol.version,
             "total_steps": len(protocol.steps),
+            "deletable": is_deletable_protocol_source(protocol.source),
         },
         "steps": [
             {
@@ -431,6 +474,10 @@ def add_protocol(raw_protocol: dict) -> dict:
     from src.storage.protocol_store import ProtocolStore, ProtocolStoreError
 
     raw_library = json.loads(PROTOCOL_FILE.read_text(encoding="utf-8"))
+    raw_protocol = dict(raw_protocol)
+    raw_protocol["title"] = _unique_protocol_title(
+        raw_protocol.get("title", ""), raw_library
+    )
     existing_ids = {item.get("protocol_id") for item in raw_library.get("protocols", [])}
     new_id = raw_protocol.get("protocol_id", "")
     if not new_id or new_id in existing_ids:
@@ -453,6 +500,60 @@ def add_protocol(raw_protocol: dict) -> dict:
         _protocol_store = None
         if _session is not None and _session.selection.protocol is None:
             pass
+
+    _sync_prep_requirements_for_protocol(raw_protocol)
+    return raw_protocol
+
+
+def upsert_protocol(raw_protocol: dict) -> dict:
+    """社区导入用：protocol_id 已存在则整份覆盖，不存在则新增。"""
+    import json
+
+    from src.storage.protocol_store import ProtocolStore, ProtocolStoreError
+
+    protocol_id = raw_protocol.get("protocol_id", "")
+    if not protocol_id:
+        raise ValueError("protocol_id 不能为空")
+
+    raw_protocol = dict(raw_protocol)
+    raw_library = json.loads(PROTOCOL_FILE.read_text(encoding="utf-8"))
+    try:
+        ProtocolStore._parse_protocol(
+            raw_protocol, index=len(raw_library["protocols"]) + 1
+        )
+    except ProtocolStoreError as error:
+        raise ValueError(f"方案草稿不符合契约：{error}") from error
+
+    replaced = False
+    for index, item in enumerate(raw_library.get("protocols", [])):
+        if item.get("protocol_id") == protocol_id:
+            raw_library["protocols"][index] = raw_protocol
+            replaced = True
+            break
+    if not replaced:
+        raw_protocol["title"] = _unique_protocol_title(
+            raw_protocol.get("title", ""), raw_library
+        )
+        raw_library["protocols"].append(raw_protocol)
+
+    PROTOCOL_FILE.write_text(
+        json.dumps(raw_library, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    global _protocol_store, _session
+    with _lock:
+        _protocol_store = None
+        if _session is not None and _session.selection.protocol is not None:
+            if _session.selection.protocol.protocol_id == protocol_id:
+                current = _session.step_number
+                _session = ProtocolSessionState.start(
+                    select_protocol(protocols(), protocol_id)
+                )
+                _progress.reset()
+                clear_progress_rows()
+                if current:
+                    _session = _session.jump_to(current)
 
     _sync_prep_requirements_for_protocol(raw_protocol)
     return raw_protocol
@@ -926,3 +1027,38 @@ def delete_protocol_step(protocol_id: str, step_number: int) -> dict:
                 if current:
                     _session = _session.jump_to(current)
     return step_view(session())
+
+
+def delete_protocol(protocol_id: str) -> dict:
+    """删除用户自己创建/上传的整份方案；内置/社区方案不允许删除。"""
+    import json
+
+    raw = json.loads(PROTOCOL_FILE.read_text(encoding="utf-8"))
+    target_index = None
+    target = None
+    for index, item in enumerate(raw.get("protocols", [])):
+        if item.get("protocol_id") == protocol_id:
+            target_index = index
+            target = item
+            break
+    if target_index is None:
+        raise ValueError("找不到方案：" + protocol_id)
+    source = target.get("source", "")
+    if not is_deletable_protocol_source(source):
+        raise ValueError("该来源的方案不能删除，仅可删除用户自己创建或上传的方案。")
+
+    del raw["protocols"][target_index]
+    PROTOCOL_FILE.write_text(
+        json.dumps(raw, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+    global _protocol_store, _session
+    with _lock:
+        _protocol_store = None
+        if _session is not None and _session.selection.has_protocol:
+            if _session.selection.protocol.protocol_id == protocol_id:
+                _session = ProtocolSessionState.start(select_protocol(protocols(), None))
+                _progress.reset()
+                clear_progress_rows()
+                _persist_snapshot()
+    return {"ok": True, "deleted": protocol_id}

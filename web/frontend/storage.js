@@ -101,12 +101,17 @@
   }
 
   function itemCard(item) {
+    var provenanceBadge = '';
+    if (item.source_experiment_id) {
+      provenanceBadge = '<div class="meta" style="color:#7c3aed"><span style="display:inline-block;background:#ede9fe;color:#7c3aed;padding:1px 7px;border-radius:5px;font-size:11px">🔬 实验产物</span> 来自 ' + esc(String(item.source_experiment_id).slice(0, 30)) + '</div>';
+    }
     return '<div class="storage-card" data-id="' + item.id + '">'
       + '<div class="name">' + esc(item.name) + '</div>'
       + '<div class="meta">类型：' + esc(item.item_type) + '</div>'
       + '<div class="meta">数量：' + esc(item.quantity || '—') + ' ' + esc(item.unit || '') + ' · ' + esc(item.concentration || '') + '</div>'
       + '<div class="meta">位置：' + esc(item.location_name || '未分配') + (item.position ? ' / ' + esc(item.position) : '') + '</div>'
       + '<div class="meta">' + statusHtml(item.status) + (item.expires_at ? ' · 到期 ' + esc(item.expires_at) : '') + '</div>'
+      + provenanceBadge
       + '<div style="margin-top:8px"><button class="sh-btn" type="button" data-edit="' + item.id + '" style="padding:3px 9px;font-size:12px">编辑</button> '
       + '<button class="sh-btn" type="button" data-del="' + item.id + '" style="padding:3px 9px;font-size:12px;color:#b91c1c">删除</button></div>'
       + '</div>';

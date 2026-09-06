@@ -1,0 +1,23 @@
+﻿You are producing the first production asset for a browser avatar eye-tracking sequence.
+
+Use the imagegen skill and the built-in image generation/editing tool. The attached images are, in order:
+1. assistant_master.png: immutable full character master.
+2. assistant_eyes_identity.png: enlarged identity reference for the exact eyes.
+3. target_center.png: gaze target guide; do not reproduce the guide in the output.
+
+Create exactly one asset: look_center.png.
+
+Requirements:
+- Preserve the character identity and original anime illustration style exactly.
+- The gaze is straight forward and centered.
+- Do not change head, eyebrows, nose, mouth, hair, clothing, lighting, body, pose, or facial proportions.
+- Produce an eye-replacement overlay only: complete left and right eye regions sufficient to cover the original eyes; everything outside those regions must be transparent.
+- Final file must be RGBA PNG, exactly 1086x1448 pixels, aligned to the master at coordinates 0,0.
+- No white matte, checkerboard, text, border, watermark, or background.
+- If the built-in image tool returns chroma-key output or a different canvas size, use the installed imagegen post-processing helper and Pillow to remove the key, resize/pad/register to exactly 1086x1448, and preserve transparency.
+- Validate final dimensions, RGBA mode, non-empty alpha, and transparent corners.
+- Save the final file to C:\Users\ASUS\avatar_72_work\eye_frames\look_center.png.
+- Also save a composited preview over the master to C:\Users\ASUS\avatar_72_work\previews\look_center_preview.png.
+- Do not modify D:\me\ai107\web yet.
+
+Work autonomously. In the final message report exact paths and validation results.

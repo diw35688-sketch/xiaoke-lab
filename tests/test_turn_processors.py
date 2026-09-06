@@ -27,7 +27,7 @@ from src.llm.schemas import (  # noqa: E402
     LLMAnalysisResult,
 )
 from src.llm.unified_router import UnifiedUnderstandingRouter  # noqa: E402
-from turn_processors import ChatProcessor, ExperimentProcessor  # noqa: E402
+from turn_processors import ExperimentProcessor  # noqa: E402
 
 
 class _StateStore:
@@ -638,22 +638,6 @@ class TurnProcessorTests(unittest.TestCase):
         )
         self.assertNotIn("已创建", result.voice_items[0].voice_text)
         self.assertEqual(result.voice_items[0].source_block_id, card.block_id)
-
-    def test_chat_prepares_both_messages_without_writing(self):
-        seen = {}
-        def generate(history, conversation_id, interaction_mode, lab_session_id):
-            seen["history"] = history
-            seen["lab_session_id"] = lab_session_id
-            return "回答"
-        processor = ChatProcessor(generate=generate, history=lambda cid: [])
-        result = processor.prepare(
-            _text(InteractionMode.CHAT, ExperimentContext.NONE, "问题"),
-            TurnTimingRecorder(),
-        )
-        self.assertEqual(seen["history"][-1], {"role": "user", "content": "问题"})
-        self.assertIsNone(seen["lab_session_id"])
-        self.assertEqual([m["role"] for m in result.messages], ["user", "assistant"])
-        self.assertEqual(result.turn.blocks[1].payload["text"], "回答")
 
     def test_explicit_text_control_uses_zero_llm_and_no_business_side_effect(self):
         llm = _NeverLLM()

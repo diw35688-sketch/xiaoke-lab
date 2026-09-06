@@ -12,6 +12,7 @@ from src.core.clarification_acceptance import (
     ClarificationContextSnapshot,
 )
 from src.core.reply_coordinator import ReplyCoordinator
+from src.core.task_context import TaskContext
 from src.core.unified_acceptance_bypass import (
     UnifiedAcceptanceBypass,
     UnifiedAcceptanceBypassInput,
@@ -121,6 +122,7 @@ class UnifiedObserver:
         reply_coordinator: ReplyCoordinator,
         recent_context: tuple[str, ...] = (),
         raw_text: str | None = None,
+        task_context: TaskContext | None = None,
     ) -> UnifiedObservation:
         try:
             snapshot = ClarificationContextSnapshot(
@@ -139,6 +141,7 @@ class UnifiedObserver:
                 clarification_context=snapshot,
                 recent_context=recent_context,
                 raw_text=raw_text,
+                task_context=task_context or TaskContext.free(),
             ))
             plan = result.execution_request.plan
             accepted = result.accepted_experiment

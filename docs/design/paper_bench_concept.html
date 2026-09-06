@@ -1,0 +1,718 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>小科 · 纸上实验台（概念稿）</title>
+<style>
+/* ============================================================
+   「纸上实验台」概念稿 v1
+   一句话：整个工作台是一本活的实验记录本，小科是本子里那滴会呼吸的墨。
+   五个签名：纸面方格 / 红边线时间轴 / 墨滴小科 / 楷体批注 / 仪器数字
+   约束：单文件、零外部请求、系统字体、prefers-reduced-motion 全兼容
+   ============================================================ */
+:root{
+  /* 纸 */
+  --paper:      #F7F3EA;   /* 桌面底 */
+  --paper-page: #FCFAF3;   /* 记录本页 */
+  --paper-deep: #F0EADC;   /* 本脊 */
+  --paper-chat: #FBF8F0;   /* 对话栏 */
+  /* 墨 */
+  --ink:        #1F2A44;   /* 正文墨色（蓝黑） */
+  --ink-strong: #141E38;
+  --ink-soft:   #55617D;
+  --ink-faint:  #8B94A9;
+  --ink-blue:   #2B4C9B;   /* 钢笔蓝：交互与用户话语 */
+  /* 记录本符号色 */
+  --margin-red: #C4604F;   /* 红边线 / 印章 */
+  --hl:         rgba(255,222,74,.55);  /* 荧光笔 */
+  --tape-amber: rgba(233,180,76,.42);  /* 标签胶带 */
+  --tape-green: rgba(110,178,134,.42);
+  --tape-blue:  rgba(122,150,214,.42);
+  --tape-red:   rgba(216,122,105,.45);
+  --grid:       rgba(59,86,134,.055);  /* 坐标纸格线 */
+  --line:       rgba(31,42,68,.10);
+  --line-soft:  rgba(31,42,68,.06);
+  /* 字 */
+  --f-ui:  "Microsoft YaHei","PingFang SC",sans-serif;
+  --f-kai: "KaiTi","STKaiti","Kaiti SC",serif;      /* 小科的手写批注 */
+  --f-mono:"Cascadia Mono","Consolas",monospace;    /* 仪器读数 */
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--paper);color:var(--ink);
+  font-family:var(--f-ui);font-size:14px;line-height:1.7;
+  -webkit-font-smoothing:antialiased;
+}
+/* 纸的颗粒：一层极淡噪点，去掉"矢量塑料感" */
+.grain{
+  position:fixed;inset:0;z-index:60;pointer-events:none;opacity:.05;mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
+}
+::selection{background:var(--hl)}
+button{font-family:inherit;cursor:pointer}
+button:focus-visible,a:focus-visible{outline:2px solid var(--ink-blue);outline-offset:2px;border-radius:4px}
+
+/* ============ 三栏：本脊 / 记录页 / 小科 ============ */
+.bench{display:flex;min-height:100vh;max-width:1560px;margin:0 auto}
+
+/* ---- 左：本脊与索引标签 ---- */
+.spine{
+  flex:0 0 208px;background:var(--paper-deep);
+  border-right:1px solid var(--line-soft);
+  padding:26px 0 18px;display:flex;flex-direction:column;gap:4px;
+}
+.brand{padding:0 20px 18px;display:flex;align-items:center;gap:12px}
+.brand .drop{width:34px;height:40px;flex:0 0 34px}
+.brand .name{font-family:var(--f-kai);font-size:22px;font-weight:700;color:var(--ink-strong);line-height:1.1}
+.brand .sub{font-size:11px;color:var(--ink-soft);letter-spacing:.14em;margin-top:3px}
+.tabs{flex:1;display:flex;flex-direction:column;gap:6px;padding:6px 0 6px 14px}
+.tab{
+  position:relative;display:flex;align-items:center;gap:10px;
+  border:1px solid transparent;border-right:0;background:transparent;
+  padding:9px 14px 9px 12px;border-radius:10px 0 0 10px;
+  font-size:14px;color:var(--ink-soft);text-align:left;
+  transition:transform .15s ease,background .15s ease;
+}
+.tab .edge{width:5px;height:20px;border-radius:3px;flex:0 0 5px;opacity:.75}
+.tab:hover{background:rgba(255,255,255,.55);transform:translateX(2px)}
+.tab.on{
+  background:var(--paper-page);color:var(--ink-strong);font-weight:600;
+  border-color:var(--line-soft);
+  box-shadow:0 2px 6px rgba(31,42,68,.07);
+  transform:translateX(4px);
+}
+.spine-note{
+  margin:10px 18px 0;padding-top:12px;border-top:1px dashed var(--line);
+  font-family:var(--f-kai);font-size:12px;color:var(--ink-soft);line-height:1.9;
+}
+
+/* ---- 中：今天这一页 ---- */
+.page-wrap{flex:1;min-width:0;padding:26px 30px 30px;display:flex}
+.page{
+  position:relative;flex:1;min-width:0;background:var(--paper-page);
+  border:1px solid var(--line-soft);border-radius:6px;
+  box-shadow:0 1px 2px rgba(31,42,68,.05),0 10px 30px rgba(31,42,68,.07);
+  padding:30px 34px 22px 108px;
+  /* 坐标纸：22px 方格 */
+  background-image:
+    linear-gradient(var(--grid) 1px,transparent 1px),
+    linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:100% 22px,22px 100%;
+}
+/* 红边线：实验记录本的灵魂线，所有记录挂在它上面 */
+.page::before{
+  content:"";position:absolute;top:0;bottom:0;left:88px;width:2px;
+  background:var(--margin-red);opacity:.5;
+}
+/* 装订孔 */
+.hole{position:absolute;left:26px;width:15px;height:15px;border-radius:50%;
+  background:var(--paper);box-shadow:inset 0 1px 2px rgba(31,42,68,.22),inset 0 -1px 1px rgba(255,255,255,.7)}
+.hole.h1{top:12%}.hole.h2{top:50%}.hole.h3{top:86%}
+
+/* 页眉：实验标题 */
+.page-head{margin:0 0 20px}
+.ph-row{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.ph-title{font-size:24px;font-weight:800;letter-spacing:-.02em;color:var(--ink-strong);margin:0}
+.chip{
+  display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border-radius:4px;
+  font-size:12px;color:var(--ink);position:relative;
+}
+.chip.tape-a{background:var(--tape-amber)}
+.chip.tape-g{background:var(--tape-green)}
+.chip.tape-b{background:var(--tape-blue)}
+.ph-meta{margin-top:6px;font-family:var(--f-mono);font-size:12px;color:var(--ink-soft);letter-spacing:.02em}
+.ph-meta b{color:var(--ink);font-weight:600}
+
+/* 当前步骤：移液管式进度 */
+.stepbar{display:flex;align-items:center;gap:14px;margin:14px 0 26px;flex-wrap:wrap}
+.stepbar .lbl{font-size:13px;color:var(--ink-soft)}
+.tube{
+  position:relative;width:220px;height:12px;border-radius:7px;
+  border:1.5px solid rgba(31,42,68,.28);background:rgba(255,255,255,.6);overflow:hidden;
+}
+.tube .fill{
+  position:absolute;inset:1px auto 1px 1px;width:60%;border-radius:5px;
+  background:linear-gradient(180deg,#5B7FC7 0%,#3D5FA8 70%,#33518F 100%);
+}
+.tube .fill::after{ /* 液面弯月面 */
+  content:"";position:absolute;right:-4px;top:-2px;bottom:-2px;width:8px;
+  border-radius:50%;background:inherit;
+}
+.stepbar .mono{font-family:var(--f-mono);font-size:13px;color:var(--ink)}
+.stepbar .mono em{font-style:normal;color:var(--ink-blue);font-weight:700}
+
+/* 时间轴条目：时间戳写在红线外侧 */
+.entry{position:relative;margin:0 0 18px;padding:14px 16px 12px;background:rgba(255,255,255,.66);
+  border:1px solid var(--line-soft);border-radius:6px;box-shadow:0 1px 3px rgba(31,42,68,.05)}
+.entry .ts{
+  position:absolute;left:-98px;top:14px;width:74px;text-align:right;
+  font-family:var(--f-mono);font-size:12px;color:var(--ink-soft);
+}
+.entry .dot{position:absolute;left:-24px;top:20px;width:8px;height:8px;border-radius:50%;
+  background:var(--paper-page);border:2px solid var(--margin-red);opacity:.85}
+.entry .tape{
+  position:absolute;top:-10px;left:22px;width:84px;height:20px;transform:rotate(-2deg);
+  background:var(--tape-amber);box-shadow:0 1px 2px rgba(31,42,68,.08);border-radius:1px;
+}
+.entry.t-green .tape{background:var(--tape-green);transform:rotate(1.6deg)}
+.entry.t-blue .tape{background:var(--tape-blue);transform:rotate(-1.2deg)}
+.entry h3{margin:0 0 4px;font-size:14px;font-weight:700;color:var(--ink-strong)}
+.entry p{margin:0;font-size:14px}
+.entry .val{font-family:var(--f-mono);font-size:13.5px;padding:0 2px}
+.entry .hl{background:var(--hl);border-radius:2px;padding:0 3px}
+.entry .facts{margin-top:8px;display:flex;gap:8px;flex-wrap:wrap}
+.fact{font-family:var(--f-mono);font-size:12px;color:var(--ink);background:rgba(59,86,134,.07);
+  border:1px solid rgba(59,86,134,.14);border-radius:4px;padding:1px 8px}
+/* 「已记录」印章 */
+.stamp{
+  position:absolute;right:16px;top:12px;width:56px;height:56px;border-radius:50%;
+  border:2px solid rgba(196,96,79,.55);color:rgba(196,96,79,.8);
+  display:grid;place-items:center;transform:rotate(-11deg);
+  font-size:12px;font-weight:700;letter-spacing:3px;padding-left:3px;
+}
+.stamp::after{content:"";position:absolute;inset:4px;border-radius:50%;border:1px dashed rgba(196,96,79,.45)}
+/* 小科的楷体批注：像师姐写在页边的字 */
+.note{
+  margin:10px 0 0;padding:8px 12px;border-left:3px solid rgba(196,96,79,.5);
+  font-family:var(--f-kai);font-size:15px;color:#7A4A41;background:rgba(196,96,79,.05);
+  border-radius:0 6px 6px 0;
+}
+.note .who{display:inline-block;margin-right:6px;font-size:12px;color:rgba(196,96,79,.8);letter-spacing:.2em}
+.page-foot{
+  margin-top:26px;padding-top:12px;border-top:1px dashed var(--line);
+  display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;
+  font-family:var(--f-mono);font-size:11.5px;color:var(--ink-faint);
+}
+
+/* ---- 撕线：中栏与对话栏之间的裁切虚线 ---- */
+.perforation{flex:0 0 1px;border-left:2px dashed rgba(31,42,68,.16);margin:26px 0}
+
+/* ---- 右：小科（拍立得立绘 + 墨点状态章 + 对话） ---- */
+.companion{flex:0 0 396px;background:var(--paper-chat);display:flex;flex-direction:column;min-width:0}
+.orb-zone{padding:24px 22px 14px;text-align:center;border-bottom:1px dashed var(--line)}
+/* 立绘 = 用胶带贴进本子的拍立得照片 */
+.polaroid{
+  position:relative;width:178px;margin:6px auto 0;background:#FFFEF8;
+  border:1px solid var(--line-soft);border-radius:2px;
+  box-shadow:0 2px 4px rgba(31,42,68,.08),0 8px 22px rgba(31,42,68,.12);
+  padding:9px 9px 6px;rotate:-1.8deg;
+  cursor:grab;touch-action:none;user-select:none;
+}
+/* 揭下来：胶带脱落、影子加深、照片转正 */
+.polaroid.lift{
+  cursor:grabbing;rotate:0deg;scale:1.05;z-index:40;
+  box-shadow:0 8px 16px rgba(31,42,68,.16),0 26px 54px rgba(31,42,68,.24);
+}
+.polaroid.lift .ptape{opacity:0}
+.polaroid .ptape{transition:opacity .16s ease}
+.polaroid.free{position:fixed;margin:0;z-index:35}
+/* 贴回去：回弹压实 */
+@keyframes settle{0%{scale:1.05;rotate:0deg}55%{scale:.985;rotate:-2.4deg}100%{scale:1;rotate:-1.8deg}}
+.polaroid.settling{animation:settle .3s ease-out}
+/* 揭走后的空位：留着胶带印，等照片回家 */
+.photo-slot{
+  display:none;position:relative;width:178px;height:208px;margin:6px auto 0;
+  border:1.5px dashed rgba(31,42,68,.16);border-radius:2px;rotate:-1.8deg;
+}
+.photo-slot::before,.photo-slot::after{content:"";position:absolute;width:58px;height:18px;border-radius:1px}
+.photo-slot::before{left:-16px;top:-8px;transform:rotate(-8deg);background:rgba(233,180,76,.16)}
+.photo-slot::after{right:-16px;top:-8px;transform:rotate(7deg);background:rgba(122,150,214,.16)}
+.photo-slot .slot-note{
+  position:absolute;left:0;right:0;bottom:14px;text-align:center;
+  font-family:var(--f-kai);font-size:12.5px;color:var(--ink-faint);line-height:2;
+}
+.companion.photo-free .photo-slot{display:block}
+/* 回答：照片在胶带上轻轻摇（说话晃头，不弹跳） */
+@keyframes rock{0%,100%{rotate:-1.8deg}50%{rotate:-.5deg}}
+.companion[data-state="speaking"] .polaroid:not(.free):not(.lift){animation:rock 1.5s ease-in-out infinite}
+/* 思考：照片角上的铅笔点点（手写涂鸦感） */
+.scribble{position:absolute;left:12px;top:12px;display:none;gap:3px;font-family:var(--f-kai)}
+.scribble i{width:4px;height:4px;border-radius:50% 40% 55% 45%;background:rgba(31,42,68,.5);opacity:0}
+@keyframes dotwrite{0%{opacity:0}18%{opacity:.9}70%{opacity:.9}100%{opacity:0}}
+.companion[data-state="thinking"] .scribble{display:flex}
+.companion[data-state="thinking"] .scribble i{animation:dotwrite 1.9s ease-in-out infinite}
+.companion[data-state="thinking"] .scribble i:nth-child(2){animation-delay:.28s}
+.companion[data-state="thinking"] .scribble i:nth-child(3){animation-delay:.56s}
+.polaroid .ptape{position:absolute;width:58px;height:18px;background:var(--tape-amber);
+  box-shadow:0 1px 2px rgba(31,42,68,.08);border-radius:1px}
+.polaroid .ptape.l{left:-16px;top:-8px;transform:rotate(-8deg)}
+.polaroid .ptape.r{right:-16px;top:-8px;transform:rotate(7deg);background:var(--tape-blue)}
+.polaroid .photo{
+  height:158px;border-radius:1px;overflow:hidden;
+  background:radial-gradient(circle at 50% 30%,#F7F3E9 0%,#EFE9DA 100%);
+  display:grid;place-items:end center;
+}
+.polaroid .photo img{display:block;max-width:100%;max-height:158px;object-fit:contain}
+.polaroid .cap{
+  font-family:var(--f-kai);font-size:15px;font-weight:700;color:var(--ink-strong);
+  padding:5px 2px 2px;letter-spacing:.3em;
+}
+.polaroid.noimg .photo img{display:none}
+.polaroid.noimg .photo::before{content:"墨";font-family:var(--f-kai);font-size:56px;color:rgba(43,76,155,.35);place-self:center}
+/* 墨点状态章：呼吸动效都在它身上 */
+.orb{position:absolute;right:-18px;bottom:34px;width:46px;height:46px}
+.orb .ring{position:absolute;inset:0;border-radius:50%;border:1.5px solid rgba(43,76,155,.45);opacity:0}
+.orb .swirl{position:absolute;inset:3px;border-radius:50%;border:1.5px dashed rgba(43,76,155,.5);opacity:0}
+.orb .core{
+  position:absolute;inset:8px;
+  background:radial-gradient(circle at 36% 30%,#44639F 0%,#2A3C66 48%,#182342 100%);
+  border-radius:47% 53% 52% 48%/46% 49% 51% 54%;
+  box-shadow:0 3px 9px rgba(31,42,68,.3),inset 0 -3px 6px rgba(0,0,0,.25),inset 0 2px 4px rgba(255,255,255,.14);
+}
+/* 状态：墨的四种呼吸 */
+@keyframes blob{
+  0%,100%{border-radius:47% 53% 52% 48%/46% 49% 51% 54%;transform:scale(1)}
+  33%{border-radius:53% 47% 45% 55%/52% 46% 54% 48%;transform:scale(1.03)}
+  66%{border-radius:45% 55% 54% 46%/47% 55% 45% 53%;transform:scale(.98)}
+}
+@keyframes ripple{from{transform:scale(.66);opacity:.7}to{transform:scale(1.75);opacity:0}}
+@keyframes swirl{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.035)}}
+.companion[data-state] .core{animation:blob 7s ease-in-out infinite}
+.companion[data-state="idle"] .core{animation:blob 7s ease-in-out infinite,breathe 4.6s ease-in-out infinite}
+.companion[data-state="listening"] .ring{animation:ripple 2.6s ease-out infinite}
+.companion[data-state="listening"] .ring.r2{animation-delay:.85s}
+.companion[data-state="listening"] .ring.r3{animation-delay:1.7s}
+.companion[data-state="thinking"] .swirl{opacity:1;animation:swirl 5.5s linear infinite}
+.companion[data-state="speaking"] .core{animation:blob 7s ease-in-out infinite,pulse 1.15s ease-in-out infinite}
+.orb-name{margin-top:10px;font-family:var(--f-kai);font-size:19px;font-weight:700;color:var(--ink-strong)}
+.orb-state{margin-top:2px;font-size:13px;color:var(--ink-soft);display:flex;align-items:center;justify-content:center;gap:8px}
+.eq{display:none;align-items:flex-end;gap:2px;height:12px}
+.eq i{width:2.5px;background:var(--ink-blue);border-radius:2px;height:4px}
+@keyframes eq{0%,100%{height:4px}50%{height:12px}}
+.companion[data-state="listening"] .eq{display:inline-flex}
+.companion[data-state="listening"] .eq i{animation:eq .9s ease-in-out infinite}
+.companion[data-state="listening"] .eq i:nth-child(2){animation-delay:.15s}
+.companion[data-state="listening"] .eq i:nth-child(3){animation-delay:.3s}
+.companion[data-state="listening"] .eq i:nth-child(4){animation-delay:.45s}
+.orb-hint{margin-top:4px;font-size:12px;color:var(--ink-faint)}
+/* 概念演示：状态切换 */
+.state-demo{margin-top:12px;display:inline-flex;gap:6px;padding:4px;border:1px dashed var(--line);border-radius:8px}
+.state-demo button{
+  border:0;background:transparent;border-radius:6px;padding:3px 10px;
+  font-size:12px;color:var(--ink-soft);
+}
+.state-demo button.on{background:rgba(43,76,155,.1);color:var(--ink-blue);font-weight:600}
+.state-demo .cap{font-size:10px;color:var(--ink-faint);align-self:center;padding-right:4px}
+
+/* 对话流 */
+.chat{flex:1;overflow-y:auto;padding:18px 20px;display:flex;flex-direction:column;gap:14px}
+.msg{max-width:88%}
+.msg.user{align-self:flex-end}
+.msg.user .b{
+  background:var(--ink-blue);color:#FBFAF5;border-radius:14px 14px 4px 14px;
+  padding:9px 13px;font-size:14px;box-shadow:0 2px 6px rgba(43,76,155,.22);
+}
+.msg.kb{align-self:flex-start}
+.msg.kb .who{font-family:var(--f-kai);font-size:12.5px;color:var(--ink-soft);margin:0 0 3px 2px}
+.msg.kb .b{
+  background:rgba(255,255,255,.7);border:1px solid var(--line-soft);
+  border-radius:4px 14px 14px 14px;padding:9px 13px;font-size:14px;color:var(--ink);
+}
+.msg .mono{font-family:var(--f-mono);font-size:13px}
+
+/* ============ 工具调用 = 仪器小票 ============
+   隐喻：小科去仪器台干活，仪器打回一张小票，贴进本子。
+   默认折叠成一行"票根"，点开看全票；打印中会走点；失败盖红戳。 */
+.ticket{
+  align-self:stretch;background:#FDFCF5;
+  border:1px solid var(--line-soft);
+  border-top:1.5px dashed rgba(31,42,68,.25);
+  border-bottom:1.5px dashed rgba(31,42,68,.25);
+  box-shadow:0 1px 3px rgba(31,42,68,.06);
+  font-family:var(--f-mono);font-size:12px;color:var(--ink);
+}
+.t-head{
+  display:flex;align-items:center;gap:8px;width:100%;
+  border:0;background:transparent;padding:7px 12px;text-align:left;
+  font-family:var(--f-mono);font-size:12px;color:var(--ink);
+}
+.t-head .glyph{flex:0 0 auto;color:var(--ink-faint)}
+.t-head .tool{font-weight:700;letter-spacing:.02em}
+.t-head .zh{font-family:var(--f-ui);color:var(--ink-soft);font-size:12px}
+.t-head .st{margin-left:auto;flex:0 0 auto}
+.t-head .st.ok{color:#3E7B5E;font-weight:700}
+.t-head .st.err{color:var(--margin-red);font-weight:700}
+.t-head .dur{color:var(--ink-faint)}
+.t-body{display:none;padding:2px 12px 9px;border-top:1px dashed rgba(31,42,68,.14)}
+.ticket.open .t-body{display:block}
+.t-row{display:flex;gap:10px;padding:2.5px 0;color:var(--ink-soft)}
+.t-row b{color:var(--ink);font-weight:600}
+.t-sep{border:0;border-top:1px dashed rgba(31,42,68,.14);margin:6px 0}
+.t-result{color:var(--ink)}
+.t-result .em{background:var(--hl);padding:0 3px;border-radius:2px}
+.t-foot{margin-top:7px;display:flex;justify-content:space-between;color:var(--ink-faint);font-size:11px}
+.t-link{font-family:var(--f-ui);color:var(--ink-blue);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+/* 打印中 */
+.ticket.printing .t-head .st{color:var(--ink-blue)}
+.ticket.printing .dots i{display:inline-block;width:3px;height:3px;border-radius:50%;background:var(--ink-blue);margin-left:3px;animation:tdots 1.2s ease-in-out infinite}
+.ticket.printing .dots i:nth-child(2){animation-delay:.2s}
+.ticket.printing .dots i:nth-child(3){animation-delay:.4s}
+@keyframes tdots{0%,100%{opacity:.25;transform:translateY(0)}50%{opacity:1;transform:translateY(-2px)}}
+/* 失败红戳 */
+.t-stamp{
+  position:relative;flex:0 0 auto;margin-left:6px;
+  color:rgba(196,96,79,.85);border:1.5px solid rgba(196,96,79,.55);
+  font-size:10px;font-weight:700;letter-spacing:2px;padding:0 4px 0 6px;
+  transform:rotate(-8deg);border-radius:3px;
+}
+/* 输入区 */
+.composer{padding:14px 18px 18px;border-top:1px dashed var(--line)}
+.comp-card{
+  display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.85);
+  border:1px solid var(--line);border-radius:14px;padding:8px 10px 8px 14px;
+  box-shadow:0 1px 3px rgba(31,42,68,.06);
+}
+.comp-card input{
+  flex:1;border:0;outline:0;background:transparent;min-width:0;
+  font-family:inherit;font-size:14px;color:var(--ink);
+}
+.comp-card input::placeholder{color:var(--ink-faint)}
+.mic{
+  width:36px;height:36px;border-radius:50%;border:1.5px solid rgba(43,76,155,.4);
+  background:rgba(43,76,155,.06);color:var(--ink-blue);display:grid;place-items:center;flex:0 0 36px;
+}
+.mic:hover{background:rgba(43,76,155,.12)}
+.send{
+  border:0;border-radius:10px;background:var(--ink);color:#FBFAF5;
+  padding:8px 16px;font-size:13.5px;letter-spacing:.06em;flex:0 0 auto;
+}
+.send:hover{background:var(--ink-strong)}
+.comp-hint{margin:8px 4px 0;font-size:11.5px;color:var(--ink-faint);text-align:center}
+
+/* 窄屏：概念稿以桌面为主，仍保证不散架 */
+@media(max-width:1080px){
+  .bench{flex-direction:column}
+  .spine{flex:0 0 auto;flex-direction:row;align-items:center;overflow-x:auto;padding:12px 10px;border-right:0;border-bottom:1px solid var(--line-soft)}
+  .brand{padding:0 10px}
+  .tabs{flex-direction:row;padding:0}
+  .tab{border-radius:10px;border-right:1px solid transparent}
+  .tab.on{transform:none}
+  .spine-note{display:none}
+  .perforation{display:none}
+  .companion{flex:0 0 auto}
+  .page{padding-left:96px}
+}
+/* 动效对可及性让路：一律停在终点帧 */
+@media(prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+  .companion[data-state="listening"] .ring{opacity:.25;transform:scale(1.3)}
+}
+</style>
+</head>
+<body>
+<div class="grain" aria-hidden="true"></div>
+
+<div class="bench">
+
+  <!-- 本脊：品牌与索引标签 -->
+  <aside class="spine">
+    <div class="brand">
+      <svg class="drop" viewBox="0 0 34 40" aria-hidden="true">
+        <path d="M17 2 C22 12 30 19 30 27 a13 13 0 1 1 -26 0 C4 19 12 12 17 2 Z"
+              fill="none" stroke="#1F2A44" stroke-width="2.2" stroke-linejoin="round"/>
+        <path d="M11 27a6.5 6.5 0 0 0 5 6.6" fill="none" stroke="#2B4C9B" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <div>
+        <div class="name">小科</div>
+        <div class="sub">纸上实验台</div>
+      </div>
+    </div>
+    <nav class="tabs" aria-label="记录本索引">
+      <button class="tab on"><span class="edge" style="background:#C4604F"></span>实验台</button>
+      <button class="tab"><span class="edge" style="background:#5B7FC7"></span>方案库</button>
+      <button class="tab"><span class="edge" style="background:#4C9B6E"></span>试剂配置</button>
+      <button class="tab"><span class="edge" style="background:#E9B44C"></span>储存库</button>
+      <button class="tab"><span class="edge" style="background:#8B7BC7"></span>社区</button>
+      <button class="tab"><span class="edge" style="background:#9A8B72"></span>本次记录</button>
+      <button class="tab"><span class="edge" style="background:#7C8A9E"></span>设置</button>
+    </nav>
+    <div class="spine-note">概念稿 v3<br>本页数据为演示样例<br>照片可揭下随处贴<br>双击照片送回本子</div>
+  </aside>
+
+  <!-- 今天这一页：实验记录 -->
+  <main class="page-wrap">
+    <div class="page">
+      <span class="hole h1" aria-hidden="true"></span>
+      <span class="hole h2" aria-hidden="true"></span>
+      <span class="hole h3" aria-hidden="true"></span>
+
+      <header class="page-head">
+        <div class="ph-row">
+          <h1 class="ph-title">CCK-8 细胞活性检测</h1>
+          <span class="chip tape-g">进行中</span>
+          <span class="chip tape-b">酶标仪</span>
+        </div>
+        <div class="ph-meta">2026-08-30 · 会话 <b>20260830_091203</b> · 记录 <b>3</b> 段 · 待确认 <b>1</b> 项</div>
+      </header>
+
+      <div class="stepbar">
+        <span class="lbl">当前步骤</span>
+        <span class="tube" role="img" aria-label="步骤进度 5 步中的第 3 步"><span class="fill"></span></span>
+        <span class="mono"><em>3</em>/5 · 加入检测试剂并孵育</span>
+      </div>
+
+      <!-- 记录挂在红边线上，时间戳写在线外 -->
+      <section aria-label="今日实验记录">
+
+        <article class="entry t-blue">
+          <span class="ts">09:12</span><span class="dot" aria-hidden="true"></span>
+          <span class="tape" aria-hidden="true"></span>
+          <h3>铺板</h3>
+          <p>96 孔板接种细胞悬液，每孔 <span class="val">100 µL</span>，置于培养箱贴壁过夜。</p>
+          <div class="facts"><span class="fact">volume = 100 µL/孔</span><span class="fact">plate = 96 孔</span></div>
+          <div class="stamp" aria-label="已记录">已记录</div>
+        </article>
+
+        <article class="entry t-green">
+          <span class="ts">09:18</span><span class="dot" aria-hidden="true"></span>
+          <span class="tape" aria-hidden="true"></span>
+          <h3>加药</h3>
+          <p>按浓度梯度 <span class="val">0 / 1 / 5 / 10 µmol/L</span> 加入受试药物，每组 <span class="val">3</span> 复孔。</p>
+          <div class="facts"><span class="fact">gradient = 4 档</span><span class="fact">replicate = 3</span></div>
+        </article>
+
+        <article class="entry">
+          <span class="ts">09:23</span><span class="dot" aria-hidden="true"></span>
+          <span class="tape" aria-hidden="true"></span>
+          <h3>加入 CCK-8 试剂</h3>
+          <p>加入 CCK-8 试剂 <span class="val hl">10 µL</span>，<span class="val hl">37 ℃</span> 避光孵育。</p>
+          <div class="facts"><span class="fact">reagent = CCK-8</span><span class="fact">temp = 37 ℃</span><span class="fact">amount = 10 µL ?</span></div>
+          <div class="note">
+            <span class="who">小科批注</span>10 微升是每孔用量，还是整板总量？回我一句「问题1，每孔 10 微升」就补上。
+          </div>
+        </article>
+
+      </section>
+
+      <footer class="page-foot">
+        <span>第 3 页 · 本页由语音口述自动生成</span>
+        <span>原始音频与转写均已存档，可追溯</span>
+      </footer>
+    </div>
+  </main>
+
+  <div class="perforation" aria-hidden="true"></div>
+
+  <!-- 小科：墨滴与对话 -->
+  <section class="companion" data-state="listening" aria-label="小科对话栏">
+    <div class="orb-zone">
+      <div class="photo-slot" id="photo-slot" aria-hidden="true">
+        <div class="slot-note">照片揭走了<br>双击照片送它回来</div>
+      </div>
+      <div class="polaroid" id="polaroid" title="按住可以把照片揭下来，贴到屏幕任意位置；双击送回本子">
+        <span class="ptape l" aria-hidden="true"></span>
+        <span class="ptape r" aria-hidden="true"></span>
+        <span class="scribble" aria-hidden="true"><i></i><i></i><i></i></span>
+        <div class="photo">
+          <img id="portrait" src="../../web/frontend/assets/assistant_listening.png"
+               alt="小科的立绘" onerror="this.closest('.polaroid').classList.add('noimg')">
+        </div>
+        <div class="cap">小科</div>
+        <div class="orb" aria-hidden="true">
+          <span class="ring r1"></span><span class="ring r2"></span><span class="ring r3"></span>
+          <span class="swirl"></span>
+          <span class="core"></span>
+        </div>
+      </div>
+      <div class="orb-state">
+        <span id="state-text">正在聆听</span>
+        <span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      </div>
+      <div class="orb-hint" id="state-hint">直接说话，说到哪儿我记到哪儿</div>
+      <div class="state-demo" role="group" aria-label="概念演示：切换小科状态">
+        <span class="cap">演示</span>
+        <button data-s="idle">就绪</button>
+        <button data-s="listening" class="on">聆听</button>
+        <button data-s="thinking">思考</button>
+        <button data-s="speaking">回答</button>
+      </div>
+    </div>
+
+    <div class="chat">
+      <div class="msg kb">
+        <div class="who">小科</div>
+        <div class="b">实验开始，我在听。你只管动手，嘴上报数就行。</div>
+      </div>
+
+      <div class="msg user"><div class="b">把 CCK-8 的方案翻出来，顺便看下试剂库存</div></div>
+
+      <!-- 工具小票 · 完成态（默认展开示范；点票头可折成票根） -->
+      <div class="ticket open">
+        <button class="t-head" aria-expanded="true">
+          <span class="glyph">⌗</span>
+          <span class="tool">list_protocols</span><span class="zh">查方案库</span>
+          <span class="st ok">✓</span><span class="dur">0.3s</span>
+        </button>
+        <div class="t-body">
+          <div class="t-row">keyword <b>= CCK-8</b></div>
+          <hr class="t-sep">
+          <div class="t-result">命中 <span class="em">1</span> 个方案：CCK-8 细胞活性检测（5 步）<br>已翻开到左页 · 方案库共 12 条 <span class="t-link">去方案库</span></div>
+          <div class="t-foot"><span>09:07:41</span><span>仪器台回执</span></div>
+        </div>
+      </div>
+
+      <!-- 工具小票 · 失败票根（点开看原因） -->
+      <div class="ticket">
+        <button class="t-head" aria-expanded="false">
+          <span class="glyph">⌗</span>
+          <span class="tool">query_storage</span><span class="zh">查库存</span>
+          <span class="st err">✗</span><span class="t-stamp">失败</span>
+        </button>
+        <div class="t-body">
+          <div class="t-result">库存服务未响应（超时 3s）。原话已存档，这条挂成待办，稍后自动重试。</div>
+          <div class="t-foot"><span>09:07:44</span><span>不影响记录主线</span></div>
+        </div>
+      </div>
+
+      <div class="msg kb">
+        <div class="who">小科</div>
+        <div class="b">方案翻开在左页了。库存那边没连上，我挂了待办，等会儿再帮你问。</div>
+      </div>
+
+      <div class="msg user"><div class="b">加入 CCK-8 试剂 10 微升，37 度避光孵育</div></div>
+
+      <!-- 工具小票 · 完成票根（最常见形态：一行存根，不刷屏） -->
+      <div class="ticket">
+        <button class="t-head" aria-expanded="false">
+          <span class="glyph">⌗</span>
+          <span class="tool">record_observation</span><span class="zh">记录口述</span>
+          <span class="st ok">✓</span><span class="dur">0.4s</span>
+        </button>
+        <div class="t-body">
+          <div class="t-row">transcript <b>= 加入 CCK-8 试剂 10 微升…</b></div>
+          <hr class="t-sep">
+          <div class="t-result">第 <span class="em">3</span> 段已落盘 · 摘出 reagent / amount / temp</div>
+          <div class="t-foot"><span>09:23:05</span><span>原始音频已存档</span></div>
+        </div>
+      </div>
+
+      <div class="msg kb">
+        <div class="who">小科</div>
+        <div class="b">记好了。有一处想确认：<span class="mono">10 µL</span> 是每孔还是整板？我先按待确认挂着，不耽误你往下做。</div>
+      </div>
+      <div class="msg user"><div class="b">问题1，每孔 10 微升</div></div>
+      <div class="msg kb">
+        <div class="who">小科</div>
+        <div class="b">补上了：<span class="mono">amount = 10 µL/孔</span>。第 3 步孵育两小时，到点我提醒你。</div>
+      </div>
+
+      <div class="msg user"><div class="b">CCK-8 显色底物的分子量是多少？</div></div>
+
+      <!-- 工具小票 · 打印中（进行态） -->
+      <div class="ticket printing">
+        <button class="t-head" aria-expanded="false">
+          <span class="glyph">⌗</span>
+          <span class="tool">mw_calculator</span><span class="zh">算分子量</span>
+          <span class="st">打印中<span class="dots"><i></i><i></i><i></i></span></span>
+        </button>
+      </div>
+    </div>
+
+    <div class="composer">
+      <div class="comp-card">
+        <button class="mic" title="按住说话（概念演示）" aria-label="语音输入">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><path d="M12 18v4"/></svg>
+        </button>
+        <input placeholder="打字，或者直接开口说" aria-label="给小科发消息">
+        <button class="send">记入</button>
+      </div>
+      <div class="comp-hint">口述自动落到左页红线上 · 数据先存原文，再做理解</div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+// 概念演示：状态切换（真实版由语音事件驱动，这里手动点着看）。
+// 立绘保留：状态同时驱动照片换表情（素材即产品现有 5 张立绘）。
+(function () {
+  var companion = document.querySelector('.companion');
+  var text = document.getElementById('state-text');
+  var hint = document.getElementById('state-hint');
+  var portrait = document.getElementById('portrait');
+  var BASE = '../../web/frontend/assets/';
+  var COPY = {
+    idle:      ['准备就绪', '开口或打字都行', 'assistant_portrait_transparent.png'],
+    listening: ['正在聆听', '直接说话，说到哪儿我记到哪儿', 'assistant_listening.png'],
+    thinking:  ['正在思考', '在整理你刚才说的', 'assistant_thinking.png'],
+    speaking:  ['正在回答', '开口就能打断我', 'assistant_speaking.png']
+  };
+  Object.keys(COPY).forEach(function (s) { new Image().src = BASE + COPY[s][2]; });
+  document.querySelectorAll('.state-demo button').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var s = btn.dataset.s;
+      companion.dataset.state = s;
+      text.textContent = COPY[s][0];
+      hint.textContent = COPY[s][1];
+      if (portrait) portrait.src = BASE + COPY[s][2];
+      document.querySelectorAll('.state-demo button').forEach(function (b) {
+        b.classList.toggle('on', b === btn);
+      });
+    });
+  });
+
+  // 工具小票：点票头在「票根 ⇄ 全票」之间切换（打印中的票还没有票身，点了不动）
+  document.querySelectorAll('.ticket .t-head').forEach(function (head) {
+    head.addEventListener('click', function () {
+      var ticket = head.closest('.ticket');
+      if (!ticket.querySelector('.t-body')) return;
+      var open = ticket.classList.toggle('open');
+      head.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+  });
+
+  // 照片自由移动：按住揭下（胶带脱落）→ 贴到任意处（回弹压实）→ 双击送回本子。
+  // 真实版复用 avatar.js 现有拖拽与位置记忆逻辑，这里只演示表现层。
+  (function () {
+    var p = document.getElementById('polaroid');
+    var slotHost = document.querySelector('.companion');
+    var drag = null;
+    function settle() {
+      p.classList.add('settling');
+      setTimeout(function () { p.classList.remove('settling'); }, 320);
+    }
+    p.addEventListener('pointerdown', function (e) {
+      if (e.button !== 0 && e.pointerType !== 'touch') return;
+      var r = p.getBoundingClientRect();
+      drag = { id: e.pointerId, dx: e.clientX - r.left, dy: e.clientY - r.top, moved: 0 };
+      p.setPointerCapture(e.pointerId);
+      p.classList.add('lift');
+      e.preventDefault();
+    });
+    p.addEventListener('pointermove', function (e) {
+      if (!drag || e.pointerId !== drag.id) return;
+      drag.moved += Math.abs(e.movementX || 0) + Math.abs(e.movementY || 0);
+      if (drag.moved < 4) return;
+      if (!p.classList.contains('free')) {
+        p.classList.add('free');
+        slotHost.classList.add('photo-free');
+      }
+      var x = Math.max(6, Math.min(e.clientX - drag.dx, window.innerWidth - p.offsetWidth - 6));
+      var y = Math.max(6, Math.min(e.clientY - drag.dy, window.innerHeight - p.offsetHeight - 6));
+      p.style.left = x + 'px';
+      p.style.top = y + 'px';
+    });
+    function drop(e) {
+      if (!drag || e.pointerId !== drag.id) return;
+      drag = null;
+      p.classList.remove('lift');
+      settle();
+    }
+    p.addEventListener('pointerup', drop);
+    p.addEventListener('pointercancel', drop);
+    p.addEventListener('dblclick', function () {
+      p.classList.remove('free', 'lift');
+      p.style.left = '';
+      p.style.top = '';
+      slotHost.classList.remove('photo-free');
+      settle();
+    });
+  })();
+})();
+</script>
+</body>
+</html>

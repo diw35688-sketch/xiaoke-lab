@@ -1561,6 +1561,2850 @@
           "substeps": []
         }
       ]
+    },
+    {
+      "protocol_id": "western-blot",
+      "title": "Western Blot(免疫印迹法)",
+      "source": "国内重点实验室分子生物学实验方法汇总",
+      "version": "1.0",
+      "schema_version": 1,
+      "steps": [
+        {
+          "step_number": 1,
+          "title": "Western Blot(免疫印迹法)：溶液和试剂",
+          "instruction": "Western Blot(免疫印迹法)主要包括样品制备、电泳分离、蛋白的膜转移、免疫杂交与显色（蛋白检测）4个基本步骤。实验前准备以下溶液和试剂。",
+          "protocol_values": {},
+          "must_record": [
+            "action"
+          ],
+          "terms": [
+            "Western Blot",
+            "免疫印迹",
+            "PBS",
+            "Modified RIPA buffer",
+            "SDS",
+            "转移缓冲液",
+            "TBS",
+            "TBS/T",
+            "BSA",
+            "甲醇",
+            "蛋白质Marker"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "action": "实际准备了哪些溶液和试剂？"
+          },
+          "value_aliases": {},
+          "substeps": [
+            {
+              "order": 1,
+              "text": "1X磷酸盐缓冲液（PBS）",
+              "note": null
+            },
+            {
+              "order": 2,
+              "text": "Modified RIPA buffer：Tris-HCl 50 mM，pH 7.4；NP-40 1%；Na-deoxycholate 0.25%；NaCl 150 mM；EDTA 1 mM；PMSF 1 mM；Aprotinin、leupeptin、pepstatin各1 μg/ml；Na3VO4 1 mM；NaF 1 mM",
+              "note": null
+            },
+            {
+              "order": 3,
+              "text": "1X SDS样品缓冲液：62.5 mM Tris-HCl（pH 6.8，25°C），2% w/v SDS，10%甘油，50 mM DTT，0.01% w/v溴酚蓝",
+              "note": null
+            },
+            {
+              "order": 4,
+              "text": "转移缓冲液：25 mM Tris base，0.2 M甘氨酸，20%甲醇（pH 8.3）",
+              "note": null
+            },
+            {
+              "order": 5,
+              "text": "10X Tris缓冲盐（TBS）：配制1 L 10X TBS需24.2 g Tris base、80 g NaCl，用1 N HCl调pH为7.6",
+              "note": null
+            },
+            {
+              "order": 6,
+              "text": "脱脂奶粉或BSA",
+              "note": null
+            },
+            {
+              "order": 7,
+              "text": "甲醇",
+              "note": null
+            },
+            {
+              "order": 8,
+              "text": "TBS/T缓冲液：1X TBS，0.1% Tween-20",
+              "note": null
+            },
+            {
+              "order": 9,
+              "text": "封闭缓冲液（TBS/T）：1X TBS、0.1% Tween-20，加5% w/v脱脂奶粉或BSA",
+              "note": null
+            },
+            {
+              "order": 10,
+              "text": "一抗稀释液：1X TBS、0.1% Tween-20，加5% BSA（多抗）或5%脱脂奶粉（单抗）",
+              "note": "一般来说，BSA推荐用于多克隆抗体，脱脂奶粉用于单克隆抗体，可得到较高信噪比；抗体稀释度参考抗体说明书或根据实验确定。"
+            },
+            {
+              "order": 11,
+              "text": "预染的蛋白质Marker，可用于监测转膜效率",
+              "note": null
+            }
+          ]
+        },
+        {
+          "step_number": 2,
+          "title": "培养细胞或药物处理",
+          "instruction": "培养细胞或进行药物处理。",
+          "protocol_values": {},
+          "must_record": [
+            "action"
+          ],
+          "terms": [
+            "细胞",
+            "药物处理"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "action": "这一步实际进行了什么培养或药物处理？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 3,
+          "title": "弃培养基并漂洗细胞",
+          "instruction": "弃培养基，用1X PBS漂洗细胞2次，去尽残留培养基。",
+          "protocol_values": {},
+          "must_record": [
+            "action"
+          ],
+          "terms": [
+            "细胞",
+            "PBS"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "action": "实际漂洗了几次，是否去尽残留培养基？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 4,
+          "title": "加入SDS样品缓冲液并收集细胞",
+          "instruction": "加入1X SDS样品缓冲液（6-well plate，100 μl/孔；或75 cm²培养瓶，500–1000 μl/瓶），刮落细胞，转移到Ep管。冰上操作。",
+          "protocol_values": {
+            "amount_value": "100",
+            "amount_unit": "μl/孔"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit"
+          ],
+          "terms": [
+            "SDS样品缓冲液",
+            "细胞",
+            "Ep管"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "amount_value": "实际加入的SDS样品缓冲液体积是多少？",
+            "amount_unit": "体积单位是什么？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 5,
+          "title": "超声剪切DNA",
+          "instruction": "超声10–15秒剪切DNA，以降低样品粘性。",
+          "protocol_values": {
+            "duration": "10–15秒"
+          },
+          "must_record": [
+            "duration"
+          ],
+          "terms": [
+            "DNA",
+            "超声"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "duration": "实际超声持续了多长时间？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 6,
+          "title": "煮沸样品",
+          "instruction": "煮沸样品5分钟。",
+          "protocol_values": {
+            "duration": "5 min"
+          },
+          "must_record": [
+            "duration"
+          ],
+          "terms": [
+            "煮沸"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "duration": "实际煮沸了多长时间？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 7,
+          "title": "离心取上清",
+          "instruction": "以12000 g离心5 min，取上清。",
+          "protocol_values": {
+            "amount_value": "12000",
+            "amount_unit": "g",
+            "duration": "5 min"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "duration"
+          ],
+          "terms": [
+            "离心",
+            "上清"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "amount_value": "实际离心力是多少？",
+            "amount_unit": "离心力单位是什么？",
+            "duration": "实际离心了多长时间？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 8,
+          "title": "上样并进行SDS-PAGE电泳",
+          "instruction": "电泳分离：上样15–20 μl至SDS-PAGE胶（10 cm × 10 cm）进行电泳。若要定量检测蛋白表达水平，用RIPA裂解液按1 ml/10⁷个细胞、100 mm培养皿或150 cm²培养瓶裂解细胞，振荡混匀4–15 min，14000 g、4℃离心15 min，取上清测定蛋白浓度，以调整上样体积和上样量；通常上样20–30 μg已足够，低丰度蛋白可加大至100 μg，但电泳条带易拖尾。定量检测时还需设置内或外参照，通常用β-actin。",
+          "protocol_values": {
+            "amount_value": "15–20",
+            "amount_unit": "μl"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit"
+          ],
+          "terms": [
+            "电泳",
+            "SDS-PAGE",
+            "RIPA",
+            "蛋白浓度",
+            "β-actin"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "amount_value": "实际上样体积是多少？",
+            "amount_unit": "上样体积单位是什么？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 9,
+          "title": "将胶浸于转移缓冲液中平衡",
+          "instruction": "将胶浸于转移缓冲液中平衡10 min。如检测小分子蛋白，可省略此步，因小分子蛋白容易扩散出胶。",
+          "protocol_values": {
+            "duration": "10 min"
+          },
+          "must_record": [
+            "duration"
+          ],
+          "terms": [
+            "转移缓冲液",
+            "胶"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "duration": "实际平衡了多长时间，是否因检测小分子蛋白而省略？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 10,
+          "title": "剪取膜和滤纸并平衡",
+          "instruction": "依据胶的大小剪取膜和滤纸6片，放入转移缓冲液中平衡10 min。如用PVDF膜，需用纯甲醇浸泡饱和3–5秒。",
+          "protocol_values": {
+            "duration": "10 min"
+          },
+          "must_record": [
+            "duration"
+          ],
+          "terms": [
+            "PVDF膜",
+            "滤纸",
+            "甲醇",
+            "转移缓冲液"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "duration": "实际平衡膜和滤纸多长时间；PVDF膜甲醇浸泡多长时间？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 11,
+          "title": "装配转移三明治",
+          "instruction": "装配转移三明治：海绵→3层滤纸→胶→膜→3层滤纸→海绵。每层放好后用试管赶去气泡。胶放于负极面（黑色面）。",
+          "protocol_values": {},
+          "must_record": [
+            "action"
+          ],
+          "terms": [
+            "海绵",
+            "滤纸",
+            "胶",
+            "膜",
+            "负极面"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "action": "实际如何装配三明治，是否赶尽气泡并将胶置于负极面？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 12,
+          "title": "安装转移槽并转膜",
+          "instruction": "将转移槽置于冰浴中，放入三明治（黑色面对黑色面），加入转移缓冲液，插上电极，以100 V转膜1 h（电流约0.3 A）。再次检查三明治、电极是否装配正确以及电源是否接通。",
+          "protocol_values": {
+            "amount_value": "100",
+            "amount_unit": "V",
+            "duration": "1 h"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "duration"
+          ],
+          "terms": [
+            "转移槽",
+            "电极",
+            "电压",
+            "转膜"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "amount_value": "实际电压是多少？",
+            "amount_unit": "电压单位是什么？",
+            "duration": "实际转膜多长时间？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 13,
+          "title": "转膜结束取出膜",
+          "instruction": "转膜结束后切断电源，取出杂交膜。",
+          "protocol_values": {},
+          "must_record": [
+            "action"
+          ],
+          "terms": [
+            "杂交膜"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "action": "是否在取膜前切断电源，膜的状态如何？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 14,
+          "title": "TBS预洗膜",
+          "instruction": "用25 ml TBS洗膜5 min，室温，摇动。",
+          "protocol_values": {
+            "amount_value": "25",
+            "amount_unit": "ml",
+            "duration": "5 min",
+            "temperature": "室温"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "duration",
+            "temperature"
+          ],
+          "terms": [
+            "TBS",
+            "洗膜"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "amount_value": "实际使用的TBS体积是多少？",
+            "amount_unit": "体积单位是什么？",
+            "duration": "实际洗膜多长时间？",
+            "temperature": "实际温度是多少？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 15,
+          "title": "封闭",
+          "instruction": "置膜于25 ml封闭缓冲液中1 h，室温摇动。",
+          "protocol_values": {
+            "amount_value": "25",
+            "amount_unit": "ml",
+            "duration": "1 h",
+            "temperature": "室温"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "duration",
+            "temperature"
+          ],
+          "terms": [
+            "封闭缓冲液",
+            "封闭"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "amount_value": "实际封闭液体积是多少？",
+            "amount_unit": "体积单位是什么？",
+            "duration": "实际封闭多长时间？",
+            "temperature": "实际温度是多少？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 16,
+          "title": "一抗孵育前洗膜",
+          "instruction": "用15 ml TBS/T洗3次，每次5 min。",
+          "protocol_values": {
+            "amount_value": "15",
+            "amount_unit": "ml",
+            "duration": "5 min"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "duration"
+          ],
+          "terms": [
+            "TBS/T",
+            "洗膜"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "amount_value": "每次实际使用的TBS/T体积是多少？",
+            "amount_unit": "体积单位是什么？",
+            "duration": "每次洗膜多长时间？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 17,
+          "title": "一抗孵育",
+          "instruction": "加入适当稀释度的一抗，室温孵育1–2 h或4℃过夜，缓慢摇动。",
+          "protocol_values": {
+            "duration": "1–2 h或过夜",
+            "temperature": "室温或4℃"
+          },
+          "must_record": [
+            "duration",
+            "temperature"
+          ],
+          "terms": [
+            "一抗",
+            "免疫杂交"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "duration": "实际孵育多长时间？",
+            "temperature": "实际孵育温度是多少？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 18,
+          "title": "一抗孵育后洗膜",
+          "instruction": "用15 ml TBS/T洗3次，每次5 min。",
+          "protocol_values": {
+            "amount_value": "15",
+            "amount_unit": "ml",
+            "duration": "5 min"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "duration"
+          ],
+          "terms": [
+            "TBS/T",
+            "洗膜"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "amount_value": "每次实际使用的TBS/T体积是多少？",
+            "amount_unit": "体积单位是什么？",
+            "duration": "每次洗膜多长时间？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 19,
+          "title": "二抗孵育",
+          "instruction": "加入适当稀释度的碱性磷酸酶（AP）或辣根过氧化酶（HRP）标记的二抗，室温孵育1 h，缓慢摇动。",
+          "protocol_values": {
+            "duration": "1 h",
+            "temperature": "室温"
+          },
+          "must_record": [
+            "duration",
+            "temperature"
+          ],
+          "terms": [
+            "二抗",
+            "AP",
+            "HRP"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "duration": "实际孵育多长时间？",
+            "temperature": "实际孵育温度是多少？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 20,
+          "title": "二抗孵育后洗膜",
+          "instruction": "用15 ml TBS/T洗3次，每次5 min。",
+          "protocol_values": {
+            "amount_value": "15",
+            "amount_unit": "ml",
+            "duration": "5 min"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "duration"
+          ],
+          "terms": [
+            "TBS/T",
+            "洗膜"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "amount_value": "每次实际使用的TBS/T体积是多少？",
+            "amount_unit": "体积单位是什么？",
+            "duration": "每次洗膜多长时间？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 21,
+          "title": "检测前洗膜",
+          "instruction": "用15 ml TBS洗1次。",
+          "protocol_values": {
+            "amount_value": "15",
+            "amount_unit": "ml"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit"
+          ],
+          "terms": [
+            "TBS",
+            "洗膜"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "amount_value": "实际使用的TBS体积是多少？",
+            "amount_unit": "体积单位是什么？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 22,
+          "title": "蛋白检测",
+          "instruction": "进行蛋白检测（显色法或发光法），按相应试剂说明操作。",
+          "protocol_values": {},
+          "must_record": [
+            "observation"
+          ],
+          "terms": [
+            "蛋白检测",
+            "显色法",
+            "发光法"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "observation": "实际采用何种检测方法，观察到的结果是什么？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 23,
+          "title": "注意事项与优化建议",
+          "instruction": "按以下注意事项进行操作，并根据实验目的优化条件。",
+          "protocol_values": {},
+          "must_record": [
+            "observation"
+          ],
+          "terms": [
+            "PVDF膜",
+            "NC膜",
+            "Tween-20",
+            "BSA",
+            "NaN3",
+            "梯度胶"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "observation": "是否出现异常，或采取了哪些优化措施？"
+          },
+          "value_aliases": {},
+          "substeps": [
+            {
+              "order": 1,
+              "text": "操作中戴手套，不要用手触膜。",
+              "note": null
+            },
+            {
+              "order": 2,
+              "text": "PVDF膜在甲醇中浸泡时间不要超过5秒。",
+              "note": null
+            },
+            {
+              "order": 3,
+              "text": "如检测小于20 kD的蛋白，应用0.2 μm的膜，并可省略转移时的平衡步骤。",
+              "note": null
+            },
+            {
+              "order": 4,
+              "text": "某些抗原和抗体可被Tween-20洗脱，此时可用1.0% BSA代替Tween-20。",
+              "note": null
+            },
+            {
+              "order": 5,
+              "text": "封闭剂选择：5%脱脂奶粉/TBS或PBS可能掩盖抗体结合；0.3–3% BSA in PBS内源性交叉反应性较低。",
+              "note": null
+            },
+            {
+              "order": 6,
+              "text": "如用0.1% Tween-20、0.02% NaN3 in PBS或TBS作封闭剂和抗体稀释液，抗体检测后可进行蛋白染色。",
+              "note": null
+            },
+            {
+              "order": 7,
+              "text": "如要同时检测大分子量和小分子蛋白，最好用梯度胶分离蛋白。",
+              "note": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "protocol_id": "rna-extraction-trizol",
+      "title": "总 RNA 的提取（Trizol 法）",
+      "source": "国内重点实验室分子生物学实验方法汇总",
+      "version": "1.0",
+      "schema_version": 1,
+      "steps": [
+        {
+          "step_number": 1,
+          "title": "冷冻保存并研磨材料",
+          "instruction": "收集生物材料后最好立即进行 RNA 制备。若需暂时储存，应以液氮将生物材料急速冷冻后储存于 -80℃ 冷冻柜。制备 RNA 时，取出冷冻材料，立即加入液氮研磨以破坏细胞，不可先行解冻，以避免 RNase 作用。",
+          "protocol_values": {
+            "temperature": "-80℃",
+            "condition": "液氮急速冷冻；材料不得先行解冻"
+          },
+          "must_record": [
+            "temperature",
+            "condition"
+          ],
+          "terms": [
+            "总 RNA",
+            "液氮",
+            "RNase",
+            "冷冻研磨"
+          ],
+          "hazard_note": "涉及液氮，操作时应做好低温防护，谨防冻伤",
+          "field_prompts": {
+            "temperature": "冷冻保存温度是多少？",
+            "condition": "材料冷冻和研磨时有哪些关键条件？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 2,
+          "title": "裂解组织或细胞",
+          "instruction": "提取组织 RNA 时，每 50～100mg 组织加入 1ml Trizol 试剂进行裂解。提取细胞 RNA 时，先离心沉淀细胞，每 5～10×10⁶ 个细胞加入 1ml Trizol，然后反复用枪吹打或剧烈振荡以裂解细胞。",
+          "protocol_values": {
+            "amount_value": "1",
+            "amount_unit": "ml",
+            "condition": "每 50～100mg 组织或每 5～10×10⁶ 个细胞加入 1ml Trizol"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "condition"
+          ],
+          "terms": [
+            "Trizol",
+            "组织 RNA",
+            "细胞 RNA",
+            "细胞裂解"
+          ],
+          "hazard_note": "涉及 Trizol 试剂，操作应佩戴手套并在通风条件下进行，避免接触皮肤和吸入挥发物",
+          "field_prompts": {
+            "amount_value": "每份样品加入 Trizol 的体积是多少？",
+            "amount_unit": "Trizol 体积单位是什么？",
+            "condition": "组织或细胞与 Trizol 的配比是多少？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 3,
+          "title": "静置 Trizol 裂解液",
+          "instruction": "将组织或细胞的 Trizol 裂解液转入 EP 管中，在室温（15～30℃）下放置 5 分钟。",
+          "protocol_values": {
+            "duration": "5 分钟",
+            "temperature": "15～30℃"
+          },
+          "must_record": [
+            "duration",
+            "temperature"
+          ],
+          "terms": [
+            "Trizol",
+            "裂解液",
+            "EP 管"
+          ],
+          "hazard_note": "涉及 Trizol 裂解液，操作应佩戴手套并在通风条件下进行",
+          "field_prompts": {
+            "duration": "裂解液需要静置多长时间？",
+            "temperature": "静置时的室温范围是多少？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 4,
+          "title": "氯仿萃取并离心",
+          "instruction": "按每 1ml Trizol 加 0.2ml 氯仿的比例加入氯仿，盖好 EP 管盖，在手中用力震荡 15 秒。室温（15～30℃）放置 2～3 分钟后，在 2～8℃ 下以 12000g 离心 15 分钟。",
+          "protocol_values": {
+            "amount_value": "0.2",
+            "amount_unit": "ml",
+            "duration": "震荡 15 秒；静置 2～3 分钟；离心 15 分钟",
+            "temperature": "室温 15～30℃；离心 2～8℃",
+            "condition": "每 1ml Trizol 加 0.2ml 氯仿；12000g 离心"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "duration",
+            "temperature",
+            "condition"
+          ],
+          "terms": [
+            "氯仿",
+            "Trizol",
+            "离心",
+            "EP 管"
+          ],
+          "hazard_note": "涉及氯仿，具有毒性和挥发性，操作必须在化学通风橱中进行并佩戴手套、防护镜",
+          "field_prompts": {
+            "amount_value": "每 1ml Trizol 加入多少毫升氯仿？",
+            "amount_unit": "氯仿体积单位是什么？",
+            "duration": "震荡、静置和离心分别持续多长时间？",
+            "temperature": "静置和离心分别使用什么温度？",
+            "condition": "氯仿加入比例和离心力是多少？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 5,
+          "title": "异丙醇沉淀 RNA",
+          "instruction": "取上层水相置于新 EP 管中，按每 1ml Trizol 加 0.5ml 异丙醇的比例加入异丙醇，在室温（15～30℃）下放置 10 分钟，然后在 2～8℃ 下以 12000g 离心 10 分钟。",
+          "protocol_values": {
+            "amount_value": "0.5",
+            "amount_unit": "ml",
+            "duration": "静置 10 分钟；离心 10 分钟",
+            "temperature": "室温 15～30℃；离心 2～8℃",
+            "condition": "每 1ml Trizol 加 0.5ml 异丙醇；12000g 离心"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "duration",
+            "temperature",
+            "condition"
+          ],
+          "terms": [
+            "异丙醇",
+            "RNA 沉淀",
+            "水相",
+            "离心"
+          ],
+          "hazard_note": "涉及异丙醇，操作应远离火源并保持通风，佩戴适当防护用品",
+          "field_prompts": {
+            "amount_value": "每 1ml Trizol 加入多少毫升异丙醇？",
+            "amount_unit": "异丙醇体积单位是什么？",
+            "duration": "异丙醇处理的静置和离心时间分别是多少？",
+            "temperature": "静置和离心分别使用什么温度？",
+            "condition": "异丙醇加入比例和离心力是多少？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 6,
+          "title": "乙醇洗涤 RNA 沉淀",
+          "instruction": "弃去上清，按每 1ml Trizol 加 1ml 75% 乙醇的比例进行洗涤，涡旋混合，在 2～8℃ 下以 7500g 离心 5 分钟，弃去上清。",
+          "protocol_values": {
+            "amount_value": "1",
+            "amount_unit": "ml",
+            "concentration": "75%",
+            "duration": "离心 5 分钟",
+            "temperature": "2～8℃",
+            "condition": "每 1ml Trizol 加 1ml 75% 乙醇；7500g 离心"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "concentration",
+            "duration",
+            "temperature",
+            "condition"
+          ],
+          "terms": [
+            "乙醇",
+            "RNA 沉淀",
+            "涡旋混合",
+            "离心"
+          ],
+          "hazard_note": "涉及乙醇，操作时远离火源并保持通风",
+          "field_prompts": {
+            "amount_value": "每 1ml Trizol 加入多少毫升乙醇？",
+            "amount_unit": "乙醇体积单位是什么？",
+            "concentration": "洗涤乙醇的浓度是多少？",
+            "duration": "洗涤后的离心时间是多少？",
+            "temperature": "离心温度是多少？",
+            "condition": "乙醇加入比例和离心力是多少？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 7,
+          "title": "自然干燥 RNA 沉淀",
+          "instruction": "让沉淀的 RNA 在室温下自然干燥。",
+          "protocol_values": {
+            "condition": "室温自然干燥"
+          },
+          "must_record": [
+            "condition"
+          ],
+          "terms": [
+            "RNA 沉淀",
+            "自然干燥"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "condition": "RNA 沉淀的干燥条件是什么？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 8,
+          "title": "溶解 RNA",
+          "instruction": "用 RNase-free water 溶解 RNA 沉淀。",
+          "protocol_values": {},
+          "must_record": [],
+          "terms": [
+            "RNA",
+            "RNase-free water"
+          ],
+          "hazard_note": null,
+          "field_prompts": {},
+          "value_aliases": {},
+          "substeps": []
+        }
+      ]
+    },
+    {
+      "protocol_id": "plasmid-dna-miniprep-alkaline-lysis",
+      "title": "大肠杆菌质粒 DNA 的提取（碱裂解法）",
+      "source": "国内重点实验室分子生物学实验方法汇总",
+      "version": "1.10",
+      "schema_version": 1,
+      "steps": [
+        {
+          "step_number": 1,
+          "title": "收集细菌培养物",
+          "instruction": "取 1.5ml 细菌培养物于 EP 管中，以 4000rpm 离心 1 分钟，弃去上清液，使细菌沉淀尽量干燥。",
+          "protocol_values": {
+            "amount_value": "1.5",
+            "amount_unit": "ml",
+            "duration": "1 分钟",
+            "condition": "4000rpm 离心"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "duration",
+            "condition"
+          ],
+          "terms": [
+            "细菌培养物",
+            "EP 管",
+            "离心"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "amount_value": "取用细菌培养物的体积是多少？",
+            "amount_unit": "培养物体积单位是什么？",
+            "duration": "离心多长时间？",
+            "condition": "离心转速是多少？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 2,
+          "title": "重悬细菌沉淀",
+          "instruction": "将细菌沉淀重悬于用冰预冷的 100µl 溶液 I 中。溶液 I 含 50mmol/L 葡萄糖、10mmol/L EDTA（pH8.0）和 25mmol/L Tris-HCl（pH8.0）。重悬后剧烈振荡。",
+          "protocol_values": {
+            "amount_value": "100",
+            "amount_unit": "µl",
+            "condition": "溶液 I：50mmol/L 葡萄糖、10mmol/L EDTA（pH8.0）、25mmol/L Tris-HCl（pH8.0）；溶液冰预冷"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "condition"
+          ],
+          "terms": [
+            "细菌沉淀",
+            "溶液 I",
+            "EDTA",
+            "Tris-HCl"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "amount_value": "加入溶液 I 的体积是多少？",
+            "amount_unit": "溶液 I 体积单位是什么？",
+            "condition": "溶液 I 的组分、浓度和预冷条件是什么？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 3,
+          "title": "碱性裂解细胞",
+          "instruction": "加入 200µl 新配制的溶液 II（0.2mol/L NaOH、1% SDS，m/v），盖紧 EP 管口，快速颠倒离心管 5 次，使混合物充分接触离心管内表面。不要涡旋，随后置于冰浴中。",
+          "protocol_values": {
+            "amount_value": "200",
+            "amount_unit": "µl",
+            "concentration": "0.2mol/L NaOH；1% SDS",
+            "condition": "快速颠倒 5 次；冰浴；禁止涡旋"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "concentration",
+            "condition"
+          ],
+          "terms": [
+            "碱裂解",
+            "NaOH",
+            "SDS",
+            "EP 管"
+          ],
+          "hazard_note": "涉及 NaOH 和 SDS，具有腐蚀性或刺激性，操作时应佩戴手套、防护镜并避免溶液接触皮肤",
+          "field_prompts": {
+            "amount_value": "加入溶液 II 的体积是多少？",
+            "amount_unit": "溶液 II 体积单位是什么？",
+            "concentration": "溶液 II 中 NaOH 和 SDS 的浓度是多少？",
+            "condition": "混合次数、温度条件和操作限制是什么？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 4,
+          "title": "中和并沉淀杂质",
+          "instruction": "加入150µl预冷的溶液III（每100ml溶液III含60ml 5mol/L乙酸钾、11.5ml冰乙酸和28.5ml H2O）。盖紧EP管口，反复颠倒数次，使溶液III在黏稠的细菌裂解物中均匀分散，之后将离心管置于冰上3～5分钟。准备新的EP管，并标记为A1、A2、A3、B1、B2、B3，以便后续转移上清液。",
+          "protocol_values": {
+            "amount_value": "150",
+            "amount_unit": "µl",
+            "duration": "3～5 分钟",
+            "condition": "溶液 III 预冷；冰上静置；反复颠倒混匀"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "duration",
+            "condition"
+          ],
+          "terms": [
+            "溶液 III",
+            "乙酸钾",
+            "冰乙酸",
+            "中和"
+          ],
+          "hazard_note": "涉及冰乙酸，具腐蚀性，操作时应在通风条件下佩戴手套和防护镜",
+          "field_prompts": {
+            "amount_value": "加入溶液 III 的体积是多少？",
+            "amount_unit": "溶液 III 体积单位是什么？",
+            "duration": "冰上静置多长时间？",
+            "condition": "溶液 III 的配方和混匀条件是什么？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 5,
+          "title": "转移上清液",
+          "instruction": "将第4步中和后的上清液转移到标记好的新EP管中（A1、A2、A3、B1、B2、B3）。",
+          "protocol_values": {
+            "duration": "5min",
+            "instrument": "离心机"
+          },
+          "must_record": [
+            "duration",
+            "instrument"
+          ],
+          "terms": [
+            "离心",
+            "上清液",
+            "EP 管"
+          ],
+          "hazard_note": "无特殊危险",
+          "field_prompts": {
+            "duration": "离心多长时间？",
+            "instrument": "使用了哪种离心机？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 6,
+          "title": "氯仿抽提",
+          "instruction": "更换新的EP管，加入当前体积70%的氯仿（例如500μL样品加入350μL氯仿），充分混匀后离心分离有机相和水相，收集上层水相。",
+          "protocol_values": {},
+          "must_record": [],
+          "terms": [],
+          "hazard_note": "氯仿有毒，需在通风橱中操作",
+          "field_prompts": {},
+          "substeps": []
+        },
+        {
+          "step_number": 7,
+          "title": "异丙醇沉淀质粒 DNA",
+          "instruction": "向上清液中加入等体积的异丙醇，轻轻混匀后室温放置5分钟，使质粒DNA沉淀。",
+          "protocol_values": {},
+          "must_record": [],
+          "terms": [],
+          "hazard_note": null,
+          "field_prompts": {},
+          "substeps": []
+        },
+        {
+          "step_number": 8,
+          "title": "乙醇沉淀质粒 DNA",
+          "instruction": "加入75%乙醇，在室温下沉淀双链DNA。振荡混合后室温放置2分钟，再以最大转速离心5分钟。",
+          "protocol_values": {
+            "duration": "室温放置 2 分钟；离心 5 分钟",
+            "condition": "乙醇用量为上清液体积的 2 倍；室温；最大转速离心"
+          },
+          "must_record": [
+            "duration",
+            "condition"
+          ],
+          "terms": [
+            "质粒 DNA",
+            "乙醇沉淀",
+            "双链 DNA"
+          ],
+          "hazard_note": "涉及乙醇，操作时应远离火源并保持通风",
+          "field_prompts": {
+            "duration": "乙醇沉淀和离心分别持续多长时间？",
+            "condition": "乙醇加入比例和离心条件是什么？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 9,
+          "title": "去除沉淀表面液滴",
+          "instruction": "小心吸去上清液，将离心管倒置于滤纸上，使所有液体流出，并除尽附着在管壁上的液滴。",
+          "protocol_values": {
+            "condition": "离心管倒置于滤纸上沥干"
+          },
+          "must_record": [
+            "condition"
+          ],
+          "terms": [
+            "DNA 沉淀",
+            "上清液",
+            "滤纸"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "condition": "沉淀沥干时采用什么操作条件？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 10,
+          "title": "乙醇洗涤并溶解 DNA",
+          "instruction": "加入 1ml 70% 乙醇洗涤沉淀，振荡混合，以 12000g 离心 2 分钟，弃去上清。将开口的 EP 管置于室温使乙醇挥发，直至管内没有可见液体（约 5～10 分钟），再用适量 ddH2O 溶解 DNA。",
+          "protocol_values": {
+            "amount_value": "1",
+            "amount_unit": "ml",
+            "concentration": "70%",
+            "duration": "离心 2 分钟；乙醇挥发 5～10 分钟",
+            "condition": "12000g 离心；室温挥发乙醇；用适量 ddH2O 溶解"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "concentration",
+            "duration",
+            "condition"
+          ],
+          "terms": [
+            "乙醇洗涤",
+            "质粒 DNA",
+            "ddH2O",
+            "离心"
+          ],
+          "hazard_note": "涉及乙醇，操作时应远离火源并保持通风",
+          "field_prompts": {
+            "amount_value": "用于洗涤的乙醇体积是多少？",
+            "amount_unit": "乙醇体积单位是什么？",
+            "concentration": "洗涤乙醇的浓度是多少？",
+            "duration": "洗涤离心和乙醇挥发分别持续多长时间？",
+            "condition": "洗涤离心力、挥发条件和 DNA 溶解液是什么？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 11,
+          "title": "RNase 处理",
+          "instruction": "加入 0.5µl RNase，在 37℃ 下温育 5～10 分钟。",
+          "protocol_values": {
+            "amount_value": "0.5",
+            "amount_unit": "µl",
+            "duration": "5～10 分钟",
+            "temperature": "37℃"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "duration",
+            "temperature"
+          ],
+          "terms": [
+            "RNase",
+            "RNA 去除",
+            "温育"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "amount_value": "加入 RNase 的体积是多少？",
+            "amount_unit": "RNase 体积单位是什么？",
+            "duration": "RNase 温育多长时间？",
+            "temperature": "RNase 温育温度是多少？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 12,
+          "title": "电泳鉴定质粒 DNA",
+          "instruction": "通过电泳对提取的质粒 DNA 进行鉴定。",
+          "protocol_values": {
+            "instrument": "电泳装置"
+          },
+          "must_record": [
+            "instrument"
+          ],
+          "terms": [
+            "质粒 DNA",
+            "电泳鉴定"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "instrument": "使用了哪种电泳装置？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        }
+      ]
+    },
+    {
+      "protocol_id": "recombinant-protein-expression-purification",
+      "title": "重组蛋白质的表达、纯化、复性和定量",
+      "source": "国内重点实验室分子生物学实验方法汇总",
+      "version": "1.0",
+      "schema_version": 1,
+      "steps": [
+        {
+          "step_number": 1,
+          "title": "培养含质粒的菌落",
+          "instruction": "按 Qiagen 公司的操作手册进行。挑取转化有质粒的单菌落，接种于 3ml 选择性 LB 液体培养基中，在 37℃、250rpm/min 条件下振摇培养过夜。",
+          "protocol_values": {
+            "amount_value": "3",
+            "amount_unit": "ml",
+            "temperature": "37℃",
+            "duration": "过夜",
+            "condition": "选择性 LB 液体培养基；250rpm/min 振摇"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "temperature",
+            "duration",
+            "condition"
+          ],
+          "terms": [
+            "重组蛋白",
+            "质粒",
+            "选择性 LB 培养基",
+            "单菌落"
+          ],
+          "hazard_note": "涉及活菌培养，应遵守生物安全和无菌操作规范",
+          "field_prompts": {
+            "amount_value": "初始培养基体积是多少？",
+            "amount_unit": "培养基体积单位是什么？",
+            "temperature": "培养温度是多少？",
+            "duration": "培养多长时间？",
+            "condition": "培养基、摇床转速等条件是什么？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 2,
+          "title": "扩大培养并收集诱导前样品",
+          "instruction": "次日取过夜培养菌液 500μl，接种于 10ml（1:20）选择性 LB 液体培养基中，在 37℃、250rpm/min 下振摇培养至 OD600=0.6。取 1ml 样本作为诱导前标本，以 10000g 离心 1min 收集菌体沉淀，置 -20℃ 冻存备用。",
+          "protocol_values": {
+            "amount_value": "500",
+            "amount_unit": "μl",
+            "temperature": "37℃；-20℃",
+            "duration": "离心 1min",
+            "condition": "10ml（1:20）选择性 LB；250rpm/min；培养至 OD600=0.6；取 1ml 诱导前样本；10000g 离心"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "temperature",
+            "duration",
+            "condition"
+          ],
+          "terms": [
+            "OD600",
+            "诱导前标本",
+            "菌体沉淀",
+            "离心"
+          ],
+          "hazard_note": "涉及活菌培养，应遵守生物安全和无菌操作规范",
+          "field_prompts": {
+            "amount_value": "接种过夜菌液的体积是多少？",
+            "amount_unit": "菌液体积单位是什么？",
+            "temperature": "培养和冻存温度分别是多少？",
+            "duration": "收集诱导前标本的离心时间是多少？",
+            "condition": "培养比例、OD600 终点、取样体积和离心力是多少？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 3,
+          "title": "IPTG 诱导表达",
+          "instruction": "向菌液中加入 1mol/L IPTG，使 IPTG 终浓度为 1mM，在 37℃、250rpm/min 下振摇培养 4～5 小时。取 1ml 样本作为诱导后标本，按同样方法收集菌体沉淀，置 -20℃ 冻存备用。",
+          "protocol_values": {
+            "amount_value": "1",
+            "amount_unit": "ml",
+            "concentration": "1mol/L IPTG；终浓度 1mM",
+            "temperature": "37℃；-20℃",
+            "duration": "4～5 小时",
+            "condition": "250rpm/min 振摇；取 1ml 诱导后标本"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "concentration",
+            "temperature",
+            "duration",
+            "condition"
+          ],
+          "terms": [
+            "IPTG",
+            "诱导表达",
+            "诱导后标本",
+            "菌体沉淀"
+          ],
+          "hazard_note": "涉及活菌培养和诱导表达，应遵守生物安全和无菌操作规范",
+          "field_prompts": {
+            "amount_value": "诱导后取样体积是多少？",
+            "amount_unit": "样品体积单位是什么？",
+            "concentration": "IPTG 母液和终浓度分别是多少？",
+            "temperature": "诱导培养和冻存温度分别是多少？",
+            "duration": "诱导培养多长时间？",
+            "condition": "诱导摇床转速和样品收集条件是什么？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 4,
+          "title": "SDS-PAGE 检测表达",
+          "instruction": "将诱导前后菌体沉淀用 20～40μl PBS（pH8.0）重悬，加入等体积 2×SDS 上样缓冲液，煮沸加热 5min，进行 SDS-PAGE 电泳分离，考马斯亮蓝染色 3 小时后脱色并观察结果。",
+          "protocol_values": {
+            "amount_value": "20～40",
+            "amount_unit": "μl",
+            "duration": "煮沸 5min；考马斯亮蓝染色 3 小时",
+            "condition": "PBS pH8.0；等体积 2×SDS 上样缓冲液；SDS-PAGE"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "duration",
+            "condition"
+          ],
+          "terms": [
+            "SDS-PAGE",
+            "PBS",
+            "考马斯亮蓝",
+            "重组蛋白表达"
+          ],
+          "hazard_note": "涉及 SDS-PAGE 和染色试剂，操作时应按试剂安全说明做好个人防护",
+          "field_prompts": {
+            "amount_value": "每份菌体沉淀加入多少 PBS？",
+            "amount_unit": "重悬液体积单位是什么？",
+            "duration": "煮沸和染色分别持续多长时间？",
+            "condition": "PBS、上样缓冲液和电泳条件是什么？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 5,
+          "title": "扩大诱导表达规模",
+          "instruction": "选取诱导成功的细菌克隆，扩大诱导规模，收集菌体沉淀，于 -20℃ 保存，准备进行后续分析和纯化。",
+          "protocol_values": {
+            "temperature": "-20℃",
+            "condition": "扩大诱导规模后收集菌体沉淀"
+          },
+          "must_record": [
+            "temperature",
+            "condition"
+          ],
+          "terms": [
+            "诱导表达",
+            "细菌克隆",
+            "菌体沉淀"
+          ],
+          "hazard_note": "涉及活菌培养物，应遵守生物安全规范",
+          "field_prompts": {
+            "temperature": "菌体沉淀保存温度是多少？",
+            "condition": "扩大诱导和菌体收集条件是什么？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 6,
+          "title": "低温处理并超声破菌",
+          "instruction": "将诱导培养后收集的菌体重悬于裂解液 1（Lysis buffer under native conditions）中，在 -80℃ 低温冰箱中放置 10min，随后在冰中解冻。在冰浴上用超声破碎仪破菌 6 次，每次 10sec，间歇 10sec，电压 200～300V。",
+          "protocol_values": {
+            "temperature": "-80℃；冰浴",
+            "duration": "低温放置 10min；超声 6 次，每次 10sec，间歇 10sec",
+            "condition": "裂解液 1；超声电压 200～300V"
+          },
+          "must_record": [
+            "temperature",
+            "duration",
+            "condition"
+          ],
+          "terms": [
+            "裂解液 1",
+            "超声破菌",
+            "冰浴",
+            "超声破碎仪"
+          ],
+          "hazard_note": "涉及超声破菌，操作时注意气溶胶和样品飞溅，做好生物安全防护",
+          "field_prompts": {
+            "temperature": "低温处理和超声破菌时的温度条件是什么？",
+            "duration": "低温放置和超声参数分别是多少？",
+            "condition": "裂解液、电压和超声间歇条件是什么？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 7,
+          "title": "离心分离可溶性蛋白",
+          "instruction": "以 10000g、4℃ 离心 20min，取上清作为溶液 A，置 -20℃ 保存；另将沉淀用同样的裂解液 1 溶解，作为溶液 B，同样置 -20℃ 保存，供后续分析使用。",
+          "protocol_values": {
+            "temperature": "4℃；-20℃",
+            "duration": "20min",
+            "condition": "10000g 离心；上清为溶液 A；沉淀溶解液为溶液 B"
+          },
+          "must_record": [
+            "temperature",
+            "duration",
+            "condition"
+          ],
+          "terms": [
+            "可溶性蛋白",
+            "溶液 A",
+            "溶液 B",
+            "离心"
+          ],
+          "hazard_note": "涉及蛋白裂解液和离心操作，应做好样品防护并遵守设备安全要求",
+          "field_prompts": {
+            "temperature": "离心和样品保存温度分别是多少？",
+            "duration": "离心多长时间？",
+            "condition": "离心力、上清液和沉淀的处理方式是什么？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 8,
+          "title": "SDS-PAGE 鉴定溶解性",
+          "instruction": "将溶液 A、溶液 B 以及诱导前后的细菌样品进行 SDS-PAGE 电泳和考马斯亮蓝染色，比较分析重组蛋白的溶解性。若诱导表达蛋白位于溶液 A 中，则为可溶性蛋白；若位于溶液 B 中，则为非可溶性蛋白。",
+          "protocol_values": {
+            "condition": "比较溶液 A、B 与诱导前后样品的电泳条带"
+          },
+          "must_record": [
+            "condition"
+          ],
+          "terms": [
+            "SDS-PAGE",
+            "考马斯亮蓝",
+            "溶解性",
+            "可溶性蛋白"
+          ],
+          "hazard_note": "涉及 SDS-PAGE 和染色试剂，操作时应按试剂安全说明做好防护",
+          "field_prompts": {
+            "condition": "溶液 A、B 和对照样品的比较判定条件是什么？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 9,
+          "title": "变性条件下溶解蛋白",
+          "instruction": "对于非可溶性重组蛋白，将菌体沉淀溶于适量裂解液 2（Lysis buffer under denaturing conditions）中，在室温下搅拌并吹打沉淀，避免产生泡沫。",
+          "protocol_values": {
+            "condition": "裂解液 2；变性条件；室温搅拌和吹打；避免泡沫"
+          },
+          "must_record": [
+            "condition"
+          ],
+          "terms": [
+            "非可溶性蛋白",
+            "裂解液 2",
+            "变性条件"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "condition": "裂解液种类和搅拌吹打条件是什么？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 10,
+          "title": "离心收集变性裂解上清",
+          "instruction": "以 10000g、4℃ 离心 30min，收集上清液。",
+          "protocol_values": {
+            "temperature": "4℃",
+            "duration": "30min",
+            "condition": "10000g 离心"
+          },
+          "must_record": [
+            "temperature",
+            "duration",
+            "condition"
+          ],
+          "terms": [
+            "变性裂解液",
+            "上清液",
+            "离心"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "temperature": "离心温度是多少？",
+            "duration": "离心多长时间？",
+            "condition": "离心力和收集物是什么？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 11,
+          "title": "平衡 Ni-NTA 亲和柱",
+          "instruction": "将 Ni-NTA Agarose 装填柱子并连接于 Pharmacia 低压液相层析系统，用 5 倍柱体积的裂解液 2 平衡 Ni-NTA Agarose，调节 A280 值至零线。",
+          "protocol_values": {
+            "condition": "用 5 倍柱体积裂解液 2 平衡；A280 调至零线"
+          },
+          "must_record": [
+            "condition"
+          ],
+          "terms": [
+            "Ni-NTA Agarose",
+            "亲和层析",
+            "A280",
+            "裂解液 2"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "condition": "亲和柱平衡液体积和 A280 基线条件是什么？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 12,
+          "title": "上样并清洗亲和柱",
+          "instruction": "将适量上清液上样到 Ni-NTA Agarose 柱中，用 lysis buffer 冲洗至 A280 值低于 0.01。再分别用 5～10 倍柱体积的清洗液 1 和清洗液 2（Wash buffer 1 and 2）清洗柱子，直至 A280 值低于 0.01。",
+          "protocol_values": {
+            "condition": "A280<0.01；清洗液 1、2 各 5～10 倍柱体积"
+          },
+          "must_record": [
+            "condition"
+          ],
+          "terms": [
+            "Ni-NTA Agarose",
+            "上样",
+            "Wash buffer",
+            "A280"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "condition": "上样和两种清洗液的体积、A280 终点是什么？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 13,
+          "title": "洗脱重组蛋白",
+          "instruction": "用洗脱液（Elution buffer）洗脱重组蛋白，在 A280 值监测下，收集出现峰线后含有重组蛋白的全部洗脱液。",
+          "protocol_values": {
+            "condition": "A280 监测峰线并收集含重组蛋白的洗脱液"
+          },
+          "must_record": [
+            "condition"
+          ],
+          "terms": [
+            "洗脱液",
+            "重组蛋白",
+            "A280",
+            "洗脱峰"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "condition": "洗脱液和洗脱峰收集条件是什么？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 14,
+          "title": "透析复性并冻干定量",
+          "instruction": "纯化后的蛋白用浓度梯度逐步降低的尿素溶液缓慢透析，最终用 0.01×PBS 透析。透析后的蛋白质溶液冻干成粉状。以牛血清白蛋白（BSA）为标准，采用 BIO-RAD 蛋白质定量试剂（protein assay）比色测定蛋白质含量。",
+          "protocol_values": {
+            "concentration": "0.01×PBS",
+            "condition": "尿素梯度降低透析；最终 0.01×PBS；BSA 作标准"
+          },
+          "must_record": [
+            "concentration",
+            "condition"
+          ],
+          "terms": [
+            "蛋白复性",
+            "尿素透析",
+            "冻干",
+            "BSA",
+            "蛋白定量"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "concentration": "最终透析 PBS 浓度是多少？",
+            "condition": "尿素透析梯度、冻干和 BSA 定量条件是什么？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        }
+      ]
+    },
+    {
+      "protocol_id": "pcr",
+      "title": "PCR",
+      "source": "国内重点实验室分子生物学实验方法汇总",
+      "version": "1.0",
+      "schema_version": 1,
+      "steps": [
+        {
+          "step_number": 1,
+          "title": "选择 DNA 聚合酶",
+          "instruction": "实验室常用 DNA 聚合酶有 TaKaRa Taq、TaKaRa EXTaq 和 Pyrobest DNA Polymerase。TaKaRa Taq 价格较低但保真性较差，常用于基因表达检测；TaKaRa EXTaq 具有一定保真性，扩增产物 3′ 端带有一个 A 碱基，适用于直接克隆到 T-vector；Pyrobest 具有很高的保真性，扩增产物为平滑末端，进行基因扩增时可选用。",
+          "protocol_values": {},
+          "must_record": [],
+          "terms": [
+            "DNA 聚合酶",
+            "TaKaRa Taq",
+            "TaKaRa EXTaq",
+            "Pyrobest"
+          ],
+          "hazard_note": null,
+          "field_prompts": {},
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 2,
+          "title": "配制 Taq/EXTaq 反应液",
+          "instruction": "按 50µl 反应体系配制 TaKaRa Taq 或 TaKaRa EXTaq 反应液：10× PCR buffer（不含 Mg2+）5µl；MgCl2（25mM），TaKaRa Taq 加 3µl、TaKaRa EXTaq 加 4µl；2.5mM dNTP mix 4µl；10µM 上游引物 1µl；10µM 下游引物 1µl；模板 DNA 1µl；Taq 或 EXTaq DNA Polymerase 0.25µl；无菌去离子水补足至 50µl。反应总体积可根据实际情况调节为 20～50µl。将各成分加入 0.2ml 或 0.5ml 灭菌 PCR 薄壁管中；若不使用 PCR 仪加热盖，可在反应混合液上层加入 30～50µl 矿物油，以防 PCR 过程中蒸发。",
+          "protocol_values": {
+            "amount_value": "50",
+            "amount_unit": "µl",
+            "condition": "MgCl2 25mM；dNTP mix 2.5mM；上下游引物各 10µM；反应总体积可调为 20～50µl"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "condition"
+          ],
+          "terms": [
+            "PCR 反应液",
+            "Taq",
+            "EXTaq",
+            "MgCl2",
+            "dNTP",
+            "引物"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "amount_value": "PCR 反应总体积是多少？",
+            "amount_unit": "反应体积单位是什么？",
+            "condition": "MgCl2、dNTP 和引物的浓度及反应体积是多少？"
+          },
+          "value_aliases": {},
+          "substeps": [
+            {
+              "order": 1,
+              "text": "10× PCR buffer（Mg2+ free）5µl；MgCl2（25mM）：TaKaRa Taq 加 3µl，TaKaRa EXTaq 加 4µl。",
+              "note": null
+            },
+            {
+              "order": 2,
+              "text": "2.5mM dNTP mix 4µl；10µM 上游引物 1µl；10µM 下游引物 1µl；模板 DNA 1µl；Taq 或 EXTaq DNA Polymerase 0.25µl。",
+              "note": null
+            },
+            {
+              "order": 3,
+              "text": "无菌去离子水补足至 50µl；各成分加入 0.2ml 或 0.5ml 灭菌 PCR 薄壁管中。",
+              "note": null
+            },
+            {
+              "order": 4,
+              "text": "若不使用 PCR 仪加热盖，可在反应混合液上层加入 30～50µl 矿物油，防止 PCR 过程中样品蒸发。",
+              "note": null
+            }
+          ]
+        },
+        {
+          "step_number": 3,
+          "title": "配制 Pyrobest 反应液",
+          "instruction": "按 50µl 反应体系配制 Pyrobest DNA Polymerase 反应液：10× Pyrobest buffer 5µl；2.5mM dNTP mix 4µl；10µM 上游引物 1µl；10µM 下游引物 1µl；模板 DNA 1µl；Pyrobest DNA Polymerase 0.25µl；无菌去离子水补足至 50µl。",
+          "protocol_values": {
+            "amount_value": "50",
+            "amount_unit": "µl",
+            "condition": "dNTP mix 2.5mM；上下游引物各 10µM"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "condition"
+          ],
+          "terms": [
+            "Pyrobest",
+            "PCR 反应液",
+            "dNTP",
+            "引物",
+            "模板 DNA"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "amount_value": "PCR 反应总体积是多少？",
+            "amount_unit": "反应体积单位是什么？",
+            "condition": "dNTP 和引物的浓度是多少？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 4,
+          "title": "进行 PCR 扩增并分析产物",
+          "instruction": "按设定程序进行 PCR 扩增。PCR 反应条件会因模板、引物等结构条件不同而变化，实际操作中应根据具体情况和 PCR 结果进行优化。反应结束后，取 5µl 扩增样品进行琼脂糖凝胶电泳分析，用 DNA marker 判断扩增片段大小，或将样品冷冻保存以备后续分析。",
+          "protocol_values": {
+            "amount_value": "5",
+            "amount_unit": "µl",
+            "instrument": "PCR 仪；琼脂糖凝胶电泳装置"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "instrument"
+          ],
+          "terms": [
+            "PCR 扩增",
+            "琼脂糖凝胶电泳",
+            "DNA marker",
+            "扩增片段"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "amount_value": "用于电泳分析的扩增样品体积是多少？",
+            "amount_unit": "样品体积单位是什么？",
+            "instrument": "使用了哪些扩增和电泳设备？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        }
+      ]
+    },
+    {
+      "protocol_id": "dna-gel-extraction",
+      "title": "胶回收纯化 DNA",
+      "source": "国内重点实验室分子生物学实验方法汇总",
+      "version": "1.0",
+      "schema_version": 1,
+      "steps": [
+        {
+          "step_number": 1,
+          "title": "切取并称量 DNA 条带",
+          "instruction": "进行琼脂糖电泳后，用刀切下目标电泳带，放入 EP 管中并称量琼脂糖带的重量。",
+          "protocol_values": {},
+          "must_record": [],
+          "terms": [
+            "琼脂糖电泳",
+            "DNA 条带",
+            "EP 管"
+          ],
+          "hazard_note": null,
+          "field_prompts": {},
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 2,
+          "title": "溶解琼脂糖胶块",
+          "instruction": "按每 100mg 琼脂糖加入 400µl binding buffer 的比例加入缓冲液。将 EP 管放入振荡器中，在 45～55℃ 下温育并振荡，直至所有琼脂糖溶解，约需 5 分钟。",
+          "protocol_values": {
+            "amount_value": "400",
+            "amount_unit": "µl",
+            "temperature": "45～55℃",
+            "duration": "约 5 分钟",
+            "condition": "每 100mg 琼脂糖加入 400µl binding buffer"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "temperature",
+            "duration",
+            "condition"
+          ],
+          "terms": [
+            "琼脂糖胶块",
+            "binding buffer",
+            "振荡溶解"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "amount_value": "每 100mg 胶块加入多少 binding buffer？",
+            "amount_unit": "binding buffer 体积单位是什么？",
+            "temperature": "温育温度范围是多少？",
+            "duration": "胶块完全溶解需要多长时间？",
+            "condition": "胶块重量与 binding buffer 的比例是多少？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 3,
+          "title": "上样并结合纯化柱",
+          "instruction": "取出纯化柱，将琼脂糖溶解液转移至柱中，室温放置 2 分钟，以 8000rpm 离心 1 分钟。弃去 EP 管中的液体，再将纯化柱放回 EP 管中。",
+          "protocol_values": {
+            "duration": "室温放置 2 分钟；离心 1 分钟",
+            "condition": "8000rpm 离心"
+          },
+          "must_record": [
+            "duration",
+            "condition"
+          ],
+          "terms": [
+            "纯化柱",
+            "琼脂糖溶解液",
+            "离心"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "duration": "上柱静置和离心分别持续多长时间？",
+            "condition": "离心转速是多少？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 4,
+          "title": "洗涤纯化柱",
+          "instruction": "向纯化柱中加入 500µl wash buffer，以 8000rpm 离心 1 分钟，弃去管中的溶液。",
+          "protocol_values": {
+            "amount_value": "500",
+            "amount_unit": "µl",
+            "duration": "1 分钟",
+            "condition": "8000rpm 离心"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "duration",
+            "condition"
+          ],
+          "terms": [
+            "wash buffer",
+            "纯化柱",
+            "离心"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "amount_value": "每次加入 wash buffer 多少微升？",
+            "amount_unit": "wash buffer 体积单位是什么？",
+            "duration": "洗涤离心多长时间？",
+            "condition": "洗涤离心转速是多少？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 5,
+          "title": "重复洗涤并去除残液",
+          "instruction": "重复第 4 步 1 次。最后将纯化柱放入 EP 管中，以 10000rpm 离心 30 秒，除去痕量 wash buffer。",
+          "protocol_values": {
+            "duration": "30 秒",
+            "condition": "重复洗涤 1 次；10000rpm 离心"
+          },
+          "must_record": [
+            "duration",
+            "condition"
+          ],
+          "terms": [
+            "纯化柱",
+            "wash buffer",
+            "离心"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "duration": "去除残留 wash buffer 的离心时间是多少？",
+            "condition": "洗涤重复次数和最终离心转速是多少？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 6,
+          "title": "洗脱并保存 DNA",
+          "instruction": "将纯化柱放入新的 EP 管，向纯化柱膜中央加入 30～40µl H2O 或 elution buffer，在 37℃ 或 50℃ 下放置 2 分钟，以 10000rpm 离心 1 分钟洗脱 DNA。将 EP 管中的 DNA 溶液置于 -20℃ 保存。",
+          "protocol_values": {
+            "amount_value": "30～40",
+            "amount_unit": "µl",
+            "temperature": "37℃ 或 50℃；保存 -20℃",
+            "duration": "温育 2 分钟；离心 1 分钟",
+            "condition": "10000rpm 离心；H2O 或 elution buffer 洗脱"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "temperature",
+            "duration",
+            "condition"
+          ],
+          "terms": [
+            "DNA 洗脱",
+            "elution buffer",
+            "纯化柱",
+            "EP 管"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "amount_value": "洗脱液体积范围是多少？",
+            "amount_unit": "洗脱液体积单位是什么？",
+            "temperature": "洗脱温度和保存温度分别是多少？",
+            "duration": "温育和洗脱离心分别持续多长时间？",
+            "condition": "洗脱液种类和离心转速是多少？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 7,
+          "title": "无电泳直接纯化 DNA",
+          "instruction": "若不经过电泳而直接纯化 DNA 溶液，只需在第 2 步中按每 100µl 液体加入 400µl binding buffer，其余步骤不变。",
+          "protocol_values": {
+            "amount_value": "400",
+            "amount_unit": "µl",
+            "condition": "每 100µl 液体加入 400µl binding buffer；其余步骤不变"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "condition"
+          ],
+          "terms": [
+            "DNA 溶液",
+            "binding buffer",
+            "直接纯化"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "amount_value": "每 100µl 样品加入多少 binding buffer？",
+            "amount_unit": "binding buffer 体积单位是什么？",
+            "condition": "直接纯化时第 2 步的加液比例是什么？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        }
+      ]
+    },
+    {
+      "protocol_id": "transformation",
+      "title": "感受态细胞转化",
+      "source": "国内重点实验室分子生物学实验方法汇总",
+      "version": "1.0",
+      "schema_version": 1,
+      "steps": [
+        {
+          "step_number": 1,
+          "title": "融化感受态细胞",
+          "instruction": "取 100μl 感受态细胞，在冰浴上融化。",
+          "protocol_values": {
+            "amount_value": "100",
+            "amount_unit": "μl",
+            "condition": "冰浴融化"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "condition"
+          ],
+          "terms": [
+            "感受态细胞",
+            "冰浴"
+          ],
+          "hazard_note": "涉及活菌材料，应遵守生物安全和无菌操作规范",
+          "field_prompts": {
+            "amount_value": "取用感受态细胞的体积是多少？",
+            "amount_unit": "细胞悬液体积单位是什么？",
+            "condition": "感受态细胞采用什么融化条件？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 2,
+          "title": "加入质粒或连接产物",
+          "instruction": "加入 1μl 纯质粒或连接产物，轻轻吹打混匀，冰浴 30min。",
+          "protocol_values": {
+            "amount_value": "1",
+            "amount_unit": "μl",
+            "duration": "30min",
+            "condition": "轻轻吹打混匀后冰浴"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "duration",
+            "condition"
+          ],
+          "terms": [
+            "纯质粒",
+            "连接产物",
+            "感受态细胞"
+          ],
+          "hazard_note": "涉及活菌和重组 DNA 材料，应遵守生物安全和无菌操作规范",
+          "field_prompts": {
+            "amount_value": "加入质粒或连接产物多少微升？",
+            "amount_unit": "样品体积单位是什么？",
+            "duration": "冰浴多长时间？",
+            "condition": "样品混匀方式和冰浴条件是什么？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 3,
+          "title": "热激并冰浴",
+          "instruction": "将菌液放入 42℃ 水浴中热激 90 秒，立即放入冰浴中 2min。",
+          "protocol_values": {
+            "temperature": "42℃",
+            "duration": "热激 90 秒；冰浴 2min",
+            "condition": "先热激后立即冰浴"
+          },
+          "must_record": [
+            "temperature",
+            "duration",
+            "condition"
+          ],
+          "terms": [
+            "热激",
+            "水浴",
+            "冰浴",
+            "转化"
+          ],
+          "hazard_note": "涉及活菌转化操作，应遵守生物安全和无菌操作规范",
+          "field_prompts": {
+            "temperature": "热激水浴温度是多少？",
+            "duration": "热激和后续冰浴分别持续多长时间？",
+            "condition": "热激与冰浴的先后条件是什么？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 4,
+          "title": "复苏转化菌液",
+          "instruction": "加入 0.9ml SOC，于 37℃、200rpm 恒温摇床上温育 1h。",
+          "protocol_values": {
+            "amount_value": "0.9",
+            "amount_unit": "ml",
+            "temperature": "37℃",
+            "duration": "1h",
+            "condition": "200rpm 恒温摇床"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "temperature",
+            "duration",
+            "condition"
+          ],
+          "terms": [
+            "SOC",
+            "转化菌液",
+            "恒温摇床",
+            "复苏"
+          ],
+          "hazard_note": "涉及活菌培养，应遵守生物安全和无菌操作规范",
+          "field_prompts": {
+            "amount_value": "加入 SOC 培养基的体积是多少？",
+            "amount_unit": "SOC 体积单位是什么？",
+            "temperature": "复苏温度是多少？",
+            "duration": "复苏温育多长时间？",
+            "condition": "恒温摇床转速是多少？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 5,
+          "title": "离心并涂布平板",
+          "instruction": "将菌液以 4000rpm/min 离心 3min，保留 200μl 上清液并将菌体打散，均匀涂布于含适当抗生素的琼脂平板表面。平板于 37℃ 倒置培养过夜。",
+          "protocol_values": {
+            "amount_value": "200",
+            "amount_unit": "μl",
+            "temperature": "37℃",
+            "duration": "离心 3min；平板培养过夜",
+            "condition": "4000rpm/min 离心；保留 200μl 上清涂布；含适当抗生素的琼脂平板"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "temperature",
+            "duration",
+            "condition"
+          ],
+          "terms": [
+            "离心",
+            "菌体",
+            "琼脂平板",
+            "抗生素",
+            "涂布"
+          ],
+          "hazard_note": "涉及活菌和抗生素筛选，应遵守生物安全和无菌操作规范",
+          "field_prompts": {
+            "amount_value": "涂布时保留多少上清液？",
+            "amount_unit": "上清液体积单位是什么？",
+            "temperature": "平板培养温度是多少？",
+            "duration": "离心和培养分别持续多长时间？",
+            "condition": "离心转速、涂布平板和培养方式是什么？"
+          },
+          "value_aliases": {},
+          "substeps": [
+            {
+              "order": 1,
+              "text": "新倒的平板可在 37℃ 培养箱中预先放置数小时至过夜，使平板干燥。",
+              "note": null
+            },
+            {
+              "order": 2,
+              "text": "转化 TA 克隆连接产物时，可在菌液中加入 8μl 1M IPTG 和 40μl 20mg/ml X-gal，进行蓝白斑筛选。",
+              "note": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "protocol_id": "competent-cell-preparation",
+      "title": "感受态细胞的制备",
+      "source": "国内重点实验室分子生物学实验方法汇总",
+      "version": "1.0",
+      "schema_version": 1,
+      "steps": [
+        {
+          "step_number": 1,
+          "title": "培养 E. coli 单菌落",
+          "instruction": "挑取适当菌株的 E. coli 单菌落，接种于 2ml SOB 培养液中，在 37℃ 摇床培养过夜。",
+          "protocol_values": {
+            "amount_value": "2",
+            "amount_unit": "ml",
+            "temperature": "37℃",
+            "duration": "过夜"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "temperature",
+            "duration"
+          ],
+          "terms": [
+            "E. coli",
+            "单菌落",
+            "SOB 培养液"
+          ],
+          "hazard_note": "涉及活菌培养，应遵守相应生物安全和无菌操作规范",
+          "field_prompts": {
+            "amount_value": "接种的 SOB 培养液体积是多少？",
+            "amount_unit": "培养液体积单位是什么？",
+            "temperature": "摇床培养温度是多少？",
+            "duration": "培养持续多长时间？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 2,
+          "title": "扩大培养并监测 A600",
+          "instruction": "取 0.5～1ml 过夜培养的菌液，转种到 50ml SOB 中，在 18℃ 剧烈震荡培养，直到 A600 达到 0.6。",
+          "protocol_values": {
+            "amount_value": "0.5～1",
+            "amount_unit": "ml",
+            "temperature": "18℃",
+            "condition": "培养至 A600=0.6"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "temperature",
+            "condition"
+          ],
+          "terms": [
+            "过夜菌液",
+            "SOB",
+            "A600"
+          ],
+          "hazard_note": "涉及活菌培养，应遵守相应生物安全和无菌操作规范",
+          "field_prompts": {
+            "amount_value": "接种过夜菌液的体积是多少？",
+            "amount_unit": "菌液体积单位是什么？",
+            "temperature": "扩大培养温度是多少？",
+            "condition": "培养终点 A600 是多少？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 3,
+          "title": "低温离心收集菌体",
+          "instruction": "将培养物转移到 50ml 离心管中，在 4℃、4000rpm 下离心 10min。同时在冰浴上配制 TB 溶液。",
+          "protocol_values": {
+            "amount_value": "50",
+            "amount_unit": "ml",
+            "temperature": "4℃",
+            "duration": "10min",
+            "condition": "4000rpm 离心；同步在冰浴上配制 TB"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "temperature",
+            "duration",
+            "condition"
+          ],
+          "terms": [
+            "菌体",
+            "离心",
+            "TB 溶液"
+          ],
+          "hazard_note": "涉及活菌培养物，应按生物安全要求操作",
+          "field_prompts": {
+            "amount_value": "转移培养物的体积是多少？",
+            "amount_unit": "培养物体积单位是什么？",
+            "temperature": "离心温度是多少？",
+            "duration": "离心多长时间？",
+            "condition": "离心转速和 TB 配制条件是什么？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 4,
+          "title": "弃上清并沥干菌体",
+          "instruction": "弃去上清液，将离心管倒置于滤纸上，使残留培养液被吸干。",
+          "protocol_values": {
+            "condition": "离心管倒置于滤纸上沥干"
+          },
+          "must_record": [
+            "condition"
+          ],
+          "terms": [
+            "上清液",
+            "菌体沉淀",
+            "滤纸"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "condition": "菌体沉淀采用什么沥干条件？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 5,
+          "title": "TB 洗涤并再次离心",
+          "instruction": "取 1ml 新配 TB 溶液打散菌体沉淀，再加入 15ml TB（约为起始培养液体积的 1/3）。冰浴 10～15min 后，在 4℃、4000rpm 下离心 10min。",
+          "protocol_values": {
+            "amount_value": "1",
+            "amount_unit": "ml",
+            "temperature": "4℃",
+            "duration": "冰浴 10～15min；离心 10min",
+            "condition": "先用 1ml TB 打散，再加入 15ml TB；4000rpm 离心"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "temperature",
+            "duration",
+            "condition"
+          ],
+          "terms": [
+            "TB 溶液",
+            "菌体沉淀",
+            "冰浴",
+            "离心"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "amount_value": "首次打散沉淀使用多少 TB？",
+            "amount_unit": "TB 体积单位是什么？",
+            "temperature": "离心温度是多少？",
+            "duration": "冰浴和离心分别持续多长时间？",
+            "condition": "TB 分步加入体积和离心条件是什么？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 6,
+          "title": "TB 重悬并冰浴",
+          "instruction": "弃去上清液，将沉淀重悬于 4ml TB（约为起始培养液体积的 1/12.5），冰浴 10min。",
+          "protocol_values": {
+            "amount_value": "4",
+            "amount_unit": "ml",
+            "duration": "10min",
+            "condition": "TB 重悬；冰浴"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "duration",
+            "condition"
+          ],
+          "terms": [
+            "菌体沉淀",
+            "TB",
+            "重悬",
+            "冰浴"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "amount_value": "重悬沉淀使用多少 TB？",
+            "amount_unit": "TB 体积单位是什么？",
+            "duration": "冰浴多长时间？",
+            "condition": "TB 重悬和冰浴条件是什么？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 7,
+          "title": "加入 DMSO 并冰浴",
+          "instruction": "加入 280μl DMSO，缓慢滴加并轻轻摇晃，使其充分混匀，冰浴 10min。",
+          "protocol_values": {
+            "amount_value": "280",
+            "amount_unit": "μl",
+            "duration": "10min",
+            "condition": "缓慢滴加、轻轻摇晃、冰浴"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "duration",
+            "condition"
+          ],
+          "terms": [
+            "DMSO",
+            "感受态细胞",
+            "冰浴"
+          ],
+          "hazard_note": "涉及 DMSO，可能促进其他物质经皮吸收，操作时应佩戴手套并避免皮肤接触",
+          "field_prompts": {
+            "amount_value": "加入 DMSO 的体积是多少？",
+            "amount_unit": "DMSO 体积单位是什么？",
+            "duration": "DMSO 加入后冰浴多长时间？",
+            "condition": "DMSO 的加入和混匀方式是什么？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 8,
+          "title": "分装并冻存感受态细胞",
+          "instruction": "将菌液分装于 EP 管中，在 -80℃ 或液氮中冻存。",
+          "protocol_values": {
+            "temperature": "-80℃ 或液氮",
+            "condition": "分装于 EP 管后冻存"
+          },
+          "must_record": [
+            "temperature",
+            "condition"
+          ],
+          "terms": [
+            "感受态细胞",
+            "EP 管",
+            "冻存",
+            "液氮"
+          ],
+          "hazard_note": "涉及液氮，操作时应做好低温防护，谨防冻伤；涉及活菌材料，应遵守生物安全规范",
+          "field_prompts": {
+            "temperature": "感受态细胞采用哪种冻存温度或介质？",
+            "condition": "菌液如何分装和冻存？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 9,
+          "title": "检测感受态质量",
+          "instruction": "取两管感受态细胞，分别加入 1μl 无菌 ddH2O（阴性对照）和 1μl 纯质粒（阳性对照）进行转化，以检测感受态质量。阴性对照平板应无菌落生长；阳性对照平板菌落数的多少可反映感受态效率。",
+          "protocol_values": {
+            "amount_value": "1",
+            "amount_unit": "μl",
+            "condition": "无菌 ddH2O 作阴性对照；纯质粒作阳性对照"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "condition"
+          ],
+          "terms": [
+            "感受态细胞",
+            "阴性对照",
+            "阳性对照",
+            "转化"
+          ],
+          "hazard_note": "涉及活菌和质粒转化，应遵守相应生物安全和无菌操作规范",
+          "field_prompts": {
+            "amount_value": "每管对照加入多少微升样品？",
+            "amount_unit": "对照样品体积单位是什么？",
+            "condition": "阴性和阳性对照分别使用什么材料，预期结果是什么？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 10,
+          "title": "配制 SOB 培养液",
+          "instruction": "SOB 培养液配方：蛋白胨 20g、酵母提取物 5g、NaCl 0.58g、KCl 0.186g、100×Mg²⁺ 溶液 10ml；溶解后加水定容至 1L，在 121℃ 下高压蒸汽灭菌 20min。",
+          "protocol_values": {
+            "amount_value": "10",
+            "amount_unit": "ml",
+            "temperature": "121℃",
+            "duration": "20min",
+            "condition": "加水定容至 1L；高压蒸汽灭菌"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "temperature",
+            "duration",
+            "condition"
+          ],
+          "terms": [
+            "SOB",
+            "蛋白胨",
+            "酵母提取物",
+            "100×Mg²⁺"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "amount_value": "加入 100×Mg²⁺ 溶液多少毫升？",
+            "amount_unit": "溶液体积单位是什么？",
+            "temperature": "高压灭菌温度是多少？",
+            "duration": "高压灭菌多长时间？",
+            "condition": "SOB 各组分用量和定容体积是多少？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 11,
+          "title": "配制 100×Mg²⁺ 溶液",
+          "instruction": "100×Mg²⁺ 溶液由 MgCl2·6H2O 和 MgSO4·7H2O 配制，溶解后加水定容至 100ml，在 121℃ 下高压蒸汽灭菌 20min。原始文本未给出两种盐的称量数值，故不擅自补写。",
+          "protocol_values": {
+            "amount_value": "100",
+            "amount_unit": "ml",
+            "temperature": "121℃",
+            "duration": "20min",
+            "condition": "MgCl2·6H2O 与 MgSO4·7H2O；加水定容至 100ml"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "temperature",
+            "duration",
+            "condition"
+          ],
+          "terms": [
+            "100×Mg²⁺ 溶液",
+            "MgCl2·6H2O",
+            "MgSO4·7H2O"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "amount_value": "100×Mg²⁺ 溶液最终体积是多少？",
+            "amount_unit": "溶液体积单位是什么？",
+            "temperature": "高压灭菌温度是多少？",
+            "duration": "高压灭菌多长时间？",
+            "condition": "两种镁盐的具体称量值和配制比例是什么？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        },
+        {
+          "step_number": 12,
+          "title": "配制 TB 溶液",
+          "instruction": "TB 溶液配方：1M KCl 5ml、0.55M MnCl2 2ml、0.5M CaCl2 0.6ml、0.1M K-Pipes（pH6.7）2ml、ddH2O 10.4ml，总体积 20ml。上述溶液均需高压蒸汽灭菌处理。",
+          "protocol_values": {
+            "amount_value": "20",
+            "amount_unit": "ml",
+            "condition": "1M KCl 5ml；0.55M MnCl2 2ml；0.5M CaCl2 0.6ml；0.1M K-Pipes 2ml；ddH2O 10.4ml；均需高压蒸汽灭菌"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "condition"
+          ],
+          "terms": [
+            "TB",
+            "KCl",
+            "MnCl2",
+            "CaCl2",
+            "K-Pipes"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "amount_value": "TB 溶液最终体积是多少？",
+            "amount_unit": "溶液体积单位是什么？",
+            "condition": "TB 各母液和水的体积、浓度及灭菌要求是什么？"
+          },
+          "value_aliases": {},
+          "substeps": []
+        }
+      ]
+    },
+    {
+      "protocol_id": "colony-pcr-protocol",
+      "title": "菌落PCR实验方案",
+      "source": "AI生成草稿",
+      "version": "1.0",
+      "schema_version": 1,
+      "steps": [
+        {
+          "step_number": 1,
+          "title": "制备菌落模板",
+          "instruction": "用无菌枪头挑取单个菌落，放入含有20-50 μL无菌水的PCR管中，充分混匀，作为PCR模板。",
+          "protocol_values": {
+            "action": "挑取单菌落",
+            "object": "无菌水",
+            "amount_value": "20-50",
+            "amount_unit": "μL",
+            "temperature": "室温",
+            "duration": "1-2分钟",
+            "condition": "无菌操作",
+            "observation": "菌落分散均匀"
+          },
+          "must_record": [
+            "action",
+            "object",
+            "amount_value",
+            "amount_unit"
+          ],
+          "terms": [
+            "单菌落",
+            "无菌水"
+          ],
+          "hazard_note": null,
+          "field_prompts": {}
+        },
+        {
+          "step_number": 2,
+          "title": "配制PCR反应体系",
+          "instruction": "在冰上配制20 μL PCR反应体系：依次加入10x Buffer 2 μL，dNTP 0.4 μL，正向引物0.4 μL，反向引物0.4 μL，Taq DNA聚合酶0.2 μL，模板1 μL，最后加ddH2O补足至20 μL。",
+          "protocol_values": {
+            "action": "配制反应体系",
+            "object": "PCR反应管",
+            "amount_value": "20",
+            "amount_unit": "μL",
+            "concentration": "10x Buffer, 2.5mM dNTP, 10μM引物, 5U/μL Taq",
+            "temperature": "冰上",
+            "condition": "避免气泡",
+            "instrument": "微量移液器"
+          },
+          "must_record": [
+            "action",
+            "object",
+            "amount_value",
+            "amount_unit",
+            "concentration"
+          ],
+          "terms": [
+            "PCR反应体系",
+            "10x Buffer",
+            "dNTP",
+            "引物",
+            "Taq DNA聚合酶",
+            "ddH2O"
+          ],
+          "hazard_note": "Taq酶和dNTP需低温保存，操作时置于冰上，避免反复冻融。",
+          "field_prompts": {}
+        },
+        {
+          "step_number": 3,
+          "title": "PCR扩增",
+          "instruction": "将配制好的PCR反应管放入PCR仪，设置程序：95℃预变性5分钟；95℃变性30秒，55℃退火30秒，72℃延伸1分钟（根据产物长度调整），循环30-35次；最后72℃延伸10分钟，4℃保存。",
+          "protocol_values": {
+            "action": "运行PCR程序",
+            "object": "PCR仪",
+            "temperature": "95℃/55℃/72℃",
+            "duration": "5分钟/30秒/30秒/1分钟/10分钟",
+            "condition": "循环30-35次",
+            "instrument": "PCR仪"
+          },
+          "must_record": [
+            "action",
+            "object",
+            "temperature",
+            "duration",
+            "condition"
+          ],
+          "terms": [
+            "预变性",
+            "变性",
+            "退火",
+            "延伸",
+            "循环"
+          ],
+          "hazard_note": "PCR仪运行时高温，注意避免烫伤。",
+          "field_prompts": {}
+        },
+        {
+          "step_number": 4,
+          "title": "琼脂糖凝胶电泳验证",
+          "instruction": "取5 μL PCR产物与1 μL 6x上样缓冲液混合，点样于1%琼脂糖凝胶（含核酸染料），在1x TAE缓冲液中以120V电泳20-30分钟，然后在紫外灯或凝胶成像系统下观察结果。",
+          "protocol_values": {
+            "action": "电泳检测",
+            "object": "PCR产物",
+            "amount_value": "5",
+            "amount_unit": "μL",
+            "concentration": "1%琼脂糖凝胶",
+            "temperature": "室温",
+            "duration": "20-30分钟",
+            "condition": "120V电压",
+            "observation": "在紫外灯下观察条带",
+            "instrument": "琼脂糖凝胶电泳仪、凝胶成像系统"
+          },
+          "must_record": [
+            "action",
+            "object",
+            "amount_value",
+            "amount_unit",
+            "concentration",
+            "duration",
+            "observation"
+          ],
+          "terms": [
+            "琼脂糖凝胶电泳",
+            "上样缓冲液",
+            "TAE缓冲液",
+            "核酸染料",
+            "紫外灯"
+          ],
+          "hazard_note": "紫外灯下操作需佩戴防护眼镜，避免皮肤暴露。核酸染料具有毒性，操作时戴手套。",
+          "field_prompts": {}
+        }
+      ]
+    },
+    {
+      "protocol_id": "colony-pcr-40s-ribosomal",
+      "title": "菌落PCR扩增40S核糖体蛋白S15等目的片段实验方案",
+      "source": "AI生成草稿",
+      "version": "1.0",
+      "schema_version": 1,
+      "steps": [
+        {
+          "step_number": 1,
+          "title": "制备菌落模板",
+          "instruction": "用无菌枪头或牙签挑取单个菌落，放入含有20µL无菌水的PCR管中，充分混匀，作为PCR模板。",
+          "protocol_values": {
+            "object": "单菌落",
+            "amount_value": "1",
+            "amount_unit": "个",
+            "condition": "无菌操作",
+            "instrument": "PCR管、无菌枪头或牙签"
+          },
+          "must_record": [
+            "object",
+            "amount_value",
+            "amount_unit"
+          ],
+          "terms": [
+            "单菌落",
+            "无菌水"
+          ],
+          "hazard_note": null,
+          "field_prompts": {}
+        },
+        {
+          "step_number": 2,
+          "title": "配制PCR反应体系",
+          "instruction": "在冰上配制20µL反应体系：取上述菌落模板2µL，加入10×Buffer 2µL、dNTP(10mM each) 0.4µL、Forward Primer(10µM) 0.4µL、Reverse Primer(10µM) 0.4µL、Taq(5U/µL) 0.2µL，最后用ddH2O补足至20µL。",
+          "protocol_values": {
+            "action": "配制",
+            "object": "PCR反应体系",
+            "amount_unit": "µL",
+            "concentration": "10×Buffer, 10mM dNTP, 10µM引物, 5U/µL Taq",
+            "condition": "冰上操作",
+            "instrument": "微量移液器、PCR管"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "concentration"
+          ],
+          "terms": [
+            "10×Buffer",
+            "dNTP",
+            "Forward Primer",
+            "Reverse Primer",
+            "Taq DNA聚合酶",
+            "ddH2O"
+          ],
+          "hazard_note": null,
+          "field_prompts": {
+            "amount_value": "请确认反应体系总体积是否为20µL？"
+          }
+        },
+        {
+          "step_number": 3,
+          "title": "PCR扩增",
+          "instruction": "将配制好的PCR管放入PCR仪，运行程序：预变性94°C 3min；然后32个循环（94°C变性30s、55°C退火30s、72°C延伸1min）；最后72°C延伸5min。",
+          "protocol_values": {
+            "action": "扩增",
+            "object": "目的片段",
+            "temperature": "94°C, 55°C, 72°C",
+            "duration": "3min, 30s, 30s, 1min, 5min",
+            "condition": "32个循环",
+            "instrument": "PCR仪"
+          },
+          "must_record": [
+            "temperature",
+            "duration",
+            "condition"
+          ],
+          "terms": [
+            "预变性",
+            "变性",
+            "退火",
+            "延伸",
+            "循环"
+          ],
+          "hazard_note": null,
+          "field_prompts": {}
+        },
+        {
+          "step_number": 4,
+          "title": "琼脂糖凝胶电泳检测",
+          "instruction": "取5µL PCR产物进行琼脂糖凝胶电泳，以合适分子量Marker为参照，电泳后使用凝胶成像系统观察并记录结果。",
+          "protocol_values": {
+            "action": "电泳检测",
+            "object": "PCR产物",
+            "amount_unit": "µL",
+            "instrument": "琼脂糖凝胶电泳装置、凝胶成像系统",
+            "observation": "目的条带大小是否正确"
+          },
+          "must_record": [
+            "observation"
+          ],
+          "terms": [
+            "琼脂糖凝胶电泳",
+            "Marker",
+            "凝胶成像"
+          ],
+          "hazard_note": "电泳时注意电压，避免触电；紫外照射时注意防护。",
+          "field_prompts": {}
+        }
+      ]
+    },
+    {
+      "protocol_id": "colony-pcr-standard",
+      "title": "菌落PCR标准实验方案（20 μL体系）",
+      "source": "AI生成草稿",
+      "version": "1.0",
+      "schema_version": 1,
+      "steps": [
+        {
+          "step_number": 1,
+          "title": "准备PCR反应体系",
+          "instruction": "在冰上配制20 μL PCR反应体系，包含2× PCR Master Mix、上下游引物、模板（单菌落）、无菌水。先计算所需各组分体积，然后依次加入PCR管中，最后用枪头挑取少量单菌落作为模板。",
+          "protocol_values": {
+            "action": "配制反应体系",
+            "object": "PCR管",
+            "amount_value": "20",
+            "amount_unit": "μL",
+            "concentration": "1×",
+            "temperature": "4",
+            "duration": "5",
+            "condition": "冰上操作",
+            "observation": "体系无气泡",
+            "instrument": "移液器、PCR管"
+          },
+          "must_record": [
+            "amount_value",
+            "amount_unit",
+            "concentration",
+            "observation"
+          ],
+          "terms": [
+            "PCR Master Mix",
+            "引物",
+            "模板"
+          ],
+          "hazard_note": "冰上操作，避免酶失活。",
+          "field_prompts": {}
+        },
+        {
+          "step_number": 2,
+          "title": "设置PCR程序并运行",
+          "instruction": "将PCR管放入PCR仪，设置程序：初始变性95°C 3分钟；然后进行32个循环：95°C变性30秒，55°C退火30秒，72°C延伸1分钟（根据产物长度调整）；最后72°C延伸5分钟，4°C保存。启动程序。",
+          "protocol_values": {
+            "action": "运行PCR",
+            "object": "PCR仪",
+            "amount_value": "32",
+            "amount_unit": "循环",
+            "concentration": "无",
+            "temperature": "55",
+            "duration": "30秒",
+            "condition": "退火温度55°C",
+            "observation": "程序运行正常",
+            "instrument": "PCR仪"
+          },
+          "must_record": [
+            "amount_value",
+            "temperature",
+            "duration",
+            "condition"
+          ],
+          "terms": [
+            "变性",
+            "退火",
+            "延伸"
+          ],
+          "hazard_note": "PCR仪高温，注意避免烫伤。",
+          "field_prompts": {}
+        },
+        {
+          "step_number": 3,
+          "title": "琼脂糖凝胶电泳检测",
+          "instruction": "PCR结束后，取5 μL PCR产物与1 μL 6×上样缓冲液混合，点样于1%琼脂糖凝胶（含核酸染料），在1×TAE缓冲液中以120V电泳20-30分钟。结束后在紫外灯或凝胶成像系统下观察条带。",
+          "protocol_values": {
+            "action": "电泳检测",
+            "object": "琼脂糖凝胶",
+            "amount_value": "5",
+            "amount_unit": "μL",
+            "concentration": "1%",
+            "temperature": "室温",
+            "duration": "25分钟",
+            "condition": "电压120V",
+            "observation": "条带清晰",
+            "instrument": "电泳仪、凝胶成像系统"
+          },
+          "must_record": [
+            "amount_value",
+            "concentration",
+            "duration",
+            "observation"
+          ],
+          "terms": [
+            "琼脂糖凝胶电泳",
+            "上样缓冲液",
+            "核酸染料"
+          ],
+          "hazard_note": "紫外灯下操作需佩戴防护面罩或护目镜，避免皮肤暴露。",
+          "field_prompts": {}
+        }
+      ]
     }
   ]
 }

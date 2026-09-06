@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 import settings_store
+import qwen_audio_bridge
 
 router = APIRouter(prefix="/settings", tags=["设置"])
 
@@ -16,11 +17,22 @@ class ModelsPayload(BaseModel):
     provider_label: str | None = None
 
 
+class ProviderPayload(BaseModel):
+    provider_id: str
+    label: str = ""
+    base_url: str = ""
+    model: str = ""
+    api_key: str = ""
+
+
 class SettingsPayload(BaseModel):
     api_key: str | None = None
     provider_id: str | None = None
     base_url: str | None = None
     model_name: str | None = None
+    thinking_level: str | None = None
+    dashscope_api_key: str | None = None
+    dashscope_realtime_model: str | None = None
     tts_enabled: bool | None = None
     speak_record_ack: bool | None = None
     tts_url: str | None = None
@@ -30,11 +42,17 @@ class SettingsPayload(BaseModel):
     tts_model: str | None = None
     tts_voice: str | None = None
     tts_speed: float | None = None
+    tts_access_key: str | None = None
+    tts_secret_key: str | None = None
+    tts_ark_api_key: str | None = None
     mineru_file_parse_url: str | None = None
     mineru_api_key: str | None = None
     ocr_base_url: str | None = None
     ocr_api_key: str | None = None
     ocr_model: str | None = None
+    heartbeat_enabled: bool | None = None
+    heartbeat_time: str | None = None
+    owner_profile: dict | None = None
 
 
 @router.get("")
@@ -61,6 +79,18 @@ def save_settings(payload: SettingsPayload):
     }
 
 
+@router.get("/qwen-audio")
+def qwen_audio_status():
+    """查看 QwenAudio 实时语音服务状态。"""
+    return qwen_audio_bridge.status()
+
+
+@router.post("/qwen-audio/start")
+def qwen_audio_start():
+    """用本项目设置的 DashScope Key 启动 QwenAudio 实时语音。"""
+    return qwen_audio_bridge.start()
+
+
 @router.post("/test")
 def test_settings(payload: SettingsPayload | None = None):
     """真实调用一次接口，验证配置是否可用。"""
@@ -75,6 +105,33 @@ def test_settings(payload: SettingsPayload | None = None):
     else:
         ok, message = settings_store.test_connection()
     return {"ok": ok, "message": message}
+
+
+@router.get("/providers")
+def read_providers():
+    return {"items": settings_store.list_providers(), "settings": settings_store.current().masked()}
+
+
+@router.post("/providers")
+def add_provider(payload: ProviderPayload):
+    try:
+        updated = settings_store.add_provider(
+            provider_id=payload.provider_id,
+            label=payload.label,
+            base_url=payload.base_url,
+            model=payload.model,
+            api_key=payload.api_key,
+        )
+    except ValueError as error:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail=str(error))
+    return {"items": settings_store.list_providers(), "settings": updated.masked()}
+
+
+@router.delete("/providers/{provider_id}")
+def delete_provider(provider_id: str):
+    settings_store.delete_provider(provider_id)
+    return {"items": settings_store.list_providers(), "settings": settings_store.current().masked()}
 
 
 @router.post("/models")

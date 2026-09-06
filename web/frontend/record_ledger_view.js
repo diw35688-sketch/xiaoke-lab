@@ -67,29 +67,69 @@
     }).join('') + '</div>';
   }
 
+  // 时间戳统一按浏览器本地时区显示（数据库存的是 UTC，不能直接取原字符串的 HH:MM）。
+  function parseLocal(value) {
+    if (!value) return null;
+    let text = String(value).trim();
+    // 兼容“2026-09-03 06:32:45”这类无时区的 SQLite 时间：按 UTC 解析。
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(text)) {
+      text = text.replace(' ', 'T') + 'Z';
+    }
+    const date = new Date(text);
+    return isNaN(date.getTime()) ? null : date;
+  }
+
+  function pad2(value) {
+    return String(value).padStart(2, '0');
+  }
+
+  function localDateTime(value) {
+    const date = parseLocal(value);
+    if (!date) return '';
+    return date.getFullYear() + '-' + pad2(date.getMonth() + 1) + '-'
+      + pad2(date.getDate()) + ' ' + pad2(date.getHours()) + ':'
+      + pad2(date.getMinutes());
+  }
+
+  function clockOf(value) {
+    const date = parseLocal(value);
+    return date ? pad2(date.getHours()) + ':' + pad2(date.getMinutes()) : '';
+  }
+
   function renderRecords(items) {
     if (!items || !items.length) {
       return '<section class="ledger-section"><h3>实验口述</h3>'
         + '<div class="ledger-empty">当前实验还没有结构化口述记录。</div></section>';
     }
-    return '<section class="ledger-section"><h3>实验口述</h3>'
+    // 记录本条目：时间戳挂红线外侧、红线上一个点、顶部胶带、右上「已记录」印章。
+    // 装饰件（胶带/印章/页边时间戳）只在纸面皮肤下显形，经典外观仍是干净卡片。
+    return '<section class="ledger-section nb-log"><h3>实验口述</h3>'
       + items.map(item => {
         const entities = Object.keys(item.entities || {}).filter(key => item.entities[key])
-          .map(key => '<span class="ledger-entity">' + esc(key) + '='
+          .map(key => '<span class="ledger-entity fact">' + esc(key) + ' = '
             + esc(item.entities[key]) + '</span>').join('');
         const evaluation = item.evaluation || {};
         const step = item.step?.step?.number;
-        return '<div class="ledger-record"><div class="ledger-record-head">'
+        const clock = clockOf(item.at);
+        const deviations = (evaluation.deviations || []).map(value =>
+          '<div class="ledger-deviation nb-dev"><b>偏差：'
+            + esc(fieldLabel[value.field] || value.field) + '</b>'
+            + '<div>期望：' + esc(value.protocol_value)
+            + ' · 实际：' + esc(value.actual_value) + '</div></div>'
+        ).join('');
+        return '<article class="ledger-record nb-entry">'
+          + (clock ? '<span class="nb-ts">' + esc(clock) + '</span>' : '')
+          + '<span class="nb-dot" aria-hidden="true"></span>'
+          + '<span class="nb-tape" aria-hidden="true"></span>'
+          + '<div class="ledger-record-head nb-head">'
           + '<b>第 ' + esc(item.segment_id) + ' 段</b>'
-          + (step ? '<span>方案步骤 ' + esc(step) + '</span>' : '')
-          + '<span>' + esc(item.at || '') + '</span></div>'
-          + '<p>' + esc(item.transcript) + '</p><div>' + entities + '</div>'
-          + (evaluation.deviations || []).map(value =>
-            '<div class="ledger-deviation"><b>偏差：'
-              + esc(fieldLabel[value.field] || value.field) + '</b>'
-              + '<div>期望：' + esc(value.protocol_value)
-              + ' · 实际：' + esc(value.actual_value) + '</div></div>'
-          ).join('') + '</div>';
+          + (step ? '<span class="nb-step">方案步骤 ' + esc(step) + '</span>' : '')
+          + '<span class="nb-at">' + esc(localDateTime(item.at)) + '</span></div>'
+          + '<p class="nb-text">' + esc(item.transcript) + '</p>'
+          + (entities ? '<div class="nb-facts">' + entities + '</div>' : '')
+          + deviations
+          + '<span class="nb-stamp" aria-hidden="true">已记录</span>'
+          + '</article>';
       }).join('') + '</section>';
   }
 
@@ -104,4 +144,7 @@
   }
 
   window.renderExperimentLedger = renderExperimentLedger;
+  window.renderLedgerRecords = renderRecords;
+  window.renderLedgerProtocol = renderProtocol;
+  window.renderLedgerClarifications = renderClarifications;
 })();

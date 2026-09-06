@@ -9,14 +9,22 @@
   const avatar = state => window.dispatchAvatarState?.(state);
 
   function isCallActive() {
-    const btn = document.getElementById('sh-call');
+    const btn = document.getElementById('cp-phone-call');
     return !!(btn && btn.classList.contains('active'));
   }
   function settleAvatar() { avatar(isCallActive() ? 'listening' : 'idle'); }
   function cleanForSpeech(text) {
     return String(text || '').replace(/```[\s\S]*?```/g, '代码内容已显示在屏幕上。')
       .replace(/`([^`]+)`/g, '$1').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
-      .replace(/[*#>|_~]/g, '').trim();
+      .replace(/[*#>|_~]/g, '').replace(/[μµµ][lL]/g, '微升')
+      .replace(/NaOH/g, '氢氧化钠').replace(/KOH/g, '氢氧化钾')
+      .replace(/HCl/g, '盐酸').replace(/H2SO4/g, '硫酸')
+      .replace(/SDS/g, 'S D S').replace(/EDTA/g, 'E D T A')
+      .replace(/DNA/g, 'D N A').replace(/RNA/g, 'R N A')
+      .replace(/PCR/g, 'P C R').replace(/Tris/g, 'Tris')
+      .replace(/TAE/g, 'T A E').replace(/TE\b/g, 'T E')
+      .replace(/PBS/g, 'P B S').replace(/EB\b/g, 'E B')
+      .trim();
   }
   function ensureAudioContext() {
     if (!audioContext) {

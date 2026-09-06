@@ -4,8 +4,7 @@ import time
 from dataclasses import dataclass
 from typing import Protocol
 
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+import httpx
 
 
 logger = logging.getLogger(__name__)
@@ -162,6 +161,12 @@ class OpenAICompatibleLLMClient:
         self.retry_delay_seconds = (
             retry_delay_seconds
         )
+        # 持久 HTTP 连接 + trust_env=False：跟 OpenAI SDK 一样跳过环境代理，
+        # 避免 SSL 握手被代理拦截导致 UNEXPECTED_EOF。
+        self._http_client = httpx.Client(
+            trust_env=False,
+            timeout=httpx.Timeout(timeout_seconds, connect=10),
+        )
 
     def generate_json(
         self,
@@ -307,38 +312,37 @@ class OpenAICompatibleLLMClient:
             f"{payload['max_tokens']}"
         )
 
-        request = Request(
-            self.endpoint,
-            data=json.dumps(
-                payload,
-                ensure_ascii=False,
-            ).encode("utf-8"),
-            headers={
-                "Authorization": (
-                    f"Bearer {self.api_key}"
-                ),
-                "Content-Type": (
-                    "application/json; "
-                    "charset=utf-8"
-                ),
-            },
-            method="POST",
-        )
-
         try:
-            with urlopen(
-                request,
-                timeout=self.timeout_seconds,
-            ) as response:
-                response_body = (
-                    response
-                    .read()
-                    .decode("utf-8")
+            response = self._http_client.post(
+                self.endpoint,
+                json=payload,
+                headers={
+                    "Authorization": (
+                        f"Bearer {self.api_key}"
+                    ),
+                    "Content-Type": (
+                        "application/json; "
+                        "charset=utf-8"
+                    ),
+                },
+            )
+
+            if (
+                response.status_code == 429
+                or 500 <= response.status_code < 600
+            ):
+                raise LLMTransientError(
+                    f"模型 HTTP {response.status_code}: "
+                    f"{response.text[:500]}"
                 )
 
-            response_data = json.loads(
-                response_body
-            )
+            if response.status_code != 200:
+                raise LLMClientError(
+                    f"模型 HTTP {response.status_code}: "
+                    f"{response.text[:500]}"
+                )
+
+            response_data = response.json()
 
             choice = (
                 response_data[
@@ -371,35 +375,15 @@ class OpenAICompatibleLLMClient:
                 {},
             )
 
-        except HTTPError as error:
-            detail = (
-                error.read()
-                .decode(
-                    "utf-8",
-                    errors="replace",
-                )[:500]
-            )
-
-            error_message = (
-                f"模型 HTTP {error.code}: "
-                f"{detail}"
-            )
-
-            if (
-                error.code == 429
-                or 500 <= error.code < 600
-            ):
-                raise LLMTransientError(
-                    error_message
-                ) from error
-
-            raise LLMClientError(
-                error_message
+        except httpx.TimeoutException as error:
+            raise LLMTransientError(
+                f"模型请求超时：{error}"
             ) from error
 
         except (
-            URLError,
-            TimeoutError,
+            httpx.ConnectError,
+            httpx.NetworkError,
+            httpx.RemoteProtocolError,
         ) as error:
             raise LLMTransientError(
                 f"模型请求失败：{error}"

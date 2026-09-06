@@ -21,6 +21,14 @@ def _ensure_column(connection, table, name, definition):
 def initialize_database():
     with closing(get_connection()) as connection, connection:
         connection.execute("PRAGMA journal_mode=WAL")
+        # 用户与登录会话：函数内导入，避免 user_store -> db 的模块级循环依赖。
+        from database.user_store import ensure_schema as _ensure_user_schema
+        _ensure_user_schema(connection)
+        connection.execute("""CREATE TABLE IF NOT EXISTS phone_login_codes (
+            token TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            created_at_ms INTEGER NOT NULL,
+            expires_at_ms INTEGER NOT NULL)""")
         connection.execute("""CREATE TABLE IF NOT EXISTS experiments (
             id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
             goal TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'pending',
@@ -80,6 +88,12 @@ def initialize_database():
             status TEXT NOT NULL DEFAULT 'running',
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
+        # 复合步骤（例如一次称取多种试剂）拆成的小步骤，落进状态机持久记录：
+        # {"0": ["称取胰化蛋白胨 2 g...", "称取酵母提取物 0.5 g...", ...], "1": [...]}
+        # 由 AI 拆分后通过 set_reagent_prep_substeps 写入，advance 据此确定性推进，
+        # 不再依赖模型每轮的记忆。
+        _ensure_column(connection, "reagent_prep_flows", "sub_steps_json", "TEXT NOT NULL DEFAULT '{}'")
+        _ensure_column(connection, "reagent_prep_flows", "current_sub_index", "INTEGER NOT NULL DEFAULT 0")
         # 储存库：全局存储位置与存储物品资产库
         connection.execute("""CREATE TABLE IF NOT EXISTS storage_locations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -148,7 +162,58 @@ def initialize_database():
             status TEXT NOT NULL DEFAULT 'published',
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
+        _ensure_column(connection, "community_entries", "likes", "INTEGER NOT NULL DEFAULT 0")
+        connection.execute("""CREATE TABLE IF NOT EXISTS community_likes (
+            entry_id INTEGER NOT NULL,
+            user_id TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY(entry_id, user_id),
+            FOREIGN KEY(entry_id) REFERENCES community_entries(id) ON DELETE CASCADE)""")
+        connection.execute("""CREATE TABLE IF NOT EXISTS community_comments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            entry_id INTEGER NOT NULL,
+            user_id TEXT NOT NULL,
+            user_name TEXT NOT NULL DEFAULT '',
+            content TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(entry_id) REFERENCES community_entries(id) ON DELETE CASCADE)""")
+        connection.execute("CREATE INDEX IF NOT EXISTS idx_community_likes_entry ON community_likes(entry_id)")
+        connection.execute("CREATE INDEX IF NOT EXISTS idx_community_comments_entry ON community_comments(entry_id,id)")
         connection.execute("CREATE INDEX IF NOT EXISTS idx_community_kind ON community_entries(kind)")
+        # 论文/Protocol 文件上传：保存原文件、OCR 文本和方案草稿，便于回看与二次生成。
+        connection.execute("""CREATE TABLE IF NOT EXISTS paper_sources (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL DEFAULT '',
+            filename TEXT NOT NULL DEFAULT '',
+            file_path TEXT NOT NULL DEFAULT '',
+            ocr_text TEXT NOT NULL DEFAULT '',
+            drafts_json TEXT NOT NULL DEFAULT '[]',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            user_id TEXT)""")
+        # 持久化 cron 任务：对应 OpenClaw 的 cron job 表。
+        connection.execute("""CREATE TABLE IF NOT EXISTS cron_jobs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            declaration_key TEXT NOT NULL DEFAULT '',
+            name TEXT NOT NULL,
+            schedule_kind TEXT NOT NULL CHECK(schedule_kind IN ('at','every','cron')),
+            at TEXT NOT NULL DEFAULT '',
+            every_ms INTEGER NOT NULL DEFAULT 0,
+            cron_expr TEXT NOT NULL DEFAULT '',
+            cron_tz TEXT NOT NULL DEFAULT 'local',
+            enabled INTEGER NOT NULL DEFAULT 1,
+            payload_kind TEXT NOT NULL,
+            payload_json TEXT NOT NULL DEFAULT '{}',
+            last_run_at TEXT NOT NULL DEFAULT '',
+            next_run_at TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
+        connection.execute("CREATE INDEX IF NOT EXISTS idx_cron_jobs_next ON cron_jobs(enabled,next_run_at)")
+        connection.execute("""CREATE TABLE IF NOT EXISTS conversation_compactions (
+            conversation_id TEXT PRIMARY KEY,
+            summary TEXT NOT NULL,
+            summarized_until_id INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
         _ensure_column(connection, "lab_records", "request_id", "TEXT")
         _ensure_column(connection, "lab_records", "conversation_id", "TEXT")
         _ensure_column(connection, "lab_records", "turn_id", "TEXT")
@@ -219,3 +284,78 @@ def initialize_database():
             "protocol_step_facts_json",
             "TEXT NOT NULL DEFAULT '{}'",
         )
+
+        # ---- 数据归属 ----
+        # 归属根只有这几张表；其余带 conversation_id 的表顺着会话继承归属，
+        # 这样不会出现「消息属于甲、会话属于乙」的矛盾状态。
+        # 列可为空：升级时既有数据先成为「无主」，由第一个注册的账号认领
+        # （见 user_store.claim_orphaned_data），避免升级即丢数据。
+        for _owned_table in ("conversations", "memories", "notifications", "experiments"):
+            _ensure_column(connection, _owned_table, "user_id", "TEXT")
+        # 实验记录署名：id 可追溯，name 是当时的显示名快照（见 attribution.py）。
+        _ensure_column(connection, "lab_records", "recorded_by_id", "TEXT")
+        _ensure_column(connection, "lab_records", "recorded_by_name", "TEXT")
+        _ensure_column(connection, "community_entries", "author_id", "TEXT")
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_conversations_user ON conversations(user_id,updated_at)")
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_memories_user ON memories(user_id)")
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id)")
+        # 方案准备清单缓存：LLM 提取结果持久化，避免每次重启都重新调用。
+        # step_signature = "总步数:步骤数"，方案修改后签名变化 → 自动失效重算。
+        connection.execute("""CREATE TABLE IF NOT EXISTS protocol_checklists (
+            protocol_id TEXT NOT NULL,
+            step_signature TEXT NOT NULL,
+            extracted_json TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY(protocol_id, step_signature))""")
+        # 步骤时间画像：LLM 提取的每步时长、类型(active/passive/flexible)、
+        # 占用设备、并行建议。跟准备清单一样持久化缓存。
+        connection.execute("""CREATE TABLE IF NOT EXISTS step_time_profiles (
+            protocol_id TEXT NOT NULL,
+            step_signature TEXT NOT NULL,
+            profiles_json TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY(protocol_id, step_signature))""")
+        # 方案选择偏好：用户在搜索到多个匹配方案时选了哪个，记住偏好。
+        # 下次同样的关键词搜索时自动选定，不再反复追问。
+        connection.execute("""CREATE TABLE IF NOT EXISTS protocol_preferences (
+            keyword TEXT NOT NULL,
+            protocol_id TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY(keyword))""")
+        # 实验准备台：一次实验的准备单（挂在本次实验，不是方案上）。
+        # prep_run 是协议级的，prep_run_items 是逐条试剂/仪器/耗材。
+        # auto_state = 系统判定（ready/prep_now/missing），manual_state = 用户覆盖。
+        connection.execute("""CREATE TABLE IF NOT EXISTS prep_runs (
+            prep_run_id TEXT PRIMARY KEY,
+            conversation_id TEXT NOT NULL DEFAULT 'lab-session',
+            protocol_id TEXT NOT NULL,
+            protocol_title TEXT NOT NULL DEFAULT '',
+            scale_unit TEXT NOT NULL DEFAULT '',
+            scale_basis TEXT NOT NULL DEFAULT '',
+            default_scale TEXT NOT NULL DEFAULT '',
+            user_scale TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'preparing',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
+        connection.execute("""CREATE TABLE IF NOT EXISTS prep_run_items (
+            prep_run_item_id TEXT PRIMARY KEY,
+            prep_run_id TEXT NOT NULL,
+            item_key TEXT NOT NULL,
+            kind TEXT NOT NULL DEFAULT 'reagent',
+            name TEXT NOT NULL,
+            auto_state TEXT NOT NULL DEFAULT 'missing',
+            manual_state TEXT NOT NULL DEFAULT '',
+            reagent_prep_id TEXT NOT NULL DEFAULT '',
+            storage_hint TEXT NOT NULL DEFAULT '',
+            quantity TEXT NOT NULL DEFAULT '',
+            estimated_minutes INTEGER,
+            time_sensitivity TEXT NOT NULL DEFAULT 'normal',
+            note TEXT NOT NULL DEFAULT '',
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(prep_run_id) REFERENCES prep_runs(prep_run_id) ON DELETE CASCADE)""")
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_prep_run_items_run ON prep_run_items(prep_run_id, sort_order)")

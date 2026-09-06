@@ -107,6 +107,8 @@ def parse_analysis(
             raise LLMOutputValidationError("需要确认时 confirmation_reason 不能为空")
         if not raw_event["needs_confirmation"] and reason is not None:
             raise LLMOutputValidationError("无需确认时 confirmation_reason 必须为 null")
+        # 兼容模型可能仍对 ordinary missing_fields 给出追问；是否创建待确认问题
+        # 仍由确定性协议策略决定，这里只保证解析不因追问标志而崩溃。
         requires_follow_up |= bool(missing) or raw_event["needs_confirmation"]
         events.append(ExperimentEvent(
             event_type=event_type,

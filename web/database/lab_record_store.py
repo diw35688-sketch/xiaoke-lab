@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """实验语音记录的 SQLite 落盘。
 
 设计要点：
@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import json
+import queue
 import sqlite3
 import threading
 from datetime import datetime
@@ -20,6 +21,61 @@ from database.db import get_connection, initialize_database
 
 _lock = threading.RLock()
 _session_id: str | None = None
+_conversation_id: str | None = None
+
+# ---------------------------------------------------------------------------
+# 进程内事件总线：save_record 写完后通知所有 SSE 订阅者，前端立刻刷新实验本。
+# ---------------------------------------------------------------------------
+_event_lock = threading.Lock()
+_event_subscribers: list[queue.Queue] = []
+
+
+def subscribe_record_events() -> queue.Queue:
+    """订阅记录变更事件，返回一个 Queue；取消订阅时调用 unsubscribe。"""
+    q: queue.Queue = queue.Queue(maxsize=64)
+    with _event_lock:
+        _event_subscribers.append(q)
+    return q
+
+
+def unsubscribe_record_events(q: queue.Queue) -> None:
+    with _event_lock:
+        if q in _event_subscribers:
+            _event_subscribers.remove(q)
+
+
+def _notify_record_written(record: dict) -> None:
+    """记录写完后向所有订阅者推送通知；满队列直接丢弃，不阻塞写流程。"""
+    with _event_lock:
+        subs = list(_event_subscribers)
+    event = {
+        "type": "record_written",
+        "conversation_id": record.get("conversation_id"),
+        "session_id": record.get("session_id"),
+        "segment_id": record.get("segment_id"),
+        "transcript": str(record.get("transcript", ""))[:200],
+        "at": record.get("at"),
+    }
+    for q in subs:
+        try:
+            q.put_nowait(event)
+        except queue.Full:
+            pass
+
+
+def set_current_session(session_id: str, conversation_id: str | None = None) -> None:
+    """外部链路（语音 MCP → /internal/tool-execute）同步实验会话到记录层。
+
+    语音工具通过 MCP 调用时，lab_session_id 和 conversation_id 由上层传入，
+    但 lab_record_store 的全局 _session_id 可能还停在旧会话上。此函数让
+    记录层与当前会话对齐，确保写入正确的 session 和 conversation。
+    """
+    global _session_id, _conversation_id
+    with _lock:
+        if session_id:
+            _session_id = session_id
+        if conversation_id is not None:
+            _conversation_id = conversation_id
 
 
 def _now() -> str:
@@ -58,6 +114,11 @@ def _row_to_item(row: sqlite3.Row) -> dict:
         "evaluation": _json_load(row["evaluation"], {}),
         "step": _json_load(row["step"], None),
         "at": row["at"],
+        "conversation_id": row["conversation_id"] if "conversation_id" in row.keys() else None,
+        "turn_id": row["turn_id"] if "turn_id" in row.keys() else None,
+        "request_id": row["request_id"] if "request_id" in row.keys() else None,
+        "recorded_by_id": row["recorded_by_id"] if "recorded_by_id" in row.keys() else None,
+        "recorded_by_name": row["recorded_by_name"] if "recorded_by_name" in row.keys() else None,
     }
     return item
 
@@ -123,6 +184,8 @@ def save_record(item: dict) -> dict:
     segment_id = int(item.get("segment_id") or next_segment_id(session_id))
     now = _now()
     last_error = None
+    # conversation_id: 优先用 item 里传的，其次用全局 _conversation_id（语音链路设置）。
+    conversation_id = item.get("conversation_id") or _conversation_id
     # 段号由 next_segment_id 从现有记录推算；并发记录同一会话时可能撞号，
     # 靠唯一约束兜底并自动顺延，而不是让用户重说一遍。
     for _ in range(3):
@@ -131,8 +194,10 @@ def save_record(item: dict) -> dict:
                 cursor = connection.execute(
                     """INSERT INTO lab_records
                        (session_id, segment_id, transcript, entities, extraction,
-                        extraction_source, evaluation, step, at)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        extraction_source, evaluation, step, at,
+                        conversation_id,
+                        recorded_by_id, recorded_by_name)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
                         session_id,
                         segment_id,
@@ -143,6 +208,8 @@ def save_record(item: dict) -> dict:
                         _json_dump(item.get("evaluation") or {}, {}),
                         _json_dump(item.get("step"), None),
                         str(item.get("at") or now),
+                        conversation_id,
+                        *_signature(conversation_id),
                     ),
                 )
                 row = connection.execute(
@@ -152,6 +219,7 @@ def save_record(item: dict) -> dict:
             global _session_id
             with _lock:
                 _session_id = saved["session_id"]
+            _notify_record_written(saved)
             return saved
         except sqlite3.IntegrityError as error:
             last_error = error
@@ -196,6 +264,20 @@ def list_sessions(limit: int = 20) -> list[dict]:
     return [dict(row) for row in rows]
 
 
+def list_records_by_date(date_text: str, limit: int = 500) -> list[dict]:
+    """按本地日期返回实验记录（供每日时间线/反思使用）。"""
+    initialize_database()
+    with get_connection() as connection:
+        rows = connection.execute(
+            """SELECT * FROM lab_records
+               WHERE date(at) = date(?, 'localtime')
+               ORDER BY id DESC
+               LIMIT ?""",
+            (date_text, int(limit)),
+        ).fetchall()
+    return [_row_to_item(row) for row in rows]
+
+
 def delete_records(session_id: str | None = None) -> int:
     """删除一条会话的全部记录；不传则删除当前会话。"""
     initialize_database()
@@ -205,3 +287,10 @@ def delete_records(session_id: str | None = None) -> int:
             "DELETE FROM lab_records WHERE session_id = ?", (target,)
         )
         return cursor.rowcount
+
+
+def _signature(conversation_id):
+    """记录落库时补上署名；查不到就留空，绝不编造。"""
+    from attribution import signature_for_conversation
+
+    return signature_for_conversation(conversation_id)

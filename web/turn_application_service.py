@@ -11,7 +11,7 @@ from typing import Mapping
 
 from asr_application_service import ASRApplicationService
 from database.turn_store import TurnRequestConflictError, TurnStore, canonical_request_hash
-from src.core.conversation_turn import ExperimentContext, InteractionMode
+from src.core.conversation_turn import ExperimentContext
 from src.core.turn_input import TurnInput
 from src.core.turn_request_envelope import TurnRequestEnvelope
 from src.core.turn_timing import TurnTimingRecorder
@@ -73,17 +73,13 @@ class _ActiveSubmission:
 class TurnApplicationService:
     """Reserve, dispatch, atomically commit, and forget in-process Futures."""
 
-    def __init__(self, *, store: TurnStore, chat_processor: TurnProcessor,
+    def __init__(self, *, store: TurnStore,
                  experiment_processor: TurnProcessor, template_processor: TurnProcessor,
-                 storage_processor: TurnProcessor, max_chat_workers: int = 4) -> None:
+                 storage_processor: TurnProcessor) -> None:
         self.store = store
-        self._chat_processor = chat_processor
         self._experiment_processor = experiment_processor
         self._template_processor = template_processor
         self._storage_processor = storage_processor
-        self._chat_executor = ThreadPoolExecutor(
-            max_workers=max_chat_workers, thread_name_prefix="turn-chat"
-        )
         self._experiment_executors: dict[tuple[str, str], ThreadPoolExecutor] = {}
         self._submissions: dict[str, _ActiveSubmission] = {}
         self._lock = Lock()
@@ -162,8 +158,6 @@ class TurnApplicationService:
         return TurnSubmission(future, False, attempt, progress)
 
     def _executor_for(self, turn) -> ThreadPoolExecutor:
-        if turn.interaction_mode == InteractionMode.CHAT:
-            return self._chat_executor
         key = (turn.conversation_id, turn.lab_session_id or "")
         executor = self._experiment_executors.get(key)
         if executor is None:
@@ -215,9 +209,7 @@ class TurnApplicationService:
                           timing: TurnTimingRecorder, progress: TurnProgress):
         timing.mark("dispatch_started")
         progress.publish("dispatching")
-        if turn.interaction_mode == InteractionMode.CHAT:
-            processor = self._chat_processor
-        elif turn.experiment_context == ExperimentContext.TEMPLATE:
+        if turn.experiment_context == ExperimentContext.TEMPLATE:
             processor = self._template_processor
         elif turn.experiment_context == ExperimentContext.STORAGE:
             processor = self._storage_processor
@@ -268,7 +260,6 @@ class TurnApplicationService:
                 self._submissions.pop(request_id, None)
 
     def close(self) -> None:
-        self._chat_executor.shutdown(wait=True)
         with self._lock:
             executors = tuple(self._experiment_executors.values())
             self._experiment_executors.clear()

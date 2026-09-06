@@ -214,6 +214,15 @@ def _copy_record_ack(intent: PresentationIntent, ui_mode: str) -> str:
             base = f"已记录实验步骤 {step_number}：{preview_text}"
         else:
             base = f"已记录实验步骤 {step_number}"
+    elif result == RecordAckResult.RECORDED_NO_STEP:
+        previews = intent.args.get("event_previews", ())
+        if previews and _is_event_preview_tuple(previews):
+            preview_text = "；".join(
+                item.normalized_text for item in previews
+            )
+            base = f"已记录：{preview_text}"
+        else:
+            base = "已记录"
     elif result == RecordAckResult.DEGRADED:
         base = "原始记录已保存，结构化处理暂时不可用"
     else:

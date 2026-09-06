@@ -26,6 +26,9 @@
   let sampleRate = 48000;
   let frameSize = 1024;
 
+  const PHONE_ENABLED_KEY = 'lab-phone-enabled';
+  window.phoneEnabled = localStorage.getItem(PHONE_ENABLED_KEY) !== '0';
+
   // VAD 状态
   let calibrated = false;
   let calibFrames = 0;
@@ -46,6 +49,7 @@
   let segmentQueue = [];
   let processingQueue = false;
   let sessionEndPending = false;
+  let segmentStartedDuringTTS = false; // 标记：当前语音段是否在 TTS 播放期间开始（回声段需丢弃）
   let autoSpeakWas = false;
   let idleFrames = 0;          // 连续静音帧计数，用于自动重新校准噪音基线
   let runtimeEventChain = Promise.resolve();
@@ -58,19 +62,44 @@
   }
 
   function setCallButton(on) {
-    const mic = $('#cp-mic');
-    if (mic) {
-      mic.textContent = on ? '■' : '◉';
-      mic.classList.toggle('rec', on);
+    // 通话状态点亮通话按钮本身（变红=通话中，再点挂断）；
+    // 不改按钮内容——那会把 SVG 图标顶掉；麦克风按钮的表现交给 composer 统一处理。
+    const call = $('#cp-phone-call');
+    if (call) {
+      call.classList.toggle('rec', on);
+      call.title = on ? '通话中：再点一次挂断' : '和小科通话：连续对话，说话可打断；再点一次挂断';
     }
     document.dispatchEvent(new CustomEvent('lab:continuous-call-state', {
       detail: { active: on }
     }));
   }
 
+  function syncPhoneEnabled() {
+    const call = $('#cp-phone-call');
+    if (call) {
+      call.classList.toggle('active', window.phoneEnabled === true);
+      call.title = window.phoneEnabled === false
+        ? '电话/语音已关闭：点击开启 TTS 和语音通话'
+        : '电话/语音已开启：点击关闭 TTS 和语音通话';
+    }
+    if (window.phoneEnabled === false && active) stopCall();
+  }
+
+  function setPhoneEnabled(enabled) {
+    window.phoneEnabled = Boolean(enabled);
+    try { localStorage.setItem(PHONE_ENABLED_KEY, enabled ? '1' : '0'); } catch (_) {}
+    syncPhoneEnabled();
+    if (!enabled) window.stopSpeech?.();
+  }
+
   window.phoneCallToggle = () => {
-    if (active) stopCall();
-    else startCall();
+    if (window.phoneEnabled === false) {
+      setPhoneEnabled(true);
+      if (!active) startCall();
+    } else {
+      if (active) stopCall();
+      setPhoneEnabled(false);
+    }
   };
   window.phoneCallIsActive = () => active && voiceMode === 'call';
   window.wakeWordToggle = () => {
@@ -84,6 +113,8 @@
       detail: {waiting}
     }));
   }
+
+  syncPhoneEnabled();
 
   function setAvatar(state) {
     window.dispatchAvatarState?.(state);
@@ -199,6 +230,8 @@
   function handleSileroEvent(type, payload) {
     if (!active) return;
     if (type === 'speech_started' || type === 'speech_resumed') {
+      if (window.__ttsSpeaking) { segmentStartedDuringTTS = true; return; } // TTS 回声：不触发 barge-in
+      segmentStartedDuringTTS = false;
       if (type === 'speech_started') void queueVoiceRuntimeEvent('user_speech_started');
       if (type === 'speech_resumed') void queueVoiceRuntimeEvent('user_speech_resumed');
       window.stopSpeech?.();
@@ -212,6 +245,7 @@
       return;
     }
     if (type === 'segment_finalized') {
+      if (segmentStartedDuringTTS) { segmentStartedDuringTTS = false; return; } // 丢弃 TTS 期间开始的回声段
       void queueVoiceRuntimeEvent('segment_finalized').then(() => {
         enqueueSileroSegment(payload);
       });
@@ -220,6 +254,7 @@
 
   function handleFrame(frame) {
     if (!active) return;
+    if (window.__ttsSpeaking) return; // TTS 播放中，丢弃回声
 
     // 校准环境噪音基线；校准期间也继续检测语音，避免重校准漏话。
     if (!calibrated) {

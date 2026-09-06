@@ -4,6 +4,32 @@
   const CONVERSATION_KEY = 'lab-agent-conversation-id';
   const now = () => window.performance?.now?.() ?? Date.now();
 
+  // ── TTS 回声保护 ──
+  // voice_delivery_client.js 是 __ttsSpeaking 标志的唯一管理者。
+  // phone_call.js / vad_mode.js / realtime_voice_inline.js 只读取它。
+  // 多条语音项排队时用计数器确保全部播完才解除静音。
+  let activeTTSCount = 0;
+  let ttsIdleTimer = null;
+
+  function ttsStarted() {
+    if (ttsIdleTimer) { clearTimeout(ttsIdleTimer); ttsIdleTimer = null; }
+    activeTTSCount++;
+    window.__ttsSpeaking = true;
+    window.__vadMuteForTTS?.();
+  }
+
+  function ttsFinished() {
+    activeTTSCount = Math.max(0, activeTTSCount - 1);
+    window.__lastTTSFinishedAt = Date.now();
+    if (activeTTSCount === 0 && !ttsIdleTimer) {
+      ttsIdleTimer = setTimeout(() => {
+        ttsIdleTimer = null;
+        window.__ttsSpeaking = false;
+        window.__vadUnmuteAfterTTS?.();
+      }, 700);
+    }
+  }
+
   async function reportTtsEvent(type, item, error) {
     const conversationId = window.localStorage?.getItem(CONVERSATION_KEY);
     if (!conversationId) return;
@@ -49,13 +75,14 @@
         chars: item.voice_text.trim().length,
       },
       speechRate: typeof item.speech_rate === 'number' ? item.speech_rate : 1.0,
-      onStarted: () => { reportInOrder('tts_started'); },
-      onFinished: () => { reportInOrder('tts_finished'); },
-      onStopped: () => { reportInOrder('tts_stopped'); },
-      onFailed: error => { reportInOrder('tts_failed', error); },
+      onStarted: () => { ttsStarted(); reportInOrder('tts_started'); },
+      onFinished: () => { reportInOrder('tts_finished'); ttsFinished(); },
+      onStopped: () => { reportInOrder('tts_stopped'); ttsFinished(); },
+      onFailed: error => { reportInOrder('tts_failed', error); ttsFinished(); },
     };
   }
   function playbackEnabled() {
+    if (window.phoneEnabled === false) return false;
     if (window.ttsMuted === true) return false;
     const autoSpeak = document.querySelector('#auto-speak');
     return Boolean(autoSpeak?.checked || window.ttsEnabled === true);

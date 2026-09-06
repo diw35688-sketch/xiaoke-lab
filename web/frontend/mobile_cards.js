@@ -287,7 +287,7 @@
       instruction: '全部 ' + total + ' 步已完成',
       description: recordCount != null
         ? ('本次实验共记录 ' + recordCount + ' 段口述')
-        : '实验记录已保存，可在"本次记录"查看',
+        : '实验记录已保存，可在"实验本"查看',
       warning: '',
       status: 'completed',
       type: 'result',
@@ -552,6 +552,15 @@
       });
   }
 
+  // 轮询时同时刷新轨道条
+  var _origLoadReal = loadReal;
+  loadReal = function (direction) {
+    return _origLoadReal(direction).then(function (v) {
+      loadTracks();
+      return v;
+    }).catch(function () { loadTracks(); });
+  };
+
   function moveReal(action) {
     if (transitioning) return;
     experimentSessionIds().then(function (ids) {
@@ -679,6 +688,7 @@
           }).join('');
     }).catch(function () {});
     sel.onchange = function () {
+      window.interactionModeState.select(sel.value ? 'protocol' : 'free', sel.value || null);
       var ids = window.protocolSessionIdentity ? window.protocolSessionIdentity() : {};
       fetch('/protocols/session', {
         method: 'POST',
@@ -1016,7 +1026,103 @@
     bind();
   }
 
-  // ---------- 13. 对外接口 ----------
+  // ---------- 13. 多轨道切换条 ----------
+  var mobileTracks = [];
+
+  function loadTracks() {
+    if (dataSource !== 'real') return Promise.resolve();
+    return fetch('/protocols/active-tracks').then(function (r) { return r.json(); })
+      .then(function (d) {
+        mobileTracks = (d && d.tracks) || [];
+        renderTracksBar();
+      }).catch(function () {});
+  }
+
+  function renderTracksBar() {
+    var bar = el('m-tracks-bar');
+    if (!bar) return;
+    // 只在有 2 个以上轨道时显示切换条
+    if (!mobileTracks || mobileTracks.length < 2) {
+      bar.style.display = 'none';
+      return;
+    }
+    bar.style.display = 'flex';
+    // 判断当前轨道
+    var curIds = activeExperimentIds || {};
+    var curSession = curIds.lab_session_id;
+    bar.innerHTML = mobileTracks.map(function (t) {
+      var isActive = t.lab_session_id === curSession;
+      var pct = t.total_steps ? Math.round((t.completed_steps / t.total_steps) * 100) : 0;
+      return '<div class="m-track-chip' + (isActive ? ' active' : '') + '"'
+        + ' data-session="' + esc(t.lab_session_id) + '"'
+        + ' data-protocol="' + esc(t.protocol_id) + '"'
+        + ' data-title="' + esc(t.title) + '">'
+        + '<span class="m-track-chip-name">' + esc(t.short_title || t.title) + '</span>'
+        + '<span class="m-track-chip-prog">' + (t.completed_steps || 0) + '/' + (t.total_steps || 0) + '</span>'
+        + '<button class="m-track-chip-x" data-archive="' + esc(t.lab_session_id) + '" title="归档/结束">✕</button>'
+        + '</div>';
+    }).join('');
+
+    // 绑定点击切换
+    Array.prototype.forEach.call(bar.querySelectorAll('.m-track-chip'), function (chip) {
+      chip.onclick = function (e) {
+        if (e.target.closest('[data-archive]')) return;
+        var protocolId = chip.getAttribute('data-protocol');
+        var labSessionId = chip.getAttribute('data-session');
+        var title = chip.getAttribute('data-title');
+        switchToTrack(protocolId, labSessionId, title);
+      };
+    });
+    // 绑定归档
+    Array.prototype.forEach.call(bar.querySelectorAll('[data-archive]'), function (btn) {
+      btn.onclick = function (e) {
+        e.stopPropagation();
+        var sessionId = btn.getAttribute('data-archive');
+        if (!confirm('确认归档/结束这个实验吗？')) return;
+        fetch('/protocols/archive-track', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lab_session_id: sessionId }),
+        }).then(function (r) { return r.json(); }).then(function (d) {
+          if (d.ok) {
+            setVoiceSoon('happy', '实验已归档', 1500);
+            loadTracks().then(loadReal);
+          } else {
+            setVoiceSoon('idle', d.detail || '归档失败', 1800);
+          }
+        }).catch(function () { setVoiceSoon('idle', '归档失败', 1800); });
+      };
+    });
+  }
+
+  function switchToTrack(protocolId, labSessionId, title) {
+    resolveConvId().then(function (conversationId) {
+      return fetch('/protocols/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          protocol_id: protocolId,
+          conversation_id: conversationId,
+          lab_session_id: labSessionId,
+        }),
+      });
+    }).then(function () {
+      // 更新当前实验身份
+      activeExperimentIds = { conversation_id: convId(), lab_session_id: labSessionId };
+      activeProtocolId = protocolId;
+      // 更新下拉框
+      var sel = el('m-protocol-select');
+      if (sel) sel.value = protocolId;
+      setVoiceSoon('idle', '已切换到：' + (title || '实验'), 1500);
+      realLastStep = null;
+      loadReal();
+      renderTracksBar();
+    }).catch(function (e) {
+      setVoiceSoon('idle', '切换失败：' + e.message, 1800);
+    });
+  }
+
+  // ---------- 14. 对外接口 ----------
   window.MobileCards = {
     applyState: applyState,
     currentCard: currentCard,
@@ -1025,6 +1131,7 @@
     submitTranscript: submitTranscript,
     submitTextChat: submitTextChat,
     resetConversation: resetConversation,
+    loadReal: loadReal,
     isReal: function () { return dataSource === 'real'; },
     MOCK_CARDS: MOCK_CARDS,
   };
