@@ -1,8 +1,13 @@
 import json
 import logging
+import os
+from pathlib import Path
 _logger = logging.getLogger("agent_core")
 if not _logger.handlers:
-    _h = logging.FileHandler(r"D:\me\ai107\agent_tool.log", encoding="utf-8")
+    # Use a writable per-user location; never rely on the developer's machine path.
+    _log_dir = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "AI107LabAssistant" / "logs"
+    _log_dir.mkdir(parents=True, exist_ok=True)
+    _h = logging.FileHandler(_log_dir / "agent_tool.log", encoding="utf-8")
     _h.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
     _logger.addHandler(_h)
     _logger.setLevel(logging.INFO)
