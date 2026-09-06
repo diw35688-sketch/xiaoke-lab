@@ -784,3 +784,25 @@ body {
 .m-track-chip-prog{font-size:10px;opacity:.7}
 .m-track-chip-x{width:18px;height:18px;border:0;border-radius:50%;background:transparent;font-size:12px;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;flex:0 0 18px}
 .m-track-chip-x:hover{background:var(--warn-weak);color:var(--warn)}
+
+/* ========== 手机端计时器 ========== */
+#m-timer-bar{display:none;align-items:center;gap:10px;padding:8px 12px;background:linear-gradient(135deg,#1e3a5f,#0f172a);color:#fff;border-radius:0;margin:0}
+#m-timer-bar.show{display:flex}
+.m-timer-icon{font-size:20px;flex:0 0 auto;line-height:1}
+.m-timer-icon.shake{animation:mTimerBell .5s ease-in-out 3}
+@keyframes mTimerBell{0%,100%{transform:rotate(0)}25%{transform:rotate(-15deg)}75%{transform:rotate(15deg)}}
+.m-timer-info{flex:1;min-width:0}
+.m-timer-label{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
+.m-timer-meta{font-size:11px;color:rgba(255,255,255,.55);line-height:1.3}
+.m-timer-display{font-size:28px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:1px;flex:0 0 auto;text-align:right;line-height:1}
+#m-timer-bar.finished .m-timer-display{color:#4ade80}
+#m-timer-bar.finished{background:linear-gradient(135deg,#14532d,#052e16);animation:mTimerPulse 1.5s ease-in-out infinite}
+@keyframes mTimerPulse{0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.3)}50%{box-shadow:0 0 16px 3px rgba(34,197,94,.15)}}
+.m-timer-progress{height:3px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden;margin-top:6px}
+.m-timer-progress-bar{height:100%;background:linear-gradient(90deg,#3b82f6,#60a5fa);border-radius:2px;transition:width .5s linear}
+#m-timer-bar.finished .m-timer-progress-bar{background:linear-gradient(90deg,#22c55e,#4ade80)}
+.m-timer-actions{display:flex;gap:6px;margin-top:6px}
+.m-timer-btn{border:0;border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer;font-weight:500}
+.m-timer-btn.notify{background:#2563eb;color:#fff}
+.m-timer-btn.dismiss{background:rgba(255,255,255,.15);color:#fff}
+.m-timer-btn.cancel{background:rgba(239,68,68,.2);color:#f87171}

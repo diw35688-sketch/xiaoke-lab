@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f4f6fb">
   <title>实验助手 · 移动端</title>
-  <link rel="stylesheet" href="/static/mobile.css?v=20260905-mobile-tracks">
+  <link rel="stylesheet" href="/static/mobile.css?v=20260906-mobile-timer">
 </head>
 <body>
   <div class="m-shell">
@@ -80,6 +80,9 @@
       <!-- 进行中的实验轨道条（多实验并行时显示） -->
       <div class="m-tracks-bar" id="m-tracks-bar" style="display:none"></div>
 
+      <!-- 计时器条（有活跃计时器时显示） -->
+      <div id="m-timer-bar"></div>
+
       <!-- 卡片舞台：一屏一张主 Card，由 mobile_cards.js 渲染 -->
       <section class="m-stage" id="stage" aria-live="polite">
         <div class="m-ai-bubble" id="ai-bubble" hidden></div>
@@ -142,7 +145,7 @@
 
     </div>
   </div>
-  <script src="/static/mobile_cards.js?v=20260905-mobile-tracks"></script>
+  <script src="/static/mobile_cards.js?v=20260906-mobile-timer"></script>
   <script src="/static/mobile_voice.js?v=20260902-chat-default"></script>
   <script src="/static/qwen_realtime_widget.js?v=20260903-mobile-realtime"></script>
   <script src="/static/mobile_realtime_voice.js?v=20260905-transcript-sync"></script>
