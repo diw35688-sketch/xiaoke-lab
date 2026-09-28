@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "servers": {
+    "lab": {
+      "enabled": true,
+      "connectTimeoutMs": 15000,
+      "transport": {
+        "type": "stdio",
+        "command": "node",
+        "args": ["lab/lab-mcp-server.mjs"],
+        "cwd": "${QWEN_AUDIO_ROOT}"
+      },
+      "tools": {}
+    }
+  }
+}
