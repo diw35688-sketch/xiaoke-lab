@@ -130,6 +130,11 @@
 
   function openOverlay() {
     addCss();
+    // 全局单例防护：卸载其他地方已挂的 widget
+    if (window.__qwenRealtimeUnmount) {
+      try { window.__qwenRealtimeUnmount(); } catch (e) {}
+      window.__qwenRealtimeUnmount = null;
+    }
     var existing = document.getElementById('m-qwen-realtime-overlay');
     if (!existing) {
       var overlay = document.createElement('div');
@@ -149,7 +154,11 @@
     var body = document.getElementById('m-qwen-realtime-body');
     body.innerHTML = '';
     if (window.QwenRealtimeWidget && window.QwenRealtimeWidget.mountQwenRealtime) {
-      window.QwenRealtimeWidget.mountQwenRealtime(body);
+      var unmountFn = window.QwenRealtimeWidget.mountQwenRealtime(body);
+      window.__qwenRealtimeUnmount = function () {
+        try { if (unmountFn) unmountFn(); } catch (e) {}
+        window.__qwenRealtimeUnmount = null;
+      };
     } else {
       body.innerHTML = '<div style="padding:24px;color:#b91c1c;text-align:center">实时语音组件未加载，请刷新重试</div>';
     }

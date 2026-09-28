@@ -302,8 +302,13 @@ def add_message(conversation_id, role, content):
 
 
 def get_recent_messages(conversation_id, limit=20):
+    """取最近 N 条消息（旧→新）。
+
+    带上 id：compaction 用它做增量摘要（只压缩上次摘要之后新淘汰的消息）。
+    注意 id 不能进模型请求体 —— compact_history 返回前会洗掉。
+    """
     with get_connection() as connection:
-        rows = connection.execute("SELECT role,content FROM messages WHERE conversation_id=? ORDER BY id DESC LIMIT ?", (conversation_id, limit)).fetchall()
+        rows = connection.execute("SELECT id,role,content FROM messages WHERE conversation_id=? ORDER BY id DESC LIMIT ?", (conversation_id, limit)).fetchall()
     return [dict(row) for row in reversed(rows)]
 
 

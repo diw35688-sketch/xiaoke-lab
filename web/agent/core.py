@@ -18,9 +18,11 @@ if not _logger.handlers:
         _logger.addHandler(logging.NullHandler())
 import httpx
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from openai import APIConnectionError, APIStatusError, APITimeoutError, OpenAI
 import compaction
 import settings_store
+import tracing
 from database.crud import list_memories
 from harness_context import build_harness_context
 from tools.calculator import calculate
@@ -129,6 +131,89 @@ DEFAULT_MAX_TOOL_TURNS = 12
 MAX_MEMORY_CONTEXT_ITEMS = 20
 MAX_MEMORY_CONTEXT_CHARS = 3000
 
+# ── 工具调用兜底 ──
+# 不存在的工具名 → 回灌错误让模型重选，而不是抛异常崩掉整个循环。
+# 每个工具执行都有超时 + 重试 + 熔断，防止单个坏工具拖死请求。
+MAX_TOOL_TIMEOUT_SECONDS = 10
+MAX_TOOL_RETRIES = 2
+MAX_TOOL_CONSECUTIVE_FAILURES = 3
+
+_TOOL_SCHEMAS: dict[str, dict] | None = None
+_tool_circuit_failures: dict[tuple[str, str], int] = {}
+_tool_circuit_lock = threading.Lock()
+
+
+def _tool_schemas() -> dict[str, dict]:
+    """从 core 内建 TOOLS + lab_tools 的 OpenAI 定义里提取 parameters schema。"""
+    global _TOOL_SCHEMAS
+    if _TOOL_SCHEMAS is None:
+        _TOOL_SCHEMAS = {}
+        for tool in list(TOOLS) + list(lab_tools.openai_tools()):
+            fn = tool.get("function") or {}
+            name = fn.get("name", "")
+            if name:
+                _TOOL_SCHEMAS[name] = fn.get("parameters") or {}
+    return _TOOL_SCHEMAS
+
+
+def _valid_tool_names() -> set[str]:
+    """工具名白名单 = core.py 内建工具 + lab_tools 注册工具 + activate_skill。"""
+    return (
+        {
+            "calculate", "list_experiments", "check_conflicts", "propose_experiment",
+            "confirm_create_experiment", "propose_memory", "confirm_save_memory",
+        }
+        | set(lab_tools.names())
+        | {"activate_skill"}
+    )
+
+
+def _validate_tool_args(name: str, args: dict) -> str | None:
+    """按工具 schema 做轻量校验：缺 required 或类型明显不对就返回错误描述。"""
+    schema = _tool_schemas().get(name)
+    if not schema:
+        return None
+    required = schema.get("required") or []
+    missing = [key for key in required if key not in args or args.get(key) in (None, "")]
+    if missing:
+        return f"缺少必填参数：{'、'.join(missing)}。请按工具定义重新调用。"
+    properties = schema.get("properties") or {}
+    for key, spec in properties.items():
+        if key not in args or args.get(key) is None:
+            continue
+        expected = spec.get("type")
+        value = args[key]
+        if expected == "string" and not isinstance(value, str):
+            return f"参数 {key} 应为字符串，实际是 {type(value).__name__}。"
+        if expected == "number" and not isinstance(value, (int, float)) and not isinstance(value, bool):
+            return f"参数 {key} 应为数字，实际是 {type(value).__name__}。"
+        if expected == "boolean" and not isinstance(value, bool):
+            return f"参数 {key} 应为布尔值，实际是 {type(value).__name__}。"
+        if expected == "array" and not isinstance(value, list):
+            return f"参数 {key} 应为数组，实际是 {type(value).__name__}。"
+    return None
+
+
+def _circuit_key(conversation_id, name):
+    return (conversation_id or "_default", name)
+
+
+def _circuit_broken(conversation_id, name) -> bool:
+    with _tool_circuit_lock:
+        return _tool_circuit_failures.get(_circuit_key(conversation_id, name), 0) >= MAX_TOOL_CONSECUTIVE_FAILURES
+
+
+def _note_tool_failure(conversation_id, name):
+    key = _circuit_key(conversation_id, name)
+    with _tool_circuit_lock:
+        _tool_circuit_failures[key] = _tool_circuit_failures.get(key, 0) + 1
+
+
+def _note_tool_success(conversation_id, name):
+    key = _circuit_key(conversation_id, name)
+    with _tool_circuit_lock:
+        _tool_circuit_failures[key] = 0
+
 
 class ModelServiceError(Exception):
     def __init__(self, detail, status_code):
@@ -141,12 +226,8 @@ def run_tool(name, args, conversation_id):
     return result
 
 
-def _run_tool_with_presentation(name, args, conversation_id, interaction_mode=None):
-    """Execute a tool and retain any backend-owned presentation plan."""
-
-    if tool_router.is_activate_skill_call(name):
-        return tool_router.handle_activate_skill(args, conversation_id), None
-
+def _execute_tool_body(name, args, conversation_id, interaction_mode=None):
+    """工具执行主体（原 _run_tool_with_presentation 逻辑，不做兜底）。"""
     handlers = {
         "calculate": lambda: calculate(args["expression"]),
         "list_experiments": list_current_experiments,
@@ -161,9 +242,69 @@ def _run_tool_with_presentation(name, args, conversation_id, interaction_mode=No
     if name in lab_tools.names():
         outcome = lab_tools.call(name, args)
         if not outcome["ok"]:
-            return {"error": outcome["error"]}, None
+            raise RuntimeError(outcome["error"])
         return outcome["result"], outcome.get("presentation_plan")
     raise ValueError(f"不支持的工具：{name}")
+
+
+def _execute_tool_with_timeout(name, args, conversation_id, interaction_mode=None):
+    """在独立线程里执行工具，超时（10 秒）即抛 TimeoutError，不让单工具卡死请求。"""
+    executor = ThreadPoolExecutor(max_workers=1)
+    try:
+        future = executor.submit(
+            _execute_tool_body, name, args, conversation_id, interaction_mode
+        )
+        return future.result(timeout=MAX_TOOL_TIMEOUT_SECONDS)
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
+
+
+def _run_tool_with_presentation(name, args, conversation_id, interaction_mode=None):
+    """Execute a tool with guardrails.
+
+    兜底顺序：工具名白名单 → 参数 schema 校验 → 熔断检查 → 超时 + 重试。
+    所有失败都返回 {"error": ...} 回灌给模型，不向外抛异常。
+    """
+
+    if tool_router.is_activate_skill_call(name):
+        return tool_router.handle_activate_skill(args, conversation_id), None
+
+    # 1. 工具名白名单：模型给了不存在的工具 → 回灌可用列表让它重选。
+    if name not in _valid_tool_names():
+        available = "、".join(sorted(_valid_tool_names())[:20])
+        return {
+            "error": f"工具 {name} 不存在。可用工具包括：{available}。请重选一个存在的工具。",
+            "tool_missing": True,
+        }, None
+
+    # 2. schema 校验：格式不对 → 回灌错误让模型重试。
+    schema_error = _validate_tool_args(name, args)
+    if schema_error:
+        return {"error": f"参数格式错误：{schema_error}", "schema_error": True}, None
+
+    # 3. 熔断：同一工具连续失败太多次，本轮直接拒绝执行。
+    if _circuit_broken(conversation_id, name):
+        return {
+            "error": f"工具 {name} 连续失败已熔断，本轮跳过。请换一种方式或稍后重试。",
+            "circuit_open": True,
+        }, None
+
+    # 4. 超时 + 重试：失败最多重试 MAX_TOOL_RETRIES 次，仍失败回灌错误。
+    last_error = None
+    for attempt in range(1 + MAX_TOOL_RETRIES):
+        try:
+            result, plan = _execute_tool_with_timeout(
+                name, args, conversation_id, interaction_mode
+            )
+            _note_tool_success(conversation_id, name)
+            return result, plan
+        except Exception as error:
+            last_error = error
+            _note_tool_failure(conversation_id, name)
+    return {
+        "error": f"工具 {name} 执行失败（已重试 {MAX_TOOL_RETRIES} 次）：{last_error}",
+        "tool_failed": True,
+    }, None
 
 
 def _memory_context():
@@ -200,6 +341,142 @@ def _client():
 def _extra_body():
     """全局关闭 DeepSeek thinking 以保证响应速度。"""
     return {"thinking": {"type": "disabled"}}
+
+
+#: usage 分桶字段名 —— 对齐 OTel GenAI 与 Langfuse 规范。
+#: OTel `gen_ai.client.token.usage` 要求属性 gen_ai.token.type = input | output，
+#: 即至少要把输入和输出分开；Langfuse 再拆出 cache_read / cache_write /
+#: reasoning 三个桶，因为它们的单价与普通输入输出不同（实测 cache_read
+#: 约为输入价的 10%）。只记 total_tokens 无法换算成本。
+USAGE_BUCKETS = (
+    "input_tokens",
+    "output_tokens",
+    "total_tokens",
+    "cache_read_tokens",
+    "cache_write_tokens",
+    "reasoning_tokens",
+)
+
+
+def _pick(*values):
+    """返回第一个非 None 的值 —— 0 是有效值，不能被 `or` 吞掉。"""
+    for value in values:
+        if value is not None:
+            return value
+    return None
+
+
+def _field(obj, name):
+    """同时兼容 SDK 对象属性与 dict 两种形态。"""
+    if obj is None:
+        return None
+    value = getattr(obj, name, None)
+    if value is None and isinstance(obj, dict):
+        value = obj.get(name)
+    return value
+
+
+def usage_buckets(source) -> dict:
+    """把一次模型调用的 usage 拆成标准分桶。
+
+    各家 provider 的字段名不同（Langfuse 的「语义别名」规则，同一语义必须同价）：
+        cache_read ← prompt_tokens_details.cached_tokens  (OpenAI 系)
+                   ← prompt_cache_hit_tokens              (DeepSeek)
+                   ← cache_read_input_tokens              (Anthropic)
+        cache_write ← prompt_tokens_details.cache_creation_tokens
+        reasoning   ← completion_tokens_details.reasoning_tokens
+
+    取不到的桶返回 None —— 按 OTel 的规定，宁可缺也不能编。
+    """
+    usage = _field(source, "usage")
+    if usage is None:
+        usage = source
+    if usage is None:
+        return {}
+    prompt_details = _field(usage, "prompt_tokens_details")
+    completion_details = _field(usage, "completion_tokens_details")
+    return {
+        "input_tokens": _field(usage, "prompt_tokens"),
+        "output_tokens": _field(usage, "completion_tokens"),
+        "total_tokens": _field(usage, "total_tokens"),
+        "cache_read_tokens": _pick(
+            _field(prompt_details, "cached_tokens"),
+            _field(usage, "prompt_cache_hit_tokens"),
+            _field(usage, "cache_read_input_tokens"),
+        ),
+        "cache_write_tokens": _pick(
+            _field(prompt_details, "cache_creation_tokens"),
+            _field(usage, "cache_write_tokens"),
+        ),
+        "reasoning_tokens": _pick(
+            _field(completion_details, "reasoning_tokens"),
+            _field(usage, "reasoning_tokens"),
+        ),
+    }
+
+
+def add_usage(acc: dict, buckets: dict) -> dict:
+    """把一帧的分桶累加进累计值（流式 usage 只在收尾帧出现一次）。"""
+    for key, value in (buckets or {}).items():
+        if value is None:
+            continue
+        try:
+            acc[key] = (acc.get(key) or 0) + int(value)
+        except (TypeError, ValueError):
+            continue
+    return acc
+
+
+def usage_extra(buckets: dict) -> dict:
+    """把分桶转成 tracing.record 的 extra 字段（只带上真正拿到的桶）。"""
+    return {key: value for key, value in (buckets or {}).items() if value is not None}
+
+
+def _usage_total(response) -> int | None:
+    """从非流式响应里提取总 token 数；拿不到时返回 None。"""
+    try:
+        total = usage_buckets(response).get("total_tokens")
+        return int(total) if total is not None else None
+    except Exception:
+        return None
+
+_STREAM_USAGE_SUPPORTED = True
+
+
+def _stream_usage_supported() -> bool:
+    """服务端是否接受 stream_options.include_usage（不支持时全局降级）。"""
+    return _STREAM_USAGE_SUPPORTED
+
+
+def _usage_of_chunk(chunk) -> int:
+    """从流式 chunk 取 usage.total_tokens，取不到返回 0。
+
+    OpenAI 兼容协议里 usage 挂在**最后一个 choices 为空的帧**上，
+    所以必须在 `if not chunk.choices: continue` 之前调用。
+    """
+    try:
+        total = usage_buckets(chunk).get("total_tokens")
+        return int(total) if total is not None else 0
+    except Exception:
+        return 0
+
+
+def _create_stream(client, request_args: dict):
+    """发起流式请求。
+
+    若服务端不认 stream_options（老版本 vLLM / 部分自建网关会 400），
+    去掉该参数重试一次并全局关闭后续注入——统计 token 不能把主链路打挂。
+    """
+    global _STREAM_USAGE_SUPPORTED
+    try:
+        return client.chat.completions.create(**request_args)
+    except APIStatusError as error:
+        if "stream_options" not in request_args or getattr(error, "status_code", None) != 400:
+            raise
+        _STREAM_USAGE_SUPPORTED = False
+        _logger.warning("模型服务不认 stream_options，已关闭流式 usage 统计")
+        retry_args = {k: v for k, v in request_args.items() if k != "stream_options"}
+        return client.chat.completions.create(**retry_args)
 
 
 def refine_chat_answer(answer: str, max_chars: int = 50) -> str:
@@ -240,14 +517,34 @@ def refine_chat_answer(answer: str, max_chars: int = 50) -> str:
 
 
 def _messages(history, interaction_mode=None, harness_context=None, policy_override=None):
+    """组装发给模型的消息列表。
+
+    ⚠️ 缓存友好性 —— 改顺序之前先读这段 ⚠️
+    实测（DeepSeek，2026-09）：prompt 缓存是【前缀逐字匹配】，且一次请求内部的
+    顺序是 system → tools → messages。所以 system 必须是**纯静态**的：
+
+        动态段放 system 中间 → 命中率 36%，等效全价 3,780 token/轮
+        动态段挪到消息列表末尾 → 命中率 96%，等效全价   786 token/轮（省 79%）
+
+    原因：动态内容一旦插进 system，排在它后面的工具 schema（约 3000 token）
+    和历史会全部缓存失效，每一轮都按全价重算。
+    静态的 INSTRUCTIONS/policy 留在 system，动态的 memory/harness 放到最后。
+    """
     if policy_override is not None:
         policy = policy_override
     else:
         policy = EXPERIMENT_RECORD_POLICY
-    system = INSTRUCTIONS + "\n\n" + policy + "\n\n" + _memory_context()
-    if harness_context:
-        system += "\n\n" + harness_context
-    return [{"role": "system", "content": system}, *history]
+    # system 只放静态内容，永不改动 —— 它是整个缓存前缀的头部
+    system = INSTRUCTIONS + "\n\n" + policy
+    messages = [{"role": "system", "content": system}, *history]
+    # 动态内容（记忆 / 实验现场上下文）追加到末尾：
+    # 既保住前缀缓存，也让模型在离它最近的上下文里看到当前状态。
+    dynamic = "\n\n".join(
+        part for part in (_memory_context(), harness_context) if part
+    )
+    if dynamic:
+        messages.append({"role": "system", "content": dynamic})
+    return messages
 
 
 def _tools_for_mode(interaction_mode=None, conversation_id=None, user_message=""):
@@ -394,6 +691,13 @@ def _execute_tool(name, args, conversation_id, interaction_mode=None):
 
 def run_agent(history, conversation_id, interaction_mode=None):
     client = _client()
+    trace_id = tracing.new_trace_id()
+    _last_msg = history[-1] if history else {}
+    _last_content = _last_msg.get("content", "") if isinstance(_last_msg, dict) else ""
+    if not isinstance(_last_content, str):
+        _last_content = json.dumps(_last_content, ensure_ascii=False) if _last_content is not None else ""
+    tracing.record(trace_id, "start", input={"user_message": _last_content[:300]},
+                   output={"mode": interaction_mode}, conversation_id=conversation_id)
     history = compaction.compact_history(history, conversation_id)
     user_message = ""
     for msg in reversed(history):
@@ -403,24 +707,39 @@ def run_agent(history, conversation_id, interaction_mode=None):
     messages = _messages(history, interaction_mode)
     last_plan = None
     try:
-        for _ in range(DEFAULT_MAX_TOOL_TURNS):
+        for round_no in range(1, DEFAULT_MAX_TOOL_TURNS + 1):
+            tracing.record(trace_id, "intent", input=user_message[:200],
+                           output={"round": round_no},
+                           conversation_id=conversation_id)
             response = client.chat.completions.create(model=settings_store.current().model_name, messages=messages, tools=_tools_for_mode(interaction_mode, conversation_id, user_message), extra_body=_extra_body())
             assistant = response.choices[0].message
             calls = assistant.tool_calls or []
             if not calls:
-                return assistant.content or "模型没有返回文字内容。"
+                answer = assistant.content or "模型没有返回文字内容。"
+                tracing.record(trace_id, "generate", output=answer[:500],
+                               tokens=_usage_total(response), conversation_id=conversation_id)
+                return answer
+            tracing.record(trace_id, "tool_select",
+                           output={"round": round_no, "calls": [{"name": c.function.name, "args": (c.function.arguments or "")[:200]} for c in calls]},
+                           tokens=_usage_total(response), conversation_id=conversation_id)
             messages.append(assistant)
             presentation_plans = []
             for call in calls:
+                tool_start = tracing.timed()
                 try:
                     result, presentation_plan = _execute_tool(
                         call.function.name,
                         json.loads(call.function.arguments),
                         conversation_id, interaction_mode,
                     )
+                    ok = True
                 except Exception as error:
                     result = {"error": str(error)}
                     presentation_plan = None
+                    ok = False
+                tracing.record(trace_id, "tool_exec", input={"name": call.function.name, "args": call.function.arguments[:200]},
+                               output=result, latency_ms=tracing.elapsed_ms(tool_start), ok=ok,
+                               conversation_id=conversation_id)
                 messages.append({"role":"tool","tool_call_id":call.id,"content":json.dumps(result, ensure_ascii=False)})
                 if presentation_plan is not None:
                     presentation_plans.append(presentation_plan)
@@ -428,12 +747,20 @@ def run_agent(history, conversation_id, interaction_mode=None):
                 last_plan = merge_tool_plans(presentation_plans)
                 # 不 return——让模型看到工具结果后继续推理下一轮
     except APITimeoutError as error:
+        tracing.record(trace_id, "degrade", output=f"APITimeoutError: {error}", ok=False,
+                       conversation_id=conversation_id)
         raise ModelServiceError("大模型连接超时，请检查网络后重试。", 504) from error
     except APIConnectionError as error:
+        tracing.record(trace_id, "degrade", output=f"APIConnectionError: {error}", ok=False,
+                       conversation_id=conversation_id)
         raise ModelServiceError("无法连接大模型服务，请检查网络后重试。", 502) from error
     except APIStatusError as error:
+        tracing.record(trace_id, "degrade", output=f"APIStatusError {error.status_code}: {error}", ok=False,
+                       conversation_id=conversation_id)
         raise ModelServiceError(f"大模型服务返回异常（状态码 {error.status_code}）。", 502) from error
     # 循环耗尽——用最后的工具计划兜底回复
+    tracing.record(trace_id, "step_limit", output={"max_turns": DEFAULT_MAX_TOOL_TURNS}, ok=False,
+                   conversation_id=conversation_id)
     if last_plan is not None:
         return tool_reply_text(last_plan)
     return "本次处理步骤过多已停止，请拆成小步骤再说一次。"
@@ -460,6 +787,9 @@ STORAGE_SKILL = """你是「储存库制作助手」。用户要制作储存库�
 
 def _run_skill_agent(skill: str, history, conversation_id, harness_context=None, skill_tools=None):
     client = _client()
+    trace_id = tracing.new_trace_id()
+    tracing.record(trace_id, "start", input={"skill": skill[:60]}, output={"skill_tools": sorted(skill_tools or [])},
+                   conversation_id=conversation_id)
     history = compaction.compact_history(history, conversation_id)
     if harness_context is None:
         harness_context = build_harness_context(
@@ -475,7 +805,8 @@ def _run_skill_agent(skill: str, history, conversation_id, harness_context=None,
         active = TOOLS
     last_plan = None
     try:
-        for _ in range(DEFAULT_MAX_TOOL_TURNS):
+        for round_no in range(1, DEFAULT_MAX_TOOL_TURNS + 1):
+            tracing.record(trace_id, "intent", output={"round": round_no}, conversation_id=conversation_id)
             response = client.chat.completions.create(
                 model=settings_store.current().model_name, messages=messages,
                 tools=active, extra_body=_extra_body(),
@@ -483,18 +814,30 @@ def _run_skill_agent(skill: str, history, conversation_id, harness_context=None,
             assistant = response.choices[0].message
             calls = assistant.tool_calls or []
             if not calls:
-                return assistant.content or "模型没有返回文字内容。"
+                answer = assistant.content or "模型没有返回文字内容。"
+                tracing.record(trace_id, "generate", output=answer[:500],
+                               tokens=_usage_total(response), conversation_id=conversation_id)
+                return answer
+            tracing.record(trace_id, "tool_select",
+                           output={"round": round_no, "calls": [{"name": c.function.name, "args": (c.function.arguments or "")[:200]} for c in calls]},
+                           tokens=_usage_total(response), conversation_id=conversation_id)
             messages.append(assistant)
             presentation_plans = []
             for call in calls:
+                tool_start = tracing.timed()
                 try:
                     result, presentation_plan = _execute_tool(
                         call.function.name, json.loads(call.function.arguments),
                         conversation_id, "experiment",
                     )
+                    ok = True
                 except Exception as error:
                     result = {"error": str(error)}
                     presentation_plan = None
+                    ok = False
+                tracing.record(trace_id, "tool_exec", input={"name": call.function.name, "args": call.function.arguments[:200]},
+                               output=result, latency_ms=tracing.elapsed_ms(tool_start), ok=ok,
+                               conversation_id=conversation_id)
                 messages.append({"role": "tool", "tool_call_id": call.id, "content": json.dumps(result, ensure_ascii=False)})
                 if presentation_plan is not None:
                     presentation_plans.append(presentation_plan)
@@ -502,11 +845,19 @@ def _run_skill_agent(skill: str, history, conversation_id, harness_context=None,
                 last_plan = merge_tool_plans(presentation_plans)
                 # 不 return——让模型看到工具结果后继续推理下一轮
     except APITimeoutError as error:
+        tracing.record(trace_id, "degrade", output=f"APITimeoutError: {error}", ok=False,
+                       conversation_id=conversation_id)
         raise ModelServiceError("大模型连接超时，请检查网络后重试。", 504) from error
     except APIConnectionError as error:
+        tracing.record(trace_id, "degrade", output=f"APIConnectionError: {error}", ok=False,
+                       conversation_id=conversation_id)
         raise ModelServiceError("无法连接大模型服务，请检查网络后重试。", 502) from error
     except APIStatusError as error:
+        tracing.record(trace_id, "degrade", output=f"APIStatusError {error.status_code}: {error}", ok=False,
+                       conversation_id=conversation_id)
         raise ModelServiceError(f"大模型服务返回异常（状态码 {error.status_code}）。", 502) from error
+    tracing.record(trace_id, "step_limit", output={"max_turns": DEFAULT_MAX_TOOL_TURNS}, ok=False,
+                   conversation_id=conversation_id)
     if last_plan is not None:
         return tool_reply_text(last_plan)
     return "本次处理步骤过多已停止，请拆成小步骤再说一次。"
@@ -525,6 +876,14 @@ def run_storage_agent(history, conversation_id):
 def stream_agent(history, conversation_id, interaction_mode=None, lab_session_id=None, policy_override=None, allow_tools=True):
     """逐段产出模型文字；遇到工具调用时先执行工具，再继续流式回答。"""
     client = _client()
+    trace_id = tracing.new_trace_id()
+    _last_msg = history[-1] if history else {}
+    _last_content = _last_msg.get("content", "") if isinstance(_last_msg, dict) else ""
+    if not isinstance(_last_content, str):
+        _last_content = json.dumps(_last_content, ensure_ascii=False) if _last_content is not None else ""
+    tracing.record(trace_id, "start", input={"user_message": _last_content[:300]},
+                   output={"mode": interaction_mode, "allow_tools": allow_tools},
+                   conversation_id=conversation_id)
     history = compaction.compact_history(history, conversation_id)
     # 从历史最后一条用户消息提取文本，用于关键词检测
     user_message = ""
@@ -547,7 +906,7 @@ def stream_agent(history, conversation_id, interaction_mode=None, lab_session_id
     messages = _messages(history, interaction_mode, harness_context, policy_override)
     last_plan = None
     try:
-        for _ in range(DEFAULT_MAX_TOOL_TURNS):
+        for round_no in range(1, DEFAULT_MAX_TOOL_TURNS + 1):
             text_parts = []
             calls_by_index = {}
             request_args = {
@@ -556,6 +915,9 @@ def stream_agent(history, conversation_id, interaction_mode=None, lab_session_id
                 "stream": True,
                 "extra_body": _extra_body(),
             }
+            if _stream_usage_supported():
+                # 让服务端在收尾帧回传 usage；否则流式响应拿不到 token 数。
+                request_args["stream_options"] = {"include_usage": True}
             if allow_tools:
                 request_args["tools"] = _tools_for_mode(
                     interaction_mode, conversation_id, user_message
@@ -563,8 +925,16 @@ def stream_agent(history, conversation_id, interaction_mode=None, lab_session_id
                 _logger.info("ROUND tools=[%s] user_msg=%r",
                              ",".join(t["function"]["name"] for t in request_args["tools"]),
                              user_message[:80])
-            stream = client.chat.completions.create(**request_args)
+                tracing.record(trace_id, "intent", input=user_message[:200],
+                               output={"round": round_no, "tools": [t["function"]["name"] for t in request_args["tools"]]},
+                               conversation_id=conversation_id)
+            stream = _create_stream(client, request_args)
+            turn_tokens = 0
+            turn_usage: dict = {}
             for chunk in stream:
+                # 带 usage 的收尾帧 choices 为空，必须在 continue 之前取出。
+                turn_tokens += _usage_of_chunk(chunk)
+                add_usage(turn_usage, usage_buckets(chunk))
                 if not chunk.choices:
                     continue
                 delta = chunk.choices[0].delta
@@ -595,11 +965,20 @@ def stream_agent(history, conversation_id, interaction_mode=None, lab_session_id
                 if final_text.strip():
                     yield final_text
                 _logger.info("NO TOOL CALL → final reply (%d chars)", len(final_text))
+                tracing.record(trace_id, "generate", output=final_text[:500],
+                               tokens=turn_tokens or None,
+                               conversation_id=conversation_id,
+                               **usage_extra(turn_usage))
                 return
             # 记录模型选择的工具
             _logger.info("TOOL CALLS: %s",
                          ", ".join(c["function"]["name"] + "(" + (c["function"]["arguments"] or "")[:100] + ")"
                                    for c in calls))
+            tracing.record(trace_id, "tool_select",
+                           output={"round": round_no, "calls": [{"name": c["function"]["name"], "args": (c["function"]["arguments"] or "")[:200]} for c in calls]},
+                           tokens=turn_tokens or None,
+                           conversation_id=conversation_id,
+                           **usage_extra(turn_usage))
             messages.append({"role":"assistant", "content":"".join(text_parts) or None, "tool_calls":calls})
             presentation_plans = []
             for call in calls:
@@ -608,9 +987,13 @@ def stream_agent(history, conversation_id, interaction_mode=None, lab_session_id
                     args = json.loads(call["function"]["arguments"] or "{}")
                 except json.JSONDecodeError:
                     args = {}
+                tool_start = tracing.timed()
                 # activate_skill：激活扩展工具组，下一轮注入
                 if tool_router.is_activate_skill_call(name):
                     result = tool_router.handle_activate_skill(args, conversation_id)
+                    tracing.record(trace_id, "tool_exec", input={"name": name, "args": args},
+                                   output=result, latency_ms=tracing.elapsed_ms(tool_start), ok=bool(result.get("ok", True)),
+                                   conversation_id=conversation_id)
                     messages.append({"role":"tool", "tool_call_id":call["id"], "content":json.dumps(result, ensure_ascii=False)})
                     continue
                 # 参考 deepseek-harness：执行前先推「待执行卡片」，
@@ -629,6 +1012,9 @@ def stream_agent(history, conversation_id, interaction_mode=None, lab_session_id
                     result = {"error": str(error)}
                     outcome = {"ok": False, "error": str(error)}
                     presentation_plan = None
+                tracing.record(trace_id, "tool_exec", input={"name": name, "args": args},
+                               output=result, latency_ms=tracing.elapsed_ms(tool_start), ok=outcome.get("ok", True),
+                               conversation_id=conversation_id)
                 if name in lab_tools.names():
                     result_view = dict(lab_tools.present_result(name, args, outcome))
                     result_view["tool_call_id"] = call["id"]
@@ -645,13 +1031,23 @@ def stream_agent(history, conversation_id, interaction_mode=None, lab_session_id
                 if plan.voice_items:
                     yield ToolVoiceDeliveryBatch(plan.voice_items)
         # 循环耗尽——用最后的工具计划兜底回复
+        tracing.record(trace_id, "step_limit", output={"max_turns": DEFAULT_MAX_TOOL_TURNS}, ok=False,
+                       conversation_id=conversation_id)
         if last_plan is not None:
+            tracing.record(trace_id, "generate", output=tool_reply_text(last_plan)[:500],
+                           conversation_id=conversation_id)
             yield tool_reply_text(last_plan)
             return
     except APITimeoutError as error:
+        tracing.record(trace_id, "degrade", output=f"APITimeoutError: {error}", ok=False,
+                       conversation_id=conversation_id)
         raise ModelServiceError("大模型连接超时，请检查网络后重试。", 504) from error
     except APIConnectionError as error:
+        tracing.record(trace_id, "degrade", output=f"APIConnectionError: {error}", ok=False,
+                       conversation_id=conversation_id)
         raise ModelServiceError("无法连接大模型服务，请检查网络后重试。", 502) from error
     except APIStatusError as error:
+        tracing.record(trace_id, "degrade", output=f"APIStatusError {error.status_code}: {error}", ok=False,
+                       conversation_id=conversation_id)
         raise ModelServiceError(f"大模型服务返回异常（状态码 {error.status_code}）。", 502) from error
     raise ModelServiceError("本次处理步骤过多已停止，请拆成小步骤再说一次。", 500)

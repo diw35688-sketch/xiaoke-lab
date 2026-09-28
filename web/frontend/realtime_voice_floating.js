@@ -55,6 +55,11 @@
 
   function mountPanel() {
     if (!panel) return;
+    // 全局单例防护
+    if (window.__qwenRealtimeUnmount) {
+      try { window.__qwenRealtimeUnmount(); } catch (e) {}
+      window.__qwenRealtimeUnmount = null;
+    }
     panel.classList.add('open');
     var toggle = document.getElementById('rvf-toggle');
     if (toggle) toggle.classList.add('on');
@@ -64,6 +69,13 @@
     body.innerHTML = '';
     if (window.QwenRealtimeWidget && window.QwenRealtimeWidget.mountQwenRealtime) {
       unmount = window.QwenRealtimeWidget.mountQwenRealtime(body);
+      var selfUnmount = unmount;
+      window.__qwenRealtimeUnmount = function () {
+        try { if (selfUnmount) selfUnmount(); } catch (e) {}
+        unmount = null;
+        mounted = false;
+        window.__qwenRealtimeUnmount = null;
+      };
     } else {
       body.innerHTML = '<div style="padding:24px;color:#b91c1c;text-align:center">实时语音组件未加载</div>';
     }

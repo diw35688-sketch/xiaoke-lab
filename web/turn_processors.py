@@ -324,7 +324,9 @@ class ExperimentProcessor:
         # 所有 Turn 统一走 stream_agent —— 模型自己决定调工具还是直接回复
         timing.mark("understanding_started")
         timing.mark("llm_started")
-        history = list(get_recent_messages(turn.conversation_id))
+        # 多取一些历史：超长会话由 compaction.compact_history 压成
+        # 「较早对话摘要 + 最近原文」，而不是像以前那样直接把 20 条以外的丢掉。
+        history = list(get_recent_messages(turn.conversation_id, limit=60))
         history.append({"role": "user", "content": turn.raw_text})
         text_parts: list[str] = []
         tool_cards: dict[str, dict] = {}
