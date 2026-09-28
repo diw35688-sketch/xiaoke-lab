@@ -101,8 +101,16 @@ _openclaw_ref/
 _rivals_src/
 _rivals/
 _pkg_meta/
-_qwen-audio-agent/
 _community_deploy/
+
+# 实时语音前端是小科自研部分，必须开源；排除依赖、构建产物、示例与日志
+_qwen-audio-agent/node_modules/
+_qwen-audio-agent/web/dist/
+_qwen-audio-agent/examples/
+_qwen-audio-agent/desktop/build/
+_qwen-audio-agent/docs/promo/
+_qwen-audio-agent/logs/
+_qwen-audio-agent/**/*.log
 
 # 临时调研/调试脚本与产物
 _*.py
@@ -125,3 +133,10 @@ build/
 
 # scripts 包入口必须提交
 !scripts/__init__.py
+
+# 内部分享密钥（运行时生成）
+web/.internal_token
+
+# 大二进制与调试日志（不随仓库分发）
+bin/cloudflared.exe
+debug_events.log
