@@ -1,20 +1,28 @@
-# 小科智能实验助手
+# 小科智能实验助手 · Xiaoke Lab
 
 > **实验台上的全双工 AI 搭档——边做边说，它替你记、算、查、盯。**
-> 每天早上的心跳先你一步检查库存与日程；实验的每一个产物，都能一路溯源到来源实验。
+> *Your voice-first AI lab partner — talk while you work; it records, calculates, searches and watches the clock for you.*
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 ---
 
-## Demo
+## 截图 / Screenshots
 
-<!-- 在这里放 30 秒演示视频或 GIF，前 10 秒必须出现：语音说 → 它记录 → 它计算 → 它提醒 -->
-![demo](docs/demo.gif)
+<p align="center">
+  <img src="docs/screenshot-1.png" width="32%" alt="语音实验流程">
+  <img src="docs/screenshot-2.png" width="32%" alt="试剂配制与计算">
+  <img src="docs/screenshot-3.png" width="32%" alt="实验方案步骤">
+</p>
+
+<p align="center">
+  <img src="docs/screenshot-4.png" width="32%" alt="产物与复盘">
+  <img src="docs/screenshot-5.png" width="32%" alt="收尾">
+</p>
 
 ---
 
-## 它是什么
+## 它是什么 / What is it
 
 高校实验室里，操作者经常双手被占用、注意力集中、设备与材料分散。传统记录要求频繁拿手机或电脑，容易漏掉实际温度、时长、质量、观察现象；已有方案常以 PDF/图片存在，难以直接执行。
 
@@ -26,9 +34,11 @@
 
 **核心价值一句话：让实验人员把精力放在"做实验"上，而不是"记实验"上。**
 
+*In real labs, your hands are full, your eyes are on the bench, and stopping to type breaks the flow. Xiaoke turns every experiment into a traceable Protocol lifecycle — from protocol import, voice recording while you work, automatic product storage, to evening review and full provenance.*
+
 ---
 
-## 核心能力
+## 核心能力 / Highlights
 
 | 能力 | 说明 |
 |------|------|
@@ -46,9 +56,10 @@
 
 ---
 
-## 技术主张
+## 技术主张 / Design Philosophy
 
 > **模型负责理解与建议，程序负责状态、权限与落盘；每个建议可校验，每个事实有来源。**
+> *Models propose; programs decide. Every suggestion is verifiable, every fact has provenance.*
 
 这是小科与"聊天机器人套壳"的本质区别。具体体现在：
 
@@ -59,7 +70,7 @@
 
 ---
 
-## 架构
+## 架构 / Architecture
 
 ```text
 ┌────────────────────────────────────────────────────────────┐
@@ -88,7 +99,7 @@
 
 ---
 
-## 快速开始
+## 快速开始 / Quick Start
 
 ### Windows（普通用户）
 
@@ -113,7 +124,7 @@ python -m scripts.eval_report
 
 ---
 
-## 项目结构
+## 项目结构 / Structure
 
 ```text
 web/                          # 服务端与前端
@@ -132,12 +143,29 @@ web/                          # 服务端与前端
 scripts/                      # 开发与评测脚本
   trace_show.py               # bad case 回放
   eval_report.py              # 固定回归集报告
-docs/                         # 文档
+docs/                         # 文档与截图
 ```
 
 ---
 
-## 开源说明
+## English Summary
+
+**Xiaoke Lab** is a voice-first AI assistant for wet-lab researchers. It combines:
+
+- **Full-duplex realtime voice** (Qwen Audio) with barge-in — you talk, it listens, and you can interrupt anytime.
+- **A proactive Agent Harness** with a daily 8:00 heartbeat (inventory check, expired reagents, today's plan) and an evening reflection that summarizes the day and suggests tomorrow's work.
+- **Full product lifecycle** — from spoken observation to structured event, to product registration in storage, to provenance tracing back to the source experiment. Today's product becomes tomorrow's raw material.
+- **55+ plugin-style tools** — calculation, reagent prep, timers, knowledge base, storage, protocol editing, scheduling — registered under one protocol and injected by context.
+- **Dual clients** — desktop web workbench + mobile flow cards — sharing one source of truth.
+- **Portable Windows EXE** — Python runtime, web assets, and offline speech models bundled; first run generates certs, config, and database.
+- **Execution tracing** — every turn gets a trace_id written to JSONL; `python -m scripts.trace_show <trace_id>` replays any bad case in seconds.
+- **Tool-call guardrails** — tool-name whitelist, schema validation, timeout/retry/circuit-breaking, and a global step cap. Bad model output never crashes the loop.
+
+**Design principle:** *Models propose; programs decide. Every suggestion is verifiable, every fact has provenance.*
+
+---
+
+## 开源说明 / License
 
 本项目采用 **Apache License 2.0**。设计上参考了 [OpenClaw](https://github.com/openclaw/openclaw)（MIT License）的 agent loop、compaction 与多智能体路由思想，在此致谢。
 
@@ -145,6 +173,8 @@ docs/                         # 文档
 
 ---
 
-## 责任边界
+## 责任边界 / Disclaimer
 
 小科定位为实验过程中的记录、规划、检索与提醒助手，不替代实验室 SOP、教师指导或安全责任人。涉及危险操作、方案变更与关键写入时，系统保留来源、版本与人工确认。
+
+*Xiaoke is a recording, planning, retrieval and reminder assistant for lab work. It does not replace lab SOPs, instructor guidance, or safety officers. For hazardous operations, protocol changes, and critical writes, the system preserves source, version, and human confirmation.*
