@@ -2,9 +2,20 @@
 """超长会话压缩（Transcript Compaction）。
 
 对应 OpenClaw 的 compaction：
-- 超过阈值的历史对话先交给模型生成摘要
-- 旧摘要 + 最近 N 条原文继续作为上下文
-- 摘要按会话持久化，避免每次重复压缩
+- 历史超过阈值时，把「较早的部分」交给模型压成摘要，最近的部分保留原文
+- 摘要按会话持久化，下一次只把「上次摘要之后新淘汰的消息」喂给摘要器（滚动摘要）
+- 摘要失败时**显式标注**并保留最近原文，绝不静默丢内容
+
+为什么按字符而不是按条数触发：
+    48 条短消息和 48 条长消息的 token 差 10 倍，按条数触发完全不可控。
+    这里用字符数做 token 的近似（中文约 1 字 ≈ 1 token），不引入 tokenizer 依赖。
+
+⚠️ 历史遗留的两个 bug（本文件已修）：
+    1. 旧实现触发条件是 `len(history) > 48`，但调用方 `get_recent_messages()`
+       默认只取 20 条 → history 最多 21 条 → **压缩从未触发（死代码）**。
+    2. 旧实现 `if stored.get("summary"): return [摘要, *tail]` 里
+       `summarized_until_id` 存了却从来不读 → 摘要永远不更新，
+       而 head 却一直在长 → **中间那段对话被静默丢弃**。
 """
 
 from __future__ import annotations
@@ -17,8 +28,18 @@ import settings_store
 from database.db import get_connection, initialize_database
 from openai import OpenAI
 
-DEFAULT_MAX_TAIL = 30
-DEFAULT_TRIGGER = 48
+#: 历史总字符数超过它才压缩（≈3000 token）。低于这个规模原样送，行为与压缩前一致。
+DEFAULT_TRIGGER_CHARS = 6000
+#: 压缩后保留的最近原文规模（字符）。
+DEFAULT_TAIL_CHARS = 3000
+#: 兜底：无论字符多少，最多保留的原文条数，防止极短消息堆太多条。
+DEFAULT_MAX_TAIL = 16
+
+#: 摘要失败时的显式标记 —— 宁可写明「省略了」，也不静默丢消息。
+_DROP_NOTICE = {
+    "role": "system",
+    "content": "（较早的对话因摘要生成失败已省略，如需追溯请查看会话历史）",
+}
 
 
 def _client() -> OpenAI:
@@ -56,8 +77,17 @@ def _text_of(messages: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def summarize_messages(messages: list[dict]) -> str:
-    """把一段历史消息压缩成摘要。失败时抛出异常，由调用方降级。"""
+def summarize_messages(messages: list[dict], previous_summary: str | None = None) -> str:
+    """把一段历史压缩成摘要（滚动式）。
+
+    previous_summary 非空时，让模型在旧摘要的基础上并入新增对话，
+    这样每次只需要付费「旧摘要 + 本次新淘汰的消息」，不必重新读全部历史。
+    失败时抛出异常，由调用方降级。
+    """
+    parts = []
+    if previous_summary:
+        parts.append(f"【已有摘要】（覆盖更早的对话）\n{previous_summary}")
+    parts.append(f"【本次新增对话】\n{_text_of(messages)}")
     client = _client()
     response = client.chat.completions.create(
         model=settings_store.current().model_name,
@@ -67,10 +97,14 @@ def summarize_messages(messages: list[dict]) -> str:
                 "content": (
                     "你是会话压缩器。把下面的实验助手历史对话压缩成一段简洁的中文摘要，"
                     "保留：用户目标、进行中的实验方案、当前步骤、关键操作、已记录数据、"
-                    "尚未解决的问题、重要安全信息。不要编造不存在的内容。"
+                    "尚未解决的问题、重要安全信息。"
+                    "如果给了【已有摘要】，把它和【本次新增对话】合并成一份摘要，"
+                    "不要丢失已有摘要里的信息，也不要重复。不要编造不存在的内容。"
+                    "只输出摘要正文：不要写标题、不要写「【已有摘要】」这类分节标记、"
+                    "不要解释你在做什么。"
                 ),
             },
-            {"role": "user", "content": _text_of(messages)},
+            {"role": "user", "content": "\n\n".join(parts)},
         ],
         extra_body=_extra_body(),
     )
@@ -89,7 +123,8 @@ def get_compaction_summary(conversation_id: str) -> dict | None:
     return dict(row) if row is not None else None
 
 
-def save_compaction_summary(conversation_id: str, summary: str, summarized_until_id: int = 0) -> dict:
+def save_compaction_summary(conversation_id: str, summary: str,
+                            summarized_until_id: int = 0) -> dict:
     initialize_database()
     now = datetime.now().isoformat(timespec="seconds")
     with get_connection() as connection:
@@ -110,46 +145,108 @@ def save_compaction_summary(conversation_id: str, summary: str, summarized_until
     return dict(row)
 
 
+# ---------- 内部工具：规模度量、切尾、清洗 ----------
+
+def _msg_id(item: dict):
+    """取消息的数据库 id；没有（合成 history）时返回 None。"""
+    try:
+        value = item.get("id")
+        return int(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _char_size(items: list[dict]) -> int:
+    """历史规模（字符）。用字符数近似 token，避免引入 tokenizer 依赖。"""
+    return sum(len(str(item.get("content") or "")) for item in items)
+
+
+def _clean(items: list[dict]) -> list[dict]:
+    """只保留 role / content。
+
+    调用方可能带 id（压缩需要用它做增量判断），但 id 不能进模型请求体，
+    所以对外返回前一律洗掉。
+    """
+    return [
+        {"role": str(item.get("role") or "user"), "content": item.get("content") or ""}
+        for item in items
+    ]
+
+
+def _tail_slice(items: list[dict], max_tail: int, tail_chars: int) -> list[dict]:
+    """从末尾往前取原文，直到超过字符或条数上限（至少留 1 条）。"""
+    tail: list[dict] = []
+    used = 0
+    for item in reversed(items):
+        size = len(str(item.get("content") or ""))
+        if tail and (used + size > tail_chars or len(tail) >= max_tail):
+            break
+        tail.append(item)
+        used += size
+    tail.reverse()
+    return tail
+
+
+def _summary_message(text: str) -> dict:
+    return {"role": "system", "content": f"以下是较早对话的压缩摘要：\n{text}"}
+
+
 def compact_history(
     history: list[dict],
     conversation_id: str | None = None,
     max_tail: int = DEFAULT_MAX_TAIL,
-    trigger: int = DEFAULT_TRIGGER,
+    trigger_chars: int = DEFAULT_TRIGGER_CHARS,
+    tail_chars: int = DEFAULT_TAIL_CHARS,
 ) -> list[dict]:
-    """把超过阈值的 history 压缩为 摘要 + 最近 max_tail 条。
+    """把过长的 history 压成「较早对话的摘要 + 最近原文」。
 
-    - 历史总条数 <= trigger 时不压缩。
-    - 已有持久化摘要且没有更多旧消息时直接复用。
-    - 摘要失败时降级为只保留最近 max_tail 条，不让对话中断。
+    - 规模未超阈值：原样返回（只洗掉非标准字段），不做任何额外模型调用。
+    - 已压缩过且没有新淘汰的消息：直接复用持久化摘要，不重复付费。
+    - 摘要失败：保留最近原文 + 显式省略标记，不静默丢内容。
+
+    返回的消息一律只含 role / content。
     """
-    history = list(history or [])
-    if len(history) <= trigger:
-        return history
+    items = list(history or [])
+    if not items:
+        return []
 
-    head = history[:-max_tail]
-    tail = history[-max_tail:]
+    if _char_size(items) <= trigger_chars:
+        return _clean(items)
 
-    if conversation_id:
-        stored = get_compaction_summary(conversation_id)
-        if stored and stored.get("summary"):
-            return [
-                {"role": "system", "content": f"以下是较早对话的压缩摘要：\n{stored['summary']}"},
-                *tail,
-            ]
+    tail = _tail_slice(items, max_tail, tail_chars)
+    head = items[: len(items) - len(tail)]
+    if not head:
+        return _clean(items)
+
+    stored = get_compaction_summary(conversation_id) if conversation_id else None
+    previous = str((stored or {}).get("summary") or "")
+    try:
+        through = int((stored or {}).get("summarized_until_id") or 0)
+    except (TypeError, ValueError):
+        through = 0
+
+    # 增量：只把「上次摘要之后新进入 head 的消息」交给摘要器。
+    # 没有 id 的（合成 history）一律当作待压缩，保证不漏。
+    pending = [m for m in head if (_msg_id(m) is None or _msg_id(m) > through)]
+
+    if not pending and previous:
+        return [_summary_message(previous), *_clean(tail)]
 
     try:
-        summary = summarize_messages(head)
+        summary = summarize_messages(pending, previous or None)
     except Exception:
-        # 压缩失败也不能把整段上下文丢掉太多：至少保留最近内容。
-        return tail
+        # 摘要失败：保留最近原文并写明省略，绝不静默丢弃。
+        return [_DROP_NOTICE, *_clean(tail)]
 
+    if not summary:
+        return [_DROP_NOTICE, *_clean(tail)]
+
+    ids = [i for i in (_msg_id(m) for m in head) if i is not None]
+    new_through = max([through, *ids]) if ids else through
     if conversation_id:
         try:
-            save_compaction_summary(conversation_id, summary)
+            save_compaction_summary(conversation_id, summary, new_through)
         except Exception:
             pass
 
-    return [
-        {"role": "system", "content": f"以下是较早对话的压缩摘要：\n{summary}"},
-        *tail,
-    ]
+    return [_summary_message(summary), *_clean(tail)]

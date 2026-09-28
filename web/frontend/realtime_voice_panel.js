@@ -50,12 +50,22 @@
       var unmount = null;
 
       function mountWidget() {
+        // 全局单例防护：卸载其他地方已挂的 widget（如内嵌按钮），确保只有一条连接
+        if (window.__qwenRealtimeUnmount) {
+          try { window.__qwenRealtimeUnmount(); } catch (e) {}
+          window.__qwenRealtimeUnmount = null;
+        }
         if (unmount) {
           unmount();
           unmount = null;
         }
         if (window.QwenRealtimeWidget && window.QwenRealtimeWidget.mountQwenRealtime) {
           unmount = window.QwenRealtimeWidget.mountQwenRealtime(body);
+          window.__qwenRealtimeUnmount = function () {
+            try { if (unmount) unmount(); } catch (e) {}
+            unmount = null;
+            window.__qwenRealtimeUnmount = null;
+          };
         } else {
           body.innerHTML = '<div style="padding:24px;color:#dc2626">实时语音组件尚未加载</div>';
         }
@@ -111,7 +121,13 @@
               status.style.color = '#047857';
               startBtn.textContent = '重新启动';
               syncCurrentConversation();
-              mountWidget();
+              // 不再自动挂载组件——只在用户点"启动实时语音"后才挂载，
+              // 避免与内嵌语音按钮产生双重 WebSocket 连接。
+              if (unmount) {
+                // 已挂载则保持，不重复挂
+              } else {
+                showStartHint();
+              }
             } else {
               status.textContent = d.dashscope_key_set ? '服务未运行' : '未配置 DashScope Key';
               status.style.color = '#b45309';

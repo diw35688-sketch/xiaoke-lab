@@ -123,8 +123,18 @@
     } catch (_) {}
   };
 
+  // ── 全局单例防护：确保任何时候只有一条 WebSocket 连接 ──
+  // 如果面板/其他组件已经挂了 widget，先卸载它再挂自己的。
+  function claimRealtime() {
+    if (window.__qwenRealtimeUnmount) {
+      try { window.__qwenRealtimeUnmount(); } catch (_) {}
+      window.__qwenRealtimeUnmount = null;
+    }
+  }
+
   function ensureHiddenWidget() {
     if (mounted) return;
+    claimRealtime();
     mounted = true;
     if (!document.getElementById('realtime-voice-hidden')) {
       var host = document.createElement('div');
@@ -142,7 +152,12 @@
     var host = document.getElementById('realtime-voice-hidden');
     host.innerHTML = '';
     if (window.QwenRealtimeWidget && window.QwenRealtimeWidget.mountQwenRealtime) {
-      window.QwenRealtimeWidget.mountQwenRealtime(host);
+      var unmountFn = window.QwenRealtimeWidget.mountQwenRealtime(host);
+      window.__qwenRealtimeUnmount = function () {
+        try { if (unmountFn) unmountFn(); } catch (_) {}
+        mounted = false;
+        window.__qwenRealtimeUnmount = null;
+      };
       report('hidden widget mounted, __labRealtimeStart=' + (typeof window.__labRealtimeStart));
     } else {
       report('hidden widget mount: QwenRealtimeWidget missing');
@@ -209,22 +224,8 @@
   });
 
   document.addEventListener('DOMContentLoaded', function () {
-    if (!document.getElementById('realtime-voice-hidden')) {
-      var host = document.createElement('div');
-      host.id = 'realtime-voice-hidden';
-      host.style.position = 'fixed';
-      host.style.left = '-9999px';
-      host.style.top = '0';
-      host.style.width = '1px';
-      host.style.height = '1px';
-      host.style.opacity = '0';
-      host.style.pointerEvents = 'none';
-      host.style.zIndex = '-1';
-      document.body.appendChild(host);
-    }
-    // 页面加载时就把组件挂到隐藏容器里（保持关闭）。
-    // 这样用户在需要时点 ▥▥，命令能立即被组件收到。
-    ensureHiddenWidget();
+    // 不再在页面加载时自动挂载语音组件——避免与面板产生双重 WebSocket 连接。
+    // 改为懒加载：用户点 ▥▥ 按钮时才挂载（realtimeVoiceToggle → ensureHiddenWidget）。
     syncConversationContext();
     // 切换会话/实验上下文后立即同步给 QwenAudio 后台，
     // 避免语音的 spawn_thinking 继续写到旧会话/旧 lab_session。

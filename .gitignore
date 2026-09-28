@@ -78,3 +78,50 @@ web/.codebuddy/
 # 网页端运行时残留（不提交）
 web/.edge-startup-*/
 web/*.log
+
+# ===== 开源前补充：敏感数据与临时调研目录 =====
+# 本地数据库（含真实实验数据）
+data/lab_ai.db
+backend/lab_assistant.db
+backend/*.db
+data/*.db
+data/*.db-*
+data/network_mode.json
+
+# 用户上传的文件（实验数据、论文、引物表）
+uploads/
+
+# 运行日志
+logs/
+*.log
+agent_tool.log
+
+# 第三方开源项目参考源码（OpenClaw 等，不随仓库分发）
+_openclaw_ref/
+_rivals_src/
+_rivals/
+_pkg_meta/
+_qwen-audio-agent/
+_community_deploy/
+
+# 临时调研/调试脚本与产物
+_*.py
+_*.md
+_*.png
+_*.html
+_*.json
+_*.pdf
+page_dump.html
+mobile_check.png
+mobile_new_icons.png
+short_conversations_backup_*.json
+restart_web.bat
+t.json
+
+# 打包/构建产物
+dist/
+build/
+*.zip
+
+# scripts 包入口必须提交
+!scripts/__init__.py
