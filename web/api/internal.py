@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """本机内部任务接口。
 
 QwenAudio 自定义后台 Adapter（Node 侧）通过该接口把语音里需要
@@ -64,7 +64,7 @@ def _read_lab_context() -> tuple[str, str]:
     lab_session_id = ""
     try:
         from pathlib import Path
-        root = Path(__file__).resolve().parent.parent.parent / "_qwen-audio-agent"
+        root = Path(__file__).resolve().parent.parent.parent / "realtime"
         conversation_id = (root / "current-conversation-id.txt").read_text(
             encoding="utf-8"
         ).strip()
@@ -80,7 +80,7 @@ def _write_qwen_conversation(conversation_id: str, lab_session_id: str | None = 
     """Persist the current QwenAudio conversation/lab-session files."""
     try:
         from pathlib import Path
-        root = Path(__file__).resolve().parent.parent.parent / "_qwen-audio-agent"
+        root = Path(__file__).resolve().parent.parent.parent / "realtime"
         root.mkdir(parents=True, exist_ok=True)
         if conversation_id:
             (root / "current-conversation-id.txt").write_text(
@@ -238,7 +238,7 @@ def lab_voice_task(payload: InternalLabTaskRequest, request: Request):
     user_id = users[0]["id"]
 
     # 语音里的实验指令必须绑定当前实验会话；优先用 Node Adapter 显式传入，
-    # 否则回退到 _qwen-audio-agent 里的 current-conversation/lab-session 文件。
+    # 否则回退到 realtime 里的 current-conversation/lab-session 文件。
     file_conversation_id, file_lab_session_id = _read_lab_context()
     conversation_id = payload.conversation_id or file_conversation_id
     if not conversation_id or not conversation_exists(conversation_id, user_id):
@@ -607,7 +607,7 @@ def set_qwen_conversation(payload: InternalConversationRequest, request: Request
 
     from pathlib import Path
 
-    root = Path(__file__).resolve().parent.parent.parent / "_qwen-audio-agent"
+    root = Path(__file__).resolve().parent.parent.parent / "realtime"
     path = root / "current-conversation-id.txt"
     try:
         root.mkdir(parents=True, exist_ok=True)
@@ -620,3 +620,4 @@ def set_qwen_conversation(payload: InternalConversationRequest, request: Request
         raise HTTPException(status_code=500, detail=f"写入会话号失败：{error}") from error
     _sync_global_from_lab_state(payload.lab_session_id or "", payload.conversation_id)
     return {"ok": True, "conversation_id": payload.conversation_id}
+

@@ -15,7 +15,7 @@ from pathlib import Path
 
 import settings_store
 
-QWEN_AUDIO_ROOT = Path(__file__).resolve().parent.parent / "_qwen-audio-agent"
+QWEN_AUDIO_ROOT = Path(__file__).resolve().parent.parent / "realtime"
 SERVER_ENTRY = QWEN_AUDIO_ROOT / "lab" / "start-lab-gateway.mjs"
 DEFAULT_PORT = 3101
 DEFAULT_MODEL = "qwen-audio-3.0-realtime-plus"

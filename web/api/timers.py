@@ -90,7 +90,7 @@ def notify_ai(timer_id: str, payload: TimerNotifyPayload, user=Depends(require_u
     conversation_id = ""
     try:
         from pathlib import Path
-        root = Path(__file__).resolve().parent.parent.parent / "_qwen-audio-agent"
+        root = Path(__file__).resolve().parent.parent.parent / "realtime"
         conversation_id = (root / "current-conversation-id.txt").read_text(encoding="utf-8").strip()
     except Exception:
         pass

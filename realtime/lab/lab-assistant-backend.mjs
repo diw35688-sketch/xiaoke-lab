@@ -11,7 +11,7 @@ const LAB_SESSION_FILE = process.env.LAB_CURRENT_LAB_SESSION_FILE
   || path.resolve(process.cwd(), 'current-lab-session-id.txt')
 
 // 内部接口共享密钥：与 Python 后端 web/.internal_token 对应。
-// 探测多个候选路径，兼容从项目根或 _qwen-audio-agent 目录启动。
+// 探测多个候选路径，兼容从项目根或 realtime 目录启动。
 const INTERNAL_TOKEN_FILE = process.env.LAB_INTERNAL_TOKEN_FILE
   || [
     path.resolve(process.cwd(), 'web', '.internal_token'),

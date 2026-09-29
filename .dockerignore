@@ -1,4 +1,4 @@
-.git
+﻿.git
 .github
 .venv
 .pytest_cache
@@ -17,10 +17,10 @@ _patch_backup/
 _pkg_meta/
 _community_deploy/
 _rivals_src/
-_qwen-audio-agent/node_modules/
-_qwen-audio-agent/desktop/build/
-_qwen-audio-agent/web/dist/
-_qwen-audio-agent/logs/
+realtime/node_modules/
+realtime/desktop/build/
+realtime/web/dist/
+realtime/logs/
 
 # 运行时数据（不进镜像）
 data/*.db
@@ -50,3 +50,4 @@ community_upload/
 docs/video_frames/
 mobile_check.png
 mobile_new_icons.png
+
