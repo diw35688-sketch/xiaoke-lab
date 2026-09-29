@@ -71,7 +71,8 @@ class ToolPresentationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "没有可显示文案"):
             tool_reply_text(plan)
 
-    def test_merge_reapplies_one_question_budget_across_plans(self):
+    def test_merge_preserves_all_questions_across_plans(self):
+        """合并后不再限制一个问题——两条追问都保留。"""
         first = build_delivery_plan((
             _intent(
                 MessageKind.CLARIFICATION,
@@ -94,8 +95,9 @@ class ToolPresentationTests(unittest.TestCase):
         merged = merge_tool_plans((first, second))
 
         self.assertEqual(len(merged.screen_intents), 2)
-        self.assertEqual(len(merged.voice_items), 1)
+        self.assertEqual(len(merged.voice_items), 2)
         self.assertEqual(merged.voice_items[0].intent_id, "ask-1")
+        self.assertEqual(merged.voice_items[1].intent_id, "ask-2")
 
     def test_voice_batch_rejects_empty_items(self):
         with self.assertRaisesRegex(ValueError, "至少需要一条"):

@@ -61,7 +61,7 @@ class ScreenDeltaContractTests(unittest.TestCase):
 
 
 class VoiceDeliveryContractTests(unittest.TestCase):
-    def test_assistant_reply_is_voice_eligible_but_constrained(self):
+    def test_assistant_reply_is_voice_eligible_and_preserved(self):
         from src.core.presentation_delivery import build_delivery_plan
         from src.core.presentation_intent import PresentationIntent, ScreenTarget
 
@@ -76,8 +76,9 @@ class VoiceDeliveryContractTests(unittest.TestCase):
         self.assertEqual(len(plan.voice_items), 1)
         self.assertEqual(plan.voice_items[0].kind, MessageKind.ASSISTANT_REPLY)
         self.assertEqual(plan.voice_items[0].priority, MessagePriority.REVIEW)
-        self.assertLessEqual(len(plan.voice_items[0].voice_text), 25)
+        # 不再截断——完整保留回复文本
         self.assertTrue(plan.voice_items[0].voice_text.endswith("。"))
+        self.assertIn("第二句", plan.voice_items[0].voice_text)
 
     def test_serializes_explicit_voice_permission(self):
         event = voice_delivery_event((
@@ -109,25 +110,29 @@ class VoiceDeliveryContractTests(unittest.TestCase):
                 authorization="PLAY_NOW",
             )
 
-    def test_rejects_more_than_two_items(self):
+    def test_accepts_more_than_two_items(self):
+        """语音预算已放宽，不再限制最多 2 条。"""
         items = tuple(
             _voice(f"issue-{index}", MessageKind.SYSTEM_ISSUE, "请重试。")
             for index in range(3)
         )
-        with self.assertRaisesRegex(ValueError, "最多交付 2 条"):
-            voice_delivery_event(items)
+        event = voice_delivery_event(items)
+        self.assertEqual(len(event["items"]), 3)
 
-    def test_rejects_more_than_one_question(self):
+    def test_accepts_multiple_questions(self):
+        """不再限制最多一个问题——模型可以连续追问。"""
         items = (
             _voice("ask-1", MessageKind.CLARIFICATION, "温度是多少？"),
             _voice("ask-2", MessageKind.CLARIFICATION, "时间是多少？"),
         )
-        with self.assertRaisesRegex(ValueError, "最多交付一个问题"):
-            voice_delivery_event(items)
+        event = voice_delivery_event(items)
+        self.assertEqual(len(event["items"]), 2)
 
-    def test_rejects_item_over_twenty_five_chars(self):
-        with self.assertRaisesRegex(ValueError, "不能超过 25 字"):
-            _voice("ask-1", MessageKind.CLARIFICATION, "问" * 26)
+    def test_accepts_long_voice_text(self):
+        """单条语音不再限制 25 字——长回复完整交给 TTS。"""
+        long_text = "请确认以下步骤是否正确执行：" + "步骤描述内容。" * 5
+        item = _voice("ask-1", MessageKind.CLARIFICATION, long_text)
+        self.assertEqual(item.voice_text, long_text)
 
     def test_rejects_empty_delivery(self):
         with self.assertRaisesRegex(ValueError, "至少需要一条"):

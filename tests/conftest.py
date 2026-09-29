@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """"测试隔离区：架构迁移/行为演进后待更新的失败测试集中登记。
 
 这些测试断言的是旧架构（统一理解引擎、observer_factory、语音预算）或
@@ -32,16 +32,9 @@ QUARANTINED = {
     'tests/test_mode_output_policies.py::ModeOutputPolicyTests::test_frontend_routes_by_mode_not_input_source',
     'tests/test_paper_skin.py::NotebookEntryTests::test_timestamp_is_extracted_not_invented',
     'tests/test_portable_launcher.py::PortableLauncherTests::test_root_keeps_only_the_public_windows_launcher',
-    'tests/test_presentation_copy.py::RecordAckCopyTests::test_recorded_no_step_copy_uses_plain_ack',
-    'tests/test_presentation_delivery.py::PresentationDeliveryPlanTests::test_plan_enforces_one_question_budget',
-    'tests/test_presentation_delivery.py::PresentationDeliveryPlanTests::test_record_ack_can_be_explicitly_spoken',
     'tests/test_protocol_navigation.py::ProtocolNavigationTests::test_active_question_blocks_next',
     'tests/test_protocol_navigation.py::ProtocolNavigationTests::test_uncovered_missing_field_blocks_next',
-    'tests/test_protocol_navigation_api.py::ProtocolNavigationApiTests::test_active_question_returns_conflict',
-    'tests/test_protocol_store_new_schema.py::ProtocolStoreNewSchemaTests::test_seed_steps_have_explicit_new_fields',
-    'tests/test_step_progress.py::StepProgressTests::test_empty_must_record_is_completed',
     'tests/test_task_context.py::TaskContextWiringTests::test_experiment_processor_passes_task_context',
-    'tests/test_tool_presentation.py::ToolPresentationTests::test_merge_reapplies_one_question_budget_across_plans',
     'tests/test_turn_processors.py::TurnProcessorTests::test_created_clarification_is_a_numbered_card_and_voice_only_reads_question',
     'tests/test_turn_processors.py::TurnProcessorTests::test_end_summary_returns_every_unresolved_question_with_stable_status',
     'tests/test_turn_processors.py::TurnProcessorTests::test_exact_end_command_commits_a_session_ended_turn_without_llm',
@@ -61,15 +54,6 @@ QUARANTINED = {
     'tests/test_unified_mic_control.py::UnifiedMicControlTests::test_composer_owns_one_mic_and_selects_single_or_continuous_input',
     'tests/test_unified_processor.py::UnifiedPromptTests::test_system_prompt_defines_closed_non_executing_contract',
     'tests/test_unified_understanding.py::UnifiedUnderstandingContractTests::test_format_failure_can_degrade_to_unclassified_note',
-    'tests/test_voice_delivery.py::VoiceDeliveryTests::test_hard_truncation_preserves_question_shape',
-    'tests/test_voice_delivery.py::VoiceDeliveryTests::test_turn_budget_is_two_items_and_fifty_chars',
-    'tests/test_web_renderer.py::WebRendererFieldTests::test_render_many_allows_only_one_question',
-    'tests/test_web_renderer.py::WebRendererFieldTests::test_render_plan_only_uses_preselected_voice_items',
-    'tests/test_web_renderer.py::WebRendererFieldTests::test_voice_text_is_filtered_and_hard_limited',
-    'tests/test_web_stream_contract.py::VoiceDeliveryContractTests::test_assistant_reply_is_voice_eligible_but_constrained',
-    'tests/test_web_stream_contract.py::VoiceDeliveryContractTests::test_rejects_item_over_twenty_five_chars',
-    'tests/test_web_stream_contract.py::VoiceDeliveryContractTests::test_rejects_more_than_one_question',
-    'tests/test_web_stream_contract.py::VoiceDeliveryContractTests::test_rejects_more_than_two_items',
 }
 
 def pytest_collection_modifyitems(config, items):

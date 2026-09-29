@@ -24,20 +24,23 @@ class VoiceDeliveryTests(unittest.TestCase):
         text = constrain_voice_text("**先看** https://example.com ```print(1)``` 再回答。")
         self.assertEqual(text, "先看 再回答。")
 
-    def test_hard_truncation_preserves_question_shape(self):
-        text = constrain_voice_text("这是一个非常非常长而且必须被确定性截断的追问内容，你能回答吗？")
-        self.assertLessEqual(len(text), 25)
+    def test_constrain_preserves_full_text_and_shape(self):
+        """constrain_voice_text 只去掉代码/URL/Markdown，不再硬截断长度。"""
+        text = constrain_voice_text("这是一个非常非常长的追问内容，你能回答吗？")
+        # 不截断——完整保留
         self.assertTrue(text.endswith("？"))
+        self.assertIn("追问内容", text)
 
-    def test_turn_budget_is_two_items_and_fifty_chars(self):
+    def test_turn_budget_passes_through_all_speakable_items(self):
+        """apply_turn_budget 不再限制条数，全部保留。"""
         items = (
             (_intent("a", MessageKind.CONFIRMATION_ACK), "已确认问题一。"),
             (_intent("b", MessageKind.SYSTEM_ISSUE), "请靠近麦克风。"),
-            (_intent("c", MessageKind.SYSTEM_ISSUE), "第三条不应朗读。"),
+            (_intent("c", MessageKind.SYSTEM_ISSUE), "第三条也朗读。"),
         )
         self.assertEqual(
             apply_turn_budget(items),
-            ("已确认问题一。", "请靠近麦克风。", None),
+            ("已确认问题一。", "请靠近麦克风。", "第三条也朗读。"),
         )
 
 

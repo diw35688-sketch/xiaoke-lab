@@ -72,16 +72,17 @@ class ProtocolNavigationApiTests(unittest.TestCase):
     def tearDown(self):
         protocol_api.turn_store = self.old_store
 
-    def test_active_question_returns_conflict(self):
+    def test_active_question_allows_move_but_marks_left_with_pending(self):
+        """有未解决问题时不再阻断跳步——允许移动，当前步标记为 left_with_pending。"""
         protocol_api.turn_store = _StateStore(_coordinator(deferred=False))
-        with self.assertRaises(HTTPException) as raised:
-            protocol_api.move(protocol_api.MovePayload(
-                conversation_id="c1", lab_session_id="lab1", action="next"
-            ))
-        self.assertEqual(raised.exception.status_code, 409)
-        self.assertEqual(
-            raised.exception.detail["blocking_question_numbers"], [1]
-        )
+        result = protocol_api.move(protocol_api.MovePayload(
+            conversation_id="c1", lab_session_id="lab1", action="next"
+        ))
+        self.assertEqual(result["step"]["number"], 2)
+        self.assertTrue(result["move"]["allowed"])
+        saved = protocol_api.turn_store.saved["protocol_step_facts"]
+        self.assertEqual(saved["statuses"]["1"], "left_with_pending")
+        self.assertEqual(saved["current_step_number"], 2)
 
     def test_deferred_question_moves_and_persists_left_with_pending(self):
         store = _StateStore(_coordinator(deferred=True))

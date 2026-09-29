@@ -127,7 +127,8 @@ class WebRendererFieldTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             web_renderer.WebRenderer().render(intent)
 
-    def test_voice_text_is_filtered_and_hard_limited(self):
+    def test_voice_text_is_filtered(self):
+        """voice_text 去掉 URL/Markdown，不再硬截断长度。"""
         intent = _intent(
             MessageKind.CLARIFICATION,
             args={"question": "请查看 https://example.com 和 `duration` 字段后告诉我需要离心多长时间？"},
@@ -137,9 +138,9 @@ class WebRendererFieldTests(unittest.TestCase):
         payload = web_renderer.WebRenderer().render(intent)
         self.assertNotIn("http", payload["voice_text"])
         self.assertNotIn("`", payload["voice_text"])
-        self.assertLessEqual(len(payload["voice_text"]), 25)
 
-    def test_render_many_allows_only_one_question(self):
+    def test_render_many_keeps_all_questions(self):
+        """不再限制只保留一个问题——多个追问都可朗读。"""
         intents = [
             _intent(
                 MessageKind.CLARIFICATION,
@@ -152,7 +153,7 @@ class WebRendererFieldTests(unittest.TestCase):
         ]
         payloads = web_renderer.WebRenderer().render_many(intents)
         self.assertEqual(payloads[0]["voice_text"], "温度是多少？")
-        self.assertIsNone(payloads[1]["voice_text"])
+        self.assertEqual(payloads[1]["voice_text"], "时间是多少？")
 
     def test_render_plan_only_uses_preselected_voice_items(self):
         intents = (
@@ -173,7 +174,7 @@ class WebRendererFieldTests(unittest.TestCase):
 
         payloads = web_renderer.WebRenderer().render_plan(plan)
 
-        self.assertEqual(payloads[0]["text"], "本段结构化处理失败，原始记录已保存。")
+        self.assertEqual(payloads[0]["text"], "已记录。")
         self.assertIsNone(payloads[0]["voice_text"])
         self.assertEqual(payloads[1]["voice_text"], "时间是多少？")
 
