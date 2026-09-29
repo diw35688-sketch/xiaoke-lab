@@ -175,6 +175,12 @@ docs/                         # 文档与截图
 
 第三方依赖的许可证见各自项目：FastAPI（MIT）、PyMuPDF（AGPL-3.0 / 商业双许可）、openpyxl（MIT）、OpenAI SDK（Apache-2.0）。
 
+### 第三方数据许可
+
+`data/protocols/external/raw/` 下的外部实验方案抓取自 [protocols.io](https://www.protocols.io/)，均为 **Creative Commons Attribution (CC BY)** 许可。每份方案的原始 URL、作者、DOI 与许可证核验说明见 [`data/protocols/external/LICENSE_LEDGER.md`](data/protocols/external/LICENSE_LEDGER.md)。**使用这些数据时请保留原作者署名。**
+
+仓库内其余知识库数据（试剂安全库、配方库、试剂目录）为本项目整理，随 Apache-2.0 授权。
+
 ---
 
 ## 责任边界 / Disclaimer
