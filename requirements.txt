@@ -1,8 +1,8 @@
-funasr
-modelscope
-sounddevice
-soundfile
-python-dotenv
-sherpa-onnx
-numpy
-torch
+funasr==1.4.1
+modelscope==1.39.1
+sounddevice==0.5.5
+soundfile==0.14.0
+python-dotenv==1.2.2
+sherpa-onnx==1.13.5
+numpy==2.4.6
+torch==2.13.0
