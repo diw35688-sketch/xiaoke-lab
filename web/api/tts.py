@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from dataclasses import replace
 
@@ -20,6 +21,8 @@ from volcano_streaming_tts import (
     VolcanoStreamingTTSError,
     volcano_streaming_tts,
 )
+
+logger = logging.getLogger("web.api.tts")
 
 router = APIRouter(prefix="/tts", tags=["语音合成"])
 
@@ -98,7 +101,7 @@ async def synthesize_stream(request: TTSRequest):
             config = replace(config, speed=request.speed)
     except VolcanoStreamingTTSError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
-    print(f"[TTS-STREAM] request.speed={request.speed} config.speed={config.speed}", flush=True)
+    logger.debug("[TTS-STREAM] request.speed=%s config.speed=%s", request.speed, config.speed)
 
     async def audio_chunks():
         async for chunk in volcano_streaming_tts.stream(request.text, config):

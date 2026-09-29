@@ -156,3 +156,12 @@ _patch_backup/
 docs/video_frames/
 web/_rag_ref/
 community_upload/
+
+# AI agent 配置/交接文档（内部用，不随仓库分发）
+AGENTS.md
+CLAUDE.md
+HANDOFF_FOR_ANALYSIS.md
+LEARNING_REVIEW_FROM_DEVELOPMENT.md
+
+# 早期实验脚本
+pre/

@@ -1,6 +1,7 @@
 import re
 import sys
 import time
+import logging
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -50,6 +51,8 @@ from config import BASE_DIR
 from database.db import initialize_database
 from scheduler import start_daily_scheduler
 from tasks.task_manager import task_manager
+
+logger = logging.getLogger("web.app")
 
 app = FastAPI(title="实验助手 API", version="1.2.0")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "frontend"), name="static")
@@ -186,19 +189,17 @@ async def request_debug_log(request: Request, call_next):
     try:
         response = await call_next(request)
     except Exception as exc:
-        print(
+        logger.error(
             f"[REQ] {time.strftime('%Y-%m-%d %H:%M:%S')} "
             f"{request.method} {request.url.path} status=500 duration=?"
             f" error={type(exc).__name__} {exc}",
-            flush=True,
         )
         raise
     duration = (time.perf_counter() - start) * 1000
-    print(
+    logger.info(
         f"[REQ] {time.strftime('%Y-%m-%d %H:%M:%S')} "
         f"{request.method} {request.url.path} status={response.status_code} "
         f"duration={duration:.0f}ms",
-        flush=True,
     )
     return response
 

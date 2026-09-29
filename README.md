@@ -107,9 +107,18 @@
 2. 双击仓库根目录 `start.bat`
 3. 首次运行自动创建虚拟环境、安装依赖；API 密钥在网页右上角「设置」中填写
 
+### Linux / macOS
+
+```bash
+chmod +x start.sh
+./start.sh
+```
+
 ### 便携版（无需 Python）
 
 下载 Release 中的 `AI107LabAssistant.exe`，双击运行，首次启动自动生成本机证书、配置和数据库。
+
+> ⚠️ **首次使用需要配置 LLM**：默认使用 DeepSeek 官方 API。请在启动后进入网页右上角「设置」→ 填入你的 API Key（支持 DeepSeek / OpenAI / 阿里通义 / 自定义兼容端点）。
 
 ### 📖 第一次用？
 
@@ -177,7 +186,14 @@ docs/                         # 文档与截图
 
 本项目采用 **Apache License 2.0**。设计上参考了 [OpenClaw](https://github.com/openclaw/openclaw)（MIT License）的 agent loop、compaction 与多智能体路由思想，在此致谢。
 
+实时语音基础设施基于 [QwenAudio/qwen-audio-agent](https://github.com/QwenAudio/qwen-audio-agent)（Apache-2.0），本项目保留了其完整的 server/ 网关代码，并在 `_qwen-audio-agent/lab/` 目录下实现了实验助手适配层。
+
 第三方依赖的许可证见各自项目：FastAPI（MIT）、PyMuPDF（AGPL-3.0 / 商业双许可）、openpyxl（MIT）、OpenAI SDK（Apache-2.0）。
+
+### 贡献与安全
+
+- 贡献指南见 [CONTRIBUTING.md](CONTRIBUTING.md)
+- 安全漏洞报告见 [SECURITY.md](SECURITY.md)
 
 ### 第三方数据许可
 
