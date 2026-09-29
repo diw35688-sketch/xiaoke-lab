@@ -291,20 +291,21 @@ def build_degraded_understanding(
 
     if not reason.strip():
         raise ValueError("降级原因不能为空。")
+    confirmation_reason = f"统一理解失败：{reason}"
     event = ExperimentEvent(
         event_type=ExperimentEventType.NOTE,
         raw_text=raw_text,
         normalized_text=raw_text,
         entities=ExperimentEntities(),
-        needs_confirmation=False,
-        confirmation_reason=f"统一理解失败：{reason}",
+        needs_confirmation=True,
+        confirmation_reason=confirmation_reason,
         source_session_id=session_id,
         source_segment_id=segment_id,
     )
     analysis = LLMAnalysisResult(
         events=[event],
-        should_ask_follow_up=False,
-        follow_up_question=None,
+        should_ask_follow_up=True,
+        follow_up_question=confirmation_reason,
         assistant_reply=None,
     )
     return UnifiedUnderstandingResult(

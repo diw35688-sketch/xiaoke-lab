@@ -44,7 +44,7 @@ class RecordObservationToolServiceTests(unittest.TestCase):
         service = unittest.mock.Mock()
         service.record.return_value = shared_result
 
-        with patch.object(lab_tools, "_build_record_service", return_value=service):
+        with patch.object(lab_tools_record, "_build_record_service", return_value=service):
             outcome = lab_tools.call(
                 "record_observation", {"transcript": "  加热到60摄氏度  "}
             )
@@ -58,8 +58,7 @@ class RecordObservationToolServiceTests(unittest.TestCase):
             {
                 "transcript": "加热到60摄氏度",
                 "entities": {"temperature": "60摄氏度"},
-                "missing_fields": ["duration"],
-                "follow_up_question": "加热了多长时间？",
+                "recorded_fields": ["temperature"],
                 "deviations": [{"field": "temperature"}],
             },
         )

@@ -29,9 +29,9 @@ class PortableLauncherTests(unittest.TestCase):
         self.assertIn('"scripts\\start_best.py"', content)
         self.assertIn('-c "import sys"', content)
 
-    def test_root_keeps_only_the_public_windows_launcher(self):
+    def test_root_keeps_only_the_public_windows_launchers(self):
         self.assertEqual(
-            ["start.bat"],
+            ["restart_web.bat", "start.bat"],
             sorted(path.name for path in PROJECT_DIR.glob("*.bat")),
         )
 

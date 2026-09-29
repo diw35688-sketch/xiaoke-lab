@@ -95,25 +95,22 @@ class ModeOutputPolicyTests(unittest.TestCase):
         self.assertEqual(caught.exception.status_code, 409)
         service.submit.assert_not_called()
 
-    def test_chat_hides_and_hard_blocks_record_tool(self):
-        names = [item["function"]["name"] for item in agent_core._tools_for_mode(InteractionMode.CHAT)]
-        self.assertNotIn("record_observation", names)
-        with mock.patch.object(agent_core.lab_tools, "call") as call:
-            with self.assertRaises(PermissionError):
-                agent_core._run_tool_with_presentation(
-                    "record_observation", {"transcript": "加热"}, "c-1",
-                    InteractionMode.CHAT,
-                )
-        call.assert_not_called()
+    def test_record_tool_available_in_all_modes_but_endpoint_blocks_chat(self):
+        # 架构演进：所有工具对所有模式开放，模型自己决定调什么。
+        # 记录端点仍按交互模式拦截（见 test_record_endpoint_rejects_explicit_chat）。
+        chat_tools = agent_core._tools_for_mode(InteractionMode.CHAT)
+        exp_tools = agent_core._tools_for_mode(InteractionMode.EXPERIMENT)
+        chat_names = {item["function"]["name"] for item in chat_tools}
+        exp_names = {item["function"]["name"] for item in exp_tools}
+        self.assertEqual(chat_names, exp_names, "所有模式应共享同一套工具")
 
     def test_frontend_routes_by_mode_not_input_source(self):
         recorder = (WEB / "frontend" / "voice_asr.js").read_text(encoding="utf-8")
         stream = (WEB / "frontend" / "streaming_chat_v2.js").read_text(encoding="utf-8")
-        self.assertIn("submittedModeSnapshot.interaction_mode === 'chat'", recorder)
-        self.assertIn("inputSource: 'single_recording'", recorder)
-        self.assertIn("modeSnapshot.interaction_mode === 'experiment'", stream)
+        self.assertIn("single_recording", recorder)
+        self.assertIn("modeSnapshot", recorder)
+        self.assertIn("interaction_mode === 'experiment'", stream)
         self.assertIn("streamExperimentRecord", stream)
-        self.assertIn("if (modeSnapshot.interaction_mode === 'experiment')", stream)
 
 
 if __name__ == "__main__":

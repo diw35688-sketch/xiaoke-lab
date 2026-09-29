@@ -121,7 +121,19 @@ class CommunityAuthorTests(AttributionTestCase):
                           "display_name": "张三"})
         response = client.post("/community", json={
             "kind": "protocol", "title": "PBS 配制",
-            "content": {"steps": []}, "author": "我冒充的别人", "tags": "",
+            "content": {
+                "protocol_id": "test_attribution",
+                "title": "PBS 配制",
+                "source": "社区",
+                "version": "1",
+                "schema_version": 1,
+                "steps": [{
+                    "step_number": 1, "title": "溶解", "instruction": "称量NaCl",
+                    "protocol_values": {}, "must_record": [],
+                    "terms": [], "hazard_note": "无",
+                }],
+            },
+            "author": "我冒充的别人", "tags": "",
         })
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["entry"]["author"], "张三",

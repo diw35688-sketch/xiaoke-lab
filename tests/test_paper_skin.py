@@ -115,7 +115,7 @@ class NotebookEntryTests(unittest.TestCase):
     def test_timestamp_is_extracted_not_invented(self):
         # 拿不到时间就不渲染页边时间戳，不允许编造
         self.assertIn("function clockOf", self.js)
-        self.assertIn("return match ?", self.js)
+        self.assertIn("function parseLocal", self.js)
         self.assertIn("clock ? '<span class=\"nb-ts\">'", self.js)
 
     def test_entities_keep_original_values(self):
