@@ -1,5 +1,5 @@
-// 自定义 QwenAudio Gateway 启动器：
-// 实时语音前台（DashScope Qwen Audio）+ 后台 = 实验助手 Adapter。
+// 小科实验助手 — 实时语音 Gateway 启动器：
+// 实时语音前台（DashScope Qwen Audio）+ 后台 = 实验助手 Python 后端。
 // 用法：
 //   DASHSCOPE_API_KEY=... node lab/start-lab-gateway.mjs
 
