@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """前端行为遥测接口：把用户使用的关键功能上报到调试日志。"""
 import json
+import logging
 import sys
 import time
 from pathlib import Path
@@ -8,6 +9,8 @@ from typing import Any
 
 from fastapi import APIRouter
 from pydantic import BaseModel
+
+logger = logging.getLogger("web.api.telemetry")
 
 if getattr(sys, "frozen", False):
     REPO_ROOT = Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent))
@@ -36,5 +39,5 @@ def telemetry(payload: TelemetryPayload):
     except Exception:
         # 日志失败不影响业务
         pass
-    print(f"[TELEMETRY] {line}", flush=True)
+    logger.debug("[TELEMETRY] %s", line)
     return {"ok": True}

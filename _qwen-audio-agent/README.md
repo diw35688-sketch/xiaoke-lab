@@ -1,3 +1,8 @@
+<!-- VENDORED DEPENDENCY: This is a subset of the upstream QwenAudio/qwen-audio-agent
+     project (Apache-2.0). Only runtime directories (server/, shared/, web/, config/,
+     lab/) are kept; upstream CI, docs, tests, CLI, TUI, and desktop are excluded.
+     See the parent project's README for integration details. -->
+
 # Qwen Audio Agent
 
 [中文](README_ZH.md) | [English](README.md) | [User Guide](https://qwenaudio.github.io/qwen-audio-agent/) | [Quickstart](https://qwenaudio.github.io/qwen-audio-agent/getting-started/quickstart)

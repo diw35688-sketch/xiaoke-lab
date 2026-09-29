@@ -1,7 +1,57 @@
 import sqlite3
+import logging
 from contextlib import closing
 
 from config import DATABASE_PATH
+
+logger = logging.getLogger("web.database.db")
+
+# ── Schema 版本管理 ──
+# 当前 schema 版本。每次有破坏性 schema 变更时递增，
+# 并在 _MIGRATIONS 里加入对应版本的迁移函数。
+SCHEMA_VERSION = 1
+
+
+def _get_schema_version(connection) -> int:
+    """读取数据库当前 schema 版本。首次创建返回 0。"""
+    try:
+        row = connection.execute(
+            "SELECT value FROM app_settings WHERE key = 'schema_version'"
+        ).fetchone()
+        return int(row["value"]) if row else 0
+    except (sqlite3.OperationalError, ValueError):
+        return 0
+
+
+def _set_schema_version(connection, version: int) -> None:
+    connection.execute(
+        "INSERT INTO app_settings (key, value) VALUES ('schema_version', ?) "
+        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        (str(version),),
+    )
+
+
+# 迁移函数注册表：version → callable(connection)
+# 每个函数从 (version-1) 升级到 version。
+_MIGRATIONS: dict[int, callable] = {}
+
+
+def migration(version: int):
+    """注册一个迁移函数。"""
+    def decorator(fn):
+        _MIGRATIONS[version] = fn
+        return fn
+    return decorator
+
+
+@migration(1)
+def _migrate_v1(connection):
+    """v1: 初始版本——所有现有表和列已由 initialize_database 创建。
+
+    这个迁移只是记录基准版本，不做额外操作。
+    后续 schema 变更从这里开始增量迁移。
+    """
+    pass
 
 
 def get_connection():
@@ -359,3 +409,14 @@ def initialize_database():
             FOREIGN KEY(prep_run_id) REFERENCES prep_runs(prep_run_id) ON DELETE CASCADE)""")
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_prep_run_items_run ON prep_run_items(prep_run_id, sort_order)")
+
+        # ── 运行增量迁移 ──
+        current_version = _get_schema_version(connection)
+        if current_version < SCHEMA_VERSION:
+            for version in range(current_version + 1, SCHEMA_VERSION + 1):
+                fn = _MIGRATIONS.get(version)
+                if fn:
+                    logger.info("Running schema migration v%d", version)
+                    fn(connection)
+            _set_schema_version(connection, SCHEMA_VERSION)
+            logger.info("Schema upgraded to v%d (was v%d)", SCHEMA_VERSION, current_version)
