@@ -103,12 +103,19 @@ _rivals/
 _pkg_meta/
 _community_deploy/
 
-# 实时语音前端是小科自研部分，必须开源；排除依赖、构建产物、示例与日志
+# 实时语音引擎（QwenAudio qwen-audio-agent，Apache-2.0）
+# 仅保留运行时依赖：lab/ + server/ + shared/ + web/ + config/
+# 其余上游目录（desktop/docs/test/tui/cli/scripts/.github 等）不随仓库分发
 _qwen-audio-agent/node_modules/
-_qwen-audio-agent/web/dist/
+_qwen-audio-agent/desktop/
+_qwen-audio-agent/docs/
 _qwen-audio-agent/examples/
-_qwen-audio-agent/desktop/build/
-_qwen-audio-agent/docs/promo/
+_qwen-audio-agent/test/
+_qwen-audio-agent/tui/
+_qwen-audio-agent/cli/
+_qwen-audio-agent/scripts/
+_qwen-audio-agent/.github/
+_qwen-audio-agent/integration/
 _qwen-audio-agent/logs/
 _qwen-audio-agent/**/*.log
 

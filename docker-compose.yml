@@ -1,0 +1,29 @@
+version: "3.8"
+
+services:
+  xiaoke-lab:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      # 数据库持久化
+      - lab-db:/app/web/data
+      # 用户上传文件
+      - lab-uploads:/app/web/uploads
+      # 运行日志
+      - lab-logs:/app/logs
+      # 配置文件（含 API Key，可选挂载）
+      - ./web/settings.json:/app/web/settings.json
+    environment:
+      - PYTHONPATH=/app/web
+      - PYTHONUNBUFFERED=1
+      # LLM 配置（也可通过网页端设置页面填写）
+      # - OPENAI_API_KEY=your-key
+      # - OPENAI_BASE_URL=https://api.deepseek.com/v1
+      # - MODEL_NAME=deepseek-chat
+    restart: unless-stopped
+
+volumes:
+  lab-db:
+  lab-uploads:
+  lab-logs:
