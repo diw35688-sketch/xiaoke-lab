@@ -17,6 +17,7 @@ from lab_tools_registry import (
     _timers, _timers_lock, _record_lock,
     domain, llm_bridge, settings_store,
     RecordCommand, SharedRecordService,
+    experiment_command_catalog,
     generate_schedule, format_schedule_brief,
     get_remaining_schedule, format_remaining_brief,
     get_step_profile, get_next_passive_window,
