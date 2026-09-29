@@ -9,9 +9,9 @@ else:
     BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", os.getenv("BASE_URL", "https://api.llm.ustc.edu.cn/v1"))
-MODEL_NAME = os.getenv("MODEL_NAME", "deepseek-v4-pro")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", os.getenv("LLM_API_KEY", ""))
+OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", os.getenv("LLM_BASE_URL", os.getenv("BASE_URL", "https://api.deepseek.com/v1")))
+MODEL_NAME = os.getenv("MODEL_NAME", os.getenv("LLM_MODEL", "deepseek-chat"))
 
 # 语音合成只使用本机 Qwen 服务。
 LOCAL_QWEN_TTS_URL = os.getenv("LOCAL_QWEN_TTS_URL", "http://127.0.0.1:8001/tts").rstrip("/")

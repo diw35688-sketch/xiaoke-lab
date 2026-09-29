@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Mapping, Protocol
 
@@ -261,6 +262,8 @@ def _restore_domain_from_store(
     except Exception:  # noqa: BLE001
         pass
 
+logger = logging.getLogger("web.turn_processors")
+
 
 class ExperimentProcessor:
     """统一路径：所有实验 Turn 都走 stream_agent，模型自己决定调什么工具。
@@ -308,7 +311,7 @@ class ExperimentProcessor:
         try:
             _restore_domain_from_store(self._store, turn.conversation_id, turn.lab_session_id)
         except Exception as _e:
-            print(f"[WARN] _restore_domain_from_store failed: {_e}")
+            logger.warning("_restore_domain_from_store failed: %s", _e)
 
         # 记录 domain 工具执行前的状态
         pre_step_number = None

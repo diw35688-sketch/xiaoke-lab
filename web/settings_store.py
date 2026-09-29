@@ -83,8 +83,8 @@ class ModelSettings:
     """一份完整的模型与语音配置。"""
 
     api_key: str = ""
-    base_url: str = "https://api.llm.ustc.edu.cn/v1"
-    model_name: str = "deepseek-v4-pro"
+    base_url: str = "https://api.deepseek.com/v1"
+    model_name: str = "deepseek-chat"
     thinking_level: str = "auto"
     dashscope_api_key: str = ""
     dashscope_realtime_model: str = "qwen-audio-3.0-realtime-plus"
