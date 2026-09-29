@@ -1,0 +1,33 @@
+name: ci
+
+on:
+  push:
+    branches: [main, codex/asr-demo-unified-understanding]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: web/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r web/requirements.txt
+          pip install pytest
+
+      - name: Run tests
+        working-directory: .
+        env:
+          PYTHONPATH: web
+        run: python -m pytest tests/ -q --tb=short
