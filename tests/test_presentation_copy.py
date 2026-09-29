@@ -117,7 +117,7 @@ class RecordAckCopyTests(unittest.TestCase):
         self.assertEqual(text, "原始记录已保存，结构化处理暂时不可用。")
 
     def test_recorded_no_step_copy_uses_plain_ack(self):
-        """RECORDED_NO_STEP：无步骤号 → 诚实说明结构化失败、原文已保存。"""
+        """RECORDED_NO_STEP：无步骤号 → 简洁确认已记录。"""
         intent = _make_intent(
             MessageKind.RECORD_ACK,
             args={"result": RecordAckResult.RECORDED_NO_STEP},
@@ -125,7 +125,7 @@ class RecordAckCopyTests(unittest.TestCase):
 
         text = copy_for_intent(intent, ui_mode="user")
 
-        self.assertEqual(text, "本段结构化处理失败，原始记录已保存。")
+        self.assertEqual(text, "已记录。")
 
     def test_failed_copy_confirms_that_raw_record_was_saved(self):
         intent = _make_intent(

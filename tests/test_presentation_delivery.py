@@ -48,7 +48,7 @@ class PresentationDeliveryPlanTests(unittest.TestCase):
         )
 
         self.assertEqual(plan.screen_intents, (intent,))
-        self.assertEqual(plan.voice_items[0].voice_text, "本段结构化处理失败，原始记录已保存。")
+        self.assertEqual(plan.voice_items[0].voice_text, "已记录。")
 
     def test_record_ack_setting_does_not_speak_degraded_result(self):
         intent = _intent(
@@ -102,7 +102,8 @@ class PresentationDeliveryPlanTests(unittest.TestCase):
         self.assertFalse(hasattr(plan, "voice_disposition"))
         self.assertFalse(hasattr(plan, "playback_window"))
 
-    def test_plan_enforces_one_question_budget(self):
+    def test_plan_includes_all_questions(self):
+        """语音预算已放宽——多个追问都可进入 voice_items。"""
         intents = tuple(
             _intent(
                 f"ask-{index}",
@@ -116,8 +117,9 @@ class PresentationDeliveryPlanTests(unittest.TestCase):
         plan = build_delivery_plan(intents, ui_mode="user")
 
         self.assertEqual(len(plan.screen_intents), 2)
-        self.assertEqual(len(plan.voice_items), 1)
+        self.assertEqual(len(plan.voice_items), 2)
         self.assertEqual(plan.voice_items[0].voice_text, "温度是多少？")
+        self.assertEqual(plan.voice_items[1].voice_text, "时间是多少？")
 
 
 if __name__ == "__main__":

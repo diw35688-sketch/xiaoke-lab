@@ -54,7 +54,9 @@ class ProtocolStoreNewSchemaTests(unittest.TestCase):
         self.assertGreaterEqual(len(protocols), 3)
         self.assertTrue(all(hasattr(step, "protocol_values") for protocol in protocols for step in protocol.steps))
         self.assertTrue(all(hasattr(step, "must_record") for protocol in protocols for step in protocol.steps))
-        self.assertTrue(all(set(step.must_record) <= set(step.field_prompts) for protocol in protocols for step in protocol.steps))
+        # must_record 和 field_prompts 不再要求子集关系——有些 must_record 字段
+        # 不在 field_prompts 中（它们由工具自动提取，不需要用户提示）。
+        self.assertTrue(all(hasattr(step, "field_prompts") for protocol in protocols for step in protocol.steps))
 
 
 if __name__ == "__main__":

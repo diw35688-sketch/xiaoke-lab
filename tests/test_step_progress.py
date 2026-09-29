@@ -31,9 +31,12 @@ class StepProgressTests(unittest.TestCase):
     def setUp(self):
         self.progress = StepProgress()
 
-    def test_empty_must_record_is_completed(self):
-        # 没有现场必测项的步骤：天然完成（无需任何口述）。
+    def test_empty_must_record_waits_until_confirmed(self):
+        # 没有现场必测项的步骤也不会自动完成——需要用户确认才打勾，
+        # 否则一进来就被标记完成，体验上等于跳步。
         step = make_step(1, [])
+        self.assertEqual(self.progress.status_for(step), STATUS_WAITING)
+        self.progress.confirm(1)
         self.assertEqual(self.progress.status_for(step), STATUS_COMPLETED)
 
     def test_missing_fields_stay_waiting(self):
