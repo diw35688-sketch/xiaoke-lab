@@ -9,6 +9,7 @@ if str(WEB_DIR) not in sys.path:
     sys.path.insert(0, str(WEB_DIR))
 
 import lab_tools  # noqa: E402
+import lab_tools_record  # noqa: E402
 from src.core.presentation_intent import (  # noqa: E402
     MessageKind,
     MessagePriority,
@@ -70,7 +71,8 @@ class RecordObservationToolServiceTests(unittest.TestCase):
         service = unittest.mock.Mock()
         service.record.side_effect = OSError("disk full")
 
-        with patch.object(lab_tools, "_build_record_service", return_value=service):
+        # lab_tools 拆分后，record_observation 的 _build_record_service 在 lab_tools_record 模块内解析
+        with patch.object(lab_tools_record, "_build_record_service", return_value=service):
             outcome = lab_tools.call(
                 "record_observation", {"transcript": "记录颜色变化"}
             )

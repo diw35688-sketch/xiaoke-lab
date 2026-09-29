@@ -115,7 +115,9 @@ class ExplicitModeSwitchTests(unittest.TestCase):
         )
 
     def test_agent_protocol_tool_switches_mode_before_navigating(self):
-        tools = (WEB / "lab_tools.py").read_text(encoding="utf-8")
+        # lab_tools 已拆分为 registry + 功能模块，select_protocol 在 protocol 模块里
+        protocol_module = (WEB / "lab_tools_protocol.py")
+        tools = protocol_module.read_text(encoding="utf-8") if protocol_module.exists() else (WEB / "lab_tools.py").read_text(encoding="utf-8")
         shell = (FRONTEND / "shell.js").read_text(encoding="utf-8")
         state = (FRONTEND / "interaction_mode_state.js").read_text(
             encoding="utf-8"
