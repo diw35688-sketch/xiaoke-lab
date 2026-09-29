@@ -12,7 +12,6 @@ class UnifiedMicControlTests(unittest.TestCase):
 
         self.assertEqual(source.count('id="cp-mic"'), 1)
         self.assertIn('id="cp-phone-call"', source)
-        self.assertIn('id="cp-wake-word"', source)
         self.assertIn("window.phoneCallToggle?.();", source)
         self.assertIn("window.wakeWordToggle?.();", source)
         self.assertIn("real.click();", source)

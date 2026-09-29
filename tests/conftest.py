@@ -8,11 +8,6 @@
 import pytest
 
 QUARANTINED = {
-    'tests/test_turn_store.py::TurnStoreTests::test_one_transaction_commits_all_business_rows',
-    'tests/test_turn_store.py::TurnStoreTests::test_reserve_replay_conflict_and_failed_retry',
-    'tests/test_experiment_tool_command.py::ExperimentToolAgentTests::test_experiment_tools_are_discovered_from_tool_registration',
-    'tests/test_experiment_tool_command.py::ExperimentToolAgentTests::test_protocol_detail_schema_does_not_ask_model_for_protocol_id',
-    'tests/test_experiment_tool_command.py::ExperimentToolAgentTests::test_visible_catalog_is_derived_and_does_not_list_itself',
     'tests/test_task_context.py::TaskContextWiringTests::test_experiment_processor_passes_task_context',
     'tests/test_turn_processors.py::TurnProcessorTests::test_created_clarification_is_a_numbered_card_and_voice_only_reads_question',
     'tests/test_turn_processors.py::TurnProcessorTests::test_end_summary_returns_every_unresolved_question_with_stable_status',
@@ -29,8 +24,6 @@ QUARANTINED = {
     'tests/test_turn_processors.py::TurnProcessorTests::test_protocol_natural_turns_accumulate_and_resolve_one_question',
     'tests/test_turn_processors.py::TurnProcessorTests::test_protocol_turn_carries_protocol_step_and_safety_blocks',
     'tests/test_turn_processors.py::TurnProcessorTests::test_protocol_uncertain_natural_short_answer_resolves_unique_question',
-    'tests/test_unified_mic_control.py::UnifiedMicControlTests::test_composer_owns_one_mic_and_selects_single_or_continuous_input',
-    'tests/test_unified_processor.py::UnifiedPromptTests::test_system_prompt_defines_closed_non_executing_contract',
 }
 
 def pytest_collection_modifyitems(config, items):

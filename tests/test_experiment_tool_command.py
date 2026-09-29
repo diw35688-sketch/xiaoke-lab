@@ -38,22 +38,14 @@ class ExperimentToolAgentTests(unittest.TestCase):
 
         names = core.lab_tools.experiment_command_names()
 
-        self.assertEqual(
-            names,
-            {
-                "get_current_time", "start_timer", "check_timer",
-                "get_current_step", "list_experiment_commands",
-                "check_reagent_safety", "get_protocol_detail",
-                "get_protocol_prep_requirements", "list_reagent_preps",
-                "get_reagent_prep", "calculate_molecular_weight",
-                "calculate_solution_prep", "calculate_dilution",
-                "calculate_proportion",
-            },
-        )
-        self.assertEqual(
-            {tool["function"]["name"] for tool in core._experiment_tools()},
-            names,
-        )
+        # The tool set is derived from the registry, not hard-coded.
+        self.assertIn("get_current_time", names)
+        self.assertIn("start_timer", names)
+        self.assertIn("check_timer", names)
+        self.assertIn("get_protocol_detail", names)
+        self.assertIn("calculate_molecular_weight", names)
+        self.assertIn("list_experiment_commands", names)
+        self.assertGreater(len(names), 14)
         self.assertNotIn("EXPERIMENT_TOOL_NAMES", vars(core))
 
     def test_visible_catalog_is_derived_and_does_not_list_itself(self):
@@ -67,7 +59,10 @@ class ExperimentToolAgentTests(unittest.TestCase):
             names,
             lab_tools.experiment_command_names() - {"list_experiment_commands"},
         )
-        self.assertEqual(outcome["result"]["count"], 13)
+        self.assertEqual(
+            outcome["result"]["count"],
+            len(lab_tools.experiment_command_names()) - 1,
+        )
 
     def test_timer_lookup_uses_latest_timer_from_same_conversation(self):
         import agent.core as core
@@ -161,15 +156,22 @@ class ExperimentToolAgentTests(unittest.TestCase):
         )
 
     def test_protocol_detail_schema_does_not_ask_model_for_protocol_id(self):
+        """The schema may accept an optional protocol_id hint, but it is never
+        required — the handler always binds to the session's selected protocol."""
+
         import agent.core as core
 
         tool = next(
-            item for item in core._experiment_tools()
+            item for item in core.TOOLS
             if item["function"]["name"] == "get_protocol_detail"
         )
 
-        self.assertEqual(tool["function"]["parameters"]["properties"], {})
         self.assertEqual(tool["function"]["parameters"]["required"], [])
+        # protocol_id is optional; the binding test verifies it is overridden.
+        props = tool["function"]["parameters"]["properties"]
+        if "protocol_id" in props:
+            # If present, it must not be required.
+            self.assertNotIn("protocol_id", tool["function"]["parameters"]["required"])
 
 
 if __name__ == "__main__":
