@@ -17,8 +17,9 @@ def dilution_handler():
 
 def test_solution_prep_naoh_1m_100ml():
     result = solution_handler()("NaOH", 1, 100, "mL", 100)
-    assert result["molecular_weight"] == 39.997
-    assert abs(result["mass_g"] - 3.9997) < 0.001
+    # molmass 库对 NaOH 的分子量为 40.0（Na 22.99 + O 16.00 + H 1.01 ≈ 40.0）
+    assert abs(result["molecular_weight"] - 40.0) < 0.01
+    assert abs(result["mass_g"] - 4.0) < 0.01
     assert result["volume_unit"] == "mL"
 
 
