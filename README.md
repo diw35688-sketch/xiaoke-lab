@@ -157,6 +157,12 @@ web/                          # 服务端与前端
   api/                        # FastAPI 路由（agent/chat/kb/protocols/papers/...）
   database/                   # SQLite 持久化（会话/知识库/论文库/储存库）
   frontend/                   # 原生 JS 前端（三列工作台 + 手机流程卡）
+realtime/                     # 实时语音引擎（基于 qwen-audio-agent，Apache-2.0）
+  lab/                        # 实验助手适配层（启动入口 / MCP 工具桥 / 人设）
+  server/                     # WebSocket 网关 + WebRTC + DashScope Realtime 客户端
+  shared/                     # 共享类型与工具
+  web/                        # 浏览器端语音 UI
+src/                          # ASR 语音识别 / LLM 客户端 / 核心数据结构
 scripts/                      # 开发与评测脚本
   trace_show.py               # bad case 回放
   eval_report.py              # 固定回归集报告
@@ -186,7 +192,7 @@ docs/                         # 文档与截图
 
 本项目采用 **Apache License 2.0**。设计上参考了 [OpenClaw](https://github.com/openclaw/openclaw)（MIT License）的 agent loop、compaction 与多智能体路由思想，在此致谢。
 
-实时语音基础设施基于 [QwenAudio/qwen-audio-agent](https://github.com/QwenAudio/qwen-audio-agent)（Apache-2.0），本项目保留了其完整的 server/ 网关代码，并在 `_qwen-audio-agent/lab/` 目录下实现了实验助手适配层。
+实时语音引擎（`realtime/`）基于 [QwenAudio/qwen-audio-agent](https://github.com/QwenAudio/qwen-audio-agent)（Apache-2.0），在其 WebSocket 网关和 WebRTC 基础设施上构建了实验助手语音适配层。原始许可证见 `realtime/LICENSE`。
 
 第三方依赖的许可证见各自项目：FastAPI（MIT）、PyMuPDF（AGPL-3.0 / 商业双许可）、openpyxl（MIT）、OpenAI SDK（Apache-2.0）。
 

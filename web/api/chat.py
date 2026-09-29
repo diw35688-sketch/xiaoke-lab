@@ -181,7 +181,7 @@ def chat_stream(request: ChatRequest):
 def _resolve_legacy_lab_session_id() -> str:
     """Legacy /chat 没有 lab_session_id：优先读音频 agent 的当前会话，否则生成一个。"""
     try:
-        root = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[2])) / "_qwen-audio-agent"
+        root = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[2])) / "realtime"
         value = (root / "current-lab-session-id.txt").read_text(encoding="utf-8").strip()
         if value:
             return value

@@ -1,13 +1,13 @@
 {
-  "name": "qwen-audio-agent",
-  "desktopName": "qwen-audio-agent.desktop",
+  "name": "xiaoke-realtime-voice",
+  "desktopName": "xiaoke-realtime-voice",
   "version": "1.11.0",
-  "description": "A realtime voice runtime that keeps AI agents talking, working, and present.",
-  "author": "qwen-audio-agent contributors",
+  "description": "Realtime voice engine for Xiaoke Lab Assistant (based on qwen-audio-agent)",
+  "author": "Xiaoke Lab contributors",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/QwenAudio/qwen-audio-agent.git"
+    "url": "git+https://github.com/diw35688-sketch/xiaoke-lab.git"
   },
   "bugs": {
     "url": "https://github.com/QwenAudio/qwen-audio-agent/issues"

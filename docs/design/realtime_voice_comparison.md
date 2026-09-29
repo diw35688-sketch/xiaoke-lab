@@ -1,15 +1,15 @@
-# 实时语音交互对比：QwenAudio/qwen-audio-agent vs 本项目
+﻿# 实时语音交互对比：QwenAudio/qwen-audio-agent vs 本项目
 
 ## 参考代码位置
 
 ```text
-D:\me\ai107\_qwen-audio-agent\web\src\useRealtimeVoice.js
-D:\me\ai107\_qwen-audio-agent\web\src\microphone-capture.js
-D:\me\ai107\_qwen-audio-agent\web\src\audio.js
-D:\me\ai107\_qwen-audio-agent\web\src\playback-lifecycle.js
-D:\me\ai107\_qwen-audio-agent\web\src\voice-defaults.js
-D:\me\ai107\_qwen-audio-agent\shared\realtime-events.mjs
-D:\me\ai107\_qwen-audio-agent\server\src\**（Gateway 实时语音后端）
+D:\me\ai107\realtime\web\src\useRealtimeVoice.js
+D:\me\ai107\realtime\web\src\microphone-capture.js
+D:\me\ai107\realtime\web\src\audio.js
+D:\me\ai107\realtime\web\src\playback-lifecycle.js
+D:\me\ai107\realtime\web\src\voice-defaults.js
+D:\me\ai107\realtime\shared\realtime-events.mjs
+D:\me\ai107\realtime\server\src\**（Gateway 实时语音后端）
 ```
 
 ---
@@ -96,3 +96,4 @@ server/src/...（Gateway 实时后端）
    - 说话时 interrupt 停止播放
 4. 保留现有 Silero VAD + SenseVoice（整段识别），先不改成持续音频流
 5. 如果后续要更低延迟，再考虑把输入改成 WebSocket AUDIO_APPEND 持续流
+
