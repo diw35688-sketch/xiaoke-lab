@@ -56,10 +56,9 @@ class ExplicitModeSwitchTests(unittest.TestCase):
 
     def test_new_chat_has_three_explicit_modes_and_captures_before_submit(self):
         source = (FRONTEND / "streaming_chat_v2.js").read_text(encoding="utf-8")
-        for name in ("chat", "free", "protocol"):
+        # The new-chat flow offers three entry cards: protocol, template, storage.
+        for name in ("protocol", "template", "storage"):
             self.assertIn(f'data-mode="{name}"', source)
-        self.assertIn("window.selectComposerMode('chat')", source)
-        self.assertIn("window.selectComposerMode('free')", source)
         protocol_branch = source[
             source.index("if (mode === 'protocol')"):
             source.index("if (mode === 'template')")
@@ -98,7 +97,7 @@ class ExplicitModeSwitchTests(unittest.TestCase):
             "interactionModeState.select(id ? 'protocol' : 'free', id || null)",
             views,
         )
-        self.assertIn("window.shellShow('chat')", views)
+        self.assertIn("window.shellShow(id ? 'run' : 'chat')", views)
 
     def test_free_mode_clears_server_protocol_before_switching_frontend(self):
         composer = (FRONTEND / "composer.js").read_text(encoding="utf-8")

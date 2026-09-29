@@ -30,7 +30,7 @@ class ProtocolNavigationTests(unittest.TestCase):
             protocol_id="p1", protocol_version="1"
         )
 
-    def test_active_question_blocks_next(self):
+    def test_active_question_allows_move_but_marks_left_with_pending(self):
         decision = decide_protocol_move(
             state=self.state,
             action="next",
@@ -38,8 +38,9 @@ class ProtocolNavigationTests(unittest.TestCase):
             evaluation={"missing_fields": ["condition"]},
             unresolved=(question(ClarificationStatus.ACTIVE),),
         )
-        self.assertFalse(decision.allowed)
-        self.assertEqual(decision.blocking_question_numbers, (1,))
+        self.assertTrue(decision.allowed)
+        self.assertEqual(decision.state.current_step_number, 2)
+        self.assertEqual(decision.state.statuses[1].value, "left_with_pending")
 
     def test_deferred_question_allows_next_with_pending_status(self):
         decision = decide_protocol_move(
@@ -53,7 +54,7 @@ class ProtocolNavigationTests(unittest.TestCase):
         self.assertEqual(decision.state.current_step_number, 2)
         self.assertEqual(decision.state.statuses[1].value, "left_with_pending")
 
-    def test_uncovered_missing_field_blocks_next(self):
+    def test_uncovered_missing_field_allows_move_but_marks_left_with_pending(self):
         decision = decide_protocol_move(
             state=self.state,
             action="next",
@@ -61,8 +62,9 @@ class ProtocolNavigationTests(unittest.TestCase):
             evaluation={"missing_fields": ["condition", "duration"]},
             unresolved=(question(ClarificationStatus.DEFERRED),),
         )
-        self.assertFalse(decision.allowed)
-        self.assertEqual(decision.missing_fields, ("duration",))
+        self.assertTrue(decision.allowed)
+        self.assertEqual(decision.state.current_step_number, 2)
+        self.assertEqual(decision.state.statuses[1].value, "left_with_pending")
 
     def test_missing_fields_without_any_question_can_move_next(self):
         decision = decide_protocol_move(
