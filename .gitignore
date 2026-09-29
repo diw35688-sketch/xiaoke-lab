@@ -140,3 +140,19 @@ web/.internal_token
 # 大二进制与调试日志（不随仓库分发）
 bin/cloudflared.exe
 debug_events.log
+
+# 实时语音运行时会话状态与实验记忆（含真实实验数据，不提交）
+_qwen-audio-agent/current-conversation-id.txt
+_qwen-audio-agent/current-lab-session-id.txt
+_qwen-audio-agent/lab/experiment-memory.json
+
+# 敏感配置备份（含明文 API Key，绝不提交）
+web/settings.backup/
+web/settings*.bak*
+*settings*.bak*
+
+# 临时/调研目录（不随仓库分发）
+_patch_backup/
+docs/video_frames/
+web/_rag_ref/
+community_upload/
