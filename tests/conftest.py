@@ -10,20 +10,9 @@ import pytest
 QUARANTINED = {
     'tests/test_turn_store.py::TurnStoreTests::test_one_transaction_commits_all_business_rows',
     'tests/test_turn_store.py::TurnStoreTests::test_reserve_replay_conflict_and_failed_retry',
-    'tests/test_chat_spoken_production.py::ChatSpokenProductionTests::test_frontend_uses_same_spoken_block_for_visible_chat_text',
-    'tests/test_conversations.py::ConversationCrudTests::test_create_list_auto_title_rename_delete',
-    'tests/test_data_ownership.py::ConversationIsolationTests::test_cannot_rename_someone_elses_conversation',
-    'tests/test_data_ownership.py::ConversationIsolationTests::test_list_shows_only_my_conversations',
-    'tests/test_data_ownership.py::OrphanClaimTests::test_first_account_inherits_pre_existing_data',
-    'tests/test_experiment_acceptance.py::ExperimentAcceptanceTests::test_accepts_degraded_result_only_as_faithful_note',
-    'tests/test_experiment_acceptance.py::ExperimentAcceptanceTests::test_degraded_shape_cannot_enter_normal_experiment_dispatch',
     'tests/test_experiment_tool_command.py::ExperimentToolAgentTests::test_experiment_tools_are_discovered_from_tool_registration',
     'tests/test_experiment_tool_command.py::ExperimentToolAgentTests::test_protocol_detail_schema_does_not_ask_model_for_protocol_id',
     'tests/test_experiment_tool_command.py::ExperimentToolAgentTests::test_visible_catalog_is_derived_and_does_not_list_itself',
-    'tests/test_explicit_mode_switch.py::ExplicitModeSwitchTests::test_new_chat_has_three_explicit_modes_and_captures_before_submit',
-    'tests/test_explicit_mode_switch.py::ExplicitModeSwitchTests::test_protocol_mode_requires_a_selected_server_protocol',
-    'tests/test_protocol_navigation.py::ProtocolNavigationTests::test_active_question_blocks_next',
-    'tests/test_protocol_navigation.py::ProtocolNavigationTests::test_uncovered_missing_field_blocks_next',
     'tests/test_task_context.py::TaskContextWiringTests::test_experiment_processor_passes_task_context',
     'tests/test_turn_processors.py::TurnProcessorTests::test_created_clarification_is_a_numbered_card_and_voice_only_reads_question',
     'tests/test_turn_processors.py::TurnProcessorTests::test_end_summary_returns_every_unresolved_question_with_stable_status',
@@ -40,10 +29,8 @@ QUARANTINED = {
     'tests/test_turn_processors.py::TurnProcessorTests::test_protocol_natural_turns_accumulate_and_resolve_one_question',
     'tests/test_turn_processors.py::TurnProcessorTests::test_protocol_turn_carries_protocol_step_and_safety_blocks',
     'tests/test_turn_processors.py::TurnProcessorTests::test_protocol_uncertain_natural_short_answer_resolves_unique_question',
-    'tests/test_unified_acceptance_bypass.py::UnifiedAcceptanceBypassTests::test_degraded_note_is_accepted_as_evidence_but_creates_no_question',
     'tests/test_unified_mic_control.py::UnifiedMicControlTests::test_composer_owns_one_mic_and_selects_single_or_continuous_input',
     'tests/test_unified_processor.py::UnifiedPromptTests::test_system_prompt_defines_closed_non_executing_contract',
-    'tests/test_unified_understanding.py::UnifiedUnderstandingContractTests::test_format_failure_can_degrade_to_unclassified_note',
 }
 
 def pytest_collection_modifyitems(config, items):

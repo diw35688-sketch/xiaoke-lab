@@ -22,6 +22,7 @@ import auth as auth_core  # noqa: E402
 from api import auth as auth_api  # noqa: E402
 from app import app  # noqa: E402
 from database import crud, db, user_store  # noqa: E402
+from database.lab_record_store import save_record  # noqa: E402
 
 PASSWORD = "a good lab password"
 
@@ -92,8 +93,12 @@ class ConversationIsolationTests(OwnershipTestCase):
         self.alice = self.client_for("alice", bootstrap=True)
         self.bob = self.client_for("bob")
         self.alice_convo = self.alice.post("/chat/conversations").json()["conversation_id"]
-        # 让会话带上一条消息，否则列表按设计不展示空会话
+        # 让会话带上一条消息和实验记录，否则侧边栏不展示纯闲聊会话。
         crud.add_message(self.alice_convo, "user", "爱丽丝的实验记录")
+        save_record({
+            "session_id": "s1", "transcript": "爱丽丝的实验记录",
+            "conversation_id": self.alice_convo, "at": "2026-08-25 10:00:00",
+        })
 
     def tearDown(self):
         self.alice.close()
@@ -149,6 +154,10 @@ class OrphanClaimTests(OwnershipTestCase):
             connection.execute(
                 "INSERT INTO messages (conversation_id,role,content)"
                 " VALUES ('legacy','user','升级前的记录')")
+            # 加一条实验记录让侧边栏展示这个会话。
+            connection.execute(
+                "INSERT INTO lab_records (session_id,transcript,conversation_id,at,segment_id)"
+                " VALUES ('legacy','升级前的实验','legacy','2026-01-01 10:00:00','seg-1')")
         self.assertEqual(user_store.count_orphaned_data().get("conversations"), 1)
 
         client = self.client_for("alice", bootstrap=True)

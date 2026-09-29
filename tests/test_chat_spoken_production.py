@@ -55,8 +55,10 @@ class ChatSpokenProductionTests(unittest.TestCase):
             encoding="utf-8"
         )
 
-        self.assertIn("`${localTurnId}:spoken`", source)
-        self.assertIn("{ role: 'spoken', text }", source)
+        # The frontend creates an optimistic assistant block before the
+        # committed turn arrives; the backend's spoken-block plan replaces it.
+        self.assertIn("`${localTurnId}:assistant`", source)
+        self.assertIn("type: 'assistant_text'", source)
 
 
 if __name__ == "__main__":
