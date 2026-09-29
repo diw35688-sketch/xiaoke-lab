@@ -11,10 +11,6 @@ QUARANTINED = {
     'tests/test_turn_store.py::TurnStoreTests::test_one_transaction_commits_all_business_rows',
     'tests/test_turn_store.py::TurnStoreTests::test_reserve_replay_conflict_and_failed_retry',
     'tests/test_cross_user_access.py::CrossUserAccessTests::test_owner_still_has_full_access',
-    'tests/test_conversation_turn_store_frontend.py::ConversationTurnStoreFrontendTests::test_run_canvas_no_longer_owns_realtime_think_or_tool_state',    'tests/test_agent_tool_presentation.py::AgentToolPresentationTests::test_run_agent_executes_all_same_turn_tools_before_replying',
-    'tests/test_agent_tool_presentation.py::AgentToolPresentationTests::test_run_agent_returns_copy_text_without_second_model_call',
-    'tests/test_agent_tool_presentation.py::AgentToolPresentationTests::test_stream_agent_does_not_emit_empty_voice_delivery',
-    'tests/test_agent_tool_presentation.py::AgentToolPresentationTests::test_stream_agent_yields_copy_text_and_stops_before_model_rewrite',
     'tests/test_attribution.py::CommunityAuthorTests::test_author_comes_from_session_not_from_payload',
     'tests/test_chat_spoken_production.py::ChatSpokenProductionTests::test_frontend_uses_same_spoken_block_for_visible_chat_text',
     'tests/test_clarification_acceptance.py::ClarificationAcceptanceTests::test_degraded_note_does_not_create_false_question',
@@ -32,11 +28,6 @@ QUARANTINED = {
     'tests/test_explicit_mode_switch.py::ExplicitModeSwitchTests::test_new_chat_has_three_explicit_modes_and_captures_before_submit',
     'tests/test_explicit_mode_switch.py::ExplicitModeSwitchTests::test_protocol_mode_requires_a_selected_server_protocol',
     'tests/test_lab_tool_record_service.py::RecordObservationToolServiceTests::test_tool_uses_shared_service_and_preserves_result_contract',
-    'tests/test_llm_client_retry.py::LLMClientRetryTests::test_empty_response_retries_and_succeeds',
-    'tests/test_llm_client_retry.py::LLMClientRetryTests::test_http_401_does_not_retry',
-    'tests/test_llm_client_retry.py::LLMClientRetryTests::test_request_disables_thinking_mode',
-    'tests/test_llm_client_retry.py::LLMClientRetryTests::test_timeout_retries_and_succeeds',
-    'tests/test_llm_client_retry.py::LLMClientRetryTests::test_two_empty_responses_raise_error',
     'tests/test_mode_output_policies.py::ModeOutputPolicyTests::test_chat_hides_and_hard_blocks_record_tool',
     'tests/test_mode_output_policies.py::ModeOutputPolicyTests::test_frontend_routes_by_mode_not_input_source',
     'tests/test_paper_skin.py::NotebookEntryTests::test_timestamp_is_extracted_not_invented',
@@ -85,5 +76,7 @@ def pytest_collection_modifyitems(config, items):
     for item in items:
         if item.nodeid in QUARANTINED:
             item.add_marker(pytest.mark.skip(reason="隔离区：架构迁移后待更新"))
+
+
 
 

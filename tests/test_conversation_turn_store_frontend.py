@@ -39,7 +39,10 @@ class ConversationTurnStoreFrontendTests(unittest.TestCase):
 
     def test_run_canvas_no_longer_owns_realtime_think_or_tool_state(self):
         source = (FRONTEND / "run_canvas.js").read_text(encoding="utf-8")
-        for removed in ("var stream =", "pendingIndex", "runPushThink", "runPushTool", "runClearStream"):
+        # run_canvas 不再拥有流式状态（stream 变量、pending 索引、think/stream 推送）。
+        # runPushTool 保留为渲染回调——它只接收已构建好的 artifact view 并渲染，
+        # 不积累 streaming delta，不属于"拥有状态"。
+        for removed in ("var stream =", "pendingIndex", "runPushThink", "runClearStream"):
             with self.subTest(removed=removed):
                 self.assertNotIn(removed, source)
         self.assertIn("stepsHtml() + stepCardHtml()", source)

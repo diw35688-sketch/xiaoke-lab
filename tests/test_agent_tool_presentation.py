@@ -46,7 +46,13 @@ def _import_agent_core():
             ),
         ),
         "database.crud": _stub_module(
-            "database.crud", list_memories=lambda: []
+            "database.crud",
+            list_memories=lambda: [],
+            # harness_context 现在也从 database.crud 取最近消息
+            get_recent_messages=lambda *args, **kwargs: [],
+            # lab_tools_registry 还会取方案偏好
+            save_protocol_preference=lambda *args, **kwargs: None,
+            get_protocol_preference=lambda *args, **kwargs: None,
         ),
         "tools.calculator": _stub_module(
             "tools.calculator", calculate=lambda value: value
@@ -113,7 +119,8 @@ class AgentToolPresentationTests(unittest.TestCase):
 
         self.assertEqual(result, outcome["result"])
 
-    def test_run_agent_returns_copy_text_without_second_model_call(self):
+    def test_run_agent_uses_model_reply_after_tool_with_presentation(self):
+        """工具返回 presentation_plan 后，模型获得下一轮推理机会并给出最终回复。"""
         call = SimpleNamespace(
             id="tool-1",
             function=SimpleNamespace(
@@ -121,13 +128,17 @@ class AgentToolPresentationTests(unittest.TestCase):
                 arguments=json.dumps({"transcript": "加热到60摄氏度"}),
             ),
         )
-        response = SimpleNamespace(
-            choices=[SimpleNamespace(message=SimpleNamespace(tool_calls=[call]))]
+        tool_response = SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(tool_calls=[call], content=None))]
         )
+        final_response = SimpleNamespace(
+            choices=[SimpleNamespace(
+                message=SimpleNamespace(tool_calls=None, content="好的，已记录。")
+            )]
+        )
+        create_mock = Mock(side_effect=[tool_response, final_response])
         client = SimpleNamespace(
-            chat=SimpleNamespace(
-                completions=SimpleNamespace(create=Mock(return_value=response))
-            )
+            chat=SimpleNamespace(completions=SimpleNamespace(create=create_mock))
         )
         with patch.object(self.core, "_client", return_value=client), patch.object(
             self.core,
@@ -136,10 +147,12 @@ class AgentToolPresentationTests(unittest.TestCase):
         ):
             reply = self.core.run_agent([], "c-1")
 
-        self.assertEqual(reply, "小科：加热了多长时间？")
-        self.assertEqual(client.chat.completions.create.call_count, 1)
+        self.assertEqual(reply, "好的，已记录。")
+        self.assertEqual(create_mock.call_count, 2)
 
-    def test_stream_agent_yields_copy_text_and_stops_before_model_rewrite(self):
+    def test_stream_agent_yields_voice_batch_then_model_reply(self):
+        """流式：工具返回带语音的 presentation_plan → 中间轮推送 ToolVoiceDeliveryBatch →
+        模型下一轮给出最终文字回复。"""
         partial = SimpleNamespace(
             index=0,
             id="tool-1",
@@ -148,11 +161,15 @@ class AgentToolPresentationTests(unittest.TestCase):
                 arguments=json.dumps({"transcript": "加热到60摄氏度"}),
             ),
         )
-        delta = SimpleNamespace(
+        tool_delta = SimpleNamespace(
             content=None, reasoning_content=None, tool_calls=[partial]
         )
-        stream = [SimpleNamespace(choices=[SimpleNamespace(delta=delta)])]
-        create = Mock(return_value=stream)
+        tool_stream = [SimpleNamespace(choices=[SimpleNamespace(delta=tool_delta)])]
+        final_delta = SimpleNamespace(
+            content="好的，已记录。", reasoning_content=None, tool_calls=None
+        )
+        final_stream = [SimpleNamespace(choices=[SimpleNamespace(delta=final_delta)])]
+        create = Mock(side_effect=[tool_stream, final_stream])
         client = SimpleNamespace(
             chat=SimpleNamespace(completions=SimpleNamespace(create=create))
         )
@@ -165,14 +182,14 @@ class AgentToolPresentationTests(unittest.TestCase):
         ):
             chunks = list(self.core.stream_agent([], "c-1"))
 
-        self.assertIn("小科：加热了多长时间？", chunks)
+        self.assertIn("好的，已记录。", chunks)
         voice_batch = next(
             chunk for chunk in chunks
             if isinstance(chunk, ToolVoiceDeliveryBatch)
         )
         self.assertEqual(voice_batch.items[0].intent_id, "ask-1")
         self.assertEqual(voice_batch.items[0].voice_text, "加热了多长时间？")
-        self.assertEqual(create.call_count, 1)
+        self.assertEqual(create.call_count, 2)
 
     def test_run_agent_executes_all_same_turn_tools_before_replying(self):
         calls = [
@@ -187,13 +204,19 @@ class AgentToolPresentationTests(unittest.TestCase):
                 function=SimpleNamespace(name="get_current_time", arguments="{}"),
             ),
         ]
-        response = SimpleNamespace(
-            choices=[SimpleNamespace(message=SimpleNamespace(tool_calls=calls))]
+        # 第一轮：模型要求调用两个工具；第二轮：模型看到结果后给出最终回复。
+        # （现在的 run_agent 会把工具结果回灌给模型继续推理，不再一轮就返回。）
+        tool_response = SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(tool_calls=calls, content=None))]
         )
+        final_response = SimpleNamespace(
+            choices=[SimpleNamespace(
+                message=SimpleNamespace(tool_calls=None, content="已记录，请继续。")
+            )]
+        )
+        create_mock = Mock(side_effect=[tool_response, final_response])
         client = SimpleNamespace(
-            chat=SimpleNamespace(
-                completions=SimpleNamespace(create=Mock(return_value=response))
-            )
+            chat=SimpleNamespace(completions=SimpleNamespace(create=create_mock))
         )
         executed = []
 
@@ -206,11 +229,14 @@ class AgentToolPresentationTests(unittest.TestCase):
         ):
             reply = self.core.run_agent([], "c-1")
 
+        # 同一轮的两个工具都执行完，才进入下一轮
         self.assertEqual(executed, ["record_observation", "get_current_time"])
-        self.assertEqual(reply, "小科：加热了多长时间？")
-        self.assertEqual(client.chat.completions.create.call_count, 1)
+        self.assertEqual(reply, "已记录，请继续。")
+        self.assertEqual(create_mock.call_count, 2)
 
     def test_stream_agent_does_not_emit_empty_voice_delivery(self):
+        """静默 plan（无 voice_items）→ 中间轮不推送 ToolVoiceDeliveryBatch；
+        模型下一轮给出最终文字。"""
         partial = SimpleNamespace(
             index=0,
             id="tool-1",
@@ -218,19 +244,18 @@ class AgentToolPresentationTests(unittest.TestCase):
                 name="record_observation", arguments='{"transcript":"记录"}'
             ),
         )
-        delta = SimpleNamespace(
+        tool_delta = SimpleNamespace(
             content=None, reasoning_content=None, tool_calls=[partial]
         )
+        tool_stream = [SimpleNamespace(choices=[SimpleNamespace(delta=tool_delta)])]
+        final_delta = SimpleNamespace(
+            content="已记录。", reasoning_content=None, tool_calls=None
+        )
+        final_stream = [SimpleNamespace(choices=[SimpleNamespace(delta=final_delta)])]
         client = SimpleNamespace(
             chat=SimpleNamespace(
                 completions=SimpleNamespace(
-                    create=Mock(
-                        return_value=[
-                            SimpleNamespace(
-                                choices=[SimpleNamespace(delta=delta)]
-                            )
-                        ]
-                    )
+                    create=Mock(side_effect=[tool_stream, final_stream])
                 )
             )
         )
@@ -243,7 +268,7 @@ class AgentToolPresentationTests(unittest.TestCase):
         ):
             chunks = list(self.core.stream_agent([], "c-1"))
 
-        self.assertIn("本段结构化处理失败，原始记录已保存。", chunks)
+        self.assertIn("已记录。", chunks)
         self.assertFalse(
             any(isinstance(chunk, ToolVoiceDeliveryBatch) for chunk in chunks)
         )
